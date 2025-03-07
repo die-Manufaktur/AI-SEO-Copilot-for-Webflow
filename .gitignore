@@ -1,0 +1,16 @@
+# Dependencies
+node_modules
+
+# Production
+/public
+
+# Misc
+.DS_Store
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Caches
+.eslintcache
