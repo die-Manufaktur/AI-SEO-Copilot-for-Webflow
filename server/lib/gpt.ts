@@ -1,4 +1,8 @@
 import OpenAI from "openai";
+import dotenv from "dotenv";
+
+// Load environment variables from .env file
+dotenv.config({ path: '.env' });
 
 // Use an environment variable to enable/disable GPT recommendations
 const useGPT = process.env.USE_GPT_RECOMMENDATIONS !== "false";
