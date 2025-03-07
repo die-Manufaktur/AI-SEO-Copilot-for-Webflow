@@ -1,7 +1,5 @@
 {
   "compilerOptions": {
-    "baseUrl": "./src",
-    "outDir": "public",
     "target": "es5",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
@@ -11,7 +9,7 @@
     "strict": true,
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
-    "typeRoots": ["./node_modules/@types", "./node_modules/@webflow"],
+    "typeRoots": ["./node_modules/@types", "./node_modules/@webflow", "./client/src/lib"],
     "module": "esnext",
     "moduleResolution": "node",
     "jsx": "react-jsx",
@@ -19,5 +17,5 @@
     "isolatedModules": true,
     "noEmit": true
   },
-  "include": ["src"]
+  "include": ["client/src", "server"]
 }
