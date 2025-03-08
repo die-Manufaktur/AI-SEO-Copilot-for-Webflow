@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -8,31 +8,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel } from "../components
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { ScrollArea } from "../components/ui/scroll-area";
-import { cva, type VariantProps } from "class-variance-authority"
-
-const buttonVariants = cva(
-  "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
-  {
-    variants: {
-      variant: {
-        default: "bg-primary text-primary-foreground shadow hover:bg-primary/90",
-        outline: "border border-input bg-transparent hover:bg-accent hover:text-accent-foreground",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-      },
-      size: {
-        default: "h-9 px-4 py-2",
-        sm: "h-8 rounded-md px-3 text-xs",
-        lg: "h-10 rounded-md px-8",
-        icon: "h-9 w-9",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-      size: "default",
-    },
-  }
-)
-
 import {
   Loader2,
   CheckCircle,
@@ -55,9 +30,6 @@ import { useToast } from "../hooks/use-toast";
 import { analyzeSEO } from "../lib/api";
 import type { SEOAnalysisResult, SEOCheck } from "../lib/types";
 import { ProgressCircle } from "../components/ui/progress-circle";
-
-export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-VariantProps<typeof buttonVariants> { asChild?: boolean }
 
 const formSchema = z.object({
   keyphrase: z.string().min(2, "Keyphrase must be at least 2 characters")
@@ -266,10 +238,12 @@ export default function Home() {
   const mutation = useMutation({
     mutationFn: analyzeSEO,
     onSuccess: (data) => {
+      console.log("Received analysis results:", data);
       setResults(data);
       setSelectedCategory(null); // Reset selected category on new analysis
     },
     onError: (error) => {
+      console.error("Error analyzing SEO:", error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -313,17 +287,62 @@ export default function Home() {
     });
   };
 
-  // Determine the URL programmatically
-  const isStaging = window.location.hostname.endsWith('.webflow.io');
-  const stagingUrl = isStaging ? window.location.href : null;
+  type SiteInfo = {
+    siteId: string;
+    siteName: string;
+    shortName: string;
+    domains: { url: string; default: boolean }[];
+  };
+  
+  const getSiteInfo = async (): Promise<SiteInfo | null> => {
+    try {
+      const siteInfo = await webflow.getSiteInfo();
+      console.log("Received site info:", siteInfo);
+      return siteInfo as SiteInfo;
+    } catch (error) {
+      console.error(`Error getting site info: ${error}`);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Error getting site info"
+      });
+      return null;
+    }
+  };
 
-  const isProduction = !window.location.hostname.endsWith('.webflow.io');
-  const productionUrl = isProduction ? window.location.href : null;
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    console.log("Form submitted with values:", values);
+    const siteInfo = await getSiteInfo();
+    if (!siteInfo || !siteInfo.domains || siteInfo.domains.length === 0) {
+      console.error("No domains found in site info");
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No domains found in site info"
+      });
+      return;
+    }
 
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
-    // Determine the URL programmatically
-    const url = productionUrl ?? stagingUrl;
+    let url = "";
+    if (siteInfo.domains.length === 1) {
+      url = siteInfo.domains[0].url;
+    } else {
+      const defaultDomain = siteInfo.domains.find(domain => domain.default);
+      if (defaultDomain) {
+        url = defaultDomain.url;
+      } else {
+        console.error("No default domain found in site info");
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "No default domain found in site info"
+        });
+        return;
+      }
+    }
+
     if (url) {
+      console.log("Sending request to /api/analyze with URL and keyphrase:", { url, keyphrase: values.keyphrase });
       mutation.mutate({ keyphrase: values.keyphrase, url });
     } else {
       toast({

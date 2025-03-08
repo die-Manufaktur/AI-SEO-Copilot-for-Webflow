@@ -1,3 +1,9 @@
+/* Tailwind CSS Directives */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom CSS */
 body {
   margin: 0;
   background: #333;

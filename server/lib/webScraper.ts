@@ -1,4 +1,4 @@
-import { load } from "cheerio";
+import { JSDOM } from "jsdom";
 
 interface ScrapedData {
   title: string;
@@ -57,46 +57,50 @@ async function getImageSize(imageUrl: string, baseUrl: URL): Promise<number | un
 }
 
 export async function scrapeWebpage(url: string): Promise<ScrapedData> {
+  // Add a default protocol if the URL does not have one
+  if (!url.startsWith("http://") && !url.startsWith("https://")) {
+    url = `http://${url}`;
+  }
+
   try {
     const response = await fetch(url);
     const html = await response.text();
-    const $ = load(html);
+    const dom = new JSDOM(html);
+    const document = dom.window.document;
 
     // Get base URL for resolving relative links
     const baseUrl = new URL(url);
 
     // Extract meta information
-    const title = $("title").text().trim();
-    const metaDescription = $('meta[name="description"]').attr("content") || "";
+    const title = document.querySelector("title")?.textContent?.trim() || "";
+    const metaDescription = document.querySelector('meta[name="description"]')?.getAttribute("content") || "";
 
     // Extract Open Graph metadata
     const ogMetadata = {
-      title: $('meta[property="og:title"]').attr("content") || "",
-      description: $('meta[property="og:description"]').attr("content") || "",
-      image: $('meta[property="og:image"]').attr("content") || "",
-      imageWidth: $('meta[property="og:image:width"]').attr("content") || "",
-      imageHeight: $('meta[property="og:image:height"]').attr("content") || ""
+      title: document.querySelector('meta[property="og:title"]')?.getAttribute("content") || "",
+      description: document.querySelector('meta[property="og:description"]')?.getAttribute("content") || "",
+      image: document.querySelector('meta[property="og:image"]')?.getAttribute("content") || "",
+      imageWidth: document.querySelector('meta[property="og:image:width"]')?.getAttribute("content") || "",
+      imageHeight: document.querySelector('meta[property="og:image:height"]')?.getAttribute("content") || ""
     };
 
     // Get all text content
-    const content = $("body").text().trim();
+    const content = document.body.textContent?.trim() || "";
 
     console.log("Scraping paragraphs...");
-    console.log("Total p tags found:", $("p").length);
+    console.log("Total p tags found:", document.querySelectorAll("p").length);
 
     // Get paragraphs with more detailed selector and logging
-    const allParagraphElements = $("article p, main p, .content p, #content p, .post-content p, p");
+    const allParagraphElements = document.querySelectorAll("article p, main p, .content p, #content p, .post-content p, p");
     console.log("Found elements with paragraph selectors:", allParagraphElements.length);
 
-    const paragraphs = allParagraphElements
-      .map((_: any, el: any) => {
-        const $el = $(el);
-        const text = $el.text().trim();
-        const parentClass = $el.parent().attr('class') || 'no-parent-class';
+    const paragraphs = Array.from(allParagraphElements)
+      .map((el: Element) => {
+        const text = el.textContent?.trim() || "";
+        const parentClass = el.parentElement?.getAttribute('class') || 'no-parent-class';
         console.log(`Paragraph found in ${parentClass}:`, text.substring(0, 100) + (text.length > 100 ? '...' : ''));
         return text;
       })
-      .get()
       .filter((text: string) => text.length > 0);
 
     console.log(`After filtering, found ${paragraphs.length} non-empty paragraphs`);
@@ -107,31 +111,28 @@ export async function scrapeWebpage(url: string): Promise<ScrapedData> {
     }
 
     // Get subheadings
-    const subheadings = $("h1, h2, h3, h4, h5, h6")
-      .map((_: any, el: any) => $(el).text().trim())
-      .get()
+    const subheadings = Array.from(document.querySelectorAll("h1, h2, h3, h4, h5, h6"))
+      .map((el: Element) => el.textContent?.trim() || "")
       .filter((text: string) => text.length > 0);
 
     // Get headings with their levels
-    const headings = $("h1, h2, h3, h4, h5, h6")
-      .map((_: any, el: any) => {
-        const tagName = $(el).prop('tagName').toLowerCase();
+    const headings = Array.from(document.querySelectorAll("h1, h2, h3, h4, h5, h6"))
+      .map((el: Element) => {
+        const tagName = el.tagName.toLowerCase();
         const level = parseInt(tagName.substring(1), 10); // Extract the number from "h1", "h2", etc.
         return {
           level,
-          text: $(el).text().trim()
+          text: el.textContent?.trim() || ""
         };
       })
-      .get()
       .filter((heading: { level: number; text: string }) => heading.text.length > 0);
 
     // Get images with alt text
-    const imageElements = $("img")
-      .map((_: any, el: any) => ({
-        src: $(el).attr("src") || "",
-        alt: $(el).attr("alt") || "",
-      }))
-      .get();
+    const imageElements = Array.from(document.querySelectorAll("img"))
+      .map((el: Element) => ({
+        src: el.getAttribute("src") || "",
+        alt: el.getAttribute("alt") || "",
+      }));
 
     // Get image sizes (in parallel)
     const images = await Promise.all(
@@ -150,8 +151,8 @@ export async function scrapeWebpage(url: string): Promise<ScrapedData> {
     const internalLinks: string[] = [];
     const outboundLinks: string[] = [];
 
-    $("a[href]").each((_: any, el: any) => {
-      const href = $(el).attr("href");
+    document.querySelectorAll("a[href]").forEach((el: Element) => {
+      const href = el.getAttribute("href");
       if (!href) return;
 
       try {
@@ -171,8 +172,8 @@ export async function scrapeWebpage(url: string): Promise<ScrapedData> {
     const cssResources: Array<{ url: string; content?: string; minified?: boolean }> = [];
 
     // Collect script sources
-    $("script[src]").each((_: any, el: any) => {
-      const src = $(el).attr("src");
+    document.querySelectorAll("script[src]").forEach((el: Element) => {
+      const src = el.getAttribute("src");
       if (src) {
         try {
           const fullUrl = new URL(src, baseUrl.origin).toString();
@@ -184,8 +185,8 @@ export async function scrapeWebpage(url: string): Promise<ScrapedData> {
     });
 
     // Collect stylesheet links
-    $("link[rel='stylesheet']").each((_: any, el: any) => {
-      const href = $(el).attr("href");
+    document.querySelectorAll("link[rel='stylesheet']").forEach((el: Element) => {
+      const href = el.getAttribute("href");
       if (href) {
         try {
           const fullUrl = new URL(href, baseUrl.origin).toString();
@@ -197,8 +198,8 @@ export async function scrapeWebpage(url: string): Promise<ScrapedData> {
     });
 
     // Also look for inline styles
-    $("style").each((_: any, el: any) => {
-      const content = $(el).html();
+    document.querySelectorAll("style").forEach((el: Element) => {
+      const content = el.textContent;
       if (content && content.trim()) {
         cssResources.push({ 
           url: 'inline-style',
@@ -209,8 +210,8 @@ export async function scrapeWebpage(url: string): Promise<ScrapedData> {
     });
 
     // Look for inline scripts
-    $("script:not([src])").each((_: any, el: any) => {
-      const content = $(el).html();
+    document.querySelectorAll("script:not([src])").forEach((el: Element) => {
+      const content = el.textContent;
       if (content && content.trim()) {
         jsResources.push({ 
           url: 'inline-script',
@@ -223,9 +224,9 @@ export async function scrapeWebpage(url: string): Promise<ScrapedData> {
     // Extract schema markup
     // 1. Look for JSON-LD
     const jsonLdBlocks: any[] = [];
-    $('script[type="application/ld+json"]').each((_: any, el: any) => {
+    document.querySelectorAll('script[type="application/ld+json"]').forEach((el: Element) => {
       try {
-        const jsonContent = $(el).html();
+        const jsonContent = el.textContent;
         if (jsonContent) {
           const parsed = JSON.parse(jsonContent);
           jsonLdBlocks.push(parsed);
@@ -237,8 +238,8 @@ export async function scrapeWebpage(url: string): Promise<ScrapedData> {
 
     // 2. Look for Microdata
     const microdataTypes: string[] = [];
-    $('[itemscope]').each((_: any, el: any) => {
-      const itemtype = $(el).attr('itemtype');
+    document.querySelectorAll('[itemscope]').forEach((el: Element) => {
+      const itemtype = el.getAttribute('itemtype');
       if (itemtype) {
         try {
           // Extract the schema type from the URL (e.g., http://schema.org/Product -> Product)
@@ -294,6 +295,7 @@ export async function scrapeWebpage(url: string): Promise<ScrapedData> {
       }
     };
   } catch (error: any) {
+    console.error("Failed to scrape webpage:", error);
     throw new Error(`Failed to scrape webpage: ${error.message}`);
   }
 }

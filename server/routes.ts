@@ -22,17 +22,23 @@ export function registerRoutes(app: Express) {
   }
 
   // SEO Analysis endpoint
-  app.post("/api/analyze", async (req, res) => {
+  app.post("/api/analyze", async (req: Request, res: Response) => {
+    console.log("Received POST request to /api/analyze");
+    console.log("Request body:", req.body);
+
     try {
       const { url, keyphrase } = req.body;
 
       if (!url || !keyphrase) {
+        console.log("Missing URL or keyphrase in request body");
         return res.status(400).json({ message: "URL and keyphrase are required" });
       }
 
       const results = await analyzeSEOElements(url, keyphrase);
+      console.log("Analysis results:", results);
       res.json(results);
     } catch (error: any) {
+      console.error("Error analyzing SEO elements:", error);
       res.status(500).json({ message: error.message });
     }
   });
