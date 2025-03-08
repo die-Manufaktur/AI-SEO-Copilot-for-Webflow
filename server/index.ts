@@ -2,8 +2,14 @@ import express, { type Request, Response, NextFunction } from "express";
 import { createServer } from "http";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import dotenv from "dotenv";
+import cors from "cors";
+
+// Load environment variables from .env file
+dotenv.config();
 
 const app = express();
+app.use(cors()); // Enable CORS
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
@@ -40,7 +46,7 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  const PORT = 5000;
+  const PORT = parseInt(process.env.PORT || "5000", 10);
   server.listen(PORT, "0.0.0.0", () => {
     log(`Server running on port ${PORT}`);
   });
