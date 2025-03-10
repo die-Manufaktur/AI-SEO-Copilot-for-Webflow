@@ -1,8 +1,21 @@
-# Webflow Designer Extension template with React + Vite
+# SEO Copilot <!-- Update the name here -->
 
-This template is based on the default template created by the `webflow-cli`, but extended and modified to host and bundle a React application using Vite.
+SEO Copilot is an advanced SEO analysis tool performing 11 comprehensive checks including title optimization, meta description analysis, content verification, keyword density, and image optimization. Get AI-powered recommendations for better rankings.
 
-See Webflow's [documentation](https://docs.developers.webflow.com/docs/how-do-apps-work-with-the-designer) for more information about Designer Extension APIs.
+## Features
+
+- Title Optimization
+- Meta Description Analysis
+- Content Verification
+- Keyword Density
+- Image Optimization
+- AI-Powered Recommendations
+
+## Installation
+
+```sh
+yarn install
+```
 
 ## Using this template
 
