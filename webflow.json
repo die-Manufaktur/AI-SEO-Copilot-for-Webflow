@@ -1,4 +1,10 @@
 {
   "apiVersion": "2",
-  "name": "SEO Copilot"
+  "name": "SEO Copilot",
+  "description": "Advanced SEO analysis tool with AI-powered recommendations.",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  }
 }
