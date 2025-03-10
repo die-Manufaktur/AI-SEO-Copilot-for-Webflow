@@ -11,7 +11,7 @@
     "noFallthroughCasesInSwitch": true,
     "typeRoots": ["./node_modules/@types", "./node_modules/@webflow", "./client/src/lib"],
     "module": "esnext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "jsx": "react-jsx",
     "resolveJsonModule": true,
     "isolatedModules": true,
