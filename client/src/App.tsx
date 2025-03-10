@@ -5,7 +5,7 @@ import Home from "./pages/Home";
 const App = () => {
   useEffect(() => {
     // Set the desired size for the extension UI
-    const newSize = {width: 1200, height: 800}; // You can change this to "default," "comfortable," or provide { width, height }
+    const newSize = {width: 1140, height: 760}; // You can change this to "default," "comfortable," or provide { width, height }
     // Set the Extension UI size
     webflow.setExtensionSize(newSize).catch((error) => {
       console.error("Error setting extension size:", error);
