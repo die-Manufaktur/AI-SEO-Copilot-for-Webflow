@@ -9,10 +9,6 @@ updates:
     directory: "/"  
     schedule:  
       interval: "daily"  
-    allow:  
-      - dependency-type: "production"  
-    commit-message:  
-      prefix: "chore(deps)"  
     labels:  
       - "dependencies"  
       - "automated"  
