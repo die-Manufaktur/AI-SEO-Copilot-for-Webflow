@@ -42,7 +42,7 @@
     "@tanstack/react-query": "^5.67.2",
     "@types/jsdom": "^21.1.7",
     "@vitejs/plugin-react": "^4.3.4",
-    "autoprefixer": "^10.4.20",
+    "autoprefixer": "^10.4.21",
     "cheerio": "^1.0.0",
     "class-variance-authority": "^0.7.1",
     "cors": "^2.8.5",
