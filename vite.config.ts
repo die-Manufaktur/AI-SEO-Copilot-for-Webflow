@@ -1,24 +1,28 @@
-import react from '@vitejs/plugin-react-swc'
-import { defineConfig } from 'vite'
-import svgrPlugin from 'vite-plugin-svgr'
-import viteTsconfigPaths from 'vite-tsconfig-paths'
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// https://vitejs.dev/config/
+// Get the directory name
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 export default defineConfig({
+  root: path.resolve(__dirname, 'client'), // Set the root directory to 'client'
+  plugins: [react()],
   build: {
-    minify: true,
-    watch: {
-      include: 'src/**',
-      exclude: 'node_modules/**, .git/**, dist/**, .vscode/**',
-    },
-    outDir: 'public',
-    copyPublicDir: false,
+    outDir: path.resolve(__dirname, 'public'), // Change output directory to 'public'
+    emptyOutDir: true, // Ensure the output directory is emptied before building
     rollupOptions: {
-      treeshake: true,
-      output: {
-        entryFileNames: `index.js`,
-      },
+      input: path.resolve(__dirname, 'client/index.html'), // Specify the entry point
     },
   },
-  plugins: [react(), viteTsconfigPaths(), svgrPlugin()],
-})
+  css: {
+    postcss: path.resolve(__dirname, 'postcss.config.js'),
+  },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, 'client/src'),
+    },
+  },
+});

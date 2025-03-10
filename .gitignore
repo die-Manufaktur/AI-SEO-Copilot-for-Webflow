@@ -14,3 +14,7 @@ yarn-error.log*
 
 # Caches
 .eslintcache
+
+# Environment
+.env
+server/.env
