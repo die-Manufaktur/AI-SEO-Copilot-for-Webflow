@@ -1,8 +1,7 @@
 import type { Config } from "tailwindcss";
 
 export default {
-  darkMode: ["class"],
-  purge: false, // Add this line to disable purging unused styles
+  darkMode: ["class", "[data-theme='dark']"],
   content: [
     "./client/index.html", // Include the index.html file
     "./client/src/**/*.{js,jsx,ts,tsx}", // Include all JS, JSX, TS, and TSX files in the src directory
@@ -77,5 +76,5 @@ export default {
       },
     },
   },
-  plugins: [require("tailwindcss-animate"), require("@tailwindcss/typography")],
+  plugins: [require("tailwindcss-animate"), require("@tailwindcss/typography"), require("@tailwindcss/postcss")],
 } satisfies Config;
