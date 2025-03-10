@@ -4,6 +4,11 @@ import dotenv from "dotenv";
 // Load environment variables from .env file
 dotenv.config({ path: '.env' });
 
+// Log the environment variables for debugging
+console.log("OPENAI_API_KEY:", process.env.OPENAI_API_KEY);
+console.log("USE_GPT_RECOMMENDATIONS:", process.env.USE_GPT_RECOMMENDATIONS);
+console.log("ENABLED_GPT_CHECKS:", process.env.ENABLED_GPT_CHECKS);
+
 // Use an environment variable to enable/disable GPT recommendations
 const useGPT = process.env.USE_GPT_RECOMMENDATIONS !== "false";
 
