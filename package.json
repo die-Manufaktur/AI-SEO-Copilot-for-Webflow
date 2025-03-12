@@ -75,7 +75,7 @@
     "framer-motion": "^12.4.11",
     "input-otp": "^1.4.2",
     "jsdom": "^26.0.0",
-    "openai": "^4.86.2",
+    "openai": "^4.87.3",
     "react": "^19.0.0",
     "react-day-picker": "^9.6.1",
     "react-dom": "^19.0.0",
