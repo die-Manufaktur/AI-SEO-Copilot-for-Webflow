@@ -18,3 +18,5 @@ yarn-error.log*
 # Environment
 .env
 server/.env
+
+bundle.dev
