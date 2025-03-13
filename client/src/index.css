@@ -36,7 +36,7 @@ body {
   color: var(--foreground);
 }
 
-form {
+/* form {
   position: absolute;
   top: 0;
   right: 0;
@@ -51,7 +51,7 @@ form {
   font-family: sans-serif;
   text-align: center;
   color: #fff;
-}
+} */
 
 button {
   color: #fff;
