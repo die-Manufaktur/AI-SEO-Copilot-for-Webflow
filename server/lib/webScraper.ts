@@ -88,27 +88,17 @@ export async function scrapeWebpage(url: string): Promise<ScrapedData> {
     const content = document.body.textContent?.trim() || "";
 
     console.log("Scraping paragraphs...");
-    console.log("Total p tags found:", document.querySelectorAll("p").length);
 
     // Get paragraphs with more detailed selector and logging
     const allParagraphElements = document.querySelectorAll("article p, main p, .content p, #content p, .post-content p, p");
-    console.log("Found elements with paragraph selectors:", allParagraphElements.length);
 
     const paragraphs = Array.from(allParagraphElements)
       .map((el: Element) => {
         const text = el.textContent?.trim() || "";
         const parentClass = el.parentElement?.getAttribute('class') || 'no-parent-class';
-        console.log(`Paragraph found in ${parentClass}:`, text.substring(0, 100) + (text.length > 100 ? '...' : ''));
         return text;
       })
       .filter((text: string) => text.length > 0);
-
-    console.log(`After filtering, found ${paragraphs.length} non-empty paragraphs`);
-    if (paragraphs.length > 0) {
-      console.log("First paragraph content:", paragraphs[0]);
-    } else {
-      console.log("No valid paragraphs found");
-    }
 
     // Get subheadings
     const subheadings = Array.from(document.querySelectorAll("h1, h2, h3, h4, h5, h6"))

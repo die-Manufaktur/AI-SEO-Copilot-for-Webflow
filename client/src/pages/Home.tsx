@@ -311,7 +311,6 @@ export default function Home() {
   };
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    console.log("Form submitted with values:", values);
     const siteInfo = await getSiteInfo();
     if (!siteInfo || !siteInfo.domains || siteInfo.domains.length === 0) {
       console.error("No domains found in site info");
@@ -342,7 +341,6 @@ export default function Home() {
     }
 
     if (url) {
-      console.log("Sending request to /api/analyze with URL and keyphrase:", { url, keyphrase: values.keyphrase });
       mutation.mutate({ keyphrase: values.keyphrase, url });
     } else {
       toast({

@@ -59,6 +59,18 @@ The above command does a few things:
 
 The command outputs the URL under which your extension is being served. Use this as the “Development URL” for your app in the Webflow Designer’s Apps panel. You can then launch the extension from the same place.
 
+You will need to create and populate the .env file in the root of the project. This should contain at least three key value pairs, consisting of the following keys:
+OPEN_AI_API_KEY - This should be the raw key for the OpenAI API.
+USE_GPT_RECOMMENDATIONS - True or false.
+ENABLED_GPT_CHECKS - Choose from the following list (comma-separated)
+Keyphrase in Title
+Keyphrase in Meta Description
+Keyphrase in Introduction
+Keyphrase in H1 Heading
+Keyphrase in H2 Headings
+
+Once the server is running, you must open the Webflow Designer, and then launch the app. The default is localhost:1337, but you can change the local URL.
+
 ## Deploying
 
 ```

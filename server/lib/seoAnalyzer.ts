@@ -285,10 +285,6 @@ export async function analyzeSEOElements(url: string, keyphrase: string) {
     let keyphraseInIntro = false;
     let introContext = "No introduction paragraph found";
 
-    console.log("Total paragraphs available:", scrapedData.paragraphs.length);
-    console.log("First paragraph content:", firstParagraph);
-    console.log("Keyphrase to check:", keyphrase);
-
     if (firstParagraph) {
       // Convert both strings to lowercase and remove extra whitespace
       const words = firstParagraph.toLowerCase().split(/\s+/);
@@ -297,9 +293,6 @@ export async function analyzeSEOElements(url: string, keyphrase: string) {
       // Check if all words from the keyphrase appear in sequence
       const normalizedParagraph = words.join(' ');
       const normalizedKeyphrase = keyphraseWords.join(' ');
-
-      console.log("Normalized paragraph:", normalizedParagraph);
-      console.log("Normalized keyphrase:", normalizedKeyphrase);
 
       // Check if the normalized keyphrase appears in the normalized paragraph
       keyphraseInIntro = normalizedParagraph.includes(normalizedKeyphrase);
@@ -450,10 +443,6 @@ export async function analyzeSEOElements(url: string, keyphrase: string) {
 
         // Consider it a pass if all important words are found
         h1HasKeyphrase = allWordsFound;
-
-        console.log("H1 tags:", h1Tags.map(h => h.text));
-        console.log("Keyphrase words:", keyphraseWords);
-        console.log("All words found in H1:", allWordsFound);
       }
     }
 
@@ -498,11 +487,6 @@ export async function analyzeSEOElements(url: string, keyphrase: string) {
 
         // Consider it a pass if either condition is met
         h2HasKeyphrase = allWordsFoundInAnyH2 || allWordsFoundAcrossH2s;
-
-        console.log("H2 tags:", h2Tags.map(h => h.text));
-        console.log("Keyphrase words:", keyphraseWords);
-        console.log("All words found in any H2:", allWordsFoundInAnyH2);
-        console.log("All words found across H2s:", allWordsFoundAcrossH2s);
       }
     }
 
