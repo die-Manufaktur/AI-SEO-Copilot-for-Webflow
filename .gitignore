@@ -19,4 +19,4 @@ yarn-error.log*
 .env
 server/.env
 
-bundle.dev
+bundle.zip
