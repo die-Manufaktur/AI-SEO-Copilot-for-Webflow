@@ -81,11 +81,11 @@
     "net": "^1.0.2",
     "openai": "^4.87.3",
     "react": "^19.0.0",
-    "react-day-picker": "^9.6.1",
+    "react-day-picker": "^9.6.2",
     "react-dom": "^19.0.0",
     "react-resizable-panels": "^2.1.7",
     "tailwind-merge": "^3.0.2",
-    "tailwindcss": "^4.0.13",
+    "tailwindcss": "^4.0.14",
     "vaul": "^1.1.2",
     "zod": "^3.24.2",
     "express-rate-limit": "^7.5.0"
