@@ -4,14 +4,28 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import dotenv from "dotenv";
 import cors from "cors";
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 // Load environment variables from .env file
 dotenv.config();
+
+// Define __dirname for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(cors()); // Enable CORS
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Set Permissions-Policy header to allow clipboard-write
+app.use((req, res, next) => {
+  res.setHeader('Permissions-Policy', 'clipboard-write=*, clipboard-read=*');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+  next();
+});
 
 // Simple request logging middleware
 app.use((req, res, next) => {
@@ -45,6 +59,8 @@ app.use((req, res, next) => {
   } else {
     serveStatic(app);
   }
+
+  app.use(express.static(path.join(__dirname, 'public')));
 
   const PORT = parseInt(process.env.PORT || "5000", 10);
   server.listen(PORT, "0.0.0.0", () => {
