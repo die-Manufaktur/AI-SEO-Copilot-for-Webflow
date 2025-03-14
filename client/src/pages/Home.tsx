@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -227,6 +227,29 @@ export default function Home() {
   const { toast } = useToast();
   const [results, setResults] = useState<SEOAnalysisResult | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [stagingName, setStagingName] = useState<string>(''); // Move this inside the component
+
+  // Move the event listener inside useEffect
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Ensure the message is coming from a trusted origin
+      if (event.origin !== 'http://localhost:1337' && event.origin !== `https://${stagingName}.webflow.io`) {
+        return;
+      }
+
+      if (event.data.name === 'copyToClipboard') {
+        const text = event.data.data;
+        navigator.clipboard.writeText(text).then(() => {
+          console.log('Text copied to clipboard');
+        }).catch(err => {
+          console.error('Failed to copy text to clipboard', err);
+        });
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [stagingName]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -252,7 +275,7 @@ export default function Home() {
     }
   });
 
-  const copyToClipboard = (text: string | undefined) => {
+  const copyCleanToClipboard = async (text: string | undefined) => {
     if (!text) return;
 
     // Extract just the text of the suggestion, not the explanation
@@ -280,11 +303,20 @@ export default function Home() {
     // Clean up any remaining quotes
     cleanText = cleanText.replace(/^"|"$/g, '');
 
-    navigator.clipboard.writeText(cleanText);
-    toast({
-      title: "Copied!",
-      description: "Recommendation copied to clipboard"
-    });
+    const success = await copyToClipboard(cleanText);
+    if (success) {
+      toast({
+        title: "Copied to clipboard!",
+        description: "You can now paste this into Webflow",
+        duration: 2000
+      });
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to copy recommendation to clipboard"
+      });
+    }
   };
 
   type SiteInfo = {
@@ -298,6 +330,9 @@ export default function Home() {
     try {
       const siteInfo = await webflow.getSiteInfo();
       console.log("Received site info:", siteInfo);
+      if (siteInfo?.shortName) {
+        setStagingName(siteInfo.shortName);
+      }
       return siteInfo as SiteInfo;
     } catch (error) {
       console.error(`Error getting site info: ${error}`);
@@ -563,7 +598,10 @@ export default function Home() {
                                           variant="outline"
                                           size="sm"
                                           className="flex items-center gap-2"
-                                          onClick={() => copyToClipboard(check.recommendation)}
+                                          onClick={async () => {
+                                            // Use copyCleanToClipboard instead of direct copyToClipboard
+                                            await copyCleanToClipboard(check.recommendation || '');
+                                          }}
                                         >
                                           <Copy className="h-4 w-4" />
                                           Copy
@@ -639,3 +677,46 @@ export default function Home() {
     </motion.div>
   );
 }
+
+// Move copyToClipboard function inside the component as well
+
+declare global {
+  interface Window {
+    webflow?: {
+      clipboard?: {
+        writeText: (text: string) => Promise<void>;
+      };
+    };
+  }
+}
+
+const copyToClipboard = async (text: string) => {
+  try {
+    // Try using Webflow's built-in clipboard method
+    if (window.webflow?.clipboard) {
+      await window.webflow.clipboard.writeText(text);
+      return true;
+    }
+    
+    // If Webflow's clipboard API is not available, try using the DOM method
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.opacity = '0';
+    document.body.appendChild(textArea);
+    
+    try {
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      return true;
+    } catch (err) {
+      console.error('DOM clipboard operation failed:', err);
+      document.body.removeChild(textArea);
+      return false;
+    }
+  } catch (error) {
+    console.error('Clipboard write failed:', error);
+    return false;
+  }
+};
