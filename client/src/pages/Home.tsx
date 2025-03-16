@@ -77,11 +77,11 @@ const shouldShowCopyButton = (checkTitle: string) => {
 const getPriorityIcon = (priority: string, className: string = "h-4 w-4") => {
   switch (priority) {
     case 'high':
-      return <AlertTriangle className={`${className} text-redText`} />;
+      return <AlertTriangle className={`${className} text-redText`} style={{color: 'var(--redText)', stroke: 'var(--redText)'}} />;
     case 'medium':
-      return <CircleAlert className={`${className} text-yellowText`} />;
+      return <CircleAlert className={`${className} text-yellowText`} style={{color: 'var(--yellowText)', stroke: 'var(--yellowText)'}} />;
     case 'low':
-      return <Info className={`${className} text-blueText`} />;
+      return <Info className={`${className} text-blueText`} style={{color: 'var(--blueText)', stroke: 'var(--blueText)'}} />;
     default:
       return null;
   }
@@ -174,13 +174,13 @@ const getCategoryStatus = (checks: SEOCheck[]) => {
 const getCategoryStatusIcon = (status: string) => {
   switch (status) {
     case "complete":
-      return <CheckCircle className="h-6 w-6 text-greenText" />;
+      return <CheckCircle className="h-6 w-6 text-greenText" style={{color: 'var(--greenText)', stroke: 'var(--greenText)'}} />;
     case "inprogress":
-      return <CircleAlert className="h-6 w-6 text-yellowText" />;
+      return <CircleAlert className="h-6 w-6 text-yellowText" style={{color: 'var(--yellowText)', stroke: 'var(--yellowText)'}} />;
     case "todo":
-      return <XCircle className="h-6 w-6 text-redText" />;
+      return <XCircle className="h-6 w-6 text-redText" style={{color: 'var(--redText)', stroke: 'var(--redText)'}} />;
     default:
-      return <Info className="h-6 w-6 text-blueText" />;
+      return <Info className="h-6 w-6 text-blueText" style={{color: 'var(--blueText)', stroke: 'var(--blueText)'}} />;
   }
 };
 
@@ -423,12 +423,12 @@ export default function Home() {
                     name="keyphrase"
                     render={({ field }) => (
                       <FormItem className="w-full">
-                        <FormLabel>Target keyphrase</FormLabel>
+                        <FormLabel className="mb-1">Target keyphrase</FormLabel>
                         <FormControl>
                           <motion.div
                             whileHover={{ scale: 1.01 }}
                             whileTap={{ scale: 0.99 }}
-                            className="w-full"
+                            className="w-full mt-2"
                           >
                             <Input
                               placeholder="Enter your target keyphrase"
@@ -544,9 +544,9 @@ export default function Home() {
                                     animate="animate"
                                   >
                                     {check.passed ? (
-                                      <CheckCircle className="h-5 w-5 text-greenText flex-shrink-0" />
+                                      <CheckCircle className="h-5 w-5 text-greenText flex-shrink-0" style={{color: 'var(--greenText)', stroke: 'var(--greenText)'}} />
                                     ) : (
-                                      <XCircle className="h-5 w-5 text-redText flex-shrink-0" />
+                                      <XCircle className="h-5 w-5 text-redText flex-shrink-0" style={{color: 'var(--redText)', stroke: 'var(--redText)'}} />
                                     )}
                                   </motion.div>
                                   {check.title}
@@ -656,8 +656,8 @@ export default function Home() {
                               {checks.map((check, idx) => (
                                 <div key={idx} className="flex items-center gap-1.5">
                                   {check.passed ? 
-                                    <CheckCircle className="h-4 w-4 text-greenText flex-shrink-0" /> : 
-                                    <XCircle className="h-4 w-4 text-redText flex-shrink-0" />
+                                    <CheckCircle className="h-4 w-4 text-greenText flex-shrink-0" style={{color: 'var(--greenText)', stroke: 'var(--greenText)'}} /> : 
+                                    <XCircle className="h-4 w-4 text-redText flex-shrink-0" style={{color: 'var(--redText)', stroke: 'var(--redText)'}} />
                                   }
                                   <span>{check.title}</span>
                                 </div>
@@ -686,7 +686,7 @@ declare global {
       clipboard?: {
         writeText: (text: string) => Promise<void>;
       };
-    };
+    }
   }
 }
 

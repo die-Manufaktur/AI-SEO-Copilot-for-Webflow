@@ -23,45 +23,57 @@
   * {
     border: var(--border);
   }
+  
+  /* Ensure SVGs inherit colors properly */
+  svg {
+    color: inherit;
+    stroke: currentColor;
+    fill: none;
+  }
+
+  /* Specific fix for Lucide icons */
+  svg.lucide {
+    stroke: currentColor;
+    color: inherit;
+    fill: none;
+  }
+
+  /* Override classes to ensure coloring works */
+  .text-greenText svg {
+    stroke: var(--greenText) !important;
+    color: var(--greenText) !important;
+  }
+
+  .text-redText svg {
+    stroke: var(--redText) !important;
+    color: var(--redText) !important;
+  }
+
+  .text-yellowText svg {
+    stroke: var(--yellowText) !important;
+    color: var(--yellowText) !important;
+  }
+
+  .text-blueText svg {
+    stroke: var(--blueText) !important;
+    color: var(--blueText) !important;
+  }
 }
 
 /* Custom CSS */
 body {
   margin: 0;
-  background: #333;
-  font-family: sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: var(--background);
   color: var(--foreground);
+  background-color: rgb(30 30 30);
 }
 
-/* form {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  padding: 16px;
-  font-family: sans-serif;
-  text-align: center;
-  color: #fff;
-} */
-
-button {
-  color: #fff;
-  background: #0073e6;
-  padding: 4px 8px;
-  border: 2px solid #0073e6;
-  border-radius: 4px;
+p, span {
+  color: var(--text2)
 }
 
-button:focus {
-  outline: none;
-  border-color: #1280ee;
+/* Add utility class for background2 */
+.bg-background2 {
+  background-color: var(--background2);
 }
