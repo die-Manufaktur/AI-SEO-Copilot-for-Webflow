@@ -27,7 +27,7 @@ import {
   TooltipTrigger,
 } from "../components/ui/tooltip";
 import { useToast } from "../hooks/use-toast";
-import { analyzeSEO } from "../lib/api";
+import { analyzeSEO, registerDomains } from "../lib/api";
 import type { SEOAnalysisResult, SEOCheck } from "../lib/types";
 import { ProgressCircle } from "../components/ui/progress-circle";
 
@@ -228,6 +228,8 @@ export default function Home() {
   const [results, setResults] = useState<SEOAnalysisResult | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [stagingName, setStagingName] = useState<string>(''); // Move this inside the component
+  const [currentUrl, setCurrentUrl] = useState<string>("");
+  const [urls, setUrls] = useState<string[]>([]);
 
   // Move the event listener inside useEffect
   useEffect(() => {
@@ -397,6 +399,61 @@ export default function Home() {
   // Calculate overall SEO score
   const seoScore = results ? calculateSEOScore(results.checks) : 0;
   const scoreRating = getScoreRatingText(seoScore);
+
+  // Function to extract domains from URLs and register them
+  const registerDetectedDomains = async (detectedUrls: string[]) => {
+    if (!detectedUrls || detectedUrls.length === 0) return;
+
+    try {
+      // Extract unique domains from the URLs
+      const domains = detectedUrls
+        .filter(Boolean)
+        .map(url => {
+          try {
+            // Handle URLs with or without protocol
+            const urlWithProtocol = url.startsWith('http') ? url : `https://${url}`;
+            const urlObj = new URL(urlWithProtocol);
+            return urlObj.hostname;
+          } catch (e) {
+            console.warn("Invalid URL format:", url);
+            return url; // Return original if parsing fails
+          }
+        })
+        .filter(Boolean);
+
+      if (domains.length > 0) {
+        console.log("Registering detected domains:", domains);
+        const result = await registerDomains(domains);
+        
+        if (result.success) {
+          console.log("Domains registered successfully");
+        } else {
+          console.warn("Failed to register some domains:", result.message);
+        }
+      }
+    } catch (error) {
+      console.error("Error registering domains:", error);
+    }
+  };
+
+  useEffect(() => {
+    // Get URLs from Webflow context
+    const getUrls = async () => {
+      try {
+        // ...existing URL fetching code...
+
+        // After setting the URLs, register their domains
+        if (detectedUrls && detectedUrls.length > 0) {
+          setUrls(detectedUrls);
+          await registerDetectedDomains(detectedUrls);
+        }
+      } catch (error) {
+        console.error("Error getting URLs:", error);
+      }
+    };
+
+    getUrls();
+  }, []);
 
   return (
     <motion.div
