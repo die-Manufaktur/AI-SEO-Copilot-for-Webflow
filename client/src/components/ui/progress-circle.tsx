@@ -1,109 +1,75 @@
-import { cn } from "../../lib/utils";
-import { cva } from "class-variance-authority";
-import { FC } from "react";
+import * as React from "react";
 
 interface ProgressCircleProps {
   value: number;
-  max?: number;
-  size?: number;
-  strokeWidth?: number;
-  showLabel?: boolean;
-  className?: string;
-  labelClassName?: string;
+  size: number;
+  strokeWidth: number;
   scoreText?: string;
 }
 
-const scoreColorVariants = cva("transition-colors duration-300", {
-  variants: {
-    scoreLevel: {
-      low: "stroke-redText",
-      medium: "stroke-yellowText",
-      high: "stroke-greenText",
-    },
-  },
-  defaultVariants: {
-    scoreLevel: "medium",
-  },
-});
-
-const textColorVariants = cva("transition-colors duration-300", {
-  variants: {
-    scoreLevel: {
-      low: "text-redText",
-      medium: "text-yellowText",
-      high: "text-greenText",
-    },
-  },
-  defaultVariants: {
-    scoreLevel: "medium",
-  },
-});
-
-export const ProgressCircle: FC<ProgressCircleProps> = ({
+export function ProgressCircle({
   value,
-  max = 100,
   size = 120,
-  strokeWidth = 8,
-  showLabel = true,
-  className,
-  labelClassName,
-  scoreText,
-}) => {
-  // Calculate percentage
-  const percentage = Math.min(100, Math.max(0, (value / max) * 100));
-  
-  // Define score level based on percentage
-  const scoreLevel = percentage < 50 ? "low" : percentage < 80 ? "medium" : "high";
-  
-  // SVG parameters
+  strokeWidth = 10,
+  scoreText = "Score",
+}: ProgressCircleProps) {
   const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (percentage / 100) * circumference;
+  const circumference = radius * 2 * Math.PI;
+  const strokeDashoffset = circumference - (value / 100) * circumference;
+  
+  // Get color based on score value
+  const getScoreColor = (score: number) => {
+    if (score >= 90) return "var(--greenText)"; // Green
+    if (score >= 70) return "var(--blueText)"; // Blue
+    if (score >= 50) return "var(--yellowText)"; // Yellow
+    return "var(--redText)"; // Red
+  };
+
+  // Get the score color once so we can use it for both the circle and text
+  const scoreColor = getScoreColor(value);
 
   return (
-    <div className={cn("relative inline-flex items-center justify-center", className)}>
-      <svg
-        width={size}
-        height={size}
-        viewBox={`0 0 ${size} ${size}`}
-        className="transform -rotate-90"
-      >
-        {/* Background circle */}
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          strokeWidth={strokeWidth}
-          className="stroke-background3"
-        />
-        
-        {/* Progress circle */}
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          strokeWidth={strokeWidth}
-          strokeDasharray={circumference}
-          strokeDashoffset={strokeDashoffset}
-          strokeLinecap="round"
-          className={scoreColorVariants({ scoreLevel })}
-        />
-      </svg>
-      
-      {showLabel && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className={cn("text-2xl font-bold", textColorVariants({ scoreLevel }), labelClassName)}>
-            {Math.round(percentage)}
+    <div className="inline-flex flex-col items-center justify-center">
+      <div className="relative inline-flex items-center justify-center">
+        <svg
+          width={size}
+          height={size}
+          viewBox={`0 0 ${size} ${size}`}
+          style={{ transform: "rotate(-90deg)" }}
+        >
+          {/* Background circle */}
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="transparent"
+            stroke="currentColor"
+            strokeWidth={strokeWidth}
+            strokeOpacity={0.1}
+          />
+          {/* Progress circle */}
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="transparent"
+            stroke={scoreColor}
+            strokeWidth={strokeWidth}
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            strokeLinecap="round"
+            style={{ transition: "stroke-dashoffset 1s ease-in-out" }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+          <span className="text-3xl font-bold" style={{ color: scoreColor }}>
+            {value}
           </span>
-          {scoreText && (
-            <span className="text-xs text-text2 mt-1">{scoreText}</span>
-          )}
+          <span className="text-xs text-muted-foreground mt-1">{scoreText}</span>
         </div>
-      )}
+      </div>
     </div>
   );
-};
+}
 
 export default ProgressCircle;
