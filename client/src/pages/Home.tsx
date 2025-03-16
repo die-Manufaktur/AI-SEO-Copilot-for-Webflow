@@ -521,7 +521,7 @@ export default function Home() {
                         variants={container}
                         initial="hidden"
                         animate="show"
-                        className="space-y-5 w-full"
+                        className="space-y-5 w-full pt-5"
                       >
                         {selectedCategoryChecks.map((check, index) => (
                           <motion.div
