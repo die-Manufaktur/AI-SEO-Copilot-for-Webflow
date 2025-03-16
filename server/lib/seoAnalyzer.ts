@@ -138,8 +138,15 @@ function formatBytes(bytes?: number): string {
 }
 
 export async function analyzeSEOElements(url: string, keyphrase: string) {
+  console.log(`[SEO Analyzer] Starting analysis for URL: ${url} with keyphrase: ${keyphrase}`);
+  const startTime = Date.now();
+  
   try {
+    console.log(`[SEO Analyzer] Scraping webpage...`);
+    const scrapingStartTime = Date.now();
     const scrapedData = await scrapeWebpage(url);
+    console.log(`[SEO Analyzer] Webpage scraped in ${Date.now() - scrapingStartTime}ms`);
+    
     const checks: SEOCheck[] = [];
     let passedChecks = 0;
     let failedChecks = 0;
@@ -764,18 +771,17 @@ Content type indicators:
       }
     }
 
+    console.log(`[SEO Analyzer] Analysis completed in ${Date.now() - startTime}ms`);
     return {
       checks,
       passedChecks,
-      failedChecks
+      failedChecks,
+      url,
+      score: Math.round((passedChecks / checks.length) * 100)
     };
   } catch (error) {
-    console.error("Error analyzing SEO elements:", error);
-    if (error instanceof Error) {
-      throw new Error(`Failed to analyze SEO elements: ${error.message}`);
-    } else {
-      throw new Error("Failed to analyze SEO elements: Unknown error");
-    }
+    console.error(`[SEO Analyzer] Error during analysis:`, error);
+    throw error; // Re-throw to be handled by the caller
   }
 }
 
