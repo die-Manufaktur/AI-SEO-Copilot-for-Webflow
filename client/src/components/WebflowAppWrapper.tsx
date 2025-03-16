@@ -50,7 +50,7 @@ const WebflowAppWrapper: React.FC<{children: React.ReactNode}> = ({ children }) 
         }
 
         /* Import fonts directly if needed */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        @import ('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         
         /* Target specific components that need fixing */
         .webflow-react-app-wrapper .progress-circle circle {
