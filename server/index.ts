@@ -15,15 +15,33 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-app.use(cors()); // Enable CORS
+
+// More flexible CORS configuration for public access
+app.use(cors({
+  // Allow requests from any origin for a public application
+  origin: true,
+  methods: ['GET', 'POST', 'OPTIONS'],
+  credentials: true,
+  maxAge: 86400, // 24 hours
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Set Permissions-Policy header to allow clipboard-write
+// Add security headers - balanced for public access
 app.use((req, res, next) => {
+  // Core security headers that don't restrict access
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  
+  // Set Permissions-Policy for clipboard access
   res.setHeader('Permissions-Policy', 'clipboard-write=*, clipboard-read=*');
-  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
-  res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+  
+  // More permissive headers for broader access
+  // Remove overly restrictive COOP/COEP headers that might block legitimate access
+  
   next();
 });
 
