@@ -358,8 +358,13 @@ function formatBytes(bytes) {
     return (bytes / 1048576).toFixed(1) + " MB";
 }
 async function analyzeSEOElements(url, keyphrase) {
+  console.log(`[SEO Analyzer] Starting analysis for URL: ${url} with keyphrase: ${keyphrase}`);
+  const startTime = Date.now();
   try {
+    console.log(`[SEO Analyzer] Scraping webpage...`);
+    const scrapingStartTime = Date.now();
     const scrapedData = await scrapeWebpage(url);
+    console.log(`[SEO Analyzer] Webpage scraped in ${Date.now() - scrapingStartTime}ms`);
     const checks = [];
     let passedChecks = 0;
     let failedChecks = 0;
@@ -819,18 +824,17 @@ You can further optimize your schema markup by ensuring all required properties 
         imageFileCheck.recommendation = fallbackRecommendations["Image File Size"]({ largeImages });
       }
     }
+    console.log(`[SEO Analyzer] Analysis completed in ${Date.now() - startTime}ms`);
     return {
       checks,
       passedChecks,
-      failedChecks
+      failedChecks,
+      url,
+      score: Math.round(passedChecks / checks.length * 100)
     };
   } catch (error) {
-    console.error("Error analyzing SEO elements:", error);
-    if (error instanceof Error) {
-      throw new Error(`Failed to analyze SEO elements: ${error.message}`);
-    } else {
-      throw new Error("Failed to analyze SEO elements: Unknown error");
-    }
+    console.error(`[SEO Analyzer] Error during analysis:`, error);
+    throw error;
   }
 }
 function generateSchemaMarkupRecommendation(scrapedData, url) {
@@ -867,10 +871,187 @@ function generateSchemaMarkupRecommendation(scrapedData, url) {
   return recommendation;
 }
 
-// server/routes.ts
-import { URL as URL2 } from "url";
-import dns from "dns";
+// server/lib/security.ts
+import * as ip from "ip";
 import IPCIDR from "ip-cidr";
+import { URL as URL2 } from "url";
+var ALLOWED_DOMAINS = [
+  "example.com",
+  "pull-list.net",
+  "*.pull-list.net",
+  "www.pmds.pull-list.net",
+  "pmds.pull-list.net"
+];
+var ENFORCE_ALLOWLIST = process.env.ENFORCE_DOMAIN_ALLOWLIST !== "false";
+function addDomainToAllowlist(domain) {
+  domain = domain.toLowerCase().trim();
+  if (ALLOWED_DOMAINS.includes(domain)) {
+    console.log(`Domain already in allowlist: ${domain}`);
+    return false;
+  }
+  ALLOWED_DOMAINS.push(domain);
+  console.log(`Added ${domain} to allowlist. Current list has ${ALLOWED_DOMAINS.length} domains.`);
+  return true;
+}
+function getAllowedDomains() {
+  return [...ALLOWED_DOMAINS];
+}
+function isIPv4Format(address) {
+  const ipv4Regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+  if (!ipv4Regex.test(address))
+    return false;
+  const octets = address.split(".").map(Number);
+  return octets.every((octet) => octet >= 0 && octet <= 255);
+}
+function isIPv6Format(address) {
+  const ipv6Regex = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/;
+  return ipv6Regex.test(address);
+}
+function isValidUrl(urlString) {
+  try {
+    if (!/^https?:\/\//i.test(urlString)) {
+      urlString = "https://" + urlString;
+    } else if (/^http:\/\//i.test(urlString)) {
+      urlString = urlString.replace(/^http:/i, "https:");
+    }
+    const url = new URL2(urlString);
+    if (url.protocol !== "https:") {
+      console.log(`Rejected non-HTTPS URL: ${urlString}`);
+      return false;
+    }
+    if (ENFORCE_ALLOWLIST && !isAllowedDomain(url.hostname)) {
+      console.warn(`Domain not in allowlist: ${url.hostname}`);
+      return false;
+    }
+    const pathname = url.pathname;
+    if (pathname.includes("../") || pathname.includes("/..")) {
+      console.warn(`Path traversal detected in URL path: ${pathname}`);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+function isAllowedDomain(domain) {
+  if (!ENFORCE_ALLOWLIST)
+    return true;
+  if (ALLOWED_DOMAINS.length === 0)
+    return true;
+  domain = domain.toLowerCase();
+  console.log(`Checking if domain '${domain}' is in allowlist:`, JSON.stringify(ALLOWED_DOMAINS));
+  if (ALLOWED_DOMAINS.includes(domain)) {
+    console.log(`Domain '${domain}' found in allowlist (exact match)`);
+    return true;
+  }
+  const matchedWildcard = ALLOWED_DOMAINS.find((allowedDomain) => {
+    if (allowedDomain.startsWith("*.")) {
+      const baseDomain = allowedDomain.substring(2);
+      const matches = domain.endsWith(baseDomain) && domain.length > baseDomain.length;
+      if (matches) {
+        console.log(`Domain '${domain}' matches wildcard '${allowedDomain}'`);
+      }
+      return matches;
+    }
+    return false;
+  });
+  return !!matchedWildcard;
+}
+function validateIPAddress(address) {
+  if (!address)
+    return false;
+  let normalizedAddr;
+  try {
+    if (isIPv4Format(address)) {
+      try {
+        const buffer = ip.toBuffer(address);
+        normalizedAddr = ip.toString(buffer);
+      } catch (e) {
+        normalizedAddr = address;
+      }
+    } else if (isIPv6Format(address)) {
+      normalizedAddr = address;
+    } else {
+      return false;
+    }
+  } catch (e) {
+    return false;
+  }
+  if (normalizedAddr === "127.0.0.1" || normalizedAddr.startsWith("127.") || normalizedAddr === "::1" || normalizedAddr.toLowerCase().includes("127.0.0.1") || normalizedAddr.toLowerCase().includes("::1")) {
+    return false;
+  }
+  const ipv4Pattern = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+  if (ipv4Pattern.test(normalizedAddr)) {
+    const matches = normalizedAddr.match(ipv4Pattern);
+    if (!matches)
+      return false;
+    const octets = matches.slice(1).map(Number);
+    if (octets[0] === 127)
+      return false;
+    if (octets[0] === 10 || octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31 || octets[0] === 192 && octets[1] === 168) {
+      return false;
+    }
+  }
+  try {
+    return ip.isPublic(normalizedAddr);
+  } catch (e) {
+    return !isPrivateIP(normalizedAddr);
+  }
+}
+function validateUrl(url) {
+  try {
+    console.log(`validateUrl - Checking URL: ${url}`);
+    const urlObj = new URL2(url);
+    const protocol = urlObj.protocol.toLowerCase();
+    console.log(`validateUrl - Protocol detected: ${protocol}`);
+    if (protocol !== "https:") {
+      console.log(`Rejected non-HTTPS URL in validateUrl: ${url}`);
+      return false;
+    }
+    const hostname = urlObj.hostname;
+    console.log(`validateUrl - Hostname: ${hostname}`);
+    if (ENFORCE_ALLOWLIST && !isAllowedDomain(hostname)) {
+      console.warn(`Domain not in allowlist: ${hostname}`);
+      return false;
+    }
+    console.log(`validateUrl - Domain allowlist check passed`);
+    if (isIPv4Format(hostname) || isIPv6Format(hostname)) {
+      console.log(`validateUrl - Hostname is an IP address: ${hostname}`);
+      const ipValid = validateIPAddress(hostname);
+      console.log(`validateUrl - IP validation result: ${ipValid}`);
+      return ipValid;
+    }
+    console.log(`validateUrl - Validation successful for: ${url}`);
+    return true;
+  } catch (e) {
+    console.error(`validateUrl - Error validating URL: ${e}`);
+    return false;
+  }
+}
+function isPrivateIP(ip2) {
+  const privateRanges = [
+    "10.0.0.0/8",
+    "172.16.0.0/12",
+    "192.168.0.0/16",
+    "127.0.0.0/8",
+    "169.254.0.0/16"
+  ];
+  return privateRanges.some((range) => {
+    try {
+      const cidr = new IPCIDR(range);
+      return cidr.contains(ip2);
+    } catch (error) {
+      console.error(`Error checking IP range ${range}:`, error);
+      return false;
+    }
+  });
+}
+
+// server/routes.ts
+import { URL as URL3 } from "url";
+import dns from "dns";
+import { promisify } from "util";
+var dnsLookup = promisify(dns.lookup);
 function registerRoutes(app2) {
   const useGPT2 = process.env.USE_GPT_RECOMMENDATIONS !== "false";
   const hasOpenAIKey = !!process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.startsWith("sk-");
@@ -878,64 +1059,136 @@ function registerRoutes(app2) {
     console.warn("[SEO Analyzer] WARNING: GPT recommendations are enabled but no valid OpenAI API key was provided. Will use fallback recommendations.");
   }
   const enabledChecks = process.env.ENABLED_GPT_CHECKS ? process.env.ENABLED_GPT_CHECKS.split(",") : ["Keyphrase in Title", "Keyphrase in Meta Description", "Keyphrase in Introduction", "Keyphrase in H1 Heading", "Keyphrase in H2 Headings"];
-  function isValidUrl(urlString) {
-    try {
-      if (!/^https?:\/\//i.test(urlString)) {
-        urlString = "http://" + urlString;
-      }
-      const url = new URL2(urlString);
-      return url.protocol === "http:" || url.protocol === "https:";
-    } catch (err) {
-      return false;
+  app2.post("/api/register-domains", async (req, res) => {
+    console.log("Received POST request to /api/register-domains");
+    const { domains } = req.body;
+    if (!domains || !Array.isArray(domains) || domains.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide an array of domains to register"
+      });
     }
-  }
-  function isPrivateIP(ip) {
-    const privateRanges = [
-      "10.0.0.0/8",
-      "172.16.0.0/12",
-      "192.168.0.0/16",
-      "127.0.0.0/8",
-      "169.254.0.0/16"
-    ];
-    return privateRanges.some((range) => {
-      const cidr = new IPCIDR(range);
-      return cidr.contains(ip);
-    });
-  }
+    try {
+      const registeredDomains = [];
+      const failedDomains = [];
+      for (const domainUrl of domains) {
+        try {
+          const url = new URL3(domainUrl.startsWith("http") ? domainUrl : `https://${domainUrl}`);
+          const domain = url.hostname;
+          console.log(`Registering domain: ${domain}`);
+          const added = addDomainToAllowlist(domain);
+          const wildcardAdded = addDomainToAllowlist(`*.${domain}`);
+          if (added || wildcardAdded) {
+            registeredDomains.push(domain);
+          } else {
+            console.log(`Domain already in allowlist: ${domain}`);
+          }
+        } catch (err) {
+          console.error(`Failed to process domain ${domainUrl}:`, err);
+          failedDomains.push(domainUrl);
+        }
+      }
+      return res.json({
+        success: true,
+        registered: registeredDomains,
+        failed: failedDomains,
+        message: `Successfully registered ${registeredDomains.length} domains. ${failedDomains.length > 0 ? `Failed to register ${failedDomains.length} domains.` : ""}`
+      });
+    } catch (error) {
+      console.error("Error registering domains:", error);
+      return res.status(500).json({
+        success: false,
+        message: error.message || "An error occurred while registering domains"
+      });
+    }
+  });
   app2.post("/api/analyze", async (req, res) => {
-    console.log("Received POST request to /api/analyze");
+    console.log("======= API ANALYZE REQUEST START =======");
+    console.log("Received POST request to /api/analyze at:", (/* @__PURE__ */ new Date()).toISOString());
+    console.log("Request body:", JSON.stringify(req.body));
     try {
       let { url, keyphrase } = req.body;
       if (!url || !keyphrase) {
         console.log("Missing URL or keyphrase in request body");
         return res.status(400).json({ message: "URL and keyphrase are required" });
       }
-      if (!isValidUrl(url)) {
-        console.log("Invalid URL format");
-        return res.status(400).json({ message: "Invalid URL format" });
-      }
+      console.log("Processing request for URL:", url, "with keyphrase:", keyphrase);
       if (!/^https?:\/\//i.test(url)) {
-        url = "http://" + url;
+        url = "https://" + url;
+        console.log("Added HTTPS protocol to URL:", url);
+      } else if (/^http:\/\//i.test(url)) {
+        url = url.replace(/^http:/i, "https:");
+        console.log("Converted HTTP to HTTPS:", url);
       }
-      dns.lookup(new URL2(url).hostname, (err, address) => {
-        if (err) {
-          console.error("DNS lookup error:", err);
-          return res.status(500).json({ message: "Failed to resolve hostname" });
+      try {
+        const parsedUrl2 = new URL3(url);
+        const domain = parsedUrl2.hostname;
+        console.log(`Auto-registering domain to allowlist: ${domain}`);
+        const domainAdded = addDomainToAllowlist(domain);
+        const wildcardAdded = addDomainToAllowlist(`*.${domain}`);
+        if (domainAdded || wildcardAdded) {
+          console.log(`Successfully added ${domain} to allowlist`);
+        } else {
+          console.log(`Domain ${domain} was already in allowlist`);
         }
-        if (isPrivateIP(address)) {
-          console.log("Private IP address detected");
-          return res.status(400).json({ message: "Requests to private IP addresses are not allowed" });
-        }
-        analyzeSEOElements(url, keyphrase).then((results) => {
-          res.json(results);
-        }).catch((error) => {
-          console.error("Error analyzing SEO elements:", error);
-          res.status(500).json({ message: error.message });
+        console.log("Current allowlist:", getAllowedDomains());
+      } catch (error) {
+        console.error("Error auto-registering domain:", error);
+      }
+      console.log("Validating URL format and allowlist...");
+      if (!isValidUrl(url)) {
+        console.log("Invalid or disallowed URL format:", url);
+        return res.status(400).json({
+          message: "Invalid URL format, non-HTTPS protocol, or domain not allowed"
         });
-      });
+      }
+      const parsedUrl = new URL3(url);
+      console.log("URL parsed successfully:", parsedUrl.toString());
+      try {
+        console.log("Resolving hostname to IP address:", parsedUrl.hostname);
+        const { address } = await dnsLookup(parsedUrl.hostname);
+        console.log("Hostname resolved to IP address:", address);
+        console.log("Checking if IP is private...");
+        if (isPrivateIP(address)) {
+          console.log("Private IP address detected:", address);
+          return res.status(400).json({
+            message: "Requests to private IP addresses are not allowed"
+          });
+        }
+        console.log("Performing final URL validation...");
+        if (!validateUrl(url)) {
+          console.log("URL failed security validation:", url);
+          return res.status(400).json({
+            message: "URL failed security validation"
+          });
+        }
+        console.log("Starting SEO analysis...");
+        const analysisStartTime = Date.now();
+        try {
+          const results = await analyzeSEOElements(url, keyphrase);
+          const analysisEndTime = Date.now();
+          console.log(`SEO analysis completed in ${analysisEndTime - analysisStartTime}ms`);
+          console.log("Analysis results:", JSON.stringify(results).substring(0, 200) + "...");
+          console.log("======= API ANALYZE REQUEST END =======");
+          return res.json(results);
+        } catch (analysisError) {
+          console.error("Error during SEO analysis:", analysisError);
+          console.log("======= API ANALYZE REQUEST END WITH ERROR =======");
+          return res.status(500).json({
+            message: "Error analyzing SEO elements: " + (analysisError.message || "Unknown error")
+          });
+        }
+      } catch (dnsError) {
+        console.error("DNS or validation error:", dnsError);
+        console.log("======= API ANALYZE REQUEST END WITH ERROR =======");
+        return res.status(500).json({
+          message: "Failed to resolve hostname or validate URL: " + (dnsError.message || "Unknown error")
+        });
+      }
     } catch (error) {
-      console.error("Error analyzing SEO elements:", error);
-      res.status(500).json({ message: error.message });
+      console.error("Unexpected error analyzing SEO elements:", error);
+      console.log("======= API ANALYZE REQUEST END WITH ERROR =======");
+      return res.status(500).json({ message: error.message || "Unknown error" });
     }
   });
   return app2;
