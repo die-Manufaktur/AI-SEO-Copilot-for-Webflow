@@ -1,11 +1,7 @@
 import React, { useEffect } from "react";
 
 export default function WebflowAppWrapper({ children }: { children: React.ReactNode }) {
-  console.log("WebflowAppWrapper rendering with children:", children ? "Has children" : "No children");
-  
   useEffect(() => {
-    console.log("WebflowAppWrapper useEffect running");
-    
     try {
       document.body.style.margin = '0';
       document.body.style.padding = '0';
@@ -23,7 +19,6 @@ export default function WebflowAppWrapper({ children }: { children: React.ReactN
     }
   }, []);
   
-  // Add more visibility to make sure wrapper is rendering properly
   return (
     <div 
       id="webflow-app-wrapper"
@@ -40,10 +35,7 @@ export default function WebflowAppWrapper({ children }: { children: React.ReactN
       }}
     >
       {children ? (
-        <>
-          {/* Ensure children are visible */}
-          {children}
-        </>
+        children
       ) : (
         <div style={{padding: "20px", color: "red", border: "1px solid red"}}>
           No children provided to WebflowAppWrapper
