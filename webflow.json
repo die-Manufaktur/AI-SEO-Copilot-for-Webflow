@@ -1,7 +1,7 @@
 {
   "$schema": "https://cdn.jsdelivr.net/gh/webflow/designer-extension-typings@latest/webflow.manifest.schema.json",
   "name": "SEO Copilot",
-  "version": "2.4.1-alpha",
+  "version": "2.4.2-alpha",
   "schema_version": "2.0.0",
   "web_accessible_resources": [
     {
@@ -13,7 +13,8 @@
     "clipboard-write": "Needed to help you copy SEO recommendations directly to your clipboard",
     "designer:siteInfo:read": "Needed to access information about your site",
     "hostPattern_WebflowSite": true,
-    "site:read": true
+    "site:read": true,
+    "externalApi:https://seo-copilot-api.paul-130.workers.dev": "Needed to connect to SEO analysis service"
   },
   "config_pages": [
     {

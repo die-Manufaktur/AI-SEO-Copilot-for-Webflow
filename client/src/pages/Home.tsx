@@ -27,7 +27,7 @@ import {
   TooltipTrigger,
 } from "../components/ui/tooltip";
 import { useToast } from "../hooks/use-toast";
-import { analyzeSEO, registerDomains } from "../lib/api";
+import { analyzeSEO, registerDomains, getApiBaseUrl } from "../lib/api";
 import type { SEOAnalysisResult, SEOCheck } from "../lib/types";
 import { ProgressCircle } from "../components/ui/progress-circle";
 import { getLearnMoreUrl } from "../lib/docs-links";
@@ -335,6 +335,10 @@ export default function Home() {
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
+      // Force a double-check of the API URL
+      const apiBaseUrl = getApiBaseUrl();
+      console.log("API base URL for request:", apiBaseUrl);
+
       const siteInfo = await getSiteInfo();
       if (!siteInfo || !siteInfo.domains || siteInfo.domains.length === 0) {
         console.error("No domains found in site info");
@@ -365,12 +369,38 @@ export default function Home() {
       }
   
       if (url) {
-        // Make sure URLs start with http:// or https://
+        // Make sure URLs start with https:// for production compatibility
         if (!url.startsWith('http://') && !url.startsWith('https://')) {
           url = 'https://' + url;
+        } else if (url.startsWith('http://')) {
+          url = url.replace(/^http:/, 'https:');
         }
         
-        mutation.mutate({ keyphrase: values.keyphrase, url });
+        // Add debugging message
+        console.log(`Using API base URL: ${getApiBaseUrl()}`);
+        
+        // Wrap in try-catch and provide useful error message
+        try {
+          // Force a direct request to the Worker to test connectivity
+          const testConnection = await fetch(`${apiBaseUrl}/api/analyze`, {
+            method: "HEAD"
+          }).catch(err => {
+            console.warn("Test connection to Worker failed:", err);
+            return null;
+          });
+          
+          console.log("Worker test connection result:", testConnection ? `${testConnection.status} ${testConnection.statusText}` : "Failed");
+          
+          // Proceed with the actual mutation
+          mutation.mutate({ keyphrase: values.keyphrase, url });
+        } catch (apiError) {
+          console.error("API request failed:", apiError);
+          toast({
+            variant: "destructive",
+            title: "Connection Error",
+            description: "Make sure the Cloudflare Worker is running with 'yarn dev:worker'"
+          });
+        }
       } else {
         toast({
           variant: "destructive",
