@@ -112,6 +112,9 @@ const groupChecksByCategory = (checks: SEOCheck[]) => {
     "Technical SEO": ["Code Minification", "Schema Markup"]
   };
 
+  // Add a debug log to see what checks are being processed
+  console.log("Checks to categorize:", checks.map(c => c.title));
+
   const grouped: Record<string, SEOCheck[]> = {};
 
   // Initialize all categories
@@ -119,15 +122,42 @@ const groupChecksByCategory = (checks: SEOCheck[]) => {
     grouped[category] = [];
   });
 
-  // Group checks by category
+  // Group checks by category with fuzzy matching
   checks.forEach(check => {
+    let foundCategory = false;
+    
     for (const [category, checkTitles] of Object.entries(categories)) {
+      // Try exact match first
       if (checkTitles.includes(check.title)) {
         grouped[category].push(check);
+        foundCategory = true;
         break;
       }
+      
+      // Try partial match if exact match fails
+      for (const title of checkTitles) {
+        if (check.title.includes(title) || title.includes(check.title)) {
+          grouped[category].push(check);
+          foundCategory = true;
+          console.log(`Categorized "${check.title}" as "${category}" through partial match with "${title}"`);
+          break;
+        }
+      }
+      
+      if (foundCategory) break;
+    }
+    
+    // If no category found, add to Technical SEO as a fallback
+    if (!foundCategory) {
+      console.log(`No category found for "${check.title}", adding to Technical SEO`);
+      grouped["Technical SEO"].push(check);
     }
   });
+
+  // Log the final categorization
+  console.log("Final categorization:", Object.entries(grouped).map(([cat, items]) => 
+    `${cat}: ${items.length} items (${items.map(i => i.title).join(', ')})`
+  ));
 
   return grouped;
 };
@@ -510,18 +540,6 @@ export default function Home() {
       className="min-h-screen bg-background p-4 md:p-6"
       style={{ color: "#FFFFFF" }} // Force white text for visibility
     >
-      {/* Add a visible debug message */}
-      <div style={{
-        padding: "10px", 
-        margin: "10px 0", 
-        backgroundColor: "#444", 
-        color: "#fff",
-        borderRadius: "4px",
-        fontWeight: "bold"
-      }}>
-        SEO Analysis Tool loaded successfully!
-      </div>
-      
       <div className="mx-auto w-full max-w-3xl space-y-6">
         <motion.div
           initial={{ y: -20, opacity: 0 }}
