@@ -30,6 +30,7 @@ import { useToast } from "../hooks/use-toast";
 import { analyzeSEO, registerDomains } from "../lib/api";
 import type { SEOAnalysisResult, SEOCheck } from "../lib/types";
 import { ProgressCircle } from "../components/ui/progress-circle";
+import { getLearnMoreUrl } from "../lib/docs-links";
 
 const formSchema = z.object({
   keyphrase: z.string().min(2, "Keyphrase must be at least 2 characters")
@@ -101,41 +102,13 @@ const getPriorityText = (priority: string) => {
   }
 };
 
-// Map check titles to documentation URLs
-const getLearnMoreUrl = (checkTitle: string): string => {
-  const baseUrl = "https://ai-seo-copilot.gitbook.io/ai-seo-copilot"; // Placeholder base URL
-
-  const checkUrls: Record<string, string> = {
-    "Keyphrase in Title": `${baseUrl}/seo-title-optimization`,
-    "Keyphrase in Meta Description": `${baseUrl}/meta-description-guide`,
-    "Keyphrase in URL": `${baseUrl}/url-optimization`,
-    "Content Length": `${baseUrl}/content-length-best-practices`,
-    "Keyphrase Density": `${baseUrl}/keyphrase-density-guide`,
-    "Keyphrase in Introduction": `${baseUrl}/introduction-optimization`,
-    "Image Alt Attributes": `${baseUrl}/image-alt-text-guide`,
-    "Internal Links": `${baseUrl}/internal-linking-strategy`,
-    "Outbound Links": `${baseUrl}/outbound-links-guide`,
-    "Next-Gen Image Formats": `${baseUrl}/next-gen-image-formats`,
-    "OG Image": `${baseUrl}/open-graph-image-optimization`,
-    "OG Title and Description": `${baseUrl}/open-graph-tags-guide`,
-    "Keyphrase in H1 Heading": `${baseUrl}/h1-heading-optimization`,
-    "Keyphrase in H2 Headings": `${baseUrl}/h2-heading-optimization`,
-    "Heading Hierarchy": `${baseUrl}/heading-hierarchy-guide`,
-    "Code Minification": `${baseUrl}/code-minification-guide`,
-    "Schema Markup": `${baseUrl}/schema-markup-guide`,
-    "Image File Size": `${baseUrl}/image-optimization-guide`,
-  };
-
-  return checkUrls[checkTitle] || `${baseUrl}/seo-optimization-guide`;
-};
-
 // Group checks by category
 const groupChecksByCategory = (checks: SEOCheck[]) => {
   const categories = {
-    "Meta SEO": ["Keyphrase in Title", "Keyphrase in Meta Description", "Keyphrase in URL", "OG Title and Description"],
-    "Content Optimisation": ["Keyphrase in H1 Heading", "Keyphrase in H2 Headings", "Heading Hierarchy", "Content Length", "Keyphrase Density", "Keyphrase in Introduction"],
+    "Meta SEO": ["Keyphrase in Title", "Keyphrase in Meta Description", "Keyphrase in URL", "Open Graph Title and Description"],
+    "Content Optimisation": ["Content Length on page", "Keyphrase Density", "Keyphrase in Introduction", "Keyphrase in H1 Heading", "Keyphrase in H2 Headings", "Heading Hierarchy"],
     "Links": ["Internal Links", "Outbound Links"],
-    "Images and Assets": ["Image Alt Attributes", "Next-Gen Image Formats", "OG Image", "Image File Size"],
+    "Images and Assets": ["Image Alt Attributes", "Next-Gen Image Formats", "OpenGraph Image", "Image File Size"],
     "Technical SEO": ["Code Minification", "Schema Markup"]
   };
 
@@ -440,8 +413,21 @@ export default function Home() {
     // Get URLs from Webflow context
     const getUrls = async () => {
       try {
-        // ...existing URL fetching code...
-
+        // Initialize detectedUrls as an empty array
+        const detectedUrls: string[] = [];
+        
+        // Try to get URL from Webflow context if available
+        if (window.webflow && typeof window.webflow.getSiteInfo === 'function') {
+          const siteInfo = await getSiteInfo();
+          if (siteInfo?.domains && siteInfo.domains.length > 0) {
+            siteInfo.domains.forEach(domain => {
+              if (domain.url) {
+                detectedUrls.push(domain.url);
+              }
+            });
+          }
+        }
+        
         // After setting the URLs, register their domains
         if (detectedUrls && detectedUrls.length > 0) {
           setUrls(detectedUrls);
