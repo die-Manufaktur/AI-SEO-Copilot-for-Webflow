@@ -27,15 +27,8 @@
         JavaScript is required to run this application. Please enable JavaScript in your browser.
       </p>
     </noscript>
-    <!-- Add diagnostic script -->
+    <!-- Remove diagnostic script and keep only error logging -->
     <script type="text/javascript">
-      console.log('HTML document loaded');
-      window.addEventListener('DOMContentLoaded', () => {
-        console.log('DOM content loaded');
-      });
-      window.addEventListener('load', () => {
-        console.log('All resources loaded');
-      });
       window.addEventListener('error', (e) => {
         console.error('Global error caught:', e.message, e.filename, e.lineno);
       });
