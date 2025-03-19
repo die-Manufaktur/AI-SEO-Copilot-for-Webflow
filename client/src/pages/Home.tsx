@@ -103,7 +103,7 @@ const getPriorityText = (priority: string) => {
 
 // Map check titles to documentation URLs
 const getLearnMoreUrl = (checkTitle: string): string => {
-  const baseUrl = "#"; // Placeholder base URL
+  const baseUrl = "https://ai-seo-copilot.gitbook.io/ai-seo-copilot"; // Placeholder base URL
 
   const checkUrls: Record<string, string> = {
     "Keyphrase in Title": `${baseUrl}/seo-title-optimization`,
