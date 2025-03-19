@@ -555,7 +555,7 @@ export default function Home() {
                       <div className="mt-2 text-center">
                         <p className="text-lg font-medium">{scoreRating}</p>
                         <p className="text-sm text-muted-foreground mt-1">
-                          {results.passedChecks} passed ✅ • {results.failedChecks} to improve ❌
+                          {results.passedChecks} passed <CheckCircle className="inline-block h-4 w-4 text-greenText" style={{color: 'var(--greenText)', stroke: 'var(--greenText)'}} /> • {results.failedChecks} to improve <XCircle className="inline-block h-4 w-4 text-redText" style={{color: 'var(--redText)', stroke: 'var(--redText)'}} />
                         </p>
                       </div>
                     </div>
@@ -566,7 +566,7 @@ export default function Home() {
                       animate={{ scale: 1 }}
                       className="text-sm text-muted-foreground text-center"
                     >
-                      {results.passedChecks} passes ✅ • {results.failedChecks} improvements needed ❌
+                      {results.passedChecks} passes <CheckCircle className="inline-block h-4 w-4 text-greenText" style={{color: 'var(--greenText)', stroke: 'var(--greenText)'}} /> • {results.failedChecks} improvements needed <XCircle className="inline-block h-4 w-4 text-redText" style={{color: 'var(--redText)', stroke: 'var(--redText)'}} />
                     </motion.div>
                   )}
                 </CardHeader>
