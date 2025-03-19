@@ -87,6 +87,15 @@ const checkPriorities: Record<string, 'high' | 'medium' | 'low'> = {
   "Image File Size": "medium" // Added new check with medium priority
 };
 
+// Define the same category mapping on the server side to ensure consistency
+const seoCategories = {
+  "Meta SEO": ["Keyphrase in Title", "Keyphrase in Meta Description", "Keyphrase in URL", "OG Title and Description"],
+  "Content Optimisation": ["Keyphrase in H1 Heading", "Keyphrase in H2 Headings", "Heading Hierarchy", "Content Length", "Keyphrase Density", "Keyphrase in Introduction"],
+  "Links": ["Internal Links", "Outbound Links"],
+  "Images and Assets": ["Image Alt Attributes", "Next-Gen Image Formats", "OG Image", "Image File Size"],
+  "Technical SEO": ["Code Minification", "Schema Markup"]
+};
+
 // Custom recommendation templates for non-GPT fallbacks
 const fallbackRecommendations: Record<string, (params: any) => string> = {
   "Keyphrase in Title": ({ keyphrase, title }) =>
@@ -444,12 +453,11 @@ export async function analyzeSEOElements(url: string, keyphrase: string) {
 
       if (keyphraseWords.length > 0) {
         // Check if all important words appear in the H1
-        const allWordsFound = keyphraseWords.every(word =>
-          h1Tags.some(heading => heading.text.toLowerCase().includes(word))
-        );
+        const normalizedParagraph = keyphraseWords.join(' ');
+        const normalizedKeyphrase = keyphraseWords.join(' ');
 
-        // Consider it a pass if all important words are found
-        h1HasKeyphrase = allWordsFound;
+        // Check if the normalized keyphrase appears in the normalized paragraph
+        h1HasKeyphrase = normalizedParagraph.includes(normalizedKeyphrase);
       }
     }
 

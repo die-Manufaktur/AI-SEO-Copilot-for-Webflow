@@ -581,10 +581,9 @@ Use tools like cwebp or online converters to optimize these images.`;
       console.log("H1 exact match failed, trying word-by-word matching...");
       const keyphraseWords = keyphrase.toLowerCase().split(/\s+/).filter((word) => word.length > 2);
       if (keyphraseWords.length > 0) {
-        const allWordsFound = keyphraseWords.every(
-          (word) => h1Tags.some((heading) => heading.text.toLowerCase().includes(word))
-        );
-        h1HasKeyphrase = allWordsFound;
+        const normalizedParagraph = keyphraseWords.join(" ");
+        const normalizedKeyphrase = keyphraseWords.join(" ");
+        h1HasKeyphrase = normalizedParagraph.includes(normalizedKeyphrase);
       }
     }
     const h1Context = h1Tags.length > 0 ? `H1 heading ${h1HasKeyphrase ? "(contains keyphrase)" : "(missing keyphrase)"}: ${h1Tags.map((h) => `"${h.text}"`).join(", ")}
@@ -1198,94 +1197,30 @@ function registerRoutes(app2) {
 import express from "express";
 import rateLimit from "express-rate-limit";
 import fs from "fs";
-import path2, { dirname } from "path";
-import { fileURLToPath as fileURLToPath2 } from "url";
-import { createServer as createViteServer, createLogger } from "vite";
-
-// vite.config.ts
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react-swc";
-import tsconfigPaths from "vite-tsconfig-paths";
-import svgr from "vite-plugin-svgr";
 import path from "path";
-import { fileURLToPath } from "url";
-var __filename = fileURLToPath(import.meta.url);
-var __dirname = path.dirname(__filename);
-var vite_config_default = defineConfig({
-  root: path.resolve(__dirname, "client"),
-  // Set the root directory to 'client'
-  plugins: [react(), tsconfigPaths(), svgr()],
-  build: {
-    outDir: "dist",
-    // Changed from 'public' to 'dist'
-    emptyOutDir: false,
-    rollupOptions: {
-      input: {
-        main: path.resolve(__dirname, "client/index.html")
-      },
-      output: {
-        entryFileNames: "assets/[name].[hash].js",
-        chunkFileNames: "assets/[name].[hash].js",
-        assetFileNames: "assets/[name].[hash].[ext]"
-      }
-    }
-  },
-  css: {
-    postcss: path.resolve(__dirname, "postcss.config.mjs")
-    // Update extension to .mjs
-  },
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "client/src")
-    }
-  },
-  server: {
-    port: 3e3,
-    open: false,
-    cors: {
-      // Allow any origin in development for testing from various domains
-      origin: "*",
-      methods: ["GET", "HEAD", "PUT", "POST", "DELETE", "PATCH", "OPTIONS"],
-      credentials: true
-    },
-    headers: {
-      // Core security headers that don't block legitimate access
-      "X-Content-Type-Options": "nosniff",
-      "X-Frame-Options": "SAMEORIGIN",
-      // More permissive CSP for development
-      "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' *; img-src 'self' data: *;"
-    }
-  },
-  publicDir: "static",
-  // Explicitly set this to a different directory
-  // Add watcher configuration to prevent excessive rebuilds
-  optimizeDeps: {
-    exclude: ["@tailwindcss/postcss"]
-    // Exclude problematic packages
-  },
-  // Configure file watching to be more efficient
-  watch: {
-    ignored: ["**/node_modules/**", "**/.git/**", "**/dist/**"]
-  }
-});
-
-// server/vite.ts
-var __filename2 = fileURLToPath2(import.meta.url);
-var __dirname2 = dirname(__filename2);
+import { createServer as createViteServer, createLogger } from "vite";
+var ROOT_DIR = process.cwd();
+var CLIENT_DIR = path.join(ROOT_DIR, "client");
+var PUBLIC_DIR = path.join(ROOT_DIR, "public");
 var viteLogger = createLogger();
-function log(message, source = "express") {
-  const formattedTime = (/* @__PURE__ */ new Date()).toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true
-  });
-  console.log(`${formattedTime} [${source}] ${message}`);
+function log(...args) {
+  console.log("\x1B[36m[server]\x1B[0m", ...args);
 }
 async function setupVite(app2, server) {
   const vite = await createViteServer({
-    ...vite_config_default,
-    configFile: false,
+    // Define config inline instead of importing it
+    plugins: [],
+    root: CLIENT_DIR,
+    // Remove the reference to viteConfig
+    server: {
+      middlewareMode: true,
+      hmr: { server }
+    },
+    appType: "spa",
+    build: {
+      outDir: "../public",
+      emptyOutDir: true
+    },
     customLogger: {
       ...viteLogger,
       error: (msg, options) => {
@@ -1302,12 +1237,7 @@ async function setupVite(app2, server) {
           process.exit(1);
         }
       }
-    },
-    server: {
-      middlewareMode: true,
-      hmr: { server }
-    },
-    appType: "custom"
+    }
   });
   const limiter = rateLimit({
     windowMs: 15 * 60 * 1e3,
@@ -1320,10 +1250,8 @@ async function setupVite(app2, server) {
   app2.use("*", async (req, res, next) => {
     const url = req.originalUrl;
     try {
-      const clientTemplate = path2.resolve(
-        __dirname2,
-        "..",
-        "client",
+      const clientTemplate = path.resolve(
+        CLIENT_DIR,
         "index.html"
       );
       const template = await fs.promises.readFile(clientTemplate, "utf-8");
@@ -1334,15 +1262,11 @@ async function setupVite(app2, server) {
       next(e);
     }
   });
+  log("Vite development server set up");
+  return vite;
 }
 function serveStatic(app2) {
-  const distPath = path2.resolve(__dirname2, "..", "public");
-  if (!fs.existsSync(distPath)) {
-    throw new Error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`
-    );
-  }
-  app2.use(express.static(distPath));
+  app2.use(express.static(PUBLIC_DIR));
   const staticLimiter = rateLimit({
     windowMs: 15 * 60 * 1e3,
     // 15 minutes
@@ -1350,21 +1274,19 @@ function serveStatic(app2) {
     // limit each IP to 100 requests per windowMs
   });
   app2.use("*", staticLimiter, (_req, res) => {
-    res.sendFile(path2.resolve(distPath, "index.html"));
+    res.sendFile(path.resolve(PUBLIC_DIR, "index.html"));
   });
+  log("Static files being served from:", PUBLIC_DIR);
 }
 
 // server/index.ts
 import dotenv2 from "dotenv";
 import cors from "cors";
-import path3 from "path";
-import { fileURLToPath as fileURLToPath3 } from "url";
+import path2 from "path";
 dotenv2.config();
-var __filename3 = fileURLToPath3(import.meta.url);
-var __dirname3 = path3.dirname(__filename3);
+var ROOT_DIR2 = process.cwd();
 var app = express2();
 app.use(cors({
-  // Allow requests from any origin for a public application
   origin: true,
   methods: ["GET", "POST", "OPTIONS"],
   credentials: true,
@@ -1377,18 +1299,15 @@ app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "SAMEORIGIN");
   res.setHeader("X-XSS-Protection", "1; mode=block");
-  res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
   res.setHeader("Permissions-Policy", "clipboard-write=*, clipboard-read=*");
   next();
 });
 app.use((req, res, next) => {
   const start = Date.now();
-  const path4 = req.path;
   res.on("finish", () => {
     const duration = Date.now() - start;
-    if (path4.startsWith("/api")) {
-      const logLine = `${req.method} ${path4} ${res.statusCode} in ${duration}ms`;
-      log(logLine);
+    if (req.path.startsWith("/api")) {
+      log(`${req.method} ${req.path} ${res.statusCode} in ${duration}ms`);
     }
   });
   next();
@@ -1401,12 +1320,12 @@ app.use((req, res, next) => {
     const message = err.message || "Internal Server Error";
     res.status(status).json({ message });
   });
-  if (app.get("env") === "development") {
+  if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
-  app.use(express2.static(path3.join(__dirname3, "public")));
+  app.use(express2.static(path2.join(ROOT_DIR2, "public")));
   const PORT = parseInt(process.env.PORT || "5000", 10);
   server.listen(PORT, "0.0.0.0", () => {
     log(`Server running on port ${PORT}`);
