@@ -1,4 +1,3 @@
-import sanitizeHtml from 'sanitize-html';
 export {}; // Ensure this file is treated as a module
 
 // Define Cloudflare Workers types
@@ -275,15 +274,8 @@ async function scrapeWebpage(url: string): Promise<any> {
       }
     }
     
-    // Extract inline scripts
-    const sanitizedContent = sanitizeHtml(bodyContent, {
-      allowedTags: ['script'],
-      allowedAttributes: {
-        script: ['src']
-      },
-      allowedSchemes: ['http', 'https']
-    });
-    const inlineScriptMatches = sanitizedContent.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi);
+    // Extract inline scripts - replace sanitizeHtml with manual extraction
+    const inlineScriptMatches = bodyContent.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi);
     for (const match of Array.from(inlineScriptMatches)) {
       const scriptContent = match[1]?.trim();
       if (scriptContent && scriptContent.length > 0) {
