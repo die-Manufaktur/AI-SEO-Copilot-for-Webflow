@@ -81,7 +81,7 @@
     "ip-cidr": "^4.0.2",
     "jsdom": "^26.0.0",
     "net": "^1.0.2",
-    "openai": "^4.87.3",
+    "openai": "^4.87.4",
     "react": "^19.0.0",
     "react-day-picker": "^9.6.2",
     "react-dom": "^19.0.0",
