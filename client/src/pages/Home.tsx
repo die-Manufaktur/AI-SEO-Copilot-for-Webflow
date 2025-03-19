@@ -197,6 +197,8 @@ const getScoreRatingText = (score: number): string => {
 };
 
 export default function Home() {
+  console.log("Home component rendering");
+  
   const { toast } = useToast();
   const [results, setResults] = useState<SEOAnalysisResult | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -225,6 +227,17 @@ export default function Home() {
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [stagingName]);
+
+  // Add direct DOM manipulation on first render to ensure visibility
+  useEffect(() => {
+    console.log("Home component mounted");
+    // Try to show a toast message to verify the component is working
+    toast({
+      title: "SEO Analyzer Ready",
+      description: "Enter your target keyphrase to begin analysis",
+      duration: 5000
+    });
+  }, []);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -321,42 +334,56 @@ export default function Home() {
   };
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    const siteInfo = await getSiteInfo();
-    if (!siteInfo || !siteInfo.domains || siteInfo.domains.length === 0) {
-      console.error("No domains found in site info");
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "No domains found in site info"
-      });
-      return;
-    }
-
-    let url = "";
-    if (siteInfo.domains.length === 1) {
-      url = siteInfo.domains[0].url;
-    } else {
-      const defaultDomain = siteInfo.domains.find(domain => domain.default);
-      if (defaultDomain) {
-        url = defaultDomain.url;
-      } else {
-        console.error("No default domain found in site info");
+    try {
+      const siteInfo = await getSiteInfo();
+      if (!siteInfo || !siteInfo.domains || siteInfo.domains.length === 0) {
+        console.error("No domains found in site info");
         toast({
           variant: "destructive",
           title: "Error",
-          description: "No default domain found in site info"
+          description: "No domains found in site info"
         });
         return;
       }
-    }
-
-    if (url) {
-      mutation.mutate({ keyphrase: values.keyphrase, url });
-    } else {
+  
+      let url = "";
+      if (siteInfo.domains.length === 1) {
+        url = siteInfo.domains[0].url;
+      } else {
+        const defaultDomain = siteInfo.domains.find(domain => domain.default);
+        if (defaultDomain) {
+          url = defaultDomain.url;
+        } else {
+          console.error("No default domain found in site info");
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "No default domain found in site info"
+          });
+          return;
+        }
+      }
+  
+      if (url) {
+        // Make sure URLs start with http:// or https://
+        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+          url = 'https://' + url;
+        }
+        
+        mutation.mutate({ keyphrase: values.keyphrase, url });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Unable to determine the URL"
+        });
+      }
+    } catch (error) {
+      console.error("Error submitting form:", error);
       toast({
-        variant: "destructive",
+        variant: "destructive", 
         title: "Error",
-        description: "Unable to determine the URL"
+        description: "Failed to analyze SEO. Please try again."
       });
     }
   };
@@ -396,12 +423,17 @@ export default function Home() {
 
       if (domains.length > 0) {
         console.log("Registering detected domains:", domains);
-        const result = await registerDomains(domains);
-        
-        if (result.success) {
-          console.log("Domains registered successfully");
-        } else {
-          console.warn("Failed to register some domains:", result.message);
+        try {
+          const result = await registerDomains(domains);
+          
+          if (result.success) {
+            console.log("Domains registered successfully");
+          } else {
+            console.warn("Failed to register some domains:", result.message);
+          }
+        } catch (err) {
+          // Don't block the app if domain registration fails (it will just use the API's default allowed domains)
+          console.warn("Domain registration failed, continuing with default allowed domains");
         }
       }
     } catch (error) {
@@ -446,7 +478,20 @@ export default function Home() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className="min-h-screen bg-background p-4 md:p-6"
+      style={{ color: "#FFFFFF" }} // Force white text for visibility
     >
+      {/* Add a visible debug message */}
+      <div style={{
+        padding: "10px", 
+        margin: "10px 0", 
+        backgroundColor: "#444", 
+        color: "#fff",
+        borderRadius: "4px",
+        fontWeight: "bold"
+      }}>
+        SEO Analysis Tool loaded successfully!
+      </div>
+      
       <div className="mx-auto w-full max-w-3xl space-y-6">
         <motion.div
           initial={{ y: -20, opacity: 0 }}
@@ -723,16 +768,7 @@ export default function Home() {
 
 // Move copyToClipboard function inside the component as well
 
-declare global {
-  interface Window {
-    webflow?: {
-      clipboard?: {
-        writeText: (text: string) => Promise<void>;
-      };
-    }
-  }
-}
-
+// Use the existing WebflowExtension type defined in global.d.ts
 const copyToClipboard = async (text: string) => {
   try {
     // Try using Webflow's built-in clipboard method
