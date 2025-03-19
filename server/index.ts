@@ -5,20 +5,17 @@ import { setupVite, serveStatic, log } from "./vite";
 import dotenv from "dotenv";
 import cors from "cors";
 import path from 'path';
-import { fileURLToPath } from 'url';
 
 // Load environment variables from .env file
 dotenv.config();
 
-// Define __dirname for ES modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Use process.cwd() for consistent directory resolution in all environments
+const ROOT_DIR = process.cwd();
 
 const app = express();
 
 // More flexible CORS configuration for public access
 app.use(cors({
-  // Allow requests from any origin for a public application
   origin: true,
   methods: ['GET', 'POST', 'OPTIONS'],
   credentials: true,
@@ -28,36 +25,24 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Add security headers - balanced for public access
+// Basic security headers
 app.use((req, res, next) => {
-  // Core security headers that don't restrict access
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('X-XSS-Protection', '1; mode=block');
-  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-  
-  // Set Permissions-Policy for clipboard access
   res.setHeader('Permissions-Policy', 'clipboard-write=*, clipboard-read=*');
-  
-  // More permissive headers for broader access
-  // Remove overly restrictive COOP/COEP headers that might block legitimate access
-  
   next();
 });
 
-// Simple request logging middleware
+// Simple request logging
 app.use((req, res, next) => {
   const start = Date.now();
-  const path = req.path;
-
   res.on("finish", () => {
     const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      const logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      log(logLine);
+    if (req.path.startsWith("/api")) {
+      log(`${req.method} ${req.path} ${res.statusCode} in ${duration}ms`);
     }
   });
-
   next();
 });
 
@@ -72,13 +57,14 @@ app.use((req, res, next) => {
     res.status(status).json({ message });
   });
 
-  if (app.get("env") === "development") {
+  if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
 
-  app.use(express.static(path.join(__dirname, 'public')));
+  // Serve from the public directory
+  app.use(express.static(path.join(ROOT_DIR, 'public')));
 
   const PORT = parseInt(process.env.PORT || "5000", 10);
   server.listen(PORT, "0.0.0.0", () => {
