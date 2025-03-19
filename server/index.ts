@@ -46,9 +46,12 @@ app.use((req, res, next) => {
   next();
 });
 
+// Register API routes FIRST - before static serving
+// This ensures API routes work in both dev and production
+registerRoutes(app);
+
 (async () => {
   const server = createServer(app);
-  registerRoutes(app);
 
   // Global error handler
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -60,11 +63,20 @@ app.use((req, res, next) => {
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
   } else {
+    // Important: in production, serve static files AFTER registering API routes
     serveStatic(app);
   }
 
-  // Serve from the public directory
+  // Serve from the public directory for the bundled app
   app.use(express.static(path.join(ROOT_DIR, 'public')));
+
+  // Fall back to index.html for any unmatched routes (important for SPA)
+  app.get('*', (req, res) => {
+    // Skip API routes
+    if (req.path.startsWith('/api')) return;
+    
+    res.sendFile(path.join(ROOT_DIR, 'public', 'index.html'));
+  });
 
   const PORT = parseInt(process.env.PORT || "5000", 10);
   server.listen(PORT, "0.0.0.0", () => {

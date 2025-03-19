@@ -1,24 +1,44 @@
 import type { AnalyzeRequest, SEOAnalysisResult } from "./types";
 
-export async function analyzeSEO({ keyphrase, url }: { keyphrase: string; url: string }) {
-  console.log("Sending request to /api/analyze with data:", { keyphrase, url });
-  const response = await fetch("http://localhost:5000/api/analyze", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ keyphrase, url })
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    console.error("Error response from /api/analyze:", errorData);
-    throw new Error(errorData.message || "Failed to analyze SEO");
+// Helper function to determine the appropriate API URL based on environment
+const getApiBaseUrl = (): string => {
+  // In production (Webflow extension environment), use relative paths
+  if (process.env.NODE_ENV === 'production' || 
+      window.location.hostname.includes('webflow.io') ||
+      !window.location.hostname.includes('localhost')) {
+    return '';  // Use relative URLs in production
   }
+  
+  // In development, use localhost with the API port
+  return 'http://localhost:5000';
+};
 
-  const data = await response.json();
-  console.log("Received response from /api/analyze:", data);
-  return data;
+export async function analyzeSEO({ keyphrase, url }: { keyphrase: string; url: string }) {
+  const baseUrl = getApiBaseUrl();
+  console.log(`Sending request to ${baseUrl}/api/analyze with data:`, { keyphrase, url });
+  
+  try {
+    const response = await fetch(`${baseUrl}/api/analyze`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ keyphrase, url })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error("Error response from /api/analyze:", errorData);
+      throw new Error(errorData.message || "Failed to analyze SEO");
+    }
+
+    const data = await response.json();
+    console.log("Received response from /api/analyze:", data);
+    return data;
+  } catch (error) {
+    console.error("API request failed:", error);
+    throw new Error(error instanceof Error ? error.message : "Network error");
+  }
 }
 
 /**
@@ -27,9 +47,11 @@ export async function analyzeSEO({ keyphrase, url }: { keyphrase: string; url: s
  * @returns Response from server
  */
 export async function registerDomains(domains: string[]): Promise<{ success: boolean; message: string }> {
+  const baseUrl = getApiBaseUrl();
+  
   try {
-    console.log("Registering domains:", domains);
-    const response = await fetch("http://localhost:5000/api/register-domains", {
+    console.log(`Registering domains at ${baseUrl}/api/register-domains:`, domains);
+    const response = await fetch(`${baseUrl}/api/register-domains`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"

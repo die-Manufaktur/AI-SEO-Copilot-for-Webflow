@@ -20,8 +20,21 @@
     --blueText: #8AC2FF;
   }
 
+  /* Reset visibility and display properties */
+  html, body, #root, #webflow-app-wrapper {
+    width: 100%;
+    min-height: 100vh;
+    display: block !important;
+    visibility: visible !important;
+    overflow: auto;
+    margin: 0;
+    padding: 0;
+  }
+  
+  /* Force all text to be visible */
   * {
     border: var(--border);
+    color: var(--text1);
   }
   
   /* Ensure SVGs inherit colors properly */
@@ -66,14 +79,29 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color: var(--foreground);
-  background-color: rgb(30 30 30);
+  background-color: #1E1E1E;
+  overflow-x: hidden;
+  overflow-y: auto;
+  min-height: 100vh;
+  padding: 0;
 }
 
 p, span {
-  color: var(--text2)
+  color: var(--text2);
 }
 
 /* Add utility class for background2 */
 .bg-background2 {
   background-color: var(--background2);
+}
+
+/* Force visibility for critical containers */
+.card {
+  display: block !important;
+  visibility: visible !important;
+  background-color: var(--background2);
+  color: var(--text1);
+  padding: 1rem;
+  border-radius: 0.5rem;
+  margin-bottom: 1rem;
 }
