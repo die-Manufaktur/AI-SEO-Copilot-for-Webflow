@@ -3,6 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Ensure CSP meta tag appears only once, here in the head -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://*.webflow.io; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' http://localhost:* https://*.webflow.io; frame-ancestors 'self' https://*.webflow.io;">
+    <!-- Update permissions policy to allow clipboard -->
+    <meta http-equiv="Permissions-Policy" content="clipboard-write=*, clipboard-read=*">
     <title>SEO Analysis Tool</title>
     <meta name="description" content="Advanced SEO analysis tool performing 11 comprehensive checks including title optimization, meta description analysis, content verification, keyword density, and image optimization. Get AI-powered recommendations for better rankings." />
     <meta name="keywords" content="seo analysis, website optimization, keyword density, meta description analyzer, content optimization, image optimization, seo tools" />
@@ -13,10 +17,6 @@
     <meta name="twitter:title" content="SEO Copilot - Website Optimization" />
     <meta name="twitter:description" content="Get detailed SEO analysis and AI recommendations for your website optimization needs." />
     <meta name="robots" content="index, follow" />
-    <!-- Update permissions policy to allow clipboard -->
-    <meta http-equiv="Permissions-Policy" content="clipboard-write=*, clipboard-read=*">
-    <!-- Update CSP to allow clipboard operations -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://*.webflow.io; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https://*.webflow.io; frame-ancestors 'self' https://*.webflow.io;">
   </head>
   <body>
     <div id="root"></div>
