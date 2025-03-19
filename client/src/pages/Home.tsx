@@ -132,11 +132,11 @@ const getLearnMoreUrl = (checkTitle: string): string => {
 // Group checks by category
 const groupChecksByCategory = (checks: SEOCheck[]) => {
   const categories = {
-    "Page Settings": ["Keyphrase in Title", "Keyphrase in Meta Description", "Keyphrase in URL", "OG Title and Description"],
-    "Content": ["Keyphrase in H1 Heading", "Keyphrase in H2 Headings", "Heading Hierarchy", "Content Length", "Keyphrase Density", "Keyphrase in Introduction"],
+    "Meta SEO": ["Keyphrase in Title", "Keyphrase in Meta Description", "Keyphrase in URL", "OG Title and Description"],
+    "Content Optimisation": ["Keyphrase in H1 Heading", "Keyphrase in H2 Headings", "Heading Hierarchy", "Content Length", "Keyphrase Density", "Keyphrase in Introduction"],
     "Links": ["Internal Links", "Outbound Links"],
-    "Images": ["Image Alt Attributes", "Next-Gen Image Formats", "OG Image", "Image File Size"],
-    "Technical": ["Code Minification", "Schema Markup"]
+    "Images and Assets": ["Image Alt Attributes", "Next-Gen Image Formats", "OG Image", "Image File Size"],
+    "Technical SEO": ["Code Minification", "Schema Markup"]
   };
 
   const grouped: Record<string, SEOCheck[]> = {};
@@ -538,7 +538,7 @@ export default function Home() {
                         >
                           <ChevronLeft className="h-5 w-5" />
                         </Button>
-                        <CardTitle>{selectedCategory} SEO</CardTitle>
+                        <CardTitle>{selectedCategory}</CardTitle>
                       </div>
                     ) : (
                       <CardTitle className="text-center">Analysis Results</CardTitle>
@@ -701,7 +701,7 @@ export default function Home() {
                             onClick={() => setSelectedCategory(category)}
                           >
                             <div className="flex items-center justify-between mb-2">
-                              <h3 className="text-lg font-medium">{category} SEO</h3>
+                              <h3 className="text-lg font-medium">{category}</h3>
                               <div className="flex items-center gap-2">
                                 {getCategoryStatusIcon(status)}
                                 <span className="text-sm text-muted-foreground">

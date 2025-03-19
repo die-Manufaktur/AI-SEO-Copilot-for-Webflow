@@ -3,6 +3,7 @@ node_modules
 
 # Production
 /public
+/dist
 
 # Misc
 .DS_Store
