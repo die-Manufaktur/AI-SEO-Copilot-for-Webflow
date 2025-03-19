@@ -3,6 +3,10 @@
   "name": "SEO Copilot",
   "description": "Advanced SEO analysis tool with AI-powered recommendations.",
   "version": "1.0.0",
+  "size": {
+    "width": 1140,
+    "height": 760
+  },
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
