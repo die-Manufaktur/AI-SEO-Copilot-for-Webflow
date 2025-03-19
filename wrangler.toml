@@ -1,0 +1,38 @@
+name = "seo-copilot-api"
+main = "./workers/index.ts"
+compatibility_date = "2023-07-10"
+
+# Account configuration
+# Replace with your account ID or remove if using `wrangler login`
+# account_id = "your-account-id"
+
+# Production environment
+[env.production]
+workers_dev = true
+# If you have a custom domain:
+# route = { pattern = "api.yoursite.com/*", zone_id = "your-zone-id" }
+
+# Development environment
+[env.development]
+workers_dev = true
+# Used when running locally with `wrangler dev`
+
+# You can add secrets using:
+# wrangler secret put API_KEY -e production
+
+# Configure CORS for your Worker
+[vars]
+ALLOWED_ORIGINS = "https://webflow.com,https://*.webflow-ext.com,https://*.webflow.io"
+
+# Adjust limits if needed for processing larger pages
+[limits]
+memory_mb = 128
+timeout_ms = 30000
+cpu_ms = 50  # Added required CPU time limit
+
+# Configure logs if needed
+# [triggers]
+# crons = ["0 0 * * *"] # Add a cron trigger if needed
+
+# Use this for environments with 128MB+ memory to improve performance
+# node_compat = true

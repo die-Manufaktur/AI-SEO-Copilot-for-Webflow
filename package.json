@@ -11,7 +11,13 @@
     "check": "tsc",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:ui": "vitest --ui"
+    "test:ui": "vitest --ui",
+    "dev:worker": "npx wrangler dev workers/index.ts",
+    "deploy:worker": "npx wrangler deploy workers/index.ts",
+    "build:worker": "npx wrangler deploy workers/index.ts",
+    "build:all": "yarn build && yarn build:worker",
+    "start-dev": "concurrently \"yarn dev\" \"yarn dev:worker\"",
+    "test-worker": "tsx test-connection.ts"
   },
   "devDependencies": {
     "@testing-library/react": "^14.0.0",
@@ -40,7 +46,8 @@
     "vite-plugin-svgr": "^3.2.0",
     "vite-tsconfig-paths": "^4.2.0",
     "vitest": "0.34.6",
-    "webflow-cli": "^1.1.0"
+    "webflow-cli": "^1.1.0",
+    "wrangler": "^3.0.0"
   },
   "dependencies": {
     "@hookform/resolvers": "^4.1.3",
