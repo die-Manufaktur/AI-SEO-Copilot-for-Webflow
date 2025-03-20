@@ -10,13 +10,17 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20'
           cache: 'yarn'
-      - run: yarn install
-      - run: yarn add vitest
-      - run: yarn build:worker
-      - run: yarn start
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+      - name: Build and Deploy
+        run: |
+          yarn build:worker
+          yarn start
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
