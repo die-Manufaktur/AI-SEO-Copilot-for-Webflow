@@ -62,8 +62,7 @@ async function scrapeWebpage(url) {
     }));
     const images = await Promise.all(
       imageElements.map(async (img) => {
-        if (!img.src)
-          return img;
+        if (!img.src) return img;
         const size = await getImageSize(img.src, baseUrl);
         return {
           ...img,
@@ -75,8 +74,7 @@ async function scrapeWebpage(url) {
     const outboundLinks = [];
     document.querySelectorAll("a[href]").forEach((el) => {
       const href = el.getAttribute("href");
-      if (!href)
-        return;
+      if (!href) return;
       try {
         const linkUrl = new URL(href, baseUrl.origin);
         if (linkUrl.hostname === baseUrl.hostname) {
@@ -196,8 +194,7 @@ async function scrapeWebpage(url) {
   }
 }
 function isMinified(code) {
-  if (!code || code.length < 50)
-    return true;
+  if (!code || code.length < 50) return true;
   const newlineRatio = (code.match(/\n/g) || []).length / code.length;
   const whitespaceRatio = (code.match(/\s/g) || []).length / code.length;
   const lines = code.split("\n").filter((line) => line.trim().length > 0);
@@ -335,8 +332,7 @@ var fallbackRecommendations = {
   "Internal Links": () => `Add links to other relevant pages on your site to improve navigation and SEO.`,
   "Outbound Links": () => `Link to reputable external sources to increase your content's credibility.`,
   "Image File Size": ({ largeImages }) => {
-    if (largeImages.length === 0)
-      return "";
+    if (largeImages.length === 0) return "";
     const imageListText = largeImages.map((img) => {
       const imageLabel = img.alt ? img.alt.length > 40 ? img.alt.substring(0, 40) + "..." : img.alt : "Image with missing alt text";
       return `\u2022 ${imageLabel} (${formatBytes(img.size)})`;
@@ -348,14 +344,10 @@ Consider using tools like TinyPNG, Squoosh, or ImageOptim.`;
   }
 };
 function formatBytes(bytes) {
-  if (!bytes)
-    return "Unknown size";
-  if (bytes < 1024)
-    return bytes + " bytes";
-  else if (bytes < 1048576)
-    return (bytes / 1024).toFixed(1) + " KB";
-  else
-    return (bytes / 1048576).toFixed(1) + " MB";
+  if (!bytes) return "Unknown size";
+  if (bytes < 1024) return bytes + " bytes";
+  else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
+  else return (bytes / 1048576).toFixed(1) + " MB";
 }
 async function analyzeSEOElements(url, keyphrase) {
   console.log(`[SEO Analyzer] Starting analysis for URL: ${url} with keyphrase: ${keyphrase}`);
@@ -897,8 +889,7 @@ function getAllowedDomains() {
 }
 function isIPv4Format(address) {
   const ipv4Regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
-  if (!ipv4Regex.test(address))
-    return false;
+  if (!ipv4Regex.test(address)) return false;
   const octets = address.split(".").map(Number);
   return octets.every((octet) => octet >= 0 && octet <= 255);
 }
@@ -933,10 +924,8 @@ function isValidUrl(urlString) {
   }
 }
 function isAllowedDomain(domain) {
-  if (!ENFORCE_ALLOWLIST)
-    return true;
-  if (ALLOWED_DOMAINS.length === 0)
-    return true;
+  if (!ENFORCE_ALLOWLIST) return true;
+  if (ALLOWED_DOMAINS.length === 0) return true;
   domain = domain.toLowerCase();
   console.log(`Checking if domain '${domain}' is in allowlist:`, JSON.stringify(ALLOWED_DOMAINS));
   if (ALLOWED_DOMAINS.includes(domain)) {
@@ -957,8 +946,7 @@ function isAllowedDomain(domain) {
   return !!matchedWildcard;
 }
 function validateIPAddress(address) {
-  if (!address)
-    return false;
+  if (!address) return false;
   let normalizedAddr;
   try {
     if (isIPv4Format(address)) {
@@ -982,11 +970,9 @@ function validateIPAddress(address) {
   const ipv4Pattern = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
   if (ipv4Pattern.test(normalizedAddr)) {
     const matches = normalizedAddr.match(ipv4Pattern);
-    if (!matches)
-      return false;
+    if (!matches) return false;
     const octets = matches.slice(1).map(Number);
-    if (octets[0] === 127)
-      return false;
+    if (octets[0] === 127) return false;
     if (octets[0] === 10 || octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31 || octets[0] === 192 && octets[1] === 168) {
       return false;
     }
@@ -1327,8 +1313,7 @@ registerRoutes(app);
   }
   app.use(express2.static(path2.join(ROOT_DIR2, "public")));
   app.get("*", (req, res) => {
-    if (req.path.startsWith("/api"))
-      return;
+    if (req.path.startsWith("/api")) return;
     res.sendFile(path2.join(ROOT_DIR2, "public", "index.html"));
   });
   const PORT = parseInt(process.env.PORT || "5000", 10);

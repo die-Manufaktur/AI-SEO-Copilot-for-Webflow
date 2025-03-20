@@ -35,4 +35,5 @@ jobs:
           cache: 'yarn'
       - run: yarn install
       - run: yarn add vitest
+      - run: npm install -g @webflow/webflow-cli
       - run: yarn build
