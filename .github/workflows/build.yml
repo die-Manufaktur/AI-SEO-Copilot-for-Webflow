@@ -34,8 +34,3 @@ jobs:
           node-version: '20'
           cache: 'yarn'
       - run: yarn build
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: build
-          path: public/
