@@ -15,7 +15,9 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '20'
-          cache: 'npm'
+          cache: 'yarn'
+      - run: yarn install
+      - run: yarn add vitest
       - run: yarn test
       - run: yarn test-worker
         env:
