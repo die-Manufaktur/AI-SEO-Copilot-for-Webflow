@@ -46,7 +46,7 @@
     "vite-tsconfig-paths": "^4.2.0",
     "vitest": "0.34.6",
     "webflow-cli": "^1.1.0",
-    "wrangler": "^3.0.0"
+    "wrangler": "^4.1.0"
   },
   "dependencies": {
     "@hookform/resolvers": "^4.1.3",
