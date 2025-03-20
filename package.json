@@ -13,7 +13,6 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "dev:worker": "npx wrangler dev workers/index.ts",
-    "deploy:worker": "npx wrangler deploy workers/index.ts",
     "build:worker": "npx wrangler deploy workers/index.ts",
     "build:all": "yarn build && yarn build:worker",
     "start-dev": "concurrently \"yarn dev\" \"yarn dev:worker\"",
