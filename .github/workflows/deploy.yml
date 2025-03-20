@@ -17,5 +17,6 @@ jobs:
           node-version: '20'
           cache: 'yarn'
       - run: yarn install
+      - run: yarn add vitest
       - run: yarn build:worker
       - run: yarn start
