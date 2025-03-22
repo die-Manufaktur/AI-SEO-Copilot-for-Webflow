@@ -724,7 +724,7 @@ export default function Home() {
                                           {getPriorityIcon(check.priority)}
                                         </motion.div>
                                       </TooltipTrigger>
-                                      <TooltipContent>
+                                      <TooltipContent className="bg-background2">
                                         <p>SEO Impact: {getPriorityText(check.priority)}</p>
                                       </TooltipContent>
                                     </Tooltip>
