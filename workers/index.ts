@@ -1,3 +1,6 @@
+import OpenAI from 'openai';
+import { WebflowClient } from 'webflow-api';
+
 export {}; // Ensure this file is treated as a module
 
 // Define Cloudflare Workers types
@@ -53,6 +56,94 @@ const handleCors = (request: Request): Response | null => {
   
   return null;
 };
+
+// Helper function to fetch OAuth token
+async function fetchOAuthToken(code: string, env: any): Promise<string> {
+  const clientId = env.WEBFLOW_CLIENT_ID;
+  const clientSecret = env.WEBFLOW_CLIENT_SECRET;
+  const redirectUri = env.WEBFLOW_REDIRECT_URI;
+
+  const response = await fetch('https://api.webflow.com/oauth/access_token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      client_id: clientId,
+      client_secret: clientSecret,
+      code,
+      redirect_uri: redirectUri,
+      grant_type: 'authorization_code',
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch OAuth token: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return data.access_token;
+}
+
+// Endpoint to handle OAuth token exchange
+async function handleOAuthTokenExchange(request: Request, env: any): Promise<Response> {
+  try {
+    const { code } = await request.json();
+    if (!code) {
+      return new Response(JSON.stringify({ error: 'Missing authorization code' }), { status: 400 });
+    }
+
+    const token = await fetchOAuthToken(code, env);
+    return new Response(JSON.stringify({ token }), { status: 200 });
+  } catch (error) {
+    console.error('Error handling OAuth token exchange:', error);
+    return new Response(JSON.stringify({ error: 'Failed to exchange OAuth token' }), { status: 500 });
+  }
+}
+
+// Endpoint to create and redirect to the authorization link
+async function handleAuthRedirect(request: Request, env: any): Promise<Response> {
+  try {
+    const authorizeUrl = WebflowClient.authorizeURL({
+      state: env.STATE,
+      scope: 'sites:read',
+      clientId: env.WEBFLOW_CLIENT_ID,
+      redirectUri: env.WEBFLOW_REDIRECT_URI,
+    });
+    return Response.redirect(authorizeUrl, 302);
+  } catch (error) {
+    console.error('Error creating authorization link:', error);
+    return new Response(JSON.stringify({ error: 'Failed to create authorization link' }), { status: 500 });
+  }
+}
+
+// Endpoint to handle the callback from Webflow
+async function handleAuthCallback(request: Request, env: any): Promise<Response> {
+  try {
+    const url = new URL(request.url);
+    const code = url.searchParams.get('code');
+    const state = url.searchParams.get('state');
+
+    if (!code) {
+      return new Response(JSON.stringify({ error: 'Missing authorization code' }), { status: 400 });
+    }
+
+    if (state !== env.STATE) {
+      return new Response(JSON.stringify({ error: 'State does not match' }), { status: 400 });
+    }
+
+    // Exchange the authorization code for an access token
+    const token = await fetchOAuthToken(code, env);
+
+    // Cache the access token securely (e.g., using KV storage)
+    await env.TOKENS.put('user-access-token', token);
+
+    return new Response(JSON.stringify({ message: 'Authorization code received', token }), { status: 200 });
+  } catch (error) {
+    console.error('Error handling auth callback:', error);
+    return new Response(JSON.stringify({ error: 'Failed to handle auth callback' }), { status: 500 });
+  }
+}
 
 // =======================================
 // SEO ANALYSIS LOGIC
@@ -686,10 +777,10 @@ async function analyzeSEO(url: string, keyphrase: string): Promise<any> {
 // Worker event handler
 // @ts-ignore: Cloudflare Workers specific API
 addEventListener('fetch', (event: any) => {
-  event.respondWith(handleRequest(event.request));
+  event.respondWith(handleRequest(event.request, event.env));
 });
 
-async function handleRequest(request: Request): Promise<Response> {
+async function handleRequest(request: Request, env: any): Promise<Response> {
   const corsResponse = handleCors(request);
   if (corsResponse) return corsResponse;
   
@@ -705,6 +796,18 @@ async function handleRequest(request: Request): Promise<Response> {
   
   if (path === '/api/analyze' && request.method === 'HEAD') {
     return new Response(null, { status: 200, headers: corsHeaders });
+  }
+
+  if (path === '/api/oauth/callback' && request.method === 'POST') {
+    return handleOAuthTokenExchange(request, env);
+  }
+
+  if (path === '/api/auth' && request.method === 'GET') {
+    return handleAuthRedirect(request, env);
+  }
+
+  if (path === '/api/callback' && request.method === 'GET') {
+    return handleAuthCallback(request, env);
   }
   
   try {
@@ -725,7 +828,18 @@ async function handleRequest(request: Request): Promise<Response> {
       return new Response(JSON.stringify({ success: true, message: `Successfully registered ${domains.length} domains.` }), { status: 200, headers: corsHeaders });
     }
     else if (path === '/api/ping' && (request.method === 'GET' || request.method === 'HEAD')) {
-      return new Response(JSON.stringify({ status: 'ok', message: 'Worker is running', timestamp: new Date().toISOString() }), { status: 200, headers: corsHeaders });
+      const pingResponse = {
+        status: 'ok',
+        message: 'Worker is running',
+        timestamp: new Date().toISOString()
+      }
+      return new Response(JSON.stringify(pingResponse), { 
+        status: 200, 
+        headers: { 
+          ...corsHeaders,
+          'Cache-Control': 'public, max-age=60'  // Cache for 60 seconds 
+        } 
+      });
     }
     return new Response(JSON.stringify({ message: "Route not found", path }), { status: 404, headers: corsHeaders });
   } catch (error: any) {
@@ -733,3 +847,621 @@ async function handleRequest(request: Request): Promise<Response> {
     return new Response(JSON.stringify({ message: "Internal server error", error: error.message }), { status: 500, headers: corsHeaders });
   }
 }
+
+// ===== Begin Security Functions (moved from server\lib\security.ts) =====
+import * as ip from "ip";
+import IPCIDR from "ip-cidr";
+import { URL } from "url";
+
+let ALLOWED_DOMAINS = [
+  "example.com",
+  "pull-list.net",
+  "*.pull-list.net",
+  "www.pmds.pull-list.net",
+  "pmds.pull-list.net"
+];
+
+const ENFORCE_ALLOWLIST = process.env.ENFORCE_DOMAIN_ALLOWLIST !== 'false';
+
+export function addDomainToAllowlist(domain: string): boolean {
+  domain = domain.toLowerCase().trim();
+  if (ALLOWED_DOMAINS.includes(domain)) {
+    console.log(`Domain already in allowlist: ${domain}`);
+    return false;
+  }
+  ALLOWED_DOMAINS.push(domain);
+  console.log(`Added ${domain} to allowlist. Current list has ${ALLOWED_DOMAINS.length} domains.`);
+  return true;
+}
+
+export function getAllowedDomains(): string[] {
+  return [...ALLOWED_DOMAINS];
+}
+
+function isIPv4Format(address: string): boolean {
+  const ipv4Regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+  if (!ipv4Regex.test(address)) return false;
+  const octets = address.split('.').map(Number);
+  return octets.every(octet => octet >= 0 && octet <= 255);
+}
+
+function isIPv6Format(address: string): boolean {
+  const ipv6Regex = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/;
+  return ipv6Regex.test(address);
+}
+
+export function isValidUrl(urlString: string): boolean {
+  try {
+    if (!/^https?:\/\//i.test(urlString)) {
+      urlString = 'https://' + urlString;
+    } else if (/^http:\/\//i.test(urlString)) {
+      urlString = urlString.replace(/^http:/i, 'https:');
+    }
+    const url = new URL(urlString);
+    if (url.protocol !== 'https:') {
+      console.log(`Rejected non-HTTPS URL: ${urlString}`);
+      return false;
+    }
+    if (ENFORCE_ALLOWLIST && !isAllowedDomain(url.hostname)) {
+      console.warn(`Domain not in allowlist: ${url.hostname}`);
+      return false;
+    }
+    const pathname = url.pathname;
+    if (pathname.includes('../') || pathname.includes('/..')) {
+      console.warn(`Path traversal detected in URL path: ${pathname}`);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+export function isAllowedDomain(domain: string): boolean {
+  if (!ENFORCE_ALLOWLIST) return true;
+  if (ALLOWED_DOMAINS.length === 0) return true;
+  domain = domain.toLowerCase();
+  console.log(`Checking if domain '${domain}' is in allowlist:`, JSON.stringify(ALLOWED_DOMAINS));
+  if (ALLOWED_DOMAINS.includes(domain)) {
+    console.log(`Domain '${domain}' found in allowlist (exact match)`);
+    return true;
+  }
+  const matchedWildcard = ALLOWED_DOMAINS.find(allowedDomain => {
+    if (allowedDomain.startsWith('*.')) {
+      const baseDomain = allowedDomain.substring(2);
+      const matches = domain.endsWith(baseDomain) && domain.length > baseDomain.length;
+      if (matches) console.log(`Domain '${domain}' matches wildcard '${allowedDomain}'`);
+      return matches;
+    }
+    return false;
+  });
+  return !!matchedWildcard;
+}
+
+export function validateIPAddress(address: string): boolean {
+  if (!address) return false;
+  let normalizedAddr: string;
+  try {
+    if (isIPv4Format(address)) {
+      try {
+        const buffer = ip.toBuffer(address);
+        normalizedAddr = ip.toString(buffer);
+      } catch (e) {
+        normalizedAddr = address;
+      }
+    } else if (isIPv6Format(address)) {
+      normalizedAddr = address;
+    } else {
+      return false;
+    }
+  } catch (e) {
+    return false;
+  }
+  
+  if (
+    normalizedAddr === '127.0.0.1' || 
+    normalizedAddr.startsWith('127.') || 
+    normalizedAddr === '::1' ||
+    normalizedAddr.toLowerCase().includes('127.0.0.1') ||
+    normalizedAddr.toLowerCase().includes('::1')
+  ) {
+    return false;
+  }
+  
+  try {
+    return ip.isPublic(normalizedAddr);
+  } catch (e) {
+    return !isPrivateIP(normalizedAddr);
+  }
+}
+
+export function validateUrl(url: string): boolean {
+  try {
+    console.log(`validateUrl - Checking URL: ${url}`);
+    const urlObj = new URL(url);
+    const protocol = urlObj.protocol.toLowerCase();
+    console.log(`validateUrl - Protocol detected: ${protocol}`);
+    if (protocol !== 'https:') {
+      console.log(`Rejected non-HTTPS URL in validateUrl: ${url}`);
+      return false;
+    }
+    const hostname = urlObj.hostname;
+    console.log(`validateUrl - Hostname: ${hostname}`);
+    if (ENFORCE_ALLOWLIST && !isAllowedDomain(hostname)) {
+      console.warn(`Domain not in allowlist: ${hostname}`);
+      return false;
+    }
+    console.log(`validateUrl - Domain allowlist check passed`);
+    if (isIPv4Format(hostname) || isIPv6Format(hostname)) {
+      console.log(`validateUrl - Hostname is an IP address: ${hostname}`);
+      const ipValid = validateIPAddress(hostname);
+      console.log(`validateUrl - IP validation result: ${ipValid}`);
+      return ipValid;
+    }
+    console.log(`validateUrl - Validation successful for: ${url}`);
+    return true;
+  } catch (e) {
+    console.error(`validateUrl - Error validating URL: ${e}`);
+    return false;
+  }
+}
+
+export function isPrivateIP(ipStr: string): boolean {
+  const privateRanges = [
+    '10.0.0.0/8',
+    '172.16.0.0/12',
+    '192.168.0.0/16',
+    '127.0.0.0/8',
+    '169.254.0.0/16'
+  ];
+  return privateRanges.some(range => {
+    try {
+      const cidr = new IPCIDR(range);
+      return cidr.contains(ipStr);
+    } catch (error) {
+      console.error(`Error checking IP range ${range}:`, error);
+      return false;
+    }
+  });
+}
+// ===== End Security Functions =====
+
+// ===== Begin GPT Functionality (moved from gpt.ts) =====
+
+// Remove global instantiation and use of process.env in GPT section
+// const useGPT = process.env.USE_GPT_RECOMMENDATIONS !== "false";
+// const openai = useGPT ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
+
+const hasValidOpenAIKey = (env: any): boolean =>
+  !!env.OPENAI_API_KEY && ('' + env.OPENAI_API_KEY).startsWith('sk-')
+
+// Update getGPTRecommendation to use env binding for configuration and instantiate OpenAI locally
+export async function getGPTRecommendation(
+  checkType: string,
+  keyphrase: string,
+  env: any,  // env binding
+  context?: string
+): Promise<string> {
+  const useGPT = env.USE_GPT_RECOMMENDATIONS !== 'false'
+  if (!useGPT || !hasValidOpenAIKey(env)) {
+    console.log("GPT recommendations are disabled or API key is invalid")
+    return "GPT recommendations are currently disabled. Enable them by setting USE_GPT_RECOMMENDATIONS=true and providing a valid OPENAI_API_KEY."
+  }
+
+  // Use local client instance instead of global variable
+  const client = new OpenAI({ apiKey: env.OPENAI_API_KEY })
+
+  try {
+    const cacheKey = `${checkType}_${keyphrase}_${context?.substring(0, 50) || ''}`
+    // ...existing cache code...
+    const truncatedContext = context && context.length > 300 
+      ? context.substring(0, 300) + "..." 
+      : context
+
+    const response = await client.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        {
+          role: "system",
+          content: `You are an SEO expert providing concise, actionable recommendations.
+Keep responses under 100 words.
+Format: "Here is a better [element]: [example]"
+Avoid quotation marks.`
+        },
+        {
+          role: "user",
+          content: `Fix this SEO issue: "${checkType}" for keyphrase "${keyphrase}".
+${truncatedContext ? `Current content: ${truncatedContext}` : ''}`
+        }
+      ],
+      max_tokens: 100,
+      temperature: 0.5,
+    })
+    const recommendation = response.choices[0].message.content?.trim() || 
+      "Unable to generate recommendation at this time."
+    // ...update cache accordingly...
+    return recommendation
+  } catch (error: any) {
+    console.error("GPT API Error:", error)
+    if (error.status === 401) {
+      return "API key error. Please check your OpenAI API key and ensure it's valid."
+    }
+    return "Unable to generate recommendation. Please try again later."
+  }
+}
+
+// ===== End GPT Functionality =====
+
+// === Begin SEO Analyzer functionality (moved from server\lib\seoAnalyzer.ts) ===
+
+// Helper functions (if not already defined or updated from existing versions)
+function escapeRegExpFromAnalyzer(str: string): string {
+	// $& means the whole matched string
+	return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function calculateKeyphraseDensityFromAnalyzer(
+	content: string,
+	keyphrase: string
+): { density: number; occurrences: number; totalWords: number } {
+	const normalizedContent = content.toLowerCase().trim();
+	const normalizedKeyphrase = keyphrase.toLowerCase().trim();
+	const escapedKeyphrase = escapeRegExpFromAnalyzer(normalizedKeyphrase);
+	const totalWords = normalizedContent.split(/\s+/).filter(word => word.length > 0).length;
+	const regex = new RegExp(`\\b${escapedKeyphrase}\\b`, 'gi');
+	const matches = normalizedContent.match(regex) || [];
+	const occurrences = matches.length;
+	const density = (occurrences * (normalizedKeyphrase.split(/\s+/).length)) / totalWords * 100;
+	return { density, occurrences, totalWords };
+}
+
+function isHomePageFromAnalyzer(url: string): boolean {
+	try {
+		const urlObj = new URL(url);
+		return urlObj.pathname === "/" || urlObj.pathname === "";
+	} catch {
+		return false;
+	}
+}
+
+// Seo analyzer constants
+const analyzerCheckPriorities: Record<string, 'high' | 'medium' | 'low'> = {
+	"Keyphrase in Title": "high",
+	"Keyphrase in Meta Description": "high",
+	"Keyphrase in URL": "medium",
+	"Content Length": "high",
+	"Keyphrase Density": "medium",
+	"Keyphrase in Introduction": "medium",
+	"Image Alt Attributes": "low",
+	"Internal Links": "medium",
+	"Outbound Links": "low",
+	"Next-Gen Image Formats": "low",
+	"OG Image": "medium",
+	"OG Title and Description": "medium",
+	"Keyphrase in H1 Heading": "high",
+	"Keyphrase in H2 Headings": "medium",
+	"Heading Hierarchy": "high",
+	"Code Minification": "low",
+	"Schema Markup": "medium",
+	"Image File Size": "medium"
+};
+
+const analyzerFallbackRecommendations: Record<string, (params: any) => string> = {
+	"Keyphrase in Title": ({ keyphrase, title }) =>
+		`Consider rewriting your title to include '${keyphrase}', preferably at the beginning.`,
+	"Keyphrase in Meta Description": ({ keyphrase }) =>
+		`Add '${keyphrase}' to your meta description naturally to boost click-through rates.`,
+	"Keyphrase in Introduction": ({ keyphrase }) =>
+		`Mention '${keyphrase}' in your first paragraph to establish relevance early.`,
+	// ... add additional fallback recommendations as needed ...
+};
+
+// Main SEO analysis function (moved from seoAnalyzer.ts)
+export async function analyzeSEOElements(url: string, keyphrase: string) {
+	console.log(`[SEO Analyzer] Starting analysis for URL: ${url} with keyphrase: ${keyphrase}`);
+	const startTime = Date.now();
+
+	try {
+		// Use your existing scrapeWebpage function (already present in this worker)
+		const scrapedData = await scrapeWebpage(url);
+		const checks: any[] = [];
+		let passedChecks = 0,
+			failedChecks = 0;
+
+		// Success messages
+		const messages: Record<string, string> = {
+			"Keyphrase in Title": "Great job! Your title includes the target keyphrase.",
+			// ... add other success messages as needed ...
+		};
+
+		// Helper to add a check (with GPT integration if available)
+		const addCheck = async (
+			title: string,
+			description: string,
+			passed: boolean,
+			context?: string,
+			skipRecommendation = false
+		) => {
+			let recommendation = "";
+			if (!passed && !skipRecommendation) {
+				try {
+					recommendation = await getGPTRecommendation(title, keyphrase, context);
+				} catch (error) {
+					recommendation = analyzerFallbackRecommendations[title]
+						? analyzerFallbackRecommendations[title]({ keyphrase })
+						: `Consider optimizing your content for "${keyphrase}" in relation to ${title.toLowerCase()}.`;
+				}
+			}
+			const successDescription = passed ? messages[title] : description;
+			const priority = analyzerCheckPriorities[title] || "medium";
+			checks.push({ title, description: successDescription, passed, recommendation, priority });
+			passed ? passedChecks++ : failedChecks++;
+		};
+
+		// Example check: Title analysis
+		await addCheck(
+			"Keyphrase in Title",
+			"The page title should contain the focus keyphrase.",
+			scrapedData.title.toLowerCase().includes(keyphrase.toLowerCase()),
+			scrapedData.title
+		);
+
+		// ... add additional checks similar to those in seoAnalyzer.ts ...
+		// For instance: Meta Description, URL analysis, content length, keyphrase density, etc.
+		// You can call calculateKeyphraseDensityFromAnalyzer and isHomePageFromAnalyzer as needed.
+
+		const score = Math.round((passedChecks / checks.length) * 100);
+		console.log(`[SEO Analyzer] Analysis completed in ${Date.now() - startTime}ms`);
+		return { checks, passedChecks, failedChecks, url, score, timestamp: new Date().toISOString() };
+	} catch (error: any) {
+		console.error(`[SEO Analyzer] Error during analysis:`, error);
+		throw error;
+	}
+}
+
+// === End SEO Analyzer functionality (moved from server\lib\seoAnalyzer.ts) ===
+
+// ===== Begin WebScraper functionality (moved from server\lib\webScraper.ts) =====
+import { JSDOM } from "jsdom";
+
+interface ScrapedData {
+  title: string;
+  metaDescription: string;
+  content: string;
+  paragraphs: string[];
+  subheadings: string[];
+  headings: Array<{ level: number; text: string }>;
+  images: Array<{ 
+    src: string; 
+    alt: string; 
+    size?: number;
+  }>;
+  internalLinks: string[];
+  outboundLinks: string[];
+  ogMetadata: {
+    title: string;
+    description: string;
+    image: string;
+    imageWidth: string;
+    imageHeight: string;
+  };
+  resources: {
+    js: Array<{ url: string; content?: string; minified?: boolean }>;
+    css: Array<{ url: string; content?: string; minified?: boolean }>;
+  };
+  schema: {
+    detected: boolean;
+    types: string[];
+    jsonLdBlocks: any[];
+    microdataTypes: string[];
+  };
+}
+
+async function getImageSize(imageUrl: string, baseUrl: URL): Promise<number | undefined> {
+  try {
+    const fullUrl = new URL(imageUrl, baseUrl.origin).toString();
+    const response = await fetch(fullUrl, { method: 'HEAD' });
+    if (response.ok) {
+      const contentLength = response.headers.get('content-length');
+      if (contentLength) {
+        return parseInt(contentLength, 10);
+      }
+    }
+    return undefined;
+  } catch (error) {
+    console.log(`Error getting size for image ${imageUrl}:`, error);
+    return undefined;
+  }
+}
+
+export async function scrapeWebpageJS(url: string): Promise<ScrapedData> {
+  if (!url.startsWith("http://") && !url.startsWith("https://")) {
+    url = `http://${url}`;
+  }
+  try {
+    const response = await fetch(url);
+    const html = await response.text();
+    const dom = new JSDOM(html);
+    const document = dom.window.document;
+    const baseUrl = new URL(url);
+
+    const title = document.querySelector("title")?.textContent?.trim() || "";
+    const metaDescription = document.querySelector('meta[name="description"]')?.getAttribute("content") || "";
+
+    const ogMetadata = {
+      title: document.querySelector('meta[property="og:title"]')?.getAttribute("content") || "",
+      description: document.querySelector('meta[property="og:description"]')?.getAttribute("content") || "",
+      image: document.querySelector('meta[property="og:image"]')?.getAttribute("content") || "",
+      imageWidth: document.querySelector('meta[property="og:image:width"]')?.getAttribute("content") || "",
+      imageHeight: document.querySelector('meta[property="og:image:height"]')?.getAttribute("content") || ""
+    };
+
+    const content = document.body.textContent?.trim() || "";
+    console.log("Scraping paragraphs...");
+    const allParagraphElements = document.querySelectorAll("article p, main p, .content p, #content p, .post-content p, p");
+    const paragraphs = Array.from(allParagraphElements)
+      .map((el: Element) => el.textContent?.trim() || "")
+      .filter((text: string) => text.length > 0);
+
+    const subheadings = Array.from(document.querySelectorAll("h1, h2, h3, h4, h5, h6"))
+      .map((el: Element) => el.textContent?.trim() || "")
+      .filter((text: string) => text.length > 0);
+
+    const headings = Array.from(document.querySelectorAll("h1, h2, h3, h4, h5, h6"))
+      .map((el: Element) => {
+        const tagName = el.tagName.toLowerCase();
+        const level = parseInt(tagName.substring(1), 10);
+        return { level, text: el.textContent?.trim() || "" };
+      })
+      .filter((heading: { level: number; text: string }) => heading.text.length > 0);
+
+    const imageElements = Array.from(document.querySelectorAll("img"))
+      .map((el: Element) => ({
+        src: el.getAttribute("src") || "",
+        alt: el.getAttribute("alt") || "",
+      }));
+      
+    const images = await Promise.all(
+      imageElements.map(async (img: { src: string; alt: string }) => {
+        if (!img.src) return img;
+        const size = await getImageSize(img.src, baseUrl);
+        return { ...img, size };
+      })
+    );
+
+    const internalLinks: string[] = [];
+    const outboundLinks: string[] = [];
+    document.querySelectorAll("a[href]").forEach((el: Element) => {
+      const href = el.getAttribute("href");
+      if (!href) return;
+      try {
+        const linkUrl = new URL(href, baseUrl.origin);
+        if (linkUrl.hostname === baseUrl.hostname) {
+          internalLinks.push(href);
+        } else {
+          outboundLinks.push(href);
+        }
+      } catch (error) {
+        // Skip invalid URLs
+      }
+    });
+
+    const jsResources: Array<{ url: string; content?: string; minified?: boolean }> = [];
+    const cssResources: Array<{ url: string; content?: string; minified?: boolean }> = [];
+    
+    document.querySelectorAll("script[src]").forEach((el: Element) => {
+      const src = el.getAttribute("src");
+      if (src) {
+        try {
+          const fullUrl = new URL(src, baseUrl.origin).toString();
+          jsResources.push({ url: fullUrl });
+        } catch (error) {
+          // Skip invalid URL
+        }
+      }
+    });
+    document.querySelectorAll("link[rel='stylesheet']").forEach((el: Element) => {
+      const href = el.getAttribute("href");
+      if (href) {
+        try {
+          const fullUrl = new URL(href, baseUrl.origin).toString();
+          cssResources.push({ url: fullUrl });
+        } catch (error) {
+          // Skip invalid URL
+        }
+      }
+    });
+    document.querySelectorAll("style").forEach((el: Element) => {
+      const content = el.textContent;
+      if (content && content.trim()) {
+        cssResources.push({ 
+          url: 'inline-style',
+          content: content.trim(),
+          minified: isMinified(content.trim())
+        });
+      }
+    });
+    document.querySelectorAll("script:not([src])").forEach((el: Element) => {
+      const content = el.textContent;
+      if (content && content.trim()) {
+        jsResources.push({ 
+          url: 'inline-script',
+          content: content.trim(),
+          minified: isMinified(content.trim())
+        });
+      }
+    });
+
+    const jsonLdBlocks: any[] = [];
+    document.querySelectorAll('script[type="application/ld+json"]').forEach((el: Element) => {
+      try {
+        const jsonContent = el.textContent;
+        if (jsonContent) {
+          const parsed = JSON.parse(jsonContent);
+          jsonLdBlocks.push(parsed);
+        }
+      } catch (error) {
+        console.log("Error parsing JSON-LD:", error);
+      }
+    });
+
+    const microdataTypes: string[] = [];
+    document.querySelectorAll('[itemscope]').forEach((el: Element) => {
+      const itemtype = el.getAttribute('itemtype');
+      if (itemtype) {
+        try {
+          const match = itemtype.match(/schema\.org\/([a-zA-Z]+)/);
+          if (match && match[1]) {
+            microdataTypes.push(match[1]);
+          } else {
+            microdataTypes.push(itemtype);
+          }
+        } catch (error) {
+          console.log("Error extracting microdata type:", error);
+        }
+      }
+    });
+
+    const schemaTypes = new Set<string>();
+    jsonLdBlocks.forEach(block => {
+      if (block['@type']) {
+        if (Array.isArray(block['@type'])) {
+          block['@type'].forEach((type: string) => schemaTypes.add(type));
+        } else {
+          schemaTypes.add(block['@type']);
+        }
+      }
+    });
+    microdataTypes.forEach(type => schemaTypes.add(type));
+
+    return {
+      title,
+      metaDescription,
+      content,
+      paragraphs,
+      subheadings,
+      headings,
+      images,
+      internalLinks,
+      outboundLinks,
+      ogMetadata,
+      resources: { js: jsResources, css: cssResources },
+      schema: { detected: jsonLdBlocks.length > 0 || microdataTypes.length > 0, types: Array.from(schemaTypes), jsonLdBlocks, microdataTypes }
+    };
+  } catch (error: any) {
+    console.error("Failed to scrape webpage:", error);
+    throw new Error(`Failed to scrape webpage: ${error.message}`);
+  }
+}
+
+function isMinified(code: string): boolean {
+  if (!code || code.length < 50) return true;
+  const newlineRatio = (code.match(/\n/g) || []).length / code.length;
+  const whitespaceRatio = (code.match(/\s/g) || []).length / code.length;
+  const lines = code.split('\n').filter(line => line.trim().length > 0);
+  const avgLineLength = lines.length > 0 ? code.length / lines.length : 0;
+  return (newlineRatio < 0.01 && whitespaceRatio < 0.15) || avgLineLength > 500;
+}
+// ===== End WebScraper functionality (moved from server\lib\webScraper.ts) =====
+
+export default { fetch: handleRequest }
