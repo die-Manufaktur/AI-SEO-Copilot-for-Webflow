@@ -91,7 +91,7 @@
     "react-resizable-panels": "^2.1.7",
     "sanitize-html": "^2.15.0",
     "tailwind-merge": "^3.0.2",
-    "tailwindcss": "^4.0.14",
+    "tailwindcss": "^4.0.15",
     "vaul": "^1.1.2",
     "webflow-api": "^3.1.1",
     "wouter": "^3.6.0",
