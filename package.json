@@ -46,7 +46,7 @@
     "vitest": "^1.4.0",
     "@testing-library/jest-dom": "^6.4.2",
     "@vitest/coverage-v8": "^1.4.0",
-    "happy-dom": "^13.6.2"
+    "happy-dom": "^15.10.2"
   },
   "dependencies": {
     "@hookform/resolvers": "^4.1.3",
