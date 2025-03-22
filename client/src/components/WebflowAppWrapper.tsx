@@ -1,46 +1,28 @@
-import React, { useEffect } from "react";
+import React, { useEffect } from 'react';
 
-export default function WebflowAppWrapper({ children }: { children: React.ReactNode }) {
+interface WebflowAppWrapperProps {
+  children: React.ReactNode;
+}
+
+export default function WebflowAppWrapper({ children }: WebflowAppWrapperProps) {
   useEffect(() => {
-    try {
-      document.body.style.margin = '0';
-      document.body.style.padding = '0';
-      document.body.style.fontFamily = 'system-ui, sans-serif';
-      document.body.style.backgroundColor = 'var(--background1, #1E1E1E)';
-      document.body.style.color = 'var(--text1, #F5F5F5)';
-      
-      const rootElement = document.getElementById('root');
-      if (rootElement) {
-        rootElement.style.height = '100%';
-        rootElement.style.width = '100%';
+    // Set extension size to "large" when component mounts
+    if (window.webflow && window.webflow.setExtensionSize) {
+      try {
+        // Use the "large" preset
+        window.webflow.setExtensionSize('large');
+        console.log('Extension size set to large');
+      } catch (error) {
+        console.error('Failed to set extension size:', error);
       }
-    } catch (error) {
-      console.error("Error applying styles:", error);
+    } else {
+      console.warn('webflow.setExtensionSize is not available');
     }
   }, []);
-  
+
   return (
-    <div 
-      id="webflow-app-wrapper"
-      style={{
-        width: '100%',
-        height: '100%',
-        minHeight: '100vh',
-        padding: '20px',
-        display: 'flex',
-        flexDirection: 'column',
-        backgroundColor: '#1E1E1E',
-        color: '#F5F5F5',
-        overflow: 'auto'
-      }}
-    >
-      {children ? (
-        children
-      ) : (
-        <div style={{padding: "20px", color: "red", border: "1px solid red"}}>
-          No children provided to WebflowAppWrapper
-        </div>
-      )}
+    <div id="webflow-app-wrapper" className="bg-background text-text1 min-h-screen">
+      {children}
     </div>
   );
 }
