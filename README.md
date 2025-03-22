@@ -1,6 +1,6 @@
-# SEO Copilot <!-- Update the name here -->
+# SEO Copilot
 
-SEO Copilot is an advanced SEO analysis tool performing 11 comprehensive checks including title optimization, meta description analysis, content verification, keyword density, and image optimization. Get AI-powered recommendations for better rankings.
+SEO Copilot is an advanced SEO analysis tool performing comprehensive checks including title optimization, meta description analysis, content verification, keyword density, and image optimization. Get AI-powered recommendations for better rankings.
 
 ## Features
 
@@ -17,24 +17,56 @@ SEO Copilot is an advanced SEO analysis tool performing 11 comprehensive checks 
 yarn install
 ```
 
+## Development Workflow
+
+Our development workflow follows these steps:
+
+1. **Setup Environment**
+   - Create `.env` file based on `.env.example`
+   - Configure required API keys and settings
+
+2. **Local Development**
+   - Start both client app and Cloudflare Worker: `yarn start-dev`
+   - Visit the app at http://localhost:1337
+
+3. **Testing & Validation**
+   - Run type checking: `yarn check`
+   - Run linting: `yarn lint`
+   - Run formatting: `yarn format`
+   - Run unit tests: `yarn test`
+
+4. **Pre-Push Checks**
+   - Run `yarn prepush` before pushing code to automatically run all checks
+
+5. **Building & Deployment**
+   - Build the application: `yarn build`
+   - Deploy worker: `yarn build:worker`
+   - Deploy both: `yarn build:all`
+
+## Directory Structure
+
+Here is an overview of the most important directories and files:
+
+`├──client/src/` — React application code<br>
+`├──workers/` — Cloudflare Workers backend code<br>
+`├──tests/` — Vitest test files<br>
+`├──public/` — Output folder for bundled React app<br>
+`├──scripts/` — Build and utility scripts<br>
+`├──tsconfig.json` — TypeScript configuration<br>
+`├──vite.config.ts` — Vite bundler configuration<br>
+`├──vitest.config.ts` — Vitest test configuration<br>
+`├──wrangler.toml` — Cloudflare Workers configuration<br>
+`├──webflow.json` — Webflow App manifest<br>
+
+## Environment Setup
+
+The application requires several environment variables to function correctly:
+
 ## Using this template
 
 To create a project from this template, select “Use this template“ → “Create new repository“ on the [GitHub page of this template](https://github.com/stefanwittwer/webflow-app-template-react).
 
 See “Developing“ below to see which scripts to use to get started.
-
-## Directory Structure
-
-Here is an overview over the most important directories and files:
-
-`├──src/` — React application code<br>
-`├──public/` — Output folder for bundled React app (see note below)<br>
-`├──index.html` — The index file which will be used as an entry point by the bundler<br>
-`├──tsconfig.json` — A modified tsconfig which combines JSX support, Webflow types, and sensible React defaults.<br>
-`├──vite.config.ts` — Configuration for the bundler<br>
-`├──webflow.json` — Webflow App manifest<br>
-
-This template includes a suggested Prettier configuration in `.prettierrc` and uses Yarn by default.
 
 ## Developing
 
@@ -127,12 +159,5 @@ If you encounter issues during deployment:
 3. Check Cloudflare Worker logs for any errors
 4. Test the Worker API with: `curl https://your-worker-url.workers.dev/api/ping`
 
-## Note about bundling output
-
-Vite is configured to use the `public/` folder as the output, as this is where the `webflow-cli` expects the final assets for deployment, including scripts and the index.html file.
-
-If you put any assets manually in the `public/` folder, they will be overriden during buliding.
-
-## License
-
-The source code of the `webflow-app-template-react` template is available for use under the MIT license. [See license](https://github.com/stefanwittwer/webflow-app-template-react/blob/main/LICENSE.md)
+If you have dependency or lockfile issues, run the dependency fix script:
+```
