@@ -9,10 +9,11 @@
     "dev": "concurrently -r \"webflow extension serve\" \"vite --force\"",
     "start": "NODE_ENV=production node public/index.js",
     "check": "tsc",
-    "dev:worker": "npx wrangler dev workers/index.ts",
-    "build:worker": "npx wrangler deploy workers/index.ts",
+    "dev:worker": "npx wrangler dev workers/index.ts --env development",
+    "build:worker": "npx wrangler deploy workers/index.ts --env production",
     "build:all": "yarn build && yarn build:worker",
-    "start-dev": "concurrently \"yarn dev\" \"yarn dev:worker\""
+    "start-dev": "concurrently \"yarn dev\" \"yarn dev:worker\"",
+    "prebuild": "node scripts/check-env.js"
   },
   "devDependencies": {
     "@testing-library/react": "^14.0.0",
