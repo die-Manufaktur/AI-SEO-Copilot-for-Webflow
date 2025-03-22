@@ -27,6 +27,7 @@ import {
   TooltipTrigger,
 } from "../components/ui/tooltip";
 import { useToast } from "../hooks/use-toast";
+import { getPageSlug } from "../lib/get-page-slug";
 import { analyzeSEO, registerDomains, getApiBaseUrl } from "../lib/api";
 import type { SEOAnalysisResult, SEOCheck } from "../lib/types";
 import { ProgressCircle } from "../components/ui/progress-circle";
@@ -228,8 +229,18 @@ const getScoreRatingText = (score: number): string => {
 
 export default function Home() {
   console.log("Home component rendering");
+
+  // Step 2: Pull the page slug
+  useEffect(() => {
+    const fetchSlug = async () => {
+      const currentSlug = await getPageSlug();
+      setSlug(currentSlug);
+    };
+    fetchSlug();
+  }, []);
   
   const { toast } = useToast();
+  const [slug, setSlug] = useState<string | null>(null);
   const [results, setResults] = useState<SEOAnalysisResult | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [stagingName, setStagingName] = useState<string>(''); // Move this inside the component
@@ -406,8 +417,21 @@ export default function Home() {
           url = url.replace(/^http:/, 'https:');
         }
         
+        // Append the slug to the URL if it exists
+        if (slug) {
+          // Remove trailing slash from URL if present
+          url = url.replace(/\/$/, '');
+          
+          // Add the slug with leading slash
+          url = `${url}/${slug}`;
+          console.log("Full page URL with slug:", url);
+        } else {
+          console.log("No slug available, using domain URL only:", url);
+        }
+        
         // Add debugging message
         console.log(`Using API base URL: ${getApiBaseUrl()}`);
+        console.log(`Using target URL: ${url}`);
         
         // Wrap in try-catch and provide useful error message
         try {
@@ -557,7 +581,7 @@ export default function Home() {
                   <FormField
                     control={form.control}
                     name="keyphrase"
-                    render={({ field }) => (
+                    render={({ field }: { field: any }) => (
                       <FormItem className="w-full">
                         <FormLabel className="mb-1">Target keyphrase</FormLabel>
                         <FormControl>

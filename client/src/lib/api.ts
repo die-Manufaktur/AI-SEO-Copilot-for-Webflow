@@ -1,25 +1,34 @@
 import type { AnalyzeRequest, SEOAnalysisResult } from "./types";
 
-// Helper function to determine the appropriate API URL based on environment
-export const getApiBaseUrl = (): string => {
-  // Force the API URL to the Cloudflare Worker regardless of environment (temporary debug fix)
-  const WORKER_URL = 'http://127.0.0.1:8787';
-  
-  // Log the hostname and port for debugging
-  console.log(`Current window location: ${window.location.hostname}:${window.location.port}`);
+// Properly declare Vite's environment variable types once
+interface ImportMetaEnv {
+  VITE_API_URL?: string;
+  DEV?: boolean;
+}
 
-  // Handle Webflow Extension Production Environment
-  const isWebflowExtension = window.location.hostname.includes('webflow-ext.com');
-  
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}
+// Helper function to determine the appropriate API URL based on environment
+const isWebflowExtension = import.meta.env.VITE_WEBFLOW_EXTENSION === 'true';
+
+export const getApiBaseUrl = (): string => {
   if (isWebflowExtension) {
     console.log('Using production API URL for Webflow Extension');
-    // In Webflow production, use the Cloudflare Worker URL
     return 'https://seo-copilot-api.paul-130.workers.dev';
   } 
   
-  // In development mode, always use the Worker URL
-  console.log('Using development Worker URL:', WORKER_URL);
-  return WORKER_URL;
+  // In development mode - Vite sets import.meta.env.DEV to true in development
+  if (import.meta.env.DEV) {
+    // Local development Worker URL
+    const localWorkerUrl = 'http://127.0.0.1:8787';
+    console.log('Using development Worker URL:', localWorkerUrl);
+    return localWorkerUrl;
+  }
+  
+  // Fallback to production URL
+  console.log('Falling back to production API URL');
+  return 'https://seo-copilot-api.paul-130.workers.dev';
 };
 
 export async function analyzeSEO({ keyphrase, url }: { keyphrase: string; url: string }) {
@@ -57,6 +66,23 @@ export async function analyzeSEO({ keyphrase, url }: { keyphrase: string; url: s
     console.error("API request failed:", error);
     throw new Error(error instanceof Error ? error.message : "Network error");
   }
+}
+
+export async function fetchOAuthToken(authCode: string): Promise<string> {
+  const response = await fetch('/api/oauth/callback', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ code: authCode }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch OAuth token: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return data.token;
 }
 
 /**
