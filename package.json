@@ -70,7 +70,7 @@
     "@radix-ui/react-tooltip": "^1.1.8",
     "@tailwindcss/postcss": "^4.0.15",
     "@tailwindcss/postcss7-compat": "^2.2.17",
-    "@tailwindcss/vite": "^4.0.14",
+    "@tailwindcss/vite": "^4.0.15",
     "@tanstack/react-query": "^5.69.0",
     "@types/jsdom": "^21.1.7",
     "@vitejs/plugin-react": "^4.3.4",

@@ -1778,15 +1778,15 @@
     postcss "^8.4.41"
     tailwindcss "4.0.15"
 
-"@tailwindcss/vite@^4.0.14":
-  version "4.0.14"
-  resolved "https://registry.yarnpkg.com/@tailwindcss/vite/-/vite-4.0.14.tgz#9d02b8925ce6eab307494d05e024566be0c205dd"
-  integrity sha512-y69ztPTRFy+13EPS/7dEFVl7q2Goh1pQueVO8IfGeyqSpcx/joNJXFk0lLhMgUbF0VFJotwRSb9ZY7Xoq3r26Q==
+"@tailwindcss/vite@^4.0.15":
+  version "4.0.15"
+  resolved "https://registry.yarnpkg.com/@tailwindcss/vite/-/vite-4.0.15.tgz#1edb04bf803a2518cc4113b26b020c035ae817c1"
+  integrity sha512-JRexava80NijI8cTcLXNM3nQL5A0ptTHI8oJLLe8z1MpNB6p5J4WCdJJP8RoyHu8/eB1JzEdbpH86eGfbuaezQ==
   dependencies:
-    "@tailwindcss/node" "4.0.14"
-    "@tailwindcss/oxide" "4.0.14"
+    "@tailwindcss/node" "4.0.15"
+    "@tailwindcss/oxide" "4.0.15"
     lightningcss "1.29.2"
-    tailwindcss "4.0.14"
+    tailwindcss "4.0.15"
 
 "@tanstack/query-core@5.69.0":
   version "5.69.0"
