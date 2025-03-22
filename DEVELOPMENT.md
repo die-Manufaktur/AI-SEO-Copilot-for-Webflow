@@ -53,6 +53,9 @@ yarn format
 
 # Unit tests
 yarn test
+
+# Test coverage
+yarn test:coverage
 ```
 
 ### Comprehensive Pre-Push Check

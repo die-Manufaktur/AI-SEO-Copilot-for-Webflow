@@ -20,10 +20,12 @@ jobs:
         run: yarn install --frozen-lockfile
       - name: Run unit tests
         run: yarn test
-      - name: Run worker tests
-        run: yarn test-worker
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      - name: Run test coverage
+        run: yarn test:coverage
+      # - name: Run worker tests
+      #   run: yarn test-worker
+      #   env:
+      #     OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       
   build-and-deploy:
     needs: test

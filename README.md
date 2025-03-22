@@ -34,6 +34,7 @@ Our development workflow follows these steps:
    - Run linting: `yarn lint`
    - Run formatting: `yarn format`
    - Run unit tests: `yarn test`
+   - Run tests with coverage: `yarn test:coverage`
 
 4. **Pre-Push Checks**
    - Run `yarn prepush` before pushing code to automatically run all checks
@@ -160,4 +161,3 @@ If you encounter issues during deployment:
 4. Test the Worker API with: `curl https://your-worker-url.workers.dev/api/ping`
 
 If you have dependency or lockfile issues, run the dependency fix script:
-```
