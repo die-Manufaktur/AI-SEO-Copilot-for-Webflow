@@ -82,7 +82,6 @@ const installSuccess = runCommand('yarn install --force');
 if (installSuccess) {
   console.log('✅ Dependencies reinstalled successfully!');
   console.log('Verifying installation...');
-  
   // Run yarn check to verify installation
   try {
     execSync('yarn check', { stdio: 'pipe' });
@@ -90,15 +89,15 @@ if (installSuccess) {
   } catch (error) {
     const output = error.output ? error.output.toString() : '';
     const errorCount = (output.match(/error/g) || []).length;
-    
+
     console.warn(`⚠️ Dependency check found ${errorCount} issues, but installation completed.`);
     console.log('Many of these issues might be non-critical. Try running your app to verify.');
   }
-  
+
   console.log('Run "yarn test" to verify your testing setup works');
 } else {
   console.error('❌ Failed to reinstall dependencies');
-  
+
   // Restore backup if installation failed
   if (fs.existsSync('yarn.lock.backup.' + Date.now())) {
     console.log('Restoring backup yarn.lock...');
