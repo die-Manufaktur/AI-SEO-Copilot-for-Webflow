@@ -307,11 +307,18 @@ async function scrapeWebpage(url: string): Promise<any> {
       }
     }
     
-    // Extract images with sizes
-    const images: Array<{ src: string; alt: string; size?: number }> = [];
+    // Update the image type definition to include format information
+    const images: Array<{ src: string; alt: string; size?: number; isNextGen?: boolean }> = [];
+    
+    // When collecting image data, add the format detection
     const imageMatches = bodyContent.matchAll(/<img[^>]*src=["'](.*?)["'][^>]*alt=["'](.*?)["'][^>]*>/gi);
     for (const match of imageMatches) {
-      images.push({ src: match[1], alt: match[2] });
+      const src = match[1];
+      images.push({ 
+        src, 
+        alt: match[2],
+        isNextGen: isNextGenImageFormat(src) 
+      });
     }
     
     // Extract links
@@ -464,7 +471,7 @@ async function scrapeWebpage(url: string): Promise<any> {
 }
 
 // Update the check title in the analyzeSEO function to match the UI
-async function analyzeSEO(url: string, keyphrase: string): Promise<any> {
+export async function analyzeSEO(url: string, keyphrase: string): Promise<any> {
   console.log(`Analyzing SEO for URL: ${url}, keyphrase: ${keyphrase}`);
   try {
     const scrapedData = await scrapeWebpage(url);
@@ -766,6 +773,23 @@ async function analyzeSEO(url: string, keyphrase: string): Promise<any> {
       }
     }
     
+    // Add this where other image checks are implemented
+    // Next-Gen Image Formats check
+    const totalImages = scrapedData.images.length;
+    const nextGenImages = scrapedData.images.filter((img: { isNextGen?: boolean }) => img.isNextGen).length;
+    const nextGenPercentage = totalImages > 0 ? (nextGenImages / totalImages) * 100 : 0;
+
+    // Determine if the check passes based on a threshold (100% for now)
+    const nextGenThreshold = 100;
+    const nextGenPasses = nextGenPercentage >= nextGenThreshold;
+
+    // Add result to the array of results
+    addCheck(
+      "Next-Gen Image Formats",
+      `At least ${nextGenThreshold}% of images should use modern formats like WebP, AVIF, or SVG. Currently: ${nextGenPercentage.toFixed(0)}% of images use next-gen formats.`,
+      nextGenPasses
+    );
+
     const score = Math.round((passedChecks / checks.length) * 100);
     return { checks, passedChecks, failedChecks, url, score, timestamp: new Date().toISOString() };
   } catch (error: any) {
@@ -780,7 +804,7 @@ addEventListener('fetch', (event: any) => {
   event.respondWith(handleRequest(event.request, event.env));
 });
 
-async function handleRequest(request: Request, env: any): Promise<Response> {
+export async function handleRequest(request: Request, env: any): Promise<Response> {
   const corsResponse = handleCors(request);
   if (corsResponse) return corsResponse;
   
@@ -1235,6 +1259,7 @@ interface ScrapedData {
     src: string; 
     alt: string; 
     size?: number;
+    isNextGen?: boolean;
   }>;
   internalLinks: string[];
   outboundLinks: string[];
@@ -1316,9 +1341,12 @@ export async function scrapeWebpageJS(url: string): Promise<ScrapedData> {
       .filter((heading: { level: number; text: string }) => heading.text.length > 0);
 
     const imageElements = Array.from(document.querySelectorAll("img"))
-      .map((el: Element) => ({
-        src: el.getAttribute("src") || "",
-        alt: el.getAttribute("alt") || "",
+      .filter(img => img.src && !img.src.startsWith("data:"))
+      .map(img => ({
+        src: img.src,
+        alt: img.alt || "",
+        // Add isNextGen property
+        isNextGen: isNextGenImageFormat(img.src)
       }));
       
     const images = await Promise.all(
@@ -1462,6 +1490,14 @@ function isMinified(code: string): boolean {
   const avgLineLength = lines.length > 0 ? code.length / lines.length : 0;
   return (newlineRatio < 0.01 && whitespaceRatio < 0.15) || avgLineLength > 500;
 }
+
+// Helper function to determine if an image URL is a next-gen format
+function isNextGenImageFormat(url: string): boolean {
+  const ext = url.split('.').pop()?.toLowerCase();
+  // Check for modern formats: WebP, AVIF, JPEG 2000, SVG
+  return ['webp', 'avif', 'jp2', 'jpx', 'svg'].includes(ext || '');
+}
+
 // ===== End WebScraper functionality (moved from server\lib\webScraper.ts) =====
 
 export default { fetch: handleRequest }

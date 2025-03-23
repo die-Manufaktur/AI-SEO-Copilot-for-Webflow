@@ -13,7 +13,9 @@
     "build:worker": "npx wrangler deploy workers/index.ts --env production",
     "build:all": "yarn build && yarn build:worker",
     "start-dev": "concurrently \"yarn dev\" \"yarn dev:worker\"",
-    "prebuild": "node scripts/check-env.js"
+    "prebuild": "yarn test",
+    "test:coverage": "vitest run --coverage",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@testing-library/react": "^14.0.0",
