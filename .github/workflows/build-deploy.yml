@@ -21,6 +21,7 @@ jobs:
       - name: Run unit tests
         run: yarn test
       - name: Run worker tests
+        if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name == 'push'
         run: yarn test-worker
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -37,8 +38,6 @@ jobs:
           cache: 'yarn'
       - name: Install dependencies
         run: yarn install --frozen-lockfile
-      - name: Install Webflow CLI
-        run: npm install -g @webflow/webflow-cli
       - name: Build application
         run: yarn build:all
         env:
@@ -46,6 +45,7 @@ jobs:
           VITE_WEBFLOW_EXTENSION: 'true'
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name == 'push'
       - name: Deploy to Cloudflare
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: npx wrangler deploy workers/index.ts --env production

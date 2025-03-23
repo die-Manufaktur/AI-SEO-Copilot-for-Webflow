@@ -15,7 +15,8 @@
     "start-dev": "concurrently \"yarn dev\" \"yarn dev:worker\"",
     "prebuild": "yarn test",
     "test:coverage": "vitest run --coverage",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test-worker": "vitest run tests/workers"
   },
   "devDependencies": {
     "@testing-library/react": "^14.0.0",
