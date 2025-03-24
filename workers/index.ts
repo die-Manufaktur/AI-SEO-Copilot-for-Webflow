@@ -254,12 +254,30 @@ const fallbackRecommendations: Record<string, (...args: any[]) => string> = {
     `Link to reputable external sources to increase your content's credibility.`
 };
 
+// Add this helper function to check for dangerous URL schemes
+function hasDangerousScheme(url: string): boolean {
+  const dangerous = ['javascript:', 'data:', 'vbscript:'];
+  return dangerous.some(scheme => url.toLowerCase().startsWith(scheme));
+}
+
 async function scrapeWebpage(url: string): Promise<any> {
   console.log(`Scraping webpage: ${url}`);
   try {
+    // First check for dangerous schemes BEFORE adding https:// prefix
+    if (hasDangerousScheme(url)) {
+      throw new Error("URL uses a dangerous scheme");
+    }
+    
     if (!url.startsWith("http://") && !url.startsWith("https://")) {
       url = `https://${url}`;
     }
+    
+    // Validate URL before fetching
+    const urlObj = new URL(url);
+    if (hasDangerousScheme(urlObj.href)) {
+      throw new Error("URL uses a dangerous scheme");
+    }
+    
     const response = await fetch(url);
     if (!response.ok) throw new Error(`Failed to fetch page: ${response.status} ${response.statusText}`);
     const html = await response.text();
@@ -321,7 +339,7 @@ async function scrapeWebpage(url: string): Promise<any> {
     document.querySelectorAll("a[href]").forEach(a => {
       const href = a.getAttribute("href");
       if (!href) return;
-      if (href.startsWith('#') || href.startsWith('javascript:')) return;
+      if (href.startsWith('#') || hasDangerousScheme(href)) return;
       
       try {
         const linkUrl = new URL(href, baseUrl.origin);
@@ -344,7 +362,7 @@ async function scrapeWebpage(url: string): Promise<any> {
     // Extract JavaScript files
     document.querySelectorAll("script[src]").forEach(script => {
       const scriptUrl = script.getAttribute("src");
-      if (scriptUrl) {
+      if (scriptUrl && !hasDangerousScheme(scriptUrl)) {
         try {
           let absoluteUrl = scriptUrl;
           if (scriptUrl.startsWith('//')) {
@@ -381,7 +399,7 @@ async function scrapeWebpage(url: string): Promise<any> {
     // Extract CSS files
     document.querySelectorAll("link[rel='stylesheet']").forEach(link => {
       const cssUrl = link.getAttribute("href");
-      if (cssUrl) {
+      if (cssUrl && !hasDangerousScheme(cssUrl)) {
         try {
           let absoluteUrl = cssUrl;
           if (cssUrl.startsWith('//')) {
@@ -590,11 +608,24 @@ function isIPv6Format(address: string): boolean {
 
 export function isValidUrl(urlString: string): boolean {
   try {
+    // First check for dangerous schemes BEFORE any URL manipulation
+    if (hasDangerousScheme(urlString)) {
+      console.log(`Rejected dangerous URL scheme: ${urlString}`);
+      return false;
+    }
+    
     if (!/^https?:\/\//i.test(urlString)) {
       urlString = 'https://' + urlString;
     } else if (/^http:\/\//i.test(urlString)) {
       urlString = urlString.replace(/^http:/i, 'https:');
     }
+    
+    // Check for dangerous schemes
+    if (hasDangerousScheme(urlString)) {
+      console.log(`Rejected dangerous URL scheme: ${urlString}`);
+      return false;
+    }
+    
     const url = new URL(urlString);
     if (url.protocol !== 'https:') {
       console.log(`Rejected non-HTTPS URL: ${urlString}`);
@@ -676,6 +707,13 @@ export function validateIPAddress(address: string): boolean {
 export function validateUrl(url: string): boolean {
   try {
     console.log(`validateUrl - Checking URL: ${url}`);
+    
+    // Check for dangerous schemes
+    if (hasDangerousScheme(url)) {
+      console.log(`Rejected dangerous URL scheme in validateUrl: ${url}`);
+      return false;
+    }
+    
     const urlObj = new URL(url);
     const protocol = urlObj.protocol.toLowerCase();
     console.log(`validateUrl - Protocol detected: ${protocol}`);
