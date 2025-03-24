@@ -82,6 +82,7 @@ const installSuccess = runCommand('yarn install --force');
 if (installSuccess) {
   console.log('✅ Dependencies reinstalled successfully!');
   console.log('Verifying installation...');
+
   // Run yarn check to verify installation
   try {
     execSync('yarn check', { stdio: 'pipe' });

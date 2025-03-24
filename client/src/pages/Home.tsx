@@ -32,7 +32,6 @@ import { analyzeSEO, registerDomains, getApiBaseUrl } from "../lib/api";
 import type { SEOAnalysisResult, SEOCheck } from "../lib/types";
 import { ProgressCircle } from "../components/ui/progress-circle";
 import { getLearnMoreUrl } from "../lib/docs-links";
-import { getSiteInfo, type SiteInfo } from "../lib/site-info";
 
 const formSchema = z.object({
   keyphrase: z.string().min(2, "Keyphrase must be at least 2 characters")
@@ -346,6 +345,32 @@ export default function Home() {
         title: "Error",
         description: "Failed to copy recommendation to clipboard"
       });
+    }
+  };
+
+  type SiteInfo = {
+    siteId: string;
+    siteName: string;
+    shortName: string;
+    domains: { url: string; default: boolean }[];
+  };
+  
+  const getSiteInfo = async (): Promise<SiteInfo | null> => {
+    try {
+      const siteInfo = await webflow.getSiteInfo();
+      console.log("Received site info:", siteInfo);
+      if (siteInfo?.shortName) {
+        setStagingName(siteInfo.shortName);
+      }
+      return siteInfo as SiteInfo;
+    } catch (error) {
+      console.error(`Error getting site info: ${error}`);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Error getting site info"
+      });
+      return null;
     }
   };
 
