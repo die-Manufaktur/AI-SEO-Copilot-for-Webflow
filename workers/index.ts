@@ -18,12 +18,26 @@ const allowedOrigins: string[] = [
   'http://localhost:5173'   // For Vite development server
 ];
 
-// Create a pattern to test domains against
+// Create a pattern to test domains against - Improved version with proper metacharacter escaping
 const createDomainPattern = (domain: string): RegExp => {
+  // Escape dots and other regex special characters in the domain
+  const escapeRegExp = (str: string): string => {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  };
+  
   if (domain.includes('*')) {
-    return new RegExp('^' + domain.replace('*.', '([a-zA-Z0-9-]+\\.)?') + '$');
+    // Handle wildcard domains (e.g., *.example.com)
+    const parts = domain.split('*.');
+    if (parts.length === 2) {
+      // Ensure the base domain is fully escaped including all dots
+      const escapedDomain = escapeRegExp(parts[1]);
+      // Ensure we match subdomain with strict pattern - subdomain must exist for wildcard domains
+      return new RegExp('^([a-zA-Z0-9][-a-zA-Z0-9]*\\.)' + escapedDomain + '$');
+    }
   }
-  return new RegExp('^' + domain + '$');
+  
+  // For non-wildcard domains, escape all special characters including dots
+  return new RegExp('^' + escapeRegExp(domain) + '$');
 };
 
 const originPatterns: RegExp[] = allowedOrigins.map(createDomainPattern);
@@ -646,24 +660,40 @@ export function isValidUrl(urlString: string): boolean {
   }
 }
 
+// Improved function for validating if a domain is in the allowlist
 export function isAllowedDomain(domain: string): boolean {
   if (!ENFORCE_ALLOWLIST) return true;
   if (ALLOWED_DOMAINS.length === 0) return true;
-  domain = domain.toLowerCase();
-  console.log(`Checking if domain '${domain}' is in allowlist:`, JSON.stringify(ALLOWED_DOMAINS));
+  
+  // Normalize the domain to lowercase to ensure case-insensitive matching
+  domain = domain.toLowerCase().trim();
+  
+  // First check for exact matches
   if (ALLOWED_DOMAINS.includes(domain)) {
     console.log(`Domain '${domain}' found in allowlist (exact match)`);
     return true;
   }
+  
+  // Then check for wildcard matches
   const matchedWildcard = ALLOWED_DOMAINS.find(allowedDomain => {
     if (allowedDomain.startsWith('*.')) {
       const baseDomain = allowedDomain.substring(2);
-      const matches = domain.endsWith(baseDomain) && domain.length > baseDomain.length;
+      // Ensure subdomain doesn't contain dots to prevent bypasses (e.g., a.b.allowed.com)
+      // by checking that the remaining part after the first subdomain exactly matches the base domain
+      const parts = domain.split('.');
+      if (parts.length < 2) return false;
+      
+      // Create the domain without the first subdomain
+      const domainWithoutFirstSubdomain = parts.slice(1).join('.');
+      
+      // Check for exact match of the base domain after the first subdomain
+      const matches = domainWithoutFirstSubdomain === baseDomain;
       if (matches) console.log(`Domain '${domain}' matches wildcard '${allowedDomain}'`);
       return matches;
     }
     return false;
   });
+  
   return !!matchedWildcard;
 }
 
