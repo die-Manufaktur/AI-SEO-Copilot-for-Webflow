@@ -18,12 +18,26 @@ const allowedOrigins: string[] = [
   'http://localhost:5173'   // For Vite development server
 ];
 
-// Create a pattern to test domains against
+// Create a pattern to test domains against - Improved version with proper metacharacter escaping
 const createDomainPattern = (domain: string): RegExp => {
+  // Escape dots and other regex special characters in the domain
+  const escapeRegExp = (str: string): string => {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  };
+  
   if (domain.includes('*')) {
-    return new RegExp('^' + domain.replace('*.', '([a-zA-Z0-9-]+\\.)?') + '$');
+    // Handle wildcard domains (e.g., *.example.com)
+    const parts = domain.split('*.');
+    if (parts.length === 2) {
+      // Ensure the base domain is fully escaped including all dots
+      const escapedDomain = escapeRegExp(parts[1]);
+      // Ensure we match subdomain with strict pattern - subdomain must exist for wildcard domains
+      return new RegExp('^([a-zA-Z0-9][-a-zA-Z0-9]*\\.)' + escapedDomain + '$');
+    }
   }
-  return new RegExp('^' + domain + '$');
+  
+  // For non-wildcard domains, escape all special characters including dots
+  return new RegExp('^' + escapeRegExp(domain) + '$');
 };
 
 const originPatterns: RegExp[] = allowedOrigins.map(createDomainPattern);
@@ -153,6 +167,20 @@ function escapeRegExp(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function isNextGenImageFormat(src: string): boolean {
+  if (!src) return false;
+  
+  // Get the file extension
+  const extension = src.split('.').pop()?.toLowerCase();
+  
+  // Check if it's a next-gen format
+  return extension === 'webp' || 
+         extension === 'avif' || 
+         extension === 'jxl' || 
+         extension === 'heif' || 
+         extension === 'heic';
+}
+
 function calculateKeyphraseDensity(content: string, keyphrase: string): {
   density: number;
   occurrences: number;
@@ -240,89 +268,94 @@ const fallbackRecommendations: Record<string, (...args: any[]) => string> = {
     `Link to reputable external sources to increase your content's credibility.`
 };
 
+// Add this helper function to check for dangerous URL schemes
+function hasDangerousScheme(url: string): boolean {
+  const dangerous = ['javascript:', 'data:', 'vbscript:'];
+  return dangerous.some(scheme => url.toLowerCase().startsWith(scheme));
+}
+
 async function scrapeWebpage(url: string): Promise<any> {
   console.log(`Scraping webpage: ${url}`);
   try {
+    // First check for dangerous schemes BEFORE adding https:// prefix
+    if (hasDangerousScheme(url)) {
+      throw new Error("URL uses a dangerous scheme");
+    }
+    
     if (!url.startsWith("http://") && !url.startsWith("https://")) {
       url = `https://${url}`;
     }
+    
+    // Validate URL before fetching
+    const urlObj = new URL(url);
+    if (hasDangerousScheme(urlObj.href)) {
+      throw new Error("URL uses a dangerous scheme");
+    }
+    
     const response = await fetch(url);
     if (!response.ok) throw new Error(`Failed to fetch page: ${response.status} ${response.statusText}`);
     const html = await response.text();
     
-    // Extract title and meta description
-    const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
-    const title = titleMatch ? titleMatch[1].trim() : "";
-    const metaDescriptionMatch = html.match(/<meta\s+name=["']description["']\s+content=["'](.*?)["']/i);
-    const metaDescription = metaDescriptionMatch ? metaDescriptionMatch[1].trim() : "";
+    // Use JSDOM to parse HTML instead of regex
+    const dom = new JSDOM(html);
+    const document = dom.window.document;
+    const baseUrl = new URL(url);
+
+    // Extract title and meta description safely
+    const title = document.querySelector("title")?.textContent?.trim() || "";
+    const metaDescription = document.querySelector('meta[name="description"]')?.getAttribute("content") || "";
     
-    // Extract OpenGraph metadata
+    // Extract OpenGraph metadata safely
     const ogMetadata: Record<string, string> = {
-      title: "",
-      description: "",
-      image: "",
-      imageWidth: "",
-      imageHeight: ""
+      title: document.querySelector('meta[property="og:title"]')?.getAttribute("content") || "",
+      description: document.querySelector('meta[property="og:description"]')?.getAttribute("content") || "",
+      image: document.querySelector('meta[property="og:image"]')?.getAttribute("content") || "",
+      imageWidth: document.querySelector('meta[property="og:image:width"]')?.getAttribute("content") || "",
+      imageHeight: document.querySelector('meta[property="og:image:height"]')?.getAttribute("content") || ""
     };
     
-    // Extract OG title
-    const ogTitleMatch = html.match(/<meta\s+property=["']og:title["']\s+content=["'](.*?)["']/i);
-    if (ogTitleMatch) ogMetadata.title = ogTitleMatch[1].trim();
+    // Extract body content safely
+    const content = document.body.textContent?.trim() || "";
     
-    // Extract OG description
-    const ogDescMatch = html.match(/<meta\s+property=["']og:description["']\s+content=["'](.*?)["']/i);
-    if (ogDescMatch) ogMetadata.description = ogDescMatch[1].trim();
-    
-    // Extract OG image
-    const ogImageMatch = html.match(/<meta\s+property=["']og:image["']\s+content=["'](.*?)["']/i);
-    if (ogImageMatch) ogMetadata.image = ogImageMatch[1].trim();
-    
-    // Extract OG image dimensions
-    const ogImageWidthMatch = html.match(/<meta\s+property=["']og:image:width["']\s+content=["'](.*?)["']/i);
-    if (ogImageWidthMatch) ogMetadata.imageWidth = ogImageWidthMatch[1].trim();
-    
-    const ogImageHeightMatch = html.match(/<meta\s+property=["']og:image:height["']\s+content=["'](.*?)["']/i);
-    if (ogImageHeightMatch) ogMetadata.imageHeight = ogImageHeightMatch[1].trim();
-    
-    // Extract body content
-    const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
-    const bodyContent = bodyMatch ? bodyMatch[1] : "";
-    const content = bodyContent.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-    
-    // Extract paragraphs
+    // Extract paragraphs safely
     const paragraphs: string[] = [];
-    const paragraphMatches = bodyContent.matchAll(/<p[^>]*>(.*?)<\/p>/gi);
-    for (const match of paragraphMatches) {
-      const text = match[1].replace(/<[^>]+>/g, ' ').trim();
+    document.querySelectorAll("p").forEach(p => {
+      const text = p.textContent?.trim() || "";
       if (text) paragraphs.push(text);
-    }
+    });
     
-    // Extract headings
+    // Extract headings safely
     const headings: Array<{ level: number; text: string }> = [];
     for (let i = 1; i <= 6; i++) {
-      const headingMatches = bodyContent.matchAll(new RegExp(`<h${i}[^>]*>(.*?)</h${i}>`, 'gi'));
-      for (const match of headingMatches) {
-        const text = match[1].replace(/<[^>]+>/g, ' ').trim();
+      document.querySelectorAll(`h${i}`).forEach(h => {
+        const text = h.textContent?.trim() || "";
         if (text) headings.push({ level: i, text });
+      });
+    }
+    
+    // Extract images safely
+    const images: Array<{ src: string; alt: string; isNextGen?: boolean }> = [];
+    document.querySelectorAll("img").forEach(img => {
+      const src = img.getAttribute("src") || "";
+      const alt = img.getAttribute("alt") || "";
+      if (src) {
+        images.push({ 
+          src, 
+          alt,
+          isNextGen: isNextGenImageFormat(src)
+        });
       }
-    }
+    });
     
-    // Extract images with sizes
-    const images: Array<{ src: string; alt: string; size?: number }> = [];
-    const imageMatches = bodyContent.matchAll(/<img[^>]*src=["'](.*?)["'][^>]*alt=["'](.*?)["'][^>]*>/gi);
-    for (const match of imageMatches) {
-      images.push({ src: match[1], alt: match[2] });
-    }
-    
-    // Extract links
-    const baseUrl = new URL(url);
+    // Extract links safely
     const internalLinks: string[] = [];
     const outboundLinks: string[] = [];
-    const linkMatches = bodyContent.matchAll(/<a[^>]*href=["'](.*?)["'][^>]*>/gi);
-    for (const match of linkMatches) {
+    document.querySelectorAll("a[href]").forEach(a => {
+      const href = a.getAttribute("href");
+      if (!href) return;
+      if (href.startsWith('#') || hasDangerousScheme(href)) return;
+      
       try {
-        const href = match[1];
-        if (href.startsWith('#') || href.startsWith('javascript:')) continue;
         const linkUrl = new URL(href, baseUrl.origin);
         if (linkUrl.hostname === baseUrl.hostname) {
           internalLinks.push(href);
@@ -332,21 +365,19 @@ async function scrapeWebpage(url: string): Promise<any> {
       } catch (e) {
         // Skip invalid URLs
       }
-    }
+    });
     
-    // Extract JavaScript and CSS resources to check minification
+    // Extract JavaScript and CSS resources safely
     const resources = {
       js: [] as Array<{url: string; minified: boolean}>,
       css: [] as Array<{url: string; minified: boolean}>
     };
     
     // Extract JavaScript files
-    const scriptMatches = bodyContent.matchAll(/<script[^>]*src=["'](.*?)["'][^>]*>/gi);
-    for (const match of Array.from(scriptMatches)) {
-      const scriptUrl = match[1];
-      if (scriptUrl) {
+    document.querySelectorAll("script[src]").forEach(script => {
+      const scriptUrl = script.getAttribute("src");
+      if (scriptUrl && !hasDangerousScheme(scriptUrl)) {
         try {
-          // Determine if it's external or can be fetched
           let absoluteUrl = scriptUrl;
           if (scriptUrl.startsWith('//')) {
             absoluteUrl = `https:${scriptUrl}`;
@@ -363,31 +394,27 @@ async function scrapeWebpage(url: string): Promise<any> {
           console.log(`Error processing script URL: ${scriptUrl}`, e);
         }
       }
-    }
+    });
     
-    // Extract inline scripts - replace sanitizeHtml with manual extraction
-    const inlineScriptMatches = bodyContent.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi);
-    for (const match of Array.from(inlineScriptMatches)) {
-      const scriptContent = match[1]?.trim();
+    // Extract inline scripts
+    document.querySelectorAll("script:not([src])").forEach(script => {
+      const scriptContent = script.textContent?.trim();
       if (scriptContent && scriptContent.length > 0) {
-        // Check if script is minified by looking for newlines and multiple spaces
         const isMinified = !scriptContent.includes('\n') && 
-                          !(/\s{2,}/).test(scriptContent) &&
-                          scriptContent.length > 50;
+                         !(/\s{2,}/).test(scriptContent) &&
+                         scriptContent.length > 50;
         resources.js.push({
           url: 'inline-script',
           minified: isMinified
         });
       }
-    }
+    });
     
     // Extract CSS files
-    const cssMatches = bodyContent.matchAll(/<link[^>]*rel=["']stylesheet["'][^>]*href=["'](.*?)["'][^>]*>/gi);
-    for (const match of Array.from(cssMatches)) {
-      const cssUrl = match[1];
-      if (cssUrl) {
+    document.querySelectorAll("link[rel='stylesheet']").forEach(link => {
+      const cssUrl = link.getAttribute("href");
+      if (cssUrl && !hasDangerousScheme(cssUrl)) {
         try {
-          // Determine if it's external or can be fetched
           let absoluteUrl = cssUrl;
           if (cssUrl.startsWith('//')) {
             absoluteUrl = `https:${cssUrl}`;
@@ -404,23 +431,21 @@ async function scrapeWebpage(url: string): Promise<any> {
           console.log(`Error processing CSS URL: ${cssUrl}`, e);
         }
       }
-    }
+    });
     
     // Extract inline styles
-    const inlineStyleMatches = bodyContent.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi);
-    for (const match of Array.from(inlineStyleMatches)) {
-      const styleContent = match[1]?.trim();
+    document.querySelectorAll("style").forEach(style => {
+      const styleContent = style.textContent?.trim();
       if (styleContent && styleContent.length > 0) {
-        // Check if style is minified
         const isMinified = !styleContent.includes('\n') && 
-                          !(/\s{2,}/).test(styleContent) &&
-                          styleContent.length > 50;
+                         !(/\s{2,}/).test(styleContent) &&
+                         styleContent.length > 50;
         resources.css.push({
           url: 'inline-style',
           minified: isMinified
         });
       }
-    }
+    });
     
     // Check for schema.org structured data
     const schema = {
@@ -428,19 +453,35 @@ async function scrapeWebpage(url: string): Promise<any> {
       types: [] as string[]
     };
     
-    const schemaJsonMatch = html.match(/<script\s+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i);
-    if (schemaJsonMatch) {
+    const schemaScripts = document.querySelectorAll('script[type="application/ld+json"]');
+    if (schemaScripts.length > 0) {
       schema.detected = true;
-      try {
-        const jsonData = JSON.parse(schemaJsonMatch[1]);
-        if (jsonData['@type']) {
-          schema.types.push(jsonData['@type']);
-        } else if (Array.isArray(jsonData) && jsonData[0] && jsonData[0]['@type']) {
-          schema.types = jsonData.map(item => item['@type']).filter(Boolean);
+      schemaScripts.forEach(script => {
+        try {
+          const jsonData = JSON.parse(script.textContent || "{}");
+          if (jsonData['@type']) {
+            if (Array.isArray(jsonData['@type'])) {
+              jsonData['@type'].forEach((type: string) => {
+                if (type && !schema.types.includes(type)) {
+                  schema.types.push(type);
+                }
+              });
+            } else {
+              if (jsonData['@type'] && !schema.types.includes(jsonData['@type'])) {
+                schema.types.push(jsonData['@type']);
+              }
+            }
+          } else if (Array.isArray(jsonData) && jsonData[0] && jsonData[0]['@type']) {
+            jsonData.forEach(item => {
+              if (item['@type'] && !schema.types.includes(item['@type'])) {
+                schema.types.push(item['@type']);
+              }
+            });
+          }
+        } catch (e) {
+          console.log('Error parsing schema JSON:', e);
         }
-      } catch (e) {
-        console.log('Error parsing schema JSON:', e);
-      }
+      });
     }
     
     return {
@@ -843,7 +884,7 @@ async function handleRequest(request: Request, env: any): Promise<Response> {
       if (!keyphrase || !url) {
         return new Response(JSON.stringify({ message: "Keyphrase and URL are required" }), { status: 400, headers: corsHeaders });
       }
-      const results = await analyzeSEO(url, keyphrase);
+      const results = await analyzeSEO(url, keyphrase, env);
       return new Response(JSON.stringify(results), { status: 200, headers: corsHeaders });
     } else if (path === '/api/register-domains' && request.method === 'POST') {
       const data = await request.json();
@@ -918,11 +959,24 @@ function isIPv6Format(address: string): boolean {
 
 export function isValidUrl(urlString: string): boolean {
   try {
+    // First check for dangerous schemes BEFORE any URL manipulation
+    if (hasDangerousScheme(urlString)) {
+      console.log(`Rejected dangerous URL scheme: ${urlString}`);
+      return false;
+    }
+    
     if (!/^https?:\/\//i.test(urlString)) {
       urlString = 'https://' + urlString;
     } else if (/^http:\/\//i.test(urlString)) {
       urlString = urlString.replace(/^http:/i, 'https:');
     }
+    
+    // Check for dangerous schemes
+    if (hasDangerousScheme(urlString)) {
+      console.log(`Rejected dangerous URL scheme: ${urlString}`);
+      return false;
+    }
+    
     const url = new URL(urlString);
     if (url.protocol !== 'https:') {
       console.log(`Rejected non-HTTPS URL: ${urlString}`);
@@ -943,24 +997,40 @@ export function isValidUrl(urlString: string): boolean {
   }
 }
 
+// Improved function for validating if a domain is in the allowlist
 export function isAllowedDomain(domain: string): boolean {
   if (!ENFORCE_ALLOWLIST) return true;
   if (ALLOWED_DOMAINS.length === 0) return true;
-  domain = domain.toLowerCase();
-  console.log(`Checking if domain '${domain}' is in allowlist:`, JSON.stringify(ALLOWED_DOMAINS));
+  
+  // Normalize the domain to lowercase to ensure case-insensitive matching
+  domain = domain.toLowerCase().trim();
+  
+  // First check for exact matches
   if (ALLOWED_DOMAINS.includes(domain)) {
     console.log(`Domain '${domain}' found in allowlist (exact match)`);
     return true;
   }
+  
+  // Then check for wildcard matches
   const matchedWildcard = ALLOWED_DOMAINS.find(allowedDomain => {
     if (allowedDomain.startsWith('*.')) {
       const baseDomain = allowedDomain.substring(2);
-      const matches = domain.endsWith(baseDomain) && domain.length > baseDomain.length;
+      // Ensure subdomain doesn't contain dots to prevent bypasses (e.g., a.b.allowed.com)
+      // by checking that the remaining part after the first subdomain exactly matches the base domain
+      const parts = domain.split('.');
+      if (parts.length < 2) return false;
+      
+      // Create the domain without the first subdomain
+      const domainWithoutFirstSubdomain = parts.slice(1).join('.');
+      
+      // Check for exact match of the base domain after the first subdomain
+      const matches = domainWithoutFirstSubdomain === baseDomain;
       if (matches) console.log(`Domain '${domain}' matches wildcard '${allowedDomain}'`);
       return matches;
     }
     return false;
   });
+  
   return !!matchedWildcard;
 }
 
@@ -1004,6 +1074,13 @@ export function validateIPAddress(address: string): boolean {
 export function validateUrl(url: string): boolean {
   try {
     console.log(`validateUrl - Checking URL: ${url}`);
+    
+    // Check for dangerous schemes
+    if (hasDangerousScheme(url)) {
+      console.log(`Rejected dangerous URL scheme in validateUrl: ${url}`);
+      return false;
+    }
+    
     const urlObj = new URL(url);
     const protocol = urlObj.protocol.toLowerCase();
     console.log(`validateUrl - Protocol detected: ${protocol}`);
@@ -1497,5 +1574,241 @@ function isNextGenImageFormat(url: string): boolean {
 }
 
 // ===== End WebScraper functionality (moved from server\lib\webScraper.ts) =====
+
+// Main SEO analysis function that calls analyzeSEOElements with proper environment
+async function analyzeSEO(url: string, keyphrase: string, env: any): Promise<any> {
+  console.log(`Starting SEO analysis for ${url} with keyphrase "${keyphrase}"`);
+  
+  try {
+    // Scrape the webpage
+    const scrapedData = await scrapeWebpage(url);
+    const checks: any[] = [];
+    let passedChecks = 0;
+    let failedChecks = 0;
+
+    // Helper function to add a check result
+    const addCheck = async (
+      title: string,
+      description: string,
+      passed: boolean,
+      context?: string,
+      skipRecommendation = false
+    ) => {
+      let recommendation = "";
+      if (!passed && !skipRecommendation) {
+        try {
+          // Use the env parameter when calling getGPTRecommendation
+          recommendation = await getGPTRecommendation(title, keyphrase, env, context);
+        } catch (error) {
+          console.error(`Error getting GPT recommendation for ${title}:`, error);
+          recommendation = fallbackRecommendations[title] 
+            ? fallbackRecommendations[title](keyphrase, context || "") 
+            : `Consider optimizing your content for "${keyphrase}" in relation to ${title.toLowerCase()}.`;
+        }
+      }
+      
+      const successMessage = passed ? getSuccessMessage(title, url) : description;
+      const priority = checkPriorities[title] || "medium";
+      
+      checks.push({
+        title,
+        description: successMessage,
+        passed,
+        recommendation,
+        priority
+      });
+      
+      passed ? passedChecks++ : failedChecks++;
+    };
+
+    // Run all SEO checks
+    // 1. Title check
+    await addCheck(
+      "Keyphrase in Title",
+      "Your title doesn't contain the keyphrase.",
+      scrapedData.title.toLowerCase().includes(keyphrase.toLowerCase()),
+      scrapedData.title
+    );
+
+    // 2. Meta description check
+    await addCheck(
+      "Keyphrase in Meta Description",
+      "Your meta description doesn't contain the keyphrase.",
+      scrapedData.metaDescription.toLowerCase().includes(keyphrase.toLowerCase()),
+      scrapedData.metaDescription
+    );
+
+    // 3. URL check
+    const urlObj = new URL(url);
+    await addCheck(
+      "Keyphrase in URL",
+      "Your URL doesn't contain the keyphrase.",
+      isHomePage(url) || urlObj.pathname.toLowerCase().includes(keyphrase.toLowerCase().replace(/\s+/g, '-')),
+      urlObj.pathname
+    );
+
+    // 4. Content length check
+    const contentLength = scrapedData.content.length;
+    await addCheck(
+      "Content Length on page",
+      "Your content is too short. Aim for at least 300 words.",
+      contentLength >= 300,
+      `Current content length: ${contentLength} characters`
+    );
+
+    // 5. Keyphrase density check
+    const { density, occurrences, totalWords } = calculateKeyphraseDensity(scrapedData.content, keyphrase);
+    await addCheck(
+      "Keyphrase Density",
+      `Your keyphrase density of ${density.toFixed(1)}% is outside the optimal range (0.5% to 2.5%).`,
+      density >= 0.5 && density <= 2.5,
+      `Current density: ${density.toFixed(1)}% (${occurrences} occurrences in ${totalWords} words)`
+    );
+
+    // 6. Introduction check
+    const hasIntroduction = scrapedData.paragraphs.length > 0;
+    const introductionText = hasIntroduction ? scrapedData.paragraphs[0] : "";
+    await addCheck(
+      "Keyphrase in Introduction",
+      "Your introduction doesn't contain the keyphrase.",
+      hasIntroduction && introductionText.toLowerCase().includes(keyphrase.toLowerCase()),
+      introductionText
+    );
+
+    // 7. H1 check
+    const h1Headings = scrapedData.headings.filter(h => h.level === 1);
+    const hasH1WithKeyphrase = h1Headings.some(h => h.text.toLowerCase().includes(keyphrase.toLowerCase()));
+    await addCheck(
+      "Keyphrase in H1 Heading",
+      h1Headings.length === 0 ? "Your page has no H1 heading." : "Your H1 heading doesn't contain the keyphrase.",
+      hasH1WithKeyphrase,
+      h1Headings.map(h => h.text).join(", ")
+    );
+
+    // 8. H2 check
+    const h2Headings = scrapedData.headings.filter(h => h.level === 2);
+    const hasH2WithKeyphrase = h2Headings.some(h => h.text.toLowerCase().includes(keyphrase.toLowerCase()));
+    await addCheck(
+      "Keyphrase in H2 Headings",
+      h2Headings.length === 0 ? "Your page has no H2 headings." : "None of your H2 headings contain the keyphrase.",
+      hasH2WithKeyphrase,
+      h2Headings.map(h => h.text).join(", ")
+    );
+
+    // 9. Heading hierarchy check
+    const hasProperHierarchy = h1Headings.length === 1 && scrapedData.headings.every((h, i, arr) => 
+      i === 0 || h.level >= arr[i-1].level || h.level === arr[i-1].level + 1
+    );
+    await addCheck(
+      "Heading Hierarchy",
+      "Your page doesn't have proper heading hierarchy. Use exactly one H1 and nest headings properly.",
+      hasProperHierarchy
+    );
+
+    // 10. Image alt attributes check
+    const imagesWithAlt = scrapedData.images.filter(img => img.alt && img.alt.trim() !== "");
+    const imagesWithKeyphraseInAlt = scrapedData.images.filter(img => 
+      img.alt && img.alt.toLowerCase().includes(keyphrase.toLowerCase())
+    );
+    await addCheck(
+      "Image Alt Attributes",
+      scrapedData.images.length === 0 ? "Your page has no images." : 
+        imagesWithAlt.length === 0 ? "None of your images have alt attributes." :
+        "None of your image alt attributes contain the keyphrase.",
+      imagesWithKeyphraseInAlt.length > 0,
+      imagesWithAlt.map(img => img.alt).join(", ")
+    );
+
+    // 11. Internal links check
+    await addCheck(
+      "Internal Links",
+      "Your page has no internal links.",
+      scrapedData.internalLinks.length > 0,
+      `Current internal links: ${scrapedData.internalLinks.length}`
+    );
+
+    // 12. Outbound links check
+    await addCheck(
+      "Outbound Links",
+      "Your page has no outbound links to authoritative sources.",
+      scrapedData.outboundLinks.length > 0,
+      `Current outbound links: ${scrapedData.outboundLinks.length}`
+    );
+
+    // 13. Next-gen image formats check
+    const nextGenImages = scrapedData.images.filter(img => isNextGenImageFormat(img.src));
+    await addCheck(
+      "Next-Gen Image Formats",
+      "None of your images use next-gen formats like WebP, AVIF, or JPEG 2000.",
+      nextGenImages.length > 0 || scrapedData.images.length === 0,
+      `${nextGenImages.length} of ${scrapedData.images.length} images use next-gen formats`
+    );
+
+    // 14. OpenGraph image check
+    await addCheck(
+      "OpenGraph Image",
+      "Your page is missing an OpenGraph image for social sharing.",
+      !!scrapedData.ogMetadata.image,
+      scrapedData.ogMetadata.image
+    );
+
+    // 15. Open Graph title and description check
+    await addCheck(
+      "Open Graph Title and Description",
+      "Your page is missing OpenGraph title and description for social sharing.",
+      !!scrapedData.ogMetadata.title && !!scrapedData.ogMetadata.description,
+      `OG Title: ${scrapedData.ogMetadata.title}, OG Description: ${scrapedData.ogMetadata.description}`
+    );
+
+    // 16. Code minification check
+    const minifiedJs = scrapedData.resources.js.filter(js => js.minified).length;
+    const minifiedCss = scrapedData.resources.css.filter(css => css.minified).length;
+    const allResourcesMinified = 
+      (minifiedJs === scrapedData.resources.js.length || scrapedData.resources.js.length === 0) &&
+      (minifiedCss === scrapedData.resources.css.length || scrapedData.resources.css.length === 0);
+    await addCheck(
+      "Code Minification",
+      "Your JavaScript and/or CSS files are not minified.",
+      allResourcesMinified,
+      `Minified JS: ${minifiedJs}/${scrapedData.resources.js.length}, Minified CSS: ${minifiedCss}/${scrapedData.resources.css.length}`
+    );
+
+    // 17. Schema markup check
+    await addCheck(
+      "Schema Markup",
+      "Your page doesn't include schema.org structured data.",
+      scrapedData.schema.detected,
+      scrapedData.schema.types.length > 0 ? `Schema types: ${scrapedData.schema.types.join(", ")}` : "No schema types detected"
+    );
+
+    // 18. Image file size check (if available)
+    const largeImages = scrapedData.images.filter(img => img.size && img.size > 200000);
+    await addCheck(
+      "Image File Size",
+      largeImages.length > 0 ? "Some of your images are too large (>200KB)." : "Your images are well optimized.",
+      largeImages.length === 0,
+      `${largeImages.length} of ${scrapedData.images.length} images are too large`
+    );
+
+    // Calculate score and return results
+    const score = Math.round((passedChecks / checks.length) * 100);
+    const timestamp = new Date().toISOString();
+    
+    console.log(`Completed SEO analysis with score: ${score}%`);
+    
+    return {
+      checks,
+      passedChecks,
+      failedChecks,
+      score,
+      url,
+      keyphrase,
+      timestamp
+    };
+  } catch (error: any) {
+    console.error("Error analyzing SEO:", error);
+    throw new Error(`Failed to analyze SEO: ${error.message}`);
+  }
+}
 
 export default { fetch: handleRequest }
