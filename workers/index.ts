@@ -464,7 +464,7 @@ async function scrapeWebpage(url: string): Promise<any> {
 }
 
 // Update the check title in the analyzeSEO function to match the UI
-async function analyzeSEO(url: string, keyphrase: string): Promise<any> {
+export async function analyzeSEO(url: string, keyphrase: string): Promise<any> {
   console.log(`Analyzing SEO for URL: ${url}, keyphrase: ${keyphrase}`);
   try {
     const scrapedData = await scrapeWebpage(url);
@@ -765,6 +765,32 @@ async function analyzeSEO(url: string, keyphrase: string): Promise<any> {
         minificationCheck.recommendation = minificationRecommendation;
       }
     }
+    
+    // Helper function to determine if an image URL is a next-gen format
+    function isNextGenImageFormat(url: string): boolean {
+      const ext = url.split('.').pop()?.toLowerCase();
+      // Check for modern formats: WebP, AVIF, JPEG 2000, SVG
+      return ['webp', 'avif', 'jp2', 'jpx', 'svg'].includes(ext || '');
+    }
+
+    // Add this where other image checks are implemented
+    // Next-Gen Image Formats check
+    const totalImages = scrapedData.images.length;
+    const nextGenImages = scrapedData.images.filter((img: { src: string }) => 
+      isNextGenImageFormat(img.src)
+    ).length;
+    const nextGenPercentage = totalImages > 0 ? Math.round((nextGenImages / totalImages) * 100) : 0;
+
+    // Determine if the check passes based on a threshold (70% for now)
+    const nextGenThreshold = 70;
+    const nextGenPasses = nextGenPercentage >= nextGenThreshold;
+
+    // Add result to the array of checks
+    addCheck(
+      "Next-Gen Image Formats",
+      `At least ${nextGenThreshold}% of images should use modern formats like WebP, AVIF, or SVG. Currently: ${nextGenPercentage}% of images use next-gen formats (${nextGenImages}/${totalImages}).`,
+      nextGenPasses
+    );
     
     const score = Math.round((passedChecks / checks.length) * 100);
     return { checks, passedChecks, failedChecks, url, score, timestamp: new Date().toISOString() };
@@ -1462,6 +1488,14 @@ function isMinified(code: string): boolean {
   const avgLineLength = lines.length > 0 ? code.length / lines.length : 0;
   return (newlineRatio < 0.01 && whitespaceRatio < 0.15) || avgLineLength > 500;
 }
+
+// Helper function to determine if an image URL is a next-gen format
+function isNextGenImageFormat(url: string): boolean {
+  const ext = url.split('.').pop()?.toLowerCase();
+  // Check for modern formats: WebP, AVIF, JPEG 2000, SVG
+  return ['webp', 'avif', 'jp2', 'jpx', 'svg'].includes(ext || '');
+}
+
 // ===== End WebScraper functionality (moved from server\lib\webScraper.ts) =====
 
 export default { fetch: handleRequest }
