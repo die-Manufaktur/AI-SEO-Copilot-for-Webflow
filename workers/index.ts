@@ -504,6 +504,343 @@ async function scrapeWebpage(url: string): Promise<any> {
   }
 }
 
+// Update the check title in the analyzeSEO function to match the UI
+export async function analyzeSEO(url: string, keyphrase: string): Promise<any> {
+  console.log(`Analyzing SEO for URL: ${url}, keyphrase: ${keyphrase}`);
+  try {
+    const scrapedData = await scrapeWebpage(url);
+    const checks: any[] = [];
+    let passedChecks = 0;
+    let failedChecks = 0;
+    const addCheck = (title: string, description: string, passed: boolean, recommendation = "") => {
+      let finalDescription = passed ? getSuccessMessage(title, url) : description;
+      let finalRecommendation = "";
+      if (!passed) {
+        switch (title) {
+          case "Keyphrase in Title":
+            finalRecommendation = fallbackRecommendations[title](keyphrase, scrapedData.title);
+            break;
+          case "Keyphrase in Meta Description":
+            finalRecommendation = fallbackRecommendations[title](keyphrase, scrapedData.metaDescription);
+            break;
+          default:
+            finalRecommendation = fallbackRecommendations[title] ? fallbackRecommendations[title](keyphrase) : `Consider optimizing your content for the keyphrase "${keyphrase}" in relation to ${title.toLowerCase()}.`;
+        }
+      }
+      if (passed) {
+        passedChecks++;
+      } else {
+        failedChecks++;
+      }
+      const priority = checkPriorities[title] || "medium";
+      checks.push({ title, description: finalDescription, passed, recommendation: finalRecommendation, priority });
+    };
+    
+    addCheck(
+      "Keyphrase in Title",
+      "The focus keyphrase should appear in the page title",
+      scrapedData.title.toLowerCase().includes(keyphrase.toLowerCase())
+    );
+    
+    addCheck(
+      "Keyphrase in Meta Description",
+      "The meta description should contain the focus keyphrase",
+      Boolean(scrapedData.metaDescription && scrapedData.metaDescription.toLowerCase().includes(keyphrase.toLowerCase()))
+    );
+    
+    const isHome = isHomePage(url);
+    addCheck(
+      "Keyphrase in URL",
+      isHome
+        ? "This is the homepage URL, so the keyphrase is not required in the URL ✨"
+        : "The URL should contain the focus keyphrase",
+      isHome || url.toLowerCase().includes(keyphrase.toLowerCase())
+    );
+    
+    const minWordCount = 300;
+    const wordCount = scrapedData.content.split(/\s+/).length;
+    addCheck(
+      "Content Length on page", // Updated name to match Home.tsx
+      `Your content has ${wordCount} words. For good SEO, aim for at least ${minWordCount} words to provide comprehensive coverage of your topic.`,
+      wordCount >= minWordCount
+    );
+    
+    const densityResult = calculateKeyphraseDensity(scrapedData.content, keyphrase);
+    addCheck(
+      "Keyphrase Density",
+      `Keyphrase density should be between 0.5% and 2.5%. Current density: ${densityResult.density.toFixed(1)}% (${densityResult.occurrences} occurrences in ${densityResult.totalWords} words)`,
+      densityResult.density >= 0.5 && densityResult.density <= 2.5
+    );
+    
+    const firstParagraph = scrapedData.paragraphs[0] || "";
+    addCheck(
+      "Keyphrase in Introduction",
+      "The focus keyphrase should appear in the first paragraph to establish topic relevance early",
+      firstParagraph.toLowerCase().includes(keyphrase.toLowerCase())
+    );
+    
+    // Image Alt Attributes check - Implementation instead of placeholder comment
+    const altTextsWithKeyphrase = scrapedData.images.some((img: { alt: string }) => img.alt?.toLowerCase().includes(keyphrase.toLowerCase()));
+    addCheck(
+      "Image Alt Attributes",
+      "At least one image should have an alt attribute containing the focus keyphrase",
+      altTextsWithKeyphrase
+    );
+    
+    // Internal Links check - Implementation instead of placeholder comment
+    const hasInternalLinks = scrapedData.internalLinks.length > 0;
+    addCheck(
+      "Internal Links",
+      "The page should contain internal links to other pages",
+      hasInternalLinks
+    );
+    
+    // Outbound Links check - Implementation instead of placeholder comment
+    const hasOutboundLinks = scrapedData.outboundLinks.length > 0;
+    addCheck(
+      "Outbound Links",
+      "The page should contain outbound links to authoritative sources",
+      hasOutboundLinks
+    );
+    
+    // 7. H1 Heading analysis
+    const h1Tags = scrapedData.headings.filter(heading => heading.level === 1);
+    let h1HasKeyphrase = h1Tags.some(heading =>
+      heading.text.toLowerCase().includes(keyphrase.toLowerCase())
+    );
+    
+    // If not found, check for all important words
+    if (!h1HasKeyphrase && h1Tags.length > 0) {
+      const keyphraseWords = keyphrase.toLowerCase().split(/\s+/).filter(word => word.length > 2);
+      if (keyphraseWords.length > 0) {
+        const allWordsFoundInAnyH1 = h1Tags.some(heading => {
+          const headingText = heading.text.toLowerCase();
+          return keyphraseWords.every(word => headingText.includes(word));
+        });
+        h1HasKeyphrase = allWordsFoundInAnyH1;
+      }
+    }
+    
+    addCheck(
+      "Keyphrase in H1 Heading",
+      h1Tags.length === 0
+        ? "Your page is missing an H1 heading. Add an H1 heading that includes your keyphrase."
+        : h1Tags.length > 1
+          ? "You have multiple H1 headings. Best practice is to have a single H1 heading that includes your keyphrase."
+          : "Your H1 heading should include your target keyphrase for optimal SEO.",
+      h1HasKeyphrase && h1Tags.length === 1
+    );
+    
+    // 8. H2 Headings analysis
+    const h2Tags = scrapedData.headings.filter(heading => heading.level === 2);
+    let h2HasKeyphrase = h2Tags.some(heading =>
+      heading.text.toLowerCase().includes(keyphrase.toLowerCase())
+    );
+    
+    // More flexible keyword matching for H2s
+    if (!h2HasKeyphrase && h2Tags.length > 0) {
+      const keyphraseWords = keyphrase.toLowerCase().split(/\s+/).filter(word => word.length > 2);
+      if (keyphraseWords.length > 0) {
+        const allWordsFoundInAnyH2 = h2Tags.some(heading => {
+          const headingText = heading.text.toLowerCase();
+          return keyphraseWords.every(word => headingText.includes(word));
+        });
+        h2HasKeyphrase = allWordsFoundInAnyH2;
+      }
+    }
+    
+    addCheck(
+      "Keyphrase in H2 Headings",
+      h2Tags.length === 0
+        ? "Your page doesn't have any H2 headings. Add H2 subheadings that include your keyphrase to structure your content."
+        : "Your H2 headings should include your target keyphrase at least once to reinforce your topic focus.",
+      h2HasKeyphrase && h2Tags.length > 0
+    );
+    
+    // 9. Heading hierarchy check
+    const hasH1 = h1Tags.length > 0;
+    const hasH2 = h2Tags.length > 0;
+    const hasProperHeadingStructure = hasH1 && hasH2 && h1Tags.length === 1;
+    
+    let hasProperLevelOrder = true;
+    const allHeadings = [...scrapedData.headings].sort((a, b) => {
+      return scrapedData.headings.indexOf(a) - scrapedData.headings.indexOf(b);
+    });
+    
+    let prevLevel = 0;
+    for (const heading of allHeadings) {
+      if (heading.level > prevLevel + 1 && prevLevel > 0) {
+        hasProperLevelOrder = false;
+        break;
+      }
+      prevLevel = heading.level;
+    }
+    
+    const hasProperHeadingHierarchy = hasProperHeadingStructure && hasProperLevelOrder;
+    
+    addCheck(
+      "Heading Hierarchy",
+      hasProperHeadingHierarchy
+        ? "Your page has a proper heading structure with a single H1 followed by appropriate subheadings."
+        : !hasH1
+          ? "Your page is missing an H1 heading, which is crucial for SEO and document structure."
+          : h1Tags.length > 1
+            ? "Your page has multiple H1 headings. Best practice is to have a single H1 heading per page."
+            : !hasH2
+              ? "Your page is missing H2 headings. Use H2 headings to structure your content under the main H1 heading."
+              : !hasProperLevelOrder
+                ? "Your heading structure skips levels (e.g., H1 followed directly by H3). This can confuse search engines and assistive technologies."
+                : "Your heading structure needs improvement. Follow a logical hierarchy (H1 → H2 → H3) for better SEO.",
+      hasProperHeadingHierarchy
+    );
+    
+    // 10. Open Graph Title and Description
+    const hasOGTitle = Boolean(scrapedData.ogMetadata.title);
+    const hasOGDescription = Boolean(scrapedData.ogMetadata.description);
+    const ogTitleLength = hasOGTitle ? scrapedData.ogMetadata.title.length : 0;
+    const ogDescLength = hasOGDescription ? scrapedData.ogMetadata.description.length : 0;
+    
+    const validOGMeta = hasOGTitle && hasOGDescription &&
+      ogTitleLength >= 10 && ogTitleLength <= 70 &&
+      ogDescLength >= 100 && ogDescLength <= 200;
+    
+    addCheck(
+      "Open Graph Title and Description",
+      validOGMeta
+        ? "Open Graph title and description are properly set with optimal lengths"
+        : "Open Graph title and/or description need optimization",
+      validOGMeta
+    );
+    
+    // 11. Open Graph Image
+    const hasOGImage = Boolean(scrapedData.ogMetadata.image);
+    const validOGImageSize = Boolean(
+      scrapedData.ogMetadata.imageWidth &&
+      scrapedData.ogMetadata.imageHeight &&
+      parseInt(scrapedData.ogMetadata.imageWidth) >= 1200 &&
+      parseInt(scrapedData.ogMetadata.imageHeight) >= 630
+    );
+    
+    addCheck(
+      "OpenGraph Image",
+      hasOGImage
+        ? (validOGImageSize
+          ? `Open Graph image is present with recommended dimensions (1200x630 or larger).`
+          : `Open Graph image is present but may not have the optimal dimensions.`)
+        : "Open Graph image is missing. Add an OG image with dimensions of at least 1200x630px.",
+      hasOGImage
+    );
+    
+    // 15. Schema Markup
+    const hasSchemaMarkup = scrapedData.schema.detected;
+    
+    addCheck(
+      "Schema Markup",
+      hasSchemaMarkup ?
+        `Your page has schema markup implemented (${scrapedData.schema.types.join(', ') || 'Unknown type'})` :
+        "Your page is missing schema markup (structured data)",
+      hasSchemaMarkup
+    );
+    
+    // Add Code Minification check
+    const jsResources = scrapedData.resources.js;
+    const cssResources = scrapedData.resources.css;
+
+    // Count resources and check minification status
+    const totalJsResources = jsResources.length;
+    const totalCssResources = cssResources.length;
+    const minifiedJsCount = jsResources.filter(r => r.minified).length;
+    const minifiedCssCount = cssResources.filter(r => r.minified).length;
+
+    // Calculate percentage of minified resources
+    const totalResources = totalJsResources + totalCssResources;
+    const minifiedResources = minifiedJsCount + minifiedCssCount;
+    const minificationPercentage = totalResources > 0
+      ? Math.round((minifiedResources / totalResources) * 100)
+      : 100; // If no resources, consider it 100% passed
+
+    // List of non-minified resources to provide in the recommendation
+    const nonMinifiedJs = jsResources
+      .filter(r => !r.minified && r.url !== 'inline-script')
+      .map(r => r.url);
+
+    const nonMinifiedCss = cssResources
+      .filter(r => !r.minified && r.url !== 'inline-style')
+      .map(r => r.url);
+
+    const hasNonMinified = nonMinifiedJs.length > 0 || nonMinifiedCss.length > 0;
+    const hasInlineNonMinified = jsResources.some(r => r.url === 'inline-script' && !r.minified) ||
+      cssResources.some(r => r.url === 'inline-style' && !r.minified);
+
+    // Create context for recommendation
+    let minificationRecommendation = "";
+    if (totalResources === 0) {
+      minificationRecommendation = "No JavaScript or CSS resources found on the page.";
+    } else {
+      minificationRecommendation = `Found ${totalJsResources} JavaScript and ${totalCssResources} CSS resources. `;
+      minificationRecommendation += `${minifiedJsCount} of ${totalJsResources} JavaScript and ${minifiedCssCount} of ${totalCssResources} CSS resources are minified. `;
+
+      if (hasInlineNonMinified) {
+        minificationRecommendation += `\n\nNon-minified inline scripts or styles detected. Consider minifying them or moving to external files.`;
+      }
+      
+      minificationRecommendation += `\n\nMinify your JavaScript and CSS files to improve page load speed. Use tools like UglifyJS, Terser, or CSSNano, or build tools like Webpack or Parcel.`;
+    }
+
+    // Determine if the check passes (40% or more resources minified)
+    const minificationPasses = minificationPercentage >= 40;
+
+    addCheck(
+      "Code Minification",
+      minificationPasses
+        ? `Your JavaScript and CSS resources are well optimized. ${minificationPercentage}% are minified.`
+        : `${minificationPercentage}% of your JavaScript and CSS resources are minified. Aim for at least 40% minification.`,
+      minificationPasses,
+      minificationRecommendation
+    );
+    
+    // If the check failed, add our custom recommendation
+    if (!minificationPasses) {
+      const minificationCheck = checks.find(check => check.title === "Code Minification");
+      if (minificationCheck) {
+        minificationCheck.recommendation = minificationRecommendation;
+      }
+    }
+    
+    // Helper function to determine if an image URL is a next-gen format
+    function isNextGenImageFormat(url: string): boolean {
+      const ext = url.split('.').pop()?.toLowerCase();
+      // Check for modern formats: WebP, AVIF, JPEG 2000, SVG
+      return ['webp', 'avif', 'jp2', 'jpx', 'svg'].includes(ext || '');
+    }
+
+    // Add this where other image checks are implemented
+    // Next-Gen Image Formats check
+    const totalImages = scrapedData.images.length;
+    const nextGenImages = scrapedData.images.filter((img: { src: string }) => 
+      isNextGenImageFormat(img.src)
+    ).length;
+    const nextGenPercentage = totalImages > 0 ? Math.round((nextGenImages / totalImages) * 100) : 0;
+
+    // Determine if the check passes based on a threshold (70% for now)
+    const nextGenThreshold = 70;
+    const nextGenPasses = nextGenPercentage >= nextGenThreshold;
+
+    // Add result to the array of checks
+    addCheck(
+      "Next-Gen Image Formats",
+      `At least ${nextGenThreshold}% of images should use modern formats like WebP, AVIF, or SVG. Currently: ${nextGenPercentage}% of images use next-gen formats (${nextGenImages}/${totalImages}).`,
+      nextGenPasses
+    );
+    
+    const score = Math.round((passedChecks / checks.length) * 100);
+    return { checks, passedChecks, failedChecks, url, score, timestamp: new Date().toISOString() };
+  } catch (error: any) {
+    console.error(`Error analyzing SEO: ${error.message}`);
+    throw error;
+  }
+}
+
 // Worker event handler
 // @ts-ignore: Cloudflare Workers specific API
 addEventListener('fetch', (event: any) => {
@@ -1228,6 +1565,14 @@ function isMinified(code: string): boolean {
   const avgLineLength = lines.length > 0 ? code.length / lines.length : 0;
   return (newlineRatio < 0.01 && whitespaceRatio < 0.15) || avgLineLength > 500;
 }
+
+// Helper function to determine if an image URL is a next-gen format
+function isNextGenImageFormat(url: string): boolean {
+  const ext = url.split('.').pop()?.toLowerCase();
+  // Check for modern formats: WebP, AVIF, JPEG 2000, SVG
+  return ['webp', 'avif', 'jp2', 'jpx', 'svg'].includes(ext || '');
+}
+
 // ===== End WebScraper functionality (moved from server\lib\webScraper.ts) =====
 
 // Main SEO analysis function that calls analyzeSEOElements with proper environment
