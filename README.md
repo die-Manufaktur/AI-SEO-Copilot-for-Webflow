@@ -1,6 +1,6 @@
-# SEO Copilot <!-- Update the name here -->
+# AI SEO Copilot for Webflow <!-- Update the name here -->
 
-SEO Copilot is an advanced SEO analysis tool performing 11 comprehensive checks including title optimization, meta description analysis, content verification, keyword density, and image optimization. Get AI-powered recommendations for better rankings.
+AI SEO Copilot is an advanced SEO analysis tool performing on-page SEO checks including title optimization, meta description analysis, content verification, keyword density, and image optimization. Get AI-powered recommendations for better rankings.
 
 ## Features
 
