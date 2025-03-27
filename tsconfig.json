@@ -15,7 +15,8 @@
     "jsx": "react-jsx",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": true
+    "noEmit": true,
+    "types": []
   },
   "include": ["client/src"]
 }
