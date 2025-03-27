@@ -30,6 +30,6 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    entries: ['./src/**/*.{ts,tsx}'],
+    entries: ['./client/src/**/*.{ts,tsx}'],
   },
 });
