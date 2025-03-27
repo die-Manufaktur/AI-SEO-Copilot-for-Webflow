@@ -18,5 +18,5 @@
     "noEmit": true,
     "types": []
   },
-  "include": ["client/src", "server"]
+  "include": ["client/src"]
 }

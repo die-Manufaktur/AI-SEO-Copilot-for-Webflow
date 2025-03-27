@@ -1,0 +1,39 @@
+name = "seo-copilot-api"
+main = "./workers/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+# Account configuration (uncomment and set if needed)
+# account_id = "c130aef39c1c8e06d07c94bbadbe2bd7"
+
+[env.production]
+workers_dev = true
+# route = { pattern = "api.yoursite.com/*", zone_id = "your-zone-id" }
+# Define production-specific environment variables
+[env.production.vars]
+USE_GPT_RECOMMENDATIONS = "true"
+ALLOWED_ORIGINS = "https://webflow.com,https://*.webflow-ext.com,https://*.webflow.io"
+STATE = "webflow-seo-copilot-prod"
+# The following secrets should be set using wrangler secret commands:
+# - OPENAI_API_KEY
+# - WEBFLOW_CLIENT_ID
+# - WEBFLOW_CLIENT_SECRET
+# - WEBFLOW_REDIRECT_URI
+
+[env.development]
+workers_dev = true
+# Define development-specific environment variables
+[env.development.vars]
+USE_GPT_RECOMMENDATIONS = "true"
+ALLOWED_ORIGINS = "https://webflow.com,https://*.webflow-ext.com,https://*.webflow.io,http://localhost:1337,http://localhost:5173"
+STATE = "webflow-seo-copilot-dev"
+# The following secrets should be set using wrangler secret commands:
+# - OPENAI_API_KEY
+# - WEBFLOW_CLIENT_ID
+# - WEBFLOW_CLIENT_SECRET
+# - WEBFLOW_REDIRECT_URI
+
+[limits]
+memory_mb = 128
+timeout_ms = 30000
+cpu_ms = 50

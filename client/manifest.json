@@ -1,0 +1,10 @@
+{
+  "name": "SEO Copilot",
+  "short_name": "SEO Copilot",
+  "description": "Advanced SEO analysis tool performing 11 comprehensive checks including title optimization, meta description analysis, content verification, keyword density, and image optimization. Get AI-powered recommendations for better rankings.",
+  "start_url": "/",
+  "size": "large",
+  "display": "standalone",
+  "background_color": "#1E1E1E",
+  "theme_color": "#006ACC"
+}

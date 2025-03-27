@@ -27,7 +27,8 @@ import {
   TooltipTrigger,
 } from "../components/ui/tooltip";
 import { useToast } from "../hooks/use-toast";
-import { analyzeSEO, registerDomains } from "../lib/api";
+import { getPageSlug } from "../lib/get-page-slug";
+import { analyzeSEO, registerDomains, getApiBaseUrl } from "../lib/api";
 import type { SEOAnalysisResult, SEOCheck } from "../lib/types";
 import { ProgressCircle } from "../components/ui/progress-circle";
 import { getLearnMoreUrl } from "../lib/docs-links";
@@ -112,6 +113,9 @@ const groupChecksByCategory = (checks: SEOCheck[]) => {
     "Technical SEO": ["Code Minification", "Schema Markup"]
   };
 
+  // Add a debug log to see what checks are being processed
+  console.log("Checks to categorize:", checks.map(c => c.title));
+
   const grouped: Record<string, SEOCheck[]> = {};
 
   // Initialize all categories
@@ -119,15 +123,42 @@ const groupChecksByCategory = (checks: SEOCheck[]) => {
     grouped[category] = [];
   });
 
-  // Group checks by category
+  // Group checks by category with fuzzy matching
   checks.forEach(check => {
+    let foundCategory = false;
+    
     for (const [category, checkTitles] of Object.entries(categories)) {
+      // Try exact match first
       if (checkTitles.includes(check.title)) {
         grouped[category].push(check);
+        foundCategory = true;
         break;
       }
+      
+      // Try partial match if exact match fails
+      for (const title of checkTitles) {
+        if (check.title.includes(title) || title.includes(check.title)) {
+          grouped[category].push(check);
+          foundCategory = true;
+          console.log(`Categorized "${check.title}" as "${category}" through partial match with "${title}"`);
+          break;
+        }
+      }
+      
+      if (foundCategory) break;
+    }
+    
+    // If no category found, add to Technical SEO as a fallback
+    if (!foundCategory) {
+      console.log(`No category found for "${check.title}", adding to Technical SEO`);
+      grouped["Technical SEO"].push(check);
     }
   });
+
+  // Log the final categorization
+  console.log("Final categorization:", Object.entries(grouped).map(([cat, items]) => 
+    `${cat}: ${items.length} items (${items.map(i => i.title).join(', ')})`
+  ));
 
   return grouped;
 };
@@ -197,7 +228,19 @@ const getScoreRatingText = (score: number): string => {
 };
 
 export default function Home() {
+  console.log("Home component rendering");
+
+  // Step 2: Pull the page slug
+  useEffect(() => {
+    const fetchSlug = async () => {
+      const currentSlug = await getPageSlug();
+      setSlug(currentSlug);
+    };
+    fetchSlug();
+  }, []);
+  
   const { toast } = useToast();
+  const [slug, setSlug] = useState<string | null>(null);
   const [results, setResults] = useState<SEOAnalysisResult | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [stagingName, setStagingName] = useState<string>(''); // Move this inside the component
@@ -225,6 +268,17 @@ export default function Home() {
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [stagingName]);
+
+  // Add direct DOM manipulation on first render to ensure visibility
+  useEffect(() => {
+    console.log("Home component mounted");
+    // Try to show a toast message to verify the component is working
+    toast({
+      title: "SEO Analyzer Ready",
+      description: "Enter your target keyphrase to begin analysis",
+      duration: 5000
+    });
+  }, []);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -321,42 +375,99 @@ export default function Home() {
   };
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    const siteInfo = await getSiteInfo();
-    if (!siteInfo || !siteInfo.domains || siteInfo.domains.length === 0) {
-      console.error("No domains found in site info");
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "No domains found in site info"
-      });
-      return;
-    }
+    try {
+      // Force a double-check of the API URL
+      const apiBaseUrl = getApiBaseUrl();
+      console.log("API base URL for request:", apiBaseUrl);
 
-    let url = "";
-    if (siteInfo.domains.length === 1) {
-      url = siteInfo.domains[0].url;
-    } else {
-      const defaultDomain = siteInfo.domains.find(domain => domain.default);
-      if (defaultDomain) {
-        url = defaultDomain.url;
-      } else {
-        console.error("No default domain found in site info");
+      const siteInfo = await getSiteInfo();
+      if (!siteInfo || !siteInfo.domains || siteInfo.domains.length === 0) {
+        console.error("No domains found in site info");
         toast({
           variant: "destructive",
           title: "Error",
-          description: "No default domain found in site info"
+          description: "No domains found in site info"
         });
         return;
       }
-    }
-
-    if (url) {
-      mutation.mutate({ keyphrase: values.keyphrase, url });
-    } else {
+  
+      let url = "";
+      if (siteInfo.domains.length === 1) {
+        url = siteInfo.domains[0].url;
+      } else {
+        const defaultDomain = siteInfo.domains.find(domain => domain.default);
+        if (defaultDomain) {
+          url = defaultDomain.url;
+        } else {
+          console.error("No default domain found in site info");
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "No default domain found in site info"
+          });
+          return;
+        }
+      }
+  
+      if (url) {
+        // Make sure URLs start with https:// for production compatibility
+        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+          url = 'https://' + url;
+        } else if (url.startsWith('http://')) {
+          url = url.replace(/^http:/, 'https:');
+        }
+        
+        // Append the slug to the URL if it exists
+        if (slug) {
+          // Remove trailing slash from URL if present
+          url = url.replace(/\/$/, '');
+          
+          // Add the slug with leading slash
+          url = `${url}/${slug}`;
+          console.log("Full page URL with slug:", url);
+        } else {
+          console.log("No slug available, using domain URL only:", url);
+        }
+        
+        // Add debugging message
+        console.log(`Using API base URL: ${getApiBaseUrl()}`);
+        console.log(`Using target URL: ${url}`);
+        
+        // Wrap in try-catch and provide useful error message
+        try {
+          // Force a direct request to the Worker to test connectivity
+          const testConnection = await fetch(`${apiBaseUrl}/api/analyze`, {
+            method: "HEAD"
+          }).catch(err => {
+            console.warn("Test connection to Worker failed:", err);
+            return null;
+          });
+          
+          console.log("Worker test connection result:", testConnection ? `${testConnection.status} ${testConnection.statusText}` : "Failed");
+          
+          // Proceed with the actual mutation
+          mutation.mutate({ keyphrase: values.keyphrase, url });
+        } catch (apiError) {
+          console.error("API request failed:", apiError);
+          toast({
+            variant: "destructive",
+            title: "Connection Error",
+            description: "Make sure the Cloudflare Worker is running with 'yarn dev:worker'"
+          });
+        }
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Unable to determine the URL"
+        });
+      }
+    } catch (error) {
+      console.error("Error submitting form:", error);
       toast({
-        variant: "destructive",
+        variant: "destructive", 
         title: "Error",
-        description: "Unable to determine the URL"
+        description: "Failed to analyze SEO. Please try again."
       });
     }
   };
@@ -396,12 +507,17 @@ export default function Home() {
 
       if (domains.length > 0) {
         console.log("Registering detected domains:", domains);
-        const result = await registerDomains(domains);
-        
-        if (result.success) {
-          console.log("Domains registered successfully");
-        } else {
-          console.warn("Failed to register some domains:", result.message);
+        try {
+          const result = await registerDomains(domains);
+          
+          if (result.success) {
+            console.log("Domains registered successfully");
+          } else {
+            console.warn("Failed to register some domains:", result.message);
+          }
+        } catch (err) {
+          // Don't block the app if domain registration fails (it will just use the API's default allowed domains)
+          console.warn("Domain registration failed, continuing with default allowed domains");
         }
       }
     } catch (error) {
@@ -446,6 +562,7 @@ export default function Home() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className="min-h-screen bg-background p-4 md:p-6"
+      style={{ color: "#FFFFFF" }} // Force white text for visibility
     >
       <div className="mx-auto w-full max-w-3xl space-y-6">
         <motion.div
@@ -464,7 +581,7 @@ export default function Home() {
                   <FormField
                     control={form.control}
                     name="keyphrase"
-                    render={({ field }) => (
+                    render={({ field }: { field: any }) => (
                       <FormItem className="w-full">
                         <FormLabel className="mb-1">Target keyphrase</FormLabel>
                         <FormControl>
@@ -607,7 +724,7 @@ export default function Home() {
                                           {getPriorityIcon(check.priority)}
                                         </motion.div>
                                       </TooltipTrigger>
-                                      <TooltipContent>
+                                      <TooltipContent className="bg-background2">
                                         <p>SEO Impact: {getPriorityText(check.priority)}</p>
                                       </TooltipContent>
                                     </Tooltip>
@@ -723,16 +840,7 @@ export default function Home() {
 
 // Move copyToClipboard function inside the component as well
 
-declare global {
-  interface Window {
-    webflow?: {
-      clipboard?: {
-        writeText: (text: string) => Promise<void>;
-      };
-    }
-  }
-}
-
+// Use the existing WebflowExtension type defined in global.d.ts
 const copyToClipboard = async (text: string) => {
   try {
     // Try using Webflow's built-in clipboard method
