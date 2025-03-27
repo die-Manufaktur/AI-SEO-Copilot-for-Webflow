@@ -1,5 +1,3 @@
-import type { AnalyzeRequest, SEOAnalysisResult } from "./types";
-
 export async function analyzeSEO({ keyphrase, url }: { keyphrase: string; url: string }) {
   console.log("Sending request to /api/analyze with data:", { keyphrase, url });
   const response = await fetch("http://localhost:5000/api/analyze", {

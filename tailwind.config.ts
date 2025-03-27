@@ -1,67 +1,72 @@
 import type { Config } from "tailwindcss";
+import defaultTheme from "tailwindcss/defaultTheme";
 
 export default {
-  darkMode: ["class", "[data-theme='dark']"],
-  content: [
-    "./client/index.html", // Include the index.html file
-    "./client/src/**/*.{js,jsx,ts,tsx}", // Include all JS, JSX, TS, and TSX files in the src directory
-  ],
+  // Content paths - ensures tailwind only includes used styles
+  content: {
+    files: ["./client/src/**/*.{js,jsx,ts,tsx}", "./client/index.html"],
+    relative: true
+  },
+  
+  // Using string format for darkMode (v2 style)
+  darkMode: 'class',
+  
   theme: {
+    container: {
+      center: true,
+      padding: "2rem",
+      screens: {
+        "sm": "640px",
+        "md": "768px",
+        "lg": "1024px",
+        "xl": "1280px",
+        "2xl": "1400px",
+      },
+    },
     extend: {
+      // Keeping your existing color definitions
+      colors: {
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        primary: {
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
+        },
+        secondary: {
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
+        },
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
+        },
+        muted: {
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
+        },
+        accent: {
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
+        },
+        popover: {
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
+        },
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
+        },
+      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
-      colors: {
-        background: "var(--background)",
-        foreground: "var(--foreground)",
-        text1: "var(--text1)",
-        text2: "var(--text2)",
-        text3: "var(--text3)",
-        border: "var(--border)",
-        greenText: "var(--greenText)",
-        redText: "var(--redText)",
-        yellowText: "var(--yellowText)",
-        blueText: "var(--blueText)",
-        card: {
-          DEFAULT: "var(--background2)",
-          foreground: "var(--text1)",
-        },
-        popover: {
-          DEFAULT: "var(--background2)",
-          foreground: "var(--text1)",
-        },
-        primary: {
-          DEFAULT: "hsl(221.2 83.2% 53.3%)",
-          foreground: "hsl(210 40% 98%)",
-        },
-        secondary: {
-          DEFAULT: "hsl(210 40% 96.1%)",
-          foreground: "hsl(222.2 47.4% 11.2%)",
-        },
-        muted: {
-          DEFAULT: "var(--background3)",
-          foreground: "var(--text2)",
-        },
-        accent: {
-          DEFAULT: "var(--background3)",
-          foreground: "var(--text1)",
-        },
-        destructive: {
-          DEFAULT: "var(--redText)",
-          foreground: "var(--text1)",
-        },
-        sidebar: {
-          DEFAULT: "var(--background2)",
-          foreground: "var(--text1)",
-          border: "var(--border)",
-          accent: "var(--background3)",
-          "accent-foreground": "var(--text1)",
-          ring: "hsl(var(--ring))",
-        },
-        ring: "var(--border)",
-        primaryText: "var(--primaryText)",
+      fontFamily: {
+        sans: ["var(--font-sans)", ...defaultTheme.fontFamily.sans],
       },
       keyframes: {
         "accordion-down": {
@@ -79,5 +84,15 @@ export default {
       },
     },
   },
-  plugins: [require("tailwindcss-animate"), require("@tailwindcss/typography"), require("@tailwindcss/postcss")],
+  
+  // Add recommended plugins
+  plugins: [
+    require('@tailwindcss/forms'),
+  ],
+  
+  // Performance optimizations
+  future: {
+    purgeLayersByDefault: true,
+    removeDeprecatedGapUtilities: true,
+  },
 } satisfies Config;
