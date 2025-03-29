@@ -576,7 +576,7 @@ export default function Home() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className="min-h-screen bg-background p-4 md:p-6"
-      style={{ color: "#FFFFFF" }} // Force white text for visibility
+      style={{ color: "#FFFFFF" }} /
     >
       <div className="mx-auto w-full max-w-3xl space-y-6">
         <motion.div
