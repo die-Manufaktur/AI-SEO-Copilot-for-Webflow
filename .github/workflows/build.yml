@@ -78,6 +78,14 @@ jobs:
       - name: Deploy to Cloudflare Workers
         run: |
           echo "Starting direct Wrangler deployment..."
+          
+          # Install specific version of Wrangler globally
+          npm install -g wrangler@3.22.1
+          
+          # Verify wrangler version
+          wrangler --version
+          
+          # Set environment variables
           export CLOUDFLARE_API_TOKEN="${{ secrets.CLOUDFLARE_API_TOKEN }}"
           export CLOUDFLARE_ACCOUNT_ID="${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
           export OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}"
@@ -85,5 +93,5 @@ jobs:
           export WEBFLOW_CLIENT_ID="${{ secrets.WEBFLOW_CLIENT_ID }}"
           export WEBFLOW_REDIRECT_URI="${{ secrets.WEBFLOW_REDIRECT_URI }}"
           
-          # Using npx with a specific older version of Wrangler known to have better authentication
-          npx wrangler@3.22.1 deploy workers/index.ts --env production
+          # Use the globally installed wrangler directly
+          wrangler deploy workers/index.ts --env production
