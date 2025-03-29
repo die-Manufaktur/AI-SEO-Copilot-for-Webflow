@@ -79,6 +79,54 @@ yarn build
 
 This will take the contents of the `./public` folder and prepare a `bundle.zip` file ready for you to upload as a Designer extension for your App.
 
+## Deployment
+
+### Setting up Environment Variables
+
+Before building and deploying, you need to set up your environment variables:
+
+1. Copy `.env.example` to `.env` and fill in the necessary values:
+   ```
+   cp .env.example .env
+   ```
+
+2. Configure your Cloudflare Worker secrets using Wrangler:
+   ```
+   npx wrangler secret put OPENAI_API_KEY
+   npx wrangler secret put WEBFLOW_CLIENT_SECRET
+   npx wrangler secret put WEBFLOW_CLIENT_ID
+   npx wrangler secret put WEBFLOW_REDIRECT_URI
+   ```
+
+### Building and Deploying
+
+1. Build both the client app and the Cloudflare Worker:
+   ```
+   yarn build:all
+   ```
+
+2. Upload the extension bundle to Webflow:
+   ```
+   webflow extension push
+   ```
+
+### Production Deployment Checklist
+
+- [ ] Environment variables are set in `.env`
+- [ ] Cloudflare Worker secrets are configured
+- [ ] Client app is built with `yarn build`
+- [ ] Worker is deployed with `yarn build:worker`
+- [ ] Extension is uploaded to Webflow
+
+### Troubleshooting
+
+If you encounter issues during deployment:
+
+1. Ensure all dependencies are installed: `yarn install`
+2. Verify environment variables are correctly set
+3. Check Cloudflare Worker logs for any errors
+4. Test the Worker API with: `curl https://your-worker-url.workers.dev/api/ping`
+
 ## Note about bundling output
 
 Vite is configured to use the `public/` folder as the output, as this is where the `webflow-cli` expects the final assets for deployment, including scripts and the index.html file.

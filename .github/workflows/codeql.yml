@@ -96,7 +96,6 @@ jobs:
       uses: github/codeql-action/analyze@v3
       with:
         category: "/language:${{matrix.language}}"
-
     - name: Cache
       uses: actions/cache@v3.4.3
       with:
@@ -115,4 +114,3 @@ jobs:
         fail-on-cache-miss: false
         # Check if a cache entry exists for the given input(s) (key, restore-keys) without downloading the cache
         lookup-only: false
-          
