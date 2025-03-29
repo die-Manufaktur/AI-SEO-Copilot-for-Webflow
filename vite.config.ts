@@ -1,14 +1,13 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import tailwindcss from '@tailwindcss/vite';
 
 const __dirname = process.cwd();
 
 // https://vitejs.dev/config/
 export default defineConfig({
   root: path.resolve(__dirname, 'client'),
-  plugins: [react(), tailwindcss()],
+  plugins: [react()],
   base: './',
   optimizeDeps: {
     exclude: ['whatwg-url', 'jsdom']
@@ -28,7 +27,7 @@ export default defineConfig({
     },
   },
   css: {
-    postcss: path.resolve(__dirname, 'postcss.config.js'),
+    postcss: path.resolve(__dirname, 'postcss.config.mjs'),
   },
   resolve: {
     alias: {

@@ -1,4 +1,3 @@
-/* Tailwind CSS Directives */
 @import "tailwindcss";
 
 @layer base {
@@ -104,4 +103,25 @@ p, span {
   padding: 1rem;
   border-radius: 0.5rem;
   margin-bottom: 1rem;
+}
+
+/* Custom focus states */
+input[name="keyphrase"]:focus {
+  outline-color: var(--text3) !important;
+  outline-style: solid !important;
+  outline-width: 2px !important;
+  outline-offset: 1px !important;
+  box-shadow: none !important;
+}
+
+input[name="keyphrase"]:focus-visible {
+  outline: none !important;
+  box-shadow: 0 0 0 2px var(--background1), 0 0 0 2px var(--text3) !important;
+  border-color: var(--text3) !important;
+}
+
+/* Direct Tailwind CSS variable override */
+input[name="keyphrase"] {
+  --tw-ring-color: var(--text3) !important;
+  --tw-ring-offset-color: var(--background1) !important;
 }

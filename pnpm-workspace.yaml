@@ -2,3 +2,7 @@ ignoredBuiltDependencies:
   - '@swc/core'
   - sharp
   - workerd
+
+packages:
+  - '.'
+  - 'packages/*'
