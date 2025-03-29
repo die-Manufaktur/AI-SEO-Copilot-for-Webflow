@@ -24,6 +24,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       
+      # Add environment check
+      - name: Check required secrets
+        run: |
+          [ -n "${{ secrets.VITE_WEBFLOW_CLIENT_ID }}" ] || exit 1
+          [ -n "${{ secrets.CLOUDFLARE_API_TOKEN }}" ] || exit 1
+          [ -n "${{ secrets.OPENAI_API_KEY }}" ] || exit 1
+      
       - name: Build application
         run: pnpm build:all
         env:
