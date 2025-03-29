@@ -125,40 +125,16 @@ const groupChecksByCategory = (checks: SEOCheck[]) => {
 
   // Group checks by category with fuzzy matching
   checks.forEach(check => {
-    let foundCategory = false;
-    
-    for (const [category, checkTitles] of Object.entries(categories)) {
-      // Try exact match first
-      if (checkTitles.includes(check.title)) {
+    for (const category in categories) {
+      if (categories[category as keyof typeof categories].includes(check.title)) {
         grouped[category].push(check);
-        foundCategory = true;
         break;
       }
-      
-      // Try partial match if exact match fails
-      for (const title of checkTitles) {
-        if (check.title.includes(title) || title.includes(check.title)) {
-          grouped[category].push(check);
-          foundCategory = true;
-          console.log(`Categorized "${check.title}" as "${category}" through partial match with "${title}"`);
-          break;
-        }
-      }
-      
-      if (foundCategory) break;
-    }
-    
-    // If no category found, add to Technical SEO as a fallback
-    if (!foundCategory) {
-      console.log(`No category found for "${check.title}", adding to Technical SEO`);
-      grouped["Technical SEO"].push(check);
     }
   });
 
   // Log the final categorization
-  console.log("Final categorization:", Object.entries(grouped).map(([cat, items]) => 
-    `${cat}: ${items.length} items (${items.map(i => i.title).join(', ')})`
-  ));
+  console.log("Final categorization:", Object.entries(grouped).map(([category, checks]) => `${category}: ${checks.length} items (${checks.map(c => c.title).join(', ')})`));
 
   return grouped;
 };
@@ -293,6 +269,9 @@ export default function Home() {
       console.log("Received analysis results:", data);
       setResults(data);
       setSelectedCategory(null); // Reset selected category on new analysis
+
+      // Inspect the checks data
+      console.log("Checks data:", data.checks);
     },
     onError: (error) => {
       console.error("Error analyzing SEO:", error);
@@ -474,6 +453,9 @@ export default function Home() {
 
   // Group checks for the overview
   const groupedChecks = results ? groupChecksByCategory(results.checks) : null;
+
+  // Inspect the groupedChecks data
+  console.log("Grouped checks data:", groupedChecks);
 
   // Get checks for the selected category
   const selectedCategoryChecks = selectedCategory && groupedChecks 

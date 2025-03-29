@@ -382,8 +382,8 @@ async function scrapeWebpage(url: string): Promise<any> {
     
     // Extract JavaScript and CSS resources to check minification
     const resources = {
-      js: [] as Array<{url: string; minified: boolean}>,
-      css: [] as Array<{url: string; minified: boolean}>
+      js: [] as Array<{url: string; content?: string; minified?: boolean }> ,
+      css: [] as Array<{url: string; content?: string; minified?: boolean}>
     };
     
     // Extract JavaScript files
@@ -401,8 +401,14 @@ async function scrapeWebpage(url: string): Promise<any> {
           } else if (!scriptUrl.startsWith('http')) {
             absoluteUrl = new URL(scriptUrl, url).toString();
           }
+
+          // Fetch the content of the script
+          const scriptResponse = await fetch(absoluteUrl);
+          const scriptContent = scriptResponse.ok ? await scriptResponse.text() : '';
+
           resources.js.push({
             url: absoluteUrl,
+            content: scriptContent,
             minified: scriptUrl.includes('.min.js') || scriptUrl.includes('-min.js')
           });
         } catch (e) {
@@ -422,6 +428,7 @@ async function scrapeWebpage(url: string): Promise<any> {
                           scriptContent.length > 50;
         resources.js.push({
           url: 'inline-script',
+          content: scriptContent,
           minified: isMinified
         });
       }
@@ -442,8 +449,14 @@ async function scrapeWebpage(url: string): Promise<any> {
           } else if (!cssUrl.startsWith('http')) {
             absoluteUrl = new URL(cssUrl, url).toString();
           }
+
+          // Fetch the content of the CSS
+          const cssResponse = await fetch(absoluteUrl);
+          const cssContent = cssResponse.ok ? await cssResponse.text() : '';
+
           resources.css.push({
             url: absoluteUrl,
+            content: cssContent,
             minified: cssUrl.includes('.min.css') || cssUrl.includes('-min.css')
           });
         } catch (e) {
@@ -463,6 +476,7 @@ async function scrapeWebpage(url: string): Promise<any> {
                           styleContent.length > 50;
         resources.css.push({
           url: 'inline-style',
+          content: styleContent,
           minified: isMinified
         });
       }
@@ -471,21 +485,40 @@ async function scrapeWebpage(url: string): Promise<any> {
     // Check for schema.org structured data
     const schema = {
       detected: false,
-      types: [] as string[]
+      types: [] as string[],
+      jsonLdBlocks: [] as any[],
+      microdataTypes: [] as string[]
     };
     
-    const schemaJsonMatch = html.match(/<script\s+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i);
-    if (schemaJsonMatch) {
-      schema.detected = true;
+    // Extract JSON-LD schema
+    const schemaJsonMatches = bodyContent.matchAll(/<script\s+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
+    for (const match of schemaJsonMatches) {
       try {
-        const jsonData = JSON.parse(schemaJsonMatch[1]);
+        const jsonData = JSON.parse(match[1]);
+        schema.detected = true;
+        schema.jsonLdBlocks.push(jsonData);
         if (jsonData['@type']) {
           schema.types.push(jsonData['@type']);
-        } else if (Array.isArray(jsonData) && jsonData[0] && jsonData[0]['@type']) {
-          schema.types = jsonData.map(item => item['@type']).filter(Boolean);
+        } else if (Array.isArray(jsonData)) {
+          jsonData.forEach(item => {
+            if (item && item['@type']) {
+              schema.types.push(item['@type']);
+            }
+          });
         }
       } catch (e) {
         console.log('Error parsing schema JSON:', e);
+      }
+    }
+    
+    // Extract Microdata schema
+    const microdataMatches = bodyContent.matchAll(/<[^>]+\s+itemscope[^>]*>/gi);
+    for (const match of microdataMatches) {
+      const itemTypeMatch = match[0].match(/itemtype=["'](.*?)["']/i);
+      if (itemTypeMatch) {
+        schema.detected = true;
+        const types = itemTypeMatch[1].split(/\s+/).filter(Boolean);
+        schema.microdataTypes.push(...types);
       }
     }
     
@@ -510,7 +543,7 @@ async function scrapeWebpage(url: string): Promise<any> {
 }
 
 // Update the check title in the analyzeSEO function to match the UI
-async function analyzeSEO(url: string, keyphrase: string): Promise<any> {
+async function analyzeSEO(url: string, keyphrase: string, env: any): Promise<any> {
   try {
     console.log(`Analyzing SEO for URL: ${url} with keyphrase: ${keyphrase}`);
     
@@ -528,8 +561,8 @@ async function analyzeSEO(url: string, keyphrase: string): Promise<any> {
 
     const html = await response.text();
     
-    // Use analyzeSEOElements which should be compatible with Workers
-    const results = await analyzeSEOElements(url, keyphrase);
+    // Pass the env parameter to analyzeSEOElements
+    const results = await analyzeSEOElements(url, keyphrase, env);
     
     // Add the HTML content to the results for additional client-side processing if needed
     return {
@@ -587,7 +620,7 @@ async function handleRequest(request: Request, env: any): Promise<Response> {
       if (!keyphrase || !url) {
         return new Response(JSON.stringify({ message: "Keyphrase and URL are required" }), { status: 400, headers: corsHeaders });
       }
-      const results = await analyzeSEO(url, keyphrase);
+      const results = await analyzeSEO(url, keyphrase, env);
       return new Response(JSON.stringify(results), { status: 200, headers: corsHeaders });
     } else if (path === '/api/register-domains' && request.method === 'POST') {
       const data = await request.json();
@@ -903,72 +936,211 @@ const analyzerFallbackRecommendations: Record<string, (params: any) => string> =
 	// ... add additional fallback recommendations as needed ...
 };
 
-// Main SEO analysis function (moved from seoAnalyzer.ts)
-export async function analyzeSEOElements(url: string, keyphrase: string) {
-	console.log(`[SEO Analyzer] Starting analysis for URL: ${url} with keyphrase: ${keyphrase}`);
-	const startTime = Date.now();
+export async function analyzeSEOElements(url: string, keyphrase: string, env: any) {
+    console.log(`[SEO Analyzer] Starting analysis for URL: ${url} with keyphrase: ${keyphrase}`);
+    const startTime = Date.now();
 
-	try {
-		// Use your existing scrapeWebpage function (already present in this worker)
-		const scrapedData = await scrapeWebpage(url);
-		const checks: any[] = [];
-		let passedChecks = 0,
-			failedChecks = 0;
+    try {
+        const scrapedData = await scrapeWebpage(url);
+        const checks: any[] = [];
+        let passedChecks = 0, failedChecks = 0;
 
-		// Success messages
-		const messages: Record<string, string> = {
-			"Keyphrase in Title": "Great job! Your title includes the target keyphrase.",
-			// ... add other success messages as needed ...
-		};
+        // Helper to add a check (with GPT integration if available)
+        const addCheck = async (
+            title: string,
+            description: string,
+            passed: boolean,
+            context?: string,
+            skipRecommendation = false
+        ) => {
+            let recommendation = "";
+            if (!passed && !skipRecommendation) {
+                try {
+                    recommendation = await getGPTRecommendation(title, keyphrase, env, context);
+                } catch (error) {
+                    recommendation = analyzerFallbackRecommendations[title]
+                        ? analyzerFallbackRecommendations[title]({ keyphrase })
+                        : `Consider optimizing your content for "${keyphrase}" in relation to ${title.toLowerCase()}.`;
+                }
+            }
+            const successDescription = passed ? getSuccessMessage(title, url) : description;
+            const priority = analyzerCheckPriorities[title] || "medium";
+            checks.push({ title, description: successDescription, passed, recommendation, priority });
+            passed ? passedChecks++ : failedChecks++;
+        };
 
-		// Helper to add a check (with GPT integration if available)
-		const addCheck = async (
-			title: string,
-			description: string,
-			passed: boolean,
-			context?: string,
-			skipRecommendation = false
-		) => {
-			let recommendation = "";
-			if (!passed && !skipRecommendation) {
-				try {
-					recommendation = await getGPTRecommendation(title, keyphrase, context);
-				} catch (error) {
-					recommendation = analyzerFallbackRecommendations[title]
-						? analyzerFallbackRecommendations[title]({ keyphrase })
-						: `Consider optimizing your content for "${keyphrase}" in relation to ${title.toLowerCase()}.`;
-				}
-			}
-			const successDescription = passed ? messages[title] : description;
-			const priority = analyzerCheckPriorities[title] || "medium";
-			checks.push({ title, description: successDescription, passed, recommendation, priority });
-			passed ? passedChecks++ : failedChecks++;
-		};
+        // 1. Title Analysis
+        await addCheck(
+            "Keyphrase in Title",
+            "The page title should contain the focus keyphrase.",
+            scrapedData.title.toLowerCase().includes(keyphrase.toLowerCase()),
+            scrapedData.title
+        );
 
-		// Example check: Title analysis
-		await addCheck(
-			"Keyphrase in Title",
-			"The page title should contain the focus keyphrase.",
-			scrapedData.title.toLowerCase().includes(keyphrase.toLowerCase()),
-			scrapedData.title
-		);
+        // 2. Meta Description Analysis
+        await addCheck(
+            "Keyphrase in Meta Description",
+            "The meta description should contain the focus keyphrase.",
+            scrapedData.metaDescription.toLowerCase().includes(keyphrase.toLowerCase()),
+            scrapedData.metaDescription
+        );
 
-		// ... add additional checks similar to those in seoAnalyzer.ts ...
-		// For instance: Meta Description, URL analysis, content length, keyphrase density, etc.
-		// You can call calculateKeyphraseDensityFromAnalyzer and isHomePageFromAnalyzer as needed.
+        // 3. URL Analysis
+        await addCheck(
+            "Keyphrase in URL",
+            "The URL should contain the focus keyphrase when appropriate.",
+            url.toLowerCase().includes(keyphrase.toLowerCase()),
+            url
+        );
 
-		const score = Math.round((passedChecks / checks.length) * 100);
-		console.log(`[SEO Analyzer] Analysis completed in ${Date.now() - startTime}ms`);
-		return { checks, passedChecks, failedChecks, url, score, timestamp: new Date().toISOString() };
-	} catch (error: any) {
-		console.error(`[SEO Analyzer] Error during analysis:`, error);
-		throw error;
-	}
+        // 4. Content Length Check
+        const wordCount = scrapedData.content.split(/\s+/).filter(Boolean).length;
+        await addCheck(
+            "Content Length on page",
+            "The content should be at least 300 words long.",
+            wordCount >= 300,
+            `Current word count: ${wordCount}`
+        );
+
+        // 5. Keyphrase Density
+        const { density } = calculateKeyphraseDensity(scrapedData.content, keyphrase);
+        await addCheck(
+            "Keyphrase Density",
+            "Keyphrase density should be between 1% and 3%.",
+            density >= 1 && density <= 3,
+            `Current density: ${density.toFixed(1)}%`
+        );
+
+        // 6. Headings Analysis
+        const h1s = scrapedData.headings.filter((h: { level: number; text: string }) => h.level === 1);
+        const h2s = scrapedData.headings.filter((h: { level: number; text: string }) => h.level === 2);
+        
+        await addCheck(
+            "Keyphrase in H1 Heading",
+            "The main heading (H1) should contain the focus keyphrase.",
+            h1s.some((h: { level: number; text: string }) => h.text.toLowerCase().includes(keyphrase.toLowerCase())),
+            h1s.map((h: { level: number; text: string }) => h.text).join(', ')
+        );
+
+        // 7. OpenGraph Tags
+        await addCheck(
+            "Open Graph Title and Description",
+            "OpenGraph meta tags should be present and optimized.",
+            Boolean(scrapedData.ogMetadata.title && scrapedData.ogMetadata.description),
+            JSON.stringify(scrapedData.ogMetadata)
+        );
+
+        // 8. Image Analysis
+        await addCheck(
+            "Image Alt Attributes",
+            "Images should have descriptive alt text.",
+            scrapedData.images.every((img: { src: string; alt: string; size?: number }) => img.alt?.length > 0),
+            JSON.stringify(scrapedData.images)
+        );
+
+        // 8a. Next-Gen Image Formats Check
+        const nextGenFormats = ['webp', 'avif'];
+        const hasNextGenImages = scrapedData.images.some((img: { src: string }) => 
+            nextGenFormats.some(format => img.src.toLowerCase().endsWith(`.${format}`))
+        );
+        await addCheck(
+            "Next-Gen Image Formats",
+            "Images should use modern formats like WebP or AVIF for better performance.",
+            hasNextGenImages,
+            JSON.stringify(scrapedData.images.map((img: { src: string; alt: string; size?: number }) => ({ src: img.src })))
+        );
+
+        // 8b. Image File Size Check
+        const MAX_IMAGE_SIZE = 500 * 1024; // 500KB
+        const allImagesOptimized = scrapedData.images.every((img: { size?: number }) => 
+            !img.size || img.size <= MAX_IMAGE_SIZE
+        );
+        await addCheck(
+            "Image File Size",
+            "Images should be optimized and under 500KB for better page load times.",
+            allImagesOptimized,
+            JSON.stringify(scrapedData.images.map((img: { src: string; alt: string; size?: number }) => ({ src: img.src, size: img.size })))
+        );
+
+        // 9. Links Analysis
+        await addCheck(
+            "Internal Links",
+            "Page should have internal links for good site structure.",
+            scrapedData.internalLinks.length > 0,
+            `Internal links found: ${scrapedData.internalLinks.length}`
+        );
+
+        // 10. Outbound Links Analysis
+        await addCheck(
+          "Outbound Links",
+          "Page should have relevant outbound links to authoritative sources.",
+          scrapedData.outboundLinks.length > 0,
+          `Outbound links found: ${scrapedData.outboundLinks.length}`
+        );
+
+        // 11. Code Minification Check
+        const jsMinified = scrapedData.resources.js.every((js: { url: string; content?: string; minified?: boolean }) => js.minified);
+        const cssMinified = scrapedData.resources.css.every((css: { url: string; content?: string; minified?: boolean }) => css.minified);
+        await addCheck(
+            "Code Minification",
+            "JavaScript and CSS code should be minified for performance.",
+            jsMinified && cssMinified,
+            `JS minified: ${jsMinified}, CSS minified: ${cssMinified}`
+        );
+
+        // 12. Schema Markup Check
+        await addCheck(
+            "Schema Markup",
+            "Page should have schema markup for better search engine understanding.",
+            scrapedData.schema.detected,
+            JSON.stringify(scrapedData.schema)
+        );
+
+        // 13. Keyphrase in Introduction Check
+        const introduction = scrapedData.paragraphs.length > 0 ? scrapedData.paragraphs[0] : '';
+        await addCheck(
+            "Keyphrase in Introduction",
+            "The keyphrase should appear in the introduction paragraph.",
+            introduction.toLowerCase().includes(keyphrase.toLowerCase()),
+            introduction
+        );
+
+        // 14. Keyphrase in H2 Headings Check
+        const subheadings = scrapedData.headings.filter((h: { level: number; text: string }) => h.level === 2);
+        await addCheck(
+            "Keyphrase in H2 Headings",
+            "At least one H2 heading should contain the keyphrase.",
+            subheadings.some((h: { level: number; text: string }) => h.text.toLowerCase().includes(keyphrase.toLowerCase())),
+            subheadings.map((h: { level: number; text: string }) => h.text).join(', ')
+        );
+
+        // 15. Heading Hierarchy Check
+        const h1Count = scrapedData.headings.filter((h: { level: number }) => h.level === 1).length;
+        const h2Count = scrapedData.headings.filter((h: { level: number; text: string }) => h.level === 2).length;
+        await addCheck(
+            "Heading Hierarchy",
+            "The page should have one H1 and multiple H2 headings.",
+            h1Count === 1 && h2Count > 0,
+            `H1 count: ${h1Count}, H2 count: ${h2Count}`
+        );
+
+        // 16. OpenGraph Image Check
+        await addCheck(
+            "OpenGraph Image",
+            "The page should have an OpenGraph image.",
+            Boolean(scrapedData.ogMetadata.image),
+            scrapedData.ogMetadata.image
+        );
+
+        const score = Math.round((passedChecks / checks.length) * 100);
+
+        console.log(`[SEO Analyzer] Analysis completed in ${Date.now() - startTime}ms`);
+        return { checks, passedChecks, failedChecks, url, score, timestamp: new Date().toISOString() };
+    } catch (error: any) {
+        console.error(`[SEO Analyzer] Error during analysis:`, error);
+        throw error;
+    }
 }
-
-// === End SEO Analyzer functionality (moved from server\lib\seoAnalyzer.ts) ===
-
-// ===== Begin WebScraper functionality (moved from server\lib\webScraper.ts) =====
 
 async function getImageSize(imageUrl: string, baseUrl: URL): Promise<number | undefined> {
   try {
@@ -989,12 +1161,52 @@ async function getImageSize(imageUrl: string, baseUrl: URL): Promise<number | un
 
 function isMinified(code: string): boolean {
   if (!code || code.length < 50) return true;
+
+  // Remove comments to avoid skewing the results
+  code = code.replace(/\/\*[\s\S]*?\*\/|([^:]|^)\/\/.*$/gm, '$1');
+
   const newlineRatio = (code.match(/\n/g) || []).length / code.length;
   const whitespaceRatio = (code.match(/\s/g) || []).length / code.length;
   const lines = code.split('\n').filter(line => line.trim().length > 0);
   const avgLineLength = lines.length > 0 ? code.length / lines.length : 0;
-  return (newlineRatio < 0.01 && whitespaceRatio < 0.15) || avgLineLength > 500;
+
+  // More robust checks for minification
+  const isLikelyMinified = (newlineRatio < 0.05 && whitespaceRatio < 0.2) || avgLineLength > 300;
+
+  return isLikelyMinified;
 }
-// ===== End WebScraper functionality (moved from server\lib\webScraper.ts) =====
+
+function getMetaDescriptionRecommendation(description: string, keyphrase: string): string | undefined {
+  if (!description) return 'Add a meta description that includes your keyphrase';
+  if (description.length < 120) return 'Meta description is too short. Aim for 120-156 characters';
+  if (description.length > 156) return 'Meta description is too long. Keep it under 156 characters';
+  if (!description.toLowerCase().includes(keyphrase.toLowerCase())) {
+    return `Include "${keyphrase}" in your meta description`;
+  }
+  return undefined;
+}
+
+function getOpenGraphRecommendation(title?: string, description?: string, image?: string): string | undefined {
+  const missing = [];
+  if (!title) missing.push('og:title');
+  if (!description) missing.push('og:description');
+  if (!image) missing.push('og:image');
+  return missing.length > 0 ? `Add missing OpenGraph tags: ${missing.join(', ')}` : undefined;
+}
+
+function getHeadingStructureRecommendation(h1Count: number, h2Count: number): string | undefined {
+  if (h1Count === 0) return 'Add an H1 heading to your page';
+  if (h1Count > 1) return 'Remove extra H1 headings - keep only one H1 per page';
+  if (h2Count === 0) return 'Add H2 headings to structure your content';
+  return undefined;
+}
+
+function getImageAltRecommendation(images: HTMLImageElement[]): string | undefined {
+  const missingAlt = images.filter(img => !img.hasAttribute('alt') || img.getAttribute('alt')?.trim() === '');
+  if (missingAlt.length > 0) {
+    return `Add descriptive alt text to ${missingAlt.length} image${missingAlt.length > 1 ? 's' : ''}`;
+  }
+  return undefined;
+}
 
 export default { fetch: handleRequest }

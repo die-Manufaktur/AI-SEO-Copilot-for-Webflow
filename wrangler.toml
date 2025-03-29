@@ -8,27 +8,16 @@ compatibility_flags = ["nodejs_compat"]
 
 [env.production]
 workers_dev = false
-# route = { pattern = "api.yoursite.com/*", zone_id = "your-zone-id" }
-# Define production-specific environment variables
+
 [env.production.vars]
 USE_GPT_RECOMMENDATIONS = "true"
 ALLOWED_ORIGINS = "https://webflow.com,https://*.webflow-ext.com,https://*.webflow.io"
 STATE = "webflow-seo-copilot-prod"
-# The following secrets should be set using wrangler secret commands:
-# - OPENAI_API_KEY
-# - WEBFLOW_CLIENT_ID
-# - WEBFLOW_CLIENT_SECRET
-# - WEBFLOW_REDIRECT_URI
 
 [env.development]
 workers_dev = true
-# Define development-specific environment variables
+
 [env.development.vars]
-USE_GPT_RECOMMENDATIONS = "false"
+USE_GPT_RECOMMENDATIONS = "true"
 ALLOWED_ORIGINS = "https://webflow.com,https://*.webflow-ext.com,https://*.webflow.io,http://localhost:1337,http://localhost:5173"
 STATE = "webflow-seo-copilot-dev"
-# The following secrets should be set using wrangler secret commands:
-# - OPENAI_API_KEY
-# - WEBFLOW_CLIENT_ID
-# - WEBFLOW_CLIENT_SECRET
-# - WEBFLOW_REDIRECT_URI
