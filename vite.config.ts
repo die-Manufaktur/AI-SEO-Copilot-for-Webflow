@@ -10,7 +10,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   base: './',
   optimizeDeps: {
-    exclude: ['whatwg-url'] // Exclude whatwg-url from pre-bundling to avoid the warning
+    exclude: ['whatwg-url', 'jsdom'] // Exclude whatwg-url from pre-bundling to avoid the warning
   },
   build: {
     outDir: path.resolve(__dirname, 'public'),

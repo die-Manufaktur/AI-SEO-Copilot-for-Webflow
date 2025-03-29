@@ -7,7 +7,7 @@ compatibility_flags = ["nodejs_compat"]
 # account_id = "c130aef39c1c8e06d07c94bbadbe2bd7"
 
 [env.production]
-workers_dev = true
+workers_dev = false
 # route = { pattern = "api.yoursite.com/*", zone_id = "your-zone-id" }
 # Define production-specific environment variables
 [env.production.vars]
@@ -24,7 +24,7 @@ STATE = "webflow-seo-copilot-prod"
 workers_dev = true
 # Define development-specific environment variables
 [env.development.vars]
-USE_GPT_RECOMMENDATIONS = "true"
+USE_GPT_RECOMMENDATIONS = "false"
 ALLOWED_ORIGINS = "https://webflow.com,https://*.webflow-ext.com,https://*.webflow.io,http://localhost:1337,http://localhost:5173"
 STATE = "webflow-seo-copilot-dev"
 # The following secrets should be set using wrangler secret commands:
@@ -32,8 +32,3 @@ STATE = "webflow-seo-copilot-dev"
 # - WEBFLOW_CLIENT_ID
 # - WEBFLOW_CLIENT_SECRET
 # - WEBFLOW_REDIRECT_URI
-
-[limits]
-memory_mb = 128
-timeout_ms = 30000
-cpu_ms = 50

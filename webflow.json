@@ -25,6 +25,9 @@
     }
   ],
   "dashboard": {
-    "size": "large"
+    "size": {
+      "width": 500,
+      "height": 800
+    }
   }
 }

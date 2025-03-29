@@ -10,7 +10,7 @@ interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
 // Helper function to determine the appropriate API URL based on environment
-const isWebflowExtension = import.meta.env.VITE_WEBFLOW_EXTENSION === 'true';
+const isWebflowExtension = process.env.VITE_WEBFLOW_EXTENSION === 'true';
 
 export const getApiBaseUrl = (): string => {
   if (isWebflowExtension) {
@@ -19,7 +19,7 @@ export const getApiBaseUrl = (): string => {
   } 
   
   // In development mode - Vite sets import.meta.env.DEV to true in development
-  if (import.meta.env.DEV) {
+  if (process.env.DEV) {
     // Local development Worker URL
     const localWorkerUrl = 'http://127.0.0.1:8787';
     console.log('Using development Worker URL:', localWorkerUrl);
@@ -46,15 +46,22 @@ export async function analyzeSEO({ keyphrase, url }: { keyphrase: string; url: s
 
     // First check if response is OK
     if (!response.ok) {
+      // Clone the response to read it multiple times if needed
+      const responseClone = response.clone();
+      
       // Try to parse as JSON, but have a fallback for HTML errors
       try {
         const errorData = await response.json();
         console.error("Error response from /api/analyze:", errorData);
         throw new Error(errorData.message || "Failed to analyze SEO");
       } catch (parseError) {
-        // If we couldn't parse JSON, get the text and show a more helpful error
-        const errorText = await response.text();
-        console.error("Non-JSON error response:", errorText.substring(0, 150) + "...");
+        // If we couldn't parse JSON, get the text from the cloned response
+        try {
+          const errorText = await responseClone.text();
+          console.error("Non-JSON error response:", errorText.substring(0, 150) + "...");
+        } catch (textError) {
+          console.error("Could not read error response content");
+        }
         throw new Error(`Server returned ${response.status}: ${response.statusText}`);
       }
     }

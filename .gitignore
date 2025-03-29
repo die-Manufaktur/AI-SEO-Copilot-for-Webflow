@@ -1,23 +1,62 @@
 # Dependencies
-node_modules
+node_modules/
+.pnpm-store/
 
-# Production
+# Production & Build
 /public
 /dist
+/build
+.cache/
+.wrangler/
+.output/
+bundle.zip
 
-# Misc
-.DS_Store
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+.dev.vars
+.prod.vars
+*.local
+.wrangler/
 
-# Logs
+# IDE & Editor
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Logs & Debug
+logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+.pnpm-debug.log*
 
-# Caches
-.eslintcache
+# Testing & Coverage
+/coverage
+.nyc_output
 
-# Environment
-.env
-server/.env
+# OS Generated
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
-bundle.zip
+# Cloudflare Workers
+.dev.vars
+.env.production
+.env.development
+workers-site/

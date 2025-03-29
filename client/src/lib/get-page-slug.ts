@@ -1,5 +1,3 @@
-import { Webflow } from 'webflow-api';
-
 export async function getPageSlug(): Promise<string> {
   try {
     // Get the current page

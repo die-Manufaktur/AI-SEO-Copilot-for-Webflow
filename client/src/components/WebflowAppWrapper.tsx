@@ -7,10 +7,12 @@ interface WebflowAppWrapperProps {
 export default function WebflowAppWrapper({ children }: WebflowAppWrapperProps) {
   useEffect(() => {
     // Set extension size to "large" when component mounts
-    if (window.webflow && window.webflow.setExtensionSize) {
+    if (webflow && webflow.setExtensionSize) {
       try {
-        // Use the "large" preset
-        window.webflow.setExtensionSize('large');
+        webflow.setExtensionSize({
+          width: 500,
+          height: 720
+        });
         console.log('Extension size set to large');
       } catch (error) {
         console.error('Failed to set extension size:', error);

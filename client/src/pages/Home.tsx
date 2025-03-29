@@ -533,7 +533,7 @@ export default function Home() {
         const detectedUrls: string[] = [];
         
         // Try to get URL from Webflow context if available
-        if (window.webflow && typeof window.webflow.getSiteInfo === 'function') {
+        if (webflow && typeof webflow.getSiteInfo === 'function') {
           const siteInfo = await getSiteInfo();
           if (siteInfo?.domains && siteInfo.domains.length > 0) {
             siteInfo.domains.forEach(domain => {
