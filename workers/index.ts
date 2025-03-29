@@ -512,7 +512,7 @@ async function scrapeWebpage(url: string): Promise<any> {
     }
     
     // Extract Microdata schema
-    const microdataMatches = bodyContent.matchAll(/<[^>]+\s+itemscope[^>]*>/gi);
+    const microdataMatches = html.matchAll(/<[^>]+\s+itemscope[^>]*>/gi);
     for (const match of microdataMatches) {
       const itemTypeMatch = match[0].match(/itemtype=["'](.*?)["']/i);
       if (itemTypeMatch) {
