@@ -1,10 +1,77 @@
-name: Deploy
+name: Build and Deploy
 
 on:
   push:
     branches: ["main"]
 
 jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    name: Build Extension Bundle
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+          run_install: false
+          
+      - name: Setup pnpm store
+        shell: bash
+        run: |
+          echo "STORE_PATH=/home/runner/.local/share/pnpm/store/v10" >> $GITHUB_ENV
+
+      - uses: actions/cache@v3
+        name: Setup pnpm cache
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install
+        
+      # Add environment check
+      - name: Check required secrets
+        run: |
+          [ -n "${{ secrets.VITE_WEBFLOW_CLIENT_ID }}" ] || exit 1
+          [ -n "${{ secrets.OPENAI_API_KEY }}" ] || exit 1
+      
+      - name: Build application
+        run: pnpm build
+        env:
+          NODE_ENV: production
+          VITE_WEBFLOW_EXTENSION: true
+          USE_GPT_RECOMMENDATIONS: true
+          VITE_WEBFLOW_API_KEY: ${{ secrets.VITE_WEBFLOW_API_KEY }}
+          VITE_WEBFLOW_SITE_ID: ${{ secrets.VITE_WEBFLOW_SITE_ID }}
+          VITE_WEBFLOW_CLIENT_ID: ${{ secrets.VITE_WEBFLOW_CLIENT_ID }}
+          
+      - name: Validate build output
+        run: |
+          if [ ! -d "public" ]; then
+            echo "Build output directory (public) is missing"
+            exit 1
+          fi
+          
+      - name: Create bundle archive
+        run: zip -r bundle.zip public/
+
+      - name: Upload bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle
+          path: bundle.zip
+          retention-days: 5
+
   deploy:
     runs-on: ubuntu-latest
     permissions:
