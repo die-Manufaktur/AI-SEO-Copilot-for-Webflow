@@ -48,7 +48,7 @@ jobs:
           [ -n "${{ secrets.OPENAI_API_KEY }}" ] || exit 1
       
       - name: Build application
-        run: pnpm build:all
+        run: pnpm build
         env:
           NODE_ENV: production
           VITE_WEBFLOW_EXTENSION: true
