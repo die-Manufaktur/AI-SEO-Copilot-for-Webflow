@@ -491,7 +491,7 @@ async function scrapeWebpage(url: string): Promise<any> {
     };
     
     // Extract JSON-LD schema
-    const schemaJsonMatches = bodyContent.matchAll(/<script\s+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
+    const schemaJsonMatches = html.matchAll(/<script\s+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
     for (const match of schemaJsonMatches) {
       try {
         const jsonData = JSON.parse(match[1]);
