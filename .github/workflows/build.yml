@@ -22,22 +22,24 @@ jobs:
         uses: pnpm/action-setup@v2
         with:
           version: 8
+          run_install: false
           
-      - name: Setup pnpm config
+      - name: Setup pnpm store
+        shell: bash
         run: |
-          pnpm config set store-dir .pnpm-store
-          
+          echo "STORE_PATH=/home/runner/.local/share/pnpm/store/v10" >> $GITHUB_ENV
+
       - uses: actions/cache@v3
         name: Setup pnpm cache
         with:
-          path: .pnpm-store
+          path: ${{ env.STORE_PATH }}
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      
+        run: pnpm install
+        
       # Add environment check
       - name: Check required secrets
         run: |
