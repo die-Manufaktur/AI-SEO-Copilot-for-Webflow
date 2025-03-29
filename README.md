@@ -1,21 +1,65 @@
-# SEO Copilot <!-- Update the name here -->
+# AI SEO Copilot for Webflow
 
-SEO Copilot is an advanced SEO analysis tool performing 11 comprehensive checks including title optimization, meta description analysis, content verification, keyword density, and image optimization. Get AI-powered recommendations for better rankings.
+An advanced SEO analysis tool that performs 11 comprehensive checks with AI-powered recommendations for Webflow sites.
+
+## Quick Links
+- [Full Documentation](https://ai-seo-copilot.gitbook.io/ai-seo-copilot)
+- [Feature Requests](https://aiseocopilot.featurebase.app)
+- [Roadmap](https://aiseocopilot.featurebase.app/roadmap)
 
 ## Features
 
-- Title Optimization
+- Title Tag Optimization
 - Meta Description Analysis
-- Content Verification
-- Keyword Density
-- Image Optimization
-- AI-Powered Recommendations
+- Content Structure Verification
+- Keyword Density Analysis
+- Image Alt Text Optimization
+- AI-Powered SEO Recommendations
+- OpenGraph Tags Validation
+- Search Engine Preview
+- Mobile Responsiveness Check
+- Page Speed Insights
+- Schema Markup Validation
 
-## Installation
+## Installing in Webflow
 
-```sh
-yarn install
-```
+1. Open the Webflow Designer
+2. Go to Apps panel (keyboard shortcut: A)
+3. Search for "AI SEO Copilot"
+4. Click Install
+5. Configure your settings:
+      - Set your Webflow API credentials
+
+## Local Development Setup
+
+1. Fork and clone the repository:
+   ```bash
+   git clone https://github.com/PMDevSolutions/seo-copilot
+   cd seo-copilot
+   ```
+
+2. Install dependencies using pnpm:
+   ```bash
+   pnpm install
+   ```
+
+3. Configure environment:
+   ```bash
+   cp .env.example .env
+   ```
+   Required environment variables:
+   - `USE_GPT_RECOMMENDATIONS`: Set to "true"
+   - `ENABLED_GPT_CHECKS`: Comma-separated list of enabled checks
+
+4. Start development server:
+   ```bash
+   pnpm start-dev
+   ```
+
+5. Access the app:
+   - Development URL: `http://localhost:1337`
+   - Add this URL in Webflow Designer's Apps panel
+   - Launch the extension from Webflow Designer
 
 ## Using this template
 
@@ -34,22 +78,14 @@ Here is an overview over the most important directories and files:
 `├──vite.config.ts` — Configuration for the bundler<br>
 `├──webflow.json` — Webflow App manifest<br>
 
-This template includes a suggested Prettier configuration in `.prettierrc` and uses Yarn by default.
+This template includes a suggested Prettier configuration in `.prettierrc` and uses pnpm by default.
 
 ## Developing
-
-### Installation
-
-Run this command in your terminal in the project root directory to install its dependencies:
-
-```
-yarn
-```
 
 ### Running a development server
 
 ```
-yarn dev
+pnpm start-dev
 ```
 
 The above command does a few things:
@@ -60,8 +96,7 @@ The above command does a few things:
 The command outputs the URL under which your extension is being served. Use this as the “Development URL” for your app in the Webflow Designer’s Apps panel. You can then launch the extension from the same place.
 
 You will need to create and populate the .env file in the root of the project. This should contain at least three key value pairs, consisting of the following keys:
-OPEN_AI_API_KEY - This should be the raw key for the OpenAI API.
-USE_GPT_RECOMMENDATIONS - True or false.
+OPENGPT_RECOMMENDATIONS - True or false.
 ENABLED_GPT_CHECKS - Choose from the following list (comma-separated)
 Keyphrase in Title
 Keyphrase in Meta Description
@@ -74,7 +109,7 @@ Once the server is running, you must open the Webflow Designer, and then launch 
 ## Deploying
 
 ```
-yarn build
+pnpm build
 ```
 
 This will take the contents of the `./public` folder and prepare a `bundle.zip` file ready for you to upload as a Designer extension for your App.
@@ -102,7 +137,7 @@ Before building and deploying, you need to set up your environment variables:
 
 1. Build both the client app and the Cloudflare Worker:
    ```
-   yarn build:all
+   pnpm build:all
    ```
 
 2. Upload the extension bundle to Webflow:
@@ -114,15 +149,15 @@ Before building and deploying, you need to set up your environment variables:
 
 - [ ] Environment variables are set in `.env`
 - [ ] Cloudflare Worker secrets are configured
-- [ ] Client app is built with `yarn build`
-- [ ] Worker is deployed with `yarn build:worker`
+- [ ] Client app is built with `pnpm build`
+- [ ] Worker is deployed with `pnpm build:worker`
 - [ ] Extension is uploaded to Webflow
 
 ### Troubleshooting
 
 If you encounter issues during deployment:
 
-1. Ensure all dependencies are installed: `yarn install`
+1. Ensure all dependencies are installed: `pnpm install`
 2. Verify environment variables are correctly set
 3. Check Cloudflare Worker logs for any errors
 4. Test the Worker API with: `curl https://your-worker-url.workers.dev/api/ping`
@@ -191,6 +226,26 @@ Follow these steps to install the AI SEO Copilot onto your Webflow site:
 
 For further assistance, refer to the [Webflow Developer Documentation](https://developers.webflow.com/designer/docs/getting-started-designer-extensions).
 
+## Documentation
+
+Complete documentation available at [AI SEO Copilot Docs](https://ai-seo-copilot.gitbook.io/ai-seo-copilot):
+- Setup guides
+- API reference
+- Configuration options
+- Troubleshooting
+- Best practices
+- Feature guides
+
+## Contributing
+
+Please see [CONTRIBUTING.md](.github/CONTRIBUTING.md) for guidelines.
+Feature requests: [FeatureBase](https://aiseocopilot.featurebase.app)
+
+## Support
+- Issues: GitHub Issues
+- Questions: GitHub Discussions
+- Updates: [Roadmap](https://aiseocopilot.featurebase.app/roadmap)
+
 ## License
 
-The source code of the `webflow-app-template-react` template is available for use under the MIT license. [See license](https://github.com/stefanwittwer/webflow-app-template-react/blob/main/LICENSE.md)
+Licensed under MIT. See [LICENSE.md](LICENSE.md) for details.

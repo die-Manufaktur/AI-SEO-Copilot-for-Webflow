@@ -61,3 +61,33 @@ Thumbs.db
 .env.production
 .env.development
 workers-site/
+
+# TypeScript
+*.tsbuildinfo
+.eslintcache
+.stylelintcache
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+temp/
+
+# Additional IDE
+.history/
+.vscode-test/
+*.code-workspace
+.settings/
+
+# Misc
+.vercel
+.netlify
+stats.html
+.turbo
+dist-ssr
+*.local
+.env.*.local
+
+# Cloudflare specific
+.mf/
+.miniflare/

@@ -23,7 +23,6 @@ jobs:
         with:
           version: 8
           
-      # Configure the store path directly
       - name: Setup pnpm config
         run: |
           pnpm config set store-dir .pnpm-store
@@ -39,8 +38,39 @@ jobs:
       - name: Install dependencies
         run: pnpm install
         
+      - name: Build project
+        run: pnpm build
+        env:
+          NODE_ENV: production
+          VITE_WEBFLOW_EXTENSION: true
+          USE_GPT_RECOMMENDATIONS: true
+          VITE_WEBFLOW_API_KEY: ${{ secrets.VITE_WEBFLOW_API_KEY }}
+          VITE_WEBFLOW_SITE_ID: ${{ secrets.VITE_WEBFLOW_SITE_ID }}
+          VITE_WEBFLOW_CLIENT_ID: ${{ secrets.VITE_WEBFLOW_CLIENT_ID }}
+          
+      - name: Validate build output
+        run: |
+          if [ ! -d "dist" ] || [ ! -d "public" ] || [ ! -d "workers" ]; then
+            echo "Build output directories are missing"
+            exit 1
+          fi
+          
+      - name: Validate Wrangler configuration
+        run: pnpm wrangler config check
+        
+      - name: Create bundle archive
+        run: zip -r bundle.zip dist/ public/ workers/
+
+      - name: Upload bundle artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: bundle
+          path: bundle.zip
+          retention-days: 5
+        
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy workers/index.ts --env production
