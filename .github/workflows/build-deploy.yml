@@ -16,8 +16,8 @@ jobs:
         with:
           node-version: '20'
           cache: 'pnpm'
-      - name: Install pnpm
-        run: npm install -g pnpm
+      - name: Enable pnpm via Corepack
+        run: corepack enable pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Run unit tests
@@ -37,8 +37,8 @@ jobs:
         with:
           node-version: '20'
           cache: 'pnpm'
-      - name: Install pnpm
-        run: npm install -g pnpm
+      - name: Enable pnpm via Corepack
+        run: corepack enable pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Install Webflow CLI
@@ -65,8 +65,8 @@ jobs:
         with:
           node-version: '20'
           cache: 'pnpm'
-      - name: Install pnpm
-        run: npm install -g pnpm
+      - name: Enable pnpm via Corepack
+        run: corepack enable pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Install Webflow CLI
