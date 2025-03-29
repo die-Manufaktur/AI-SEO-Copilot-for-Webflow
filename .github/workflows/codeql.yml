@@ -96,4 +96,21 @@ jobs:
       uses: github/codeql-action/analyze@v3
       with:
         category: "/language:${{matrix.language}}"
-
+    - name: Cache
+      uses: actions/cache@v3.4.3
+      with:
+        # A list of files, directories, and wildcard patterns to cache and restore
+        path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+        # An explicit key for restoring and saving the cache
+        key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+        # An ordered list of keys to use for restoring stale cache if no cache hit occurred for key. Note `cache-hit` returns false in this case.
+        restore-keys: |
+          ${{ runner.os }}-yarn-# optional
+        # The chunk size used to split up large files during upload, in bytes
+        upload-chunk-size: 5000
+        # An optional boolean when enabled, allows windows runners to save or restore caches that can be restored or saved respectively on other platforms
+        enableCrossOsArchive: false
+        # Fail the workflow if cache entry is not found
+        fail-on-cache-miss: false
+        # Check if a cache entry exists for the given input(s) (key, restore-keys) without downloading the cache
+        lookup-only: false
