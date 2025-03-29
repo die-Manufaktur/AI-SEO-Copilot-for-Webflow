@@ -3,11 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Ensure CSP meta tag appears only once, here in the head -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://*.webflow.io; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' http://localhost:* https://*.webflow.io; frame-ancestors 'self' https://*.webflow.io;">
-    <!-- Update permissions policy to allow clipboard -->
+    <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-eval' 'unsafe-inline'; script-src * 'unsafe-eval' 'unsafe-inline'; style-src * 'unsafe-inline'; img-src * data: blob:; font-src * data:; connect-src * blob:;" />
     <meta http-equiv="Permissions-Policy" content="clipboard-write=*, clipboard-read=*">
-    <title>SEO Analysis Tool</title>
+    <title>SEO Copilot</title>
+    <link rel="manifest" href="./manifest.json" />
     <meta name="description" content="Advanced SEO analysis tool performing 11 comprehensive checks including title optimization, meta description analysis, content verification, keyword density, and image optimization. Get AI-powered recommendations for better rankings." />
     <meta name="keywords" content="seo analysis, website optimization, keyword density, meta description analyzer, content optimization, image optimization, seo tools" />
     <meta property="og:title" content="SEO Copilot - Website Optimization & Analysis" />
@@ -20,6 +19,16 @@
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="./src/main.tsx"></script>
+    <noscript>
+      <p style="text-align:center;margin:2rem;font-family:sans-serif;">
+        JavaScript is required to run this application. Please enable JavaScript in your browser.
+      </p>
+    </noscript>
+    <script type="text/javascript">
+      window.addEventListener('error', (e) => {
+        console.error('Global error caught:', e.message, e.filename, e.lineno);
+      });
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -1,14 +1,33 @@
 {
-  "apiVersion": "2",
+  "$schema": "https://cdn.jsdelivr.net/gh/webflow/designer-extension-typings@latest/schema/webflow.manifest.schema.json",
   "name": "SEO Copilot",
-  "description": "Advanced SEO analysis tool with AI-powered recommendations.",
-  "version": "1.0.0",
-  "size": {
-    "width": 1140,
-    "height": 760
+  "version": "3.0.0beta",
+  "schema_version": "2.0.0",
+  "web_accessible_resources": [
+    {
+      "resources": ["public/*"],
+      "matches": ["https://*.webflow.io/*"]
+    }
+  ],
+  "permissions": {
+    "clipboard-write": "Needed to help you copy SEO recommendations directly to your clipboard",
+    "designer:siteInfo:read": "Needed to access information about your site",
+    "hostPattern_WebflowSite": true,
+    "site:read": true,
+    "externalApi:https://seo-copilot-api.paul-130.workers.dev": "Needed to connect to SEO analysis service"
   },
-  "main": "index.js",
-  "scripts": {
-    "start": "node index.js"
+  "config_pages": [
+    {
+      "id": "main",
+      "title": "SEO Analysis Tool",
+      "path": "/",
+      "description": "Analyze and improve your website's SEO"
+    }
+  ],
+  "dashboard": {
+    "size": {
+      "width": 500,
+      "height": 800
+    }
   }
 }
