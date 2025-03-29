@@ -1,46 +1,33 @@
-name: Build and Deploy
+name: Deploy
 
 on:
   push:
-    branches: [ main ]
+    branches: ["main"]
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    name: Deploy to Cloudflare Workers
     steps:
       - uses: actions/checkout@v4
       
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'pnpm'
-      
+          
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v2
         with:
-          version: 9
-      
+          version: 8
+          
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      
-      - name: Build application
-        run: pnpm build:all
-        env:
-          VITE_WEBFLOW_CLIENT_ID: ${{ secrets.VITE_WEBFLOW_CLIENT_ID }}
-          VITE_WEBFLOW_EXTENSION: 'true'
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        run: pnpm install
+        
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
         with:
-          name: extension-bundle
-          path: bundle.zip
-          retention-days: 30
-          if-no-files-found: error
-      
-      - name: Deploy to Cloudflare
-        run: pnpm exec wrangler deploy workers/index.ts --env production
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
