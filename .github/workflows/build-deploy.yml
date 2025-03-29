@@ -15,13 +15,13 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '20'
-          cache: 'yarn'
+          cache: 'pnpm'
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
       - name: Run unit tests
-        run: yarn test
+        run: pnpm test
       - name: Run worker tests
-        run: yarn test-worker
+        run: pnpm test-worker
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       
@@ -34,13 +34,13 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '20'
-          cache: 'yarn'
+          cache: 'pnpm'
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
       - name: Install Webflow CLI
-        run: npm install -g @webflow/webflow-cli
+        run: pnpm add -g @webflow/webflow-cli
       - name: Build application
-        run: yarn build:all
+        run: pnpm build:all
         env:
           VITE_WEBFLOW_CLIENT_ID: ${{ secrets.VITE_WEBFLOW_CLIENT_ID }}
           VITE_WEBFLOW_EXTENSION: 'true'
@@ -48,6 +48,43 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       - name: Deploy to Cloudflare
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: npx wrangler deploy workers/index.ts --env production
+        run: pnpm exec wrangler deploy workers/index.ts --env production
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+  build-and-bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      
+      - name: Install Webflow CLI
+        run: pnpm add -g @webflow/webflow-cli
+      
+      - name: Build application
+        run: pnpm build:all
+        env:
+          VITE_WEBFLOW_CLIENT_ID: ${{ secrets.VITE_WEBFLOW_CLIENT_ID }}
+          VITE_WEBFLOW_EXTENSION: 'true'
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-bundle
+          path: bundle.zip
+          retention-days: 30
+      
+      - name: Deploy to Cloudflare
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: pnpm exec wrangler deploy workers/index.ts --env production
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

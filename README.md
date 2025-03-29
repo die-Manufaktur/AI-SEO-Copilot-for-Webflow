@@ -133,6 +133,64 @@ Vite is configured to use the `public/` folder as the output, as this is where t
 
 If you put any assets manually in the `public/` folder, they will be overriden during buliding.
 
+## Installation Guide
+
+Follow these steps to install the AI SEO Copilot onto your Webflow site:
+
+### Prerequisites
+1. Ensure you have access to the Webflow Designer and the Webflow CLI installed globally:
+   ```bash
+   pnpm add -g @webflow/webflow-cli
+   ```
+2. Obtain your Webflow Client ID and API credentials from the Webflow Developer Portal.
+3. Make sure you have Node.js (v20 or later) and `pnpm` installed.
+
+### Steps to Install
+1. **Clone the Repository**:
+   Clone this repository to your local machine:
+   ```bash
+   git clone <repository-url>
+   cd AI-SEO-Copilot-for-Webflow
+   ```
+
+2. **Install Dependencies**:
+   Install the required dependencies using `pnpm`:
+   ```bash
+   pnpm install --frozen-lockfile
+   ```
+
+3. **Build the Application**:
+   Build the application for deployment:
+   ```bash
+   pnpm build:all
+   ```
+
+4. **Deploy to Webflow**:
+   Use the Webflow CLI to deploy the extension:
+   ```bash
+   webflow deploy
+   ```
+   Ensure you have the following environment variables set:
+   - `VITE_WEBFLOW_CLIENT_ID`
+   - `VITE_WEBFLOW_EXTENSION=true`
+   - `CLOUDFLARE_API_TOKEN`
+   - `OPENAI_API_KEY`
+
+5. **Activate the Extension**:
+   - Log in to your Webflow account.
+   - Navigate to the **Extensions** section in the Webflow Designer.
+   - Locate the AI SEO Copilot extension and activate it.
+
+6. **Configure Settings**:
+   - Open the extension settings in Webflow Designer.
+   - Provide your OpenAI API Key and any other required configuration.
+
+### Troubleshooting
+- If you encounter issues during deployment, ensure your environment variables are correctly set.
+- Check the Webflow CLI documentation for additional deployment options.
+
+For further assistance, refer to the [Webflow Developer Documentation](https://developers.webflow.com/designer/docs/getting-started-designer-extensions).
+
 ## License
 
 The source code of the `webflow-app-template-react` template is available for use under the MIT license. [See license](https://github.com/stefanwittwer/webflow-app-template-react/blob/main/LICENSE.md)
