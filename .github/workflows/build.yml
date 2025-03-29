@@ -83,7 +83,14 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy workers/index.ts --env production
+          workingDirectory: '.' # Explicitly set working directory
+          command: 'deploy workers/index.ts --env production'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # Make sure these secrets are also in your API token permissions in Cloudflare 
+          # The API token needs Workers Scripts Edit permission for your account
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          WEBFLOW_CLIENT_SECRET: ${{ secrets.WEBFLOW_CLIENT_SECRET }}
+          WEBFLOW_CLIENT_ID: ${{ secrets.WEBFLOW_CLIENT_ID }}
+          WEBFLOW_REDIRECT_URI: ${{ secrets.WEBFLOW_REDIRECT_URI }}
