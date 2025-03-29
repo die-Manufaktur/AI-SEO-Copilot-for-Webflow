@@ -8,6 +8,7 @@ compatibility_flags = ["nodejs_compat"]
 
 [env.production]
 workers_dev = false
+route = "seo-copilot-api.paul-130.workers.dev"
 
 [env.production.vars]
 USE_GPT_RECOMMENDATIONS = "true"
@@ -16,6 +17,7 @@ STATE = "webflow-seo-copilot-prod"
 
 [env.development]
 workers_dev = true
+route = "*-seo-copilot-api.paul-130.workers.dev"
 
 [env.development.vars]
 USE_GPT_RECOMMENDATIONS = "true"

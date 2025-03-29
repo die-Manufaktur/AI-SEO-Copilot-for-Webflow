@@ -76,28 +76,16 @@ jobs:
           retention-days: 5
         
       - name: Deploy to Cloudflare Workers
-        run: |
-          # Install wrangler globally to use directly
-          npm install -g wrangler
-          
-          # Create a temporary wrangler.toml file that targets the correct endpoint
-          cat > wrangler-deploy.toml << EOF
-          name = "seo-copilot-api"
-          main = "./workers/index.ts"
-          compatibility_date = "2024-09-23"
-          compatibility_flags = ["nodejs_compat"]
-          route = "seo-copilot-api.paul-130.workers.dev/*"
-          
-          [vars]
-          USE_GPT_RECOMMENDATIONS = "true"
-          ALLOWED_ORIGINS = "https://webflow.com,https://*.webflow-ext.com,https://*.webflow.io"
-          EOF
-          
-          # Deploy using the custom config
-          CLOUDFLARE_API_TOKEN="${{ secrets.CLOUDFLARE_API_TOKEN }}" \
-          CLOUDFLARE_ACCOUNT_ID="${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" \
-          OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
-          WEBFLOW_CLIENT_SECRET="${{ secrets.WEBFLOW_CLIENT_SECRET }}" \
-          WEBFLOW_CLIENT_ID="${{ secrets.WEBFLOW_CLIENT_ID }}" \
-          WEBFLOW_REDIRECT_URI="${{ secrets.WEBFLOW_REDIRECT_URI }}" \
-          wrangler deploy --config wrangler-deploy.toml
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: '.'
+          command: deploy --name seo-copilot-api workers/index.ts
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          WEBFLOW_CLIENT_SECRET: ${{ secrets.WEBFLOW_CLIENT_SECRET }}
+          WEBFLOW_CLIENT_ID: ${{ secrets.WEBFLOW_CLIENT_ID }}
+          WEBFLOW_REDIRECT_URI: ${{ secrets.WEBFLOW_REDIRECT_URI }}
