@@ -82,25 +82,16 @@ jobs:
           # Install specific version of Wrangler globally
           npm install -g wrangler@3.22.1
           
+          # Create Cloudflare config file
+          mkdir -p ~/.wrangler
+          echo "api_token = \"${{ secrets.CLOUDFLARE_API_TOKEN }}\"" > ~/.wrangler/config.toml
+          echo "account_id = \"${{ secrets.CLOUDFLARE_ACCOUNT_ID }}\"" >> ~/.wrangler/config.toml
+          
+          # Set permissions
+          chmod 600 ~/.wrangler/config.toml
+          
           # Verify wrangler version
           wrangler --version
-          
-          # Set environment variables with validation
-          if [[ -n "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]]; then
-            export CLOUDFLARE_API_TOKEN="${{ secrets.CLOUDFLARE_API_TOKEN }}"
-            echo "✅ API Token set"
-          else
-            echo "❌ API Token missing"
-            exit 1
-          fi
-          
-          if [[ -n "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" ]]; then
-            export CLOUDFLARE_ACCOUNT_ID="${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
-            echo "✅ Account ID set"
-          else
-            echo "❌ Account ID missing"
-            exit 1
-          fi
           
           # Set other environment variables
           export OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}"
@@ -108,5 +99,5 @@ jobs:
           export WEBFLOW_CLIENT_ID="${{ secrets.WEBFLOW_CLIENT_ID }}"
           export WEBFLOW_REDIRECT_URI="${{ secrets.WEBFLOW_REDIRECT_URI }}"
           
-          # Deploy using supported flags
+          # Deploy using config file
           wrangler deploy workers/index.ts --name seo-copilot-api
