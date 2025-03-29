@@ -1,0 +1,46 @@
+version: 2
+updates:
+  # Node.js dependencies
+  - package-ecosystem: "yarn"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 20
+    labels:
+      - "dependencies"
+      - "automerge"
+    # Only include production dependencies
+    allow:
+      - dependency-type: "production"
+    # Group TypeScript-related dependencies
+    groups:
+      typescript-types:
+        patterns:
+          - "@types/*"
+        update-types:
+          - "minor"
+          - "patch"
+    # Group React-related dependencies
+    groups:
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react*"
+        update-types:
+          - "minor"
+          - "patch"
+    # Tailwind and PostCSS dependencies
+    groups:
+      styling:
+        patterns:
+          - "tailwindcss"
+          - "postcss"
+          - "postcss-*"
+        update-types:
+          - "minor"
+          - "patch"
+    # Handle version constraints specially
+    versioning-strategy: increase

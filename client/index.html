@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-eval' 'unsafe-inline'; script-src * 'unsafe-eval' 'unsafe-inline'; style-src * 'unsafe-inline'; img-src * data: blob:; font-src * data:; connect-src * blob:;" />
+    <meta http-equiv="Permissions-Policy" content="clipboard-write=*, clipboard-read=*">
+    <title>SEO Copilot</title>
+    <link rel="manifest" href="./manifest.json" />
+    <meta name="description" content="Advanced SEO analysis tool performing 11 comprehensive checks including title optimization, meta description analysis, content verification, keyword density, and image optimization. Get AI-powered recommendations for better rankings." />
+    <meta name="keywords" content="seo analysis, website optimization, keyword density, meta description analyzer, content optimization, image optimization, seo tools" />
+    <meta property="og:title" content="SEO Copilot - Website Optimization & Analysis" />
+    <meta property="og:description" content="Comprehensive SEO analysis tool with AI-powered recommendations. Analyze titles, meta descriptions, content, keywords, and more." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="SEO Copilot - Website Optimization" />
+    <meta name="twitter:description" content="Get detailed SEO analysis and AI recommendations for your website optimization needs." />
+    <meta name="robots" content="index, follow" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>
+      <p style="text-align:center;margin:2rem;font-family:sans-serif;">
+        JavaScript is required to run this application. Please enable JavaScript in your browser.
+      </p>
+    </noscript>
+    <script type="text/javascript">
+      window.addEventListener('error', (e) => {
+        console.error('Global error caught:', e.message, e.filename, e.lineno);
+      });
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
