@@ -76,16 +76,14 @@ jobs:
           retention-days: 5
         
       - name: Deploy to Cloudflare Workers
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: '.'
-          command: deploy --name seo-copilot-api workers/index.ts
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          WEBFLOW_CLIENT_SECRET: ${{ secrets.WEBFLOW_CLIENT_SECRET }}
-          WEBFLOW_CLIENT_ID: ${{ secrets.WEBFLOW_CLIENT_ID }}
-          WEBFLOW_REDIRECT_URI: ${{ secrets.WEBFLOW_REDIRECT_URI }}
+        run: |
+          echo "Starting direct Wrangler deployment..."
+          export CLOUDFLARE_API_TOKEN="${{ secrets.CLOUDFLARE_API_TOKEN }}"
+          export CLOUDFLARE_ACCOUNT_ID="${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
+          export OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}"
+          export WEBFLOW_CLIENT_SECRET="${{ secrets.WEBFLOW_CLIENT_SECRET }}"
+          export WEBFLOW_CLIENT_ID="${{ secrets.WEBFLOW_CLIENT_ID }}"
+          export WEBFLOW_REDIRECT_URI="${{ secrets.WEBFLOW_REDIRECT_URI }}"
+          
+          # Using npx with a specific older version of Wrangler known to have better authentication
+          npx wrangler@3.22.1 deploy workers/index.ts --env production
