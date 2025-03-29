@@ -75,19 +75,13 @@ jobs:
           path: bundle.zip
           retention-days: 5
         
-      # Note: Your Cloudflare API Token needs these permissions:
-      # - Account.Workers Scripts:Edit
-      # - Account.Workers Routes:Edit (if using routes)
-      # - User.User Details:Read
-      # - Zone.Zone:Read
-      # - Zone.Workers Routes:Edit (if using routes)
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: 'workers'
-          command: deploy index.ts --env production
+          command: deploy --name seo-copilot-ai index.ts
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
