@@ -7,8 +7,7 @@ compatibility_flags = ["nodejs_compat"]
 # account_id = "c130aef39c1c8e06d07c94bbadbe2bd7"
 
 [env.production]
-workers_dev = false
-route = "seo-copilot-api.paul-130.workers.dev"
+workers_dev = true
 
 [env.production.vars]
 USE_GPT_RECOMMENDATIONS = "true"
