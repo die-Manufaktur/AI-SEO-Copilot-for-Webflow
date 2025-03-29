@@ -85,17 +85,28 @@ jobs:
           # Verify wrangler version
           wrangler --version
           
-          # Debug info (safely masked)
-          echo "Account ID length: ${#CLOUDFLARE_ACCOUNT_ID}"
-          echo "API Token length: ${#CLOUDFLARE_API_TOKEN}"
+          # Set environment variables with validation
+          if [[ -n "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]]; then
+            export CLOUDFLARE_API_TOKEN="${{ secrets.CLOUDFLARE_API_TOKEN }}"
+            echo "✅ API Token set"
+          else
+            echo "❌ API Token missing"
+            exit 1
+          fi
           
-          # Set environment variables
-          export CLOUDFLARE_API_TOKEN="${{ secrets.CLOUDFLARE_API_TOKEN }}"
-          export CLOUDFLARE_ACCOUNT_ID="${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
+          if [[ -n "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" ]]; then
+            export CLOUDFLARE_ACCOUNT_ID="${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
+            echo "✅ Account ID set"
+          else
+            echo "❌ Account ID missing"
+            exit 1
+          fi
+          
+          # Set other environment variables
           export OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}"
           export WEBFLOW_CLIENT_SECRET="${{ secrets.WEBFLOW_CLIENT_SECRET }}"
           export WEBFLOW_CLIENT_ID="${{ secrets.WEBFLOW_CLIENT_ID }}"
           export WEBFLOW_REDIRECT_URI="${{ secrets.WEBFLOW_REDIRECT_URI }}"
           
-          # Use debug mode for more verbose output
-          wrangler deploy workers/index.ts --name seo-copilot-api --debug
+          # Deploy using supported flags
+          wrangler deploy workers/index.ts --name seo-copilot-api
