@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle as OriginalCardTitle } from "../components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel } from "../components/ui/form";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
@@ -32,6 +32,8 @@ import { analyzeSEO, registerDomains, getApiBaseUrl } from "../lib/api";
 import type { SEOAnalysisResult, SEOCheck } from "../lib/types";
 import { ProgressCircle } from "../components/ui/progress-circle";
 import { getLearnMoreUrl } from "../lib/docs-links";
+import React from 'react';
+import styled from 'styled-components';
 
 const formSchema = z.object({
   keyphrase: z.string().min(2, "Keyphrase must be at least 2 characters")
@@ -202,6 +204,36 @@ const getScoreRatingText = (score: number): string => {
   if (score >= 50) return "Needs Work";
   return "Poor";
 };
+
+const CategoryHeader = styled.div`
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+`;
+
+const BackButton = styled.button`
+  display: flex;
+  align-items: center;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  gap: 8px; /* Add some spacing between the chevron and title */
+
+  &:focus {
+    outline: 2px solid var(--primaryText); /* Add focus styling for accessibility */
+    outline-offset: 2px;
+  }
+`;
+
+const CardTitle = styled.h2`
+  font-size: 20px;
+  margin: 0;
+  font-weight: 500;
+`;
 
 export default function Home() {
   console.log("Home component rendering");
@@ -555,7 +587,7 @@ export default function Home() {
         >
           <Card className="w-full">
             <CardHeader>
-              <CardTitle className="text-center">SEO Analysis Tool</CardTitle>
+              <OriginalCardTitle className="text-center">SEO Analysis Tool</OriginalCardTitle>
             </CardHeader>
             <CardContent>
               <Form {...form}>
@@ -614,19 +646,14 @@ export default function Home() {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     {selectedCategory ? (
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setSelectedCategory(null)}
-                          className="mr-2"
-                        >
-                          <ChevronLeft className="h-5 w-5" />
-                        </Button>
-                        <CardTitle>{selectedCategory}</CardTitle>
-                      </div>
+                      <CategoryHeader>
+                        <BackButton onClick={() => setSelectedCategory(null)}>
+                          <ChevronLeft />
+                          <CardTitle>{selectedCategory}</CardTitle>
+                        </BackButton>
+                      </CategoryHeader>
                     ) : (
-                      <CardTitle className="text-center">Analysis Results</CardTitle>
+                      <OriginalCardTitle className="text-center">Analysis Results</OriginalCardTitle>
                     )}
                   </div>
                   {!selectedCategory && (

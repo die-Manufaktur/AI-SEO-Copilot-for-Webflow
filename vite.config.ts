@@ -5,12 +5,13 @@ import tailwindcss from '@tailwindcss/vite';
 
 const __dirname = process.cwd();
 
+// https://vitejs.dev/config/
 export default defineConfig({
   root: path.resolve(__dirname, 'client'),
   plugins: [react(), tailwindcss()],
   base: './',
   optimizeDeps: {
-    exclude: ['whatwg-url', 'jsdom'] // Exclude whatwg-url from pre-bundling to avoid the warning
+    exclude: ['whatwg-url', 'jsdom']
   },
   build: {
     outDir: path.resolve(__dirname, 'public'),
@@ -32,8 +33,6 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'client/src'),
-      // Optionally, you can add an alias for whatwg-url if needed:
-      // 'whatwg-url': path.resolve(__dirname, 'node_modules/whatwg-url/dist/whatwg-url.mjs')
     },
   },
   server: {
