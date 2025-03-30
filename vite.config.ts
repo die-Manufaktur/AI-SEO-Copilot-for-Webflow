@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react-swc';
+import react from '@vitejs/plugin-react';
 import path from 'path';
 
 const __dirname = process.cwd();
@@ -15,7 +15,7 @@ export default defineConfig({
     exclude: ['whatwg-url', 'jsdom']
   },
   build: {
-    outDir: 'public',
+    outDir: path.resolve(__dirname, './public'), // Output to the project root's public directory
     emptyOutDir: true,
     sourcemap: false, // disable source maps for production
     assetsDir: 'assets',
@@ -24,7 +24,21 @@ export default defineConfig({
       output: {
         entryFileNames: 'assets/[name].[hash].js',
         chunkFileNames: 'assets/[name].[hash].js',
-        assetFileNames: 'assets/[name].[hash].[ext]'
+        assetFileNames: 'assets/[name].[hash].[ext]',
+        // Use a function-based approach for manualChunks
+        manualChunks: (id) => {
+          // Vendor chunk for React
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
+            return 'vendor';
+          }
+          
+          // UI libraries chunk
+          if (id.includes('node_modules/react-icons') || id.includes('node_modules/tailwindcss')) {
+            return 'ui';
+          }
+          
+          // You can add more chunk definitions as needed
+        }
       }
     },
   },
@@ -33,7 +47,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, 'client/src'),
+      '@': path.resolve(__dirname, './src'),
     },
   },
   server: {
