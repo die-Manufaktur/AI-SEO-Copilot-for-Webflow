@@ -16,7 +16,7 @@ export default defineConfig({
   },
   build: {
     outDir: 'public',
-    emptyOutDir: false,
+    emptyOutDir: true,
     sourcemap: false, // disable source maps for production
     assetsDir: 'assets',
     rollupOptions: {
