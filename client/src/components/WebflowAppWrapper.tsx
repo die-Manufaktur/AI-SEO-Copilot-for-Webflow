@@ -1,4 +1,8 @@
 import React, { useEffect } from 'react';
+import { createLogger } from '../lib/utils';
+
+// Create a namespaced logger for the WebflowAppWrapper component
+const logger = createLogger('WebflowWrapper');
 
 interface WebflowAppWrapperProps {
   children: React.ReactNode;
@@ -13,12 +17,11 @@ export default function WebflowAppWrapper({ children }: WebflowAppWrapperProps) 
           width: 500,
           height: 720
         });
-        console.log('Extension size set to large');
       } catch (error) {
-        console.error('Failed to set extension size:', error);
+        logger.error('Failed to set extension size:', error);
       }
     } else {
-      console.warn('webflow.setExtensionSize is not available');
+      logger.warn('webflow.setExtensionSize is not available');
     }
   }, []);
 
