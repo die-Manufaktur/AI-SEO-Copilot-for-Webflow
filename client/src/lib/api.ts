@@ -24,6 +24,7 @@ export const getApiBaseUrl = (): string => {
     }
   } catch (e) {
     // Not in Webflow extension context
+    logger.warn('Error checking Webflow extension context:', e);
   }
 
   // Try to use local dev URL
@@ -35,53 +36,37 @@ export const getApiBaseUrl = (): string => {
     }
   } catch (e) {
     // Error accessing window.location, fall back to production
+    logger.warn('Error checking local development environment:', e);
   }
 
   logger.info('Falling back to production API URL');
   return 'https://seo-copilot-api.paul-130.workers.dev';
 };
 
-export async function analyzeSEO({ keyphrase, url }: { keyphrase: string; url: string }) {
-  const baseUrl = getApiBaseUrl();
-  logger.debug(`Sending request to ${baseUrl}/api/analyze with data:`, { keyphrase, url });
+export async function analyzeSEO({ keyphrase, url, isHomePage }: { keyphrase: string; url: string; isHomePage: boolean }) {
+  const apiBaseUrl = getApiBaseUrl();
+  logger.debug('Analyzing SEO with:', { keyphrase, url, apiUrl: apiBaseUrl });
   
   try {
-    const response = await fetch(`${baseUrl}/api/analyze`, {
-      method: "POST",
+    const response = await fetch(`${apiBaseUrl}/api/analyze`, {
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json"
+        'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ keyphrase, url })
+      body: JSON.stringify({ keyphrase, url }),
     });
-
-    // First check if response is OK
+    
     if (!response.ok) {
-      // Clone the response to read it multiple times if needed
-      const responseClone = response.clone();
-      
-      // Try to parse as JSON, but have a fallback for HTML errors
-      try {
-        const errorData = await response.json();
-        logger.error("Error response from /api/analyze:", errorData);
-        throw new Error(errorData.message || "Failed to analyze SEO");
-      } catch (parseError) {
-        // If we couldn't parse JSON, get the text from the cloned response
-        try {
-          const errorText = await responseClone.text();
-          logger.error("Non-JSON error response:", errorText.substring(0, 150) + "...");
-        } catch (textError) {
-          logger.error("Could not read error response content");
-        }
-        throw new Error(`Server returned ${response.status}: ${response.statusText}`);
-      }
+      const errorText = await response.text();
+      logger.error(`API error (${response.status}):`, errorText);
+      throw new Error(`API request failed with status ${response.status}: ${errorText}`);
     }
-
-    const data = await response.json();
-    logger.debug("Received response from /api/analyze:", data);
-    return data;
+    
+    logger.debug('API response received successfully');
+    return await response.json();
   } catch (error) {
-    logger.error("API request failed:", error);
-    throw new Error(error instanceof Error ? error.message : "Network error");
+    logger.error('SEO analysis request failed:', error);
+    throw error; // Re-throw to allow handling by the caller
   }
 }
 
