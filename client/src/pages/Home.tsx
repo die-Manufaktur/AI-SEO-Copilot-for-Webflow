@@ -32,8 +32,11 @@ import { analyzeSEO, registerDomains, getApiBaseUrl } from "../lib/api";
 import type { SEOAnalysisResult, SEOCheck } from "../lib/types";
 import { ProgressCircle } from "../components/ui/progress-circle";
 import { getLearnMoreUrl } from "../lib/docs-links";
-import React from 'react';
 import styled from 'styled-components';
+import { createLogger } from "../lib/utils";
+
+// Create a namespaced logger for the Home component
+const logger = createLogger('Home');
 
 const formSchema = z.object({
   keyphrase: z.string().min(2, "Keyphrase must be at least 2 characters")
@@ -115,8 +118,10 @@ const groupChecksByCategory = (checks: SEOCheck[]) => {
     "Technical SEO": ["Code Minification", "Schema Markup"]
   };
 
-  // Add a debug log to see what checks are being processed
-  console.log("Checks to categorize:", checks.map(c => c.title));
+  // Add a debug log only if checks exist
+  if (checks && checks.length > 0) {
+    logger.debug("Checks to categorize:", checks.map(c => c.title));
+  }
 
   const grouped: Record<string, SEOCheck[]> = {};
 
@@ -135,8 +140,13 @@ const groupChecksByCategory = (checks: SEOCheck[]) => {
     }
   });
 
-  // Log the final categorization
-  console.log("Final categorization:", Object.entries(grouped).map(([category, checks]) => `${category}: ${checks.length} items (${checks.map(c => c.title).join(', ')})`));
+  // Log the final categorization only if there are meaningful results
+  const hasChecks = Object.values(grouped).some(categoryChecks => categoryChecks.length > 0);
+  if (hasChecks) {
+    logger.debug("Final categorization:", Object.entries(grouped).map(([category, checks]) => 
+      `${category}: ${checks.length} items (${checks.map(c => c.title).join(', ')})`
+    ));
+  }
 
   return grouped;
 };
@@ -236,9 +246,6 @@ const CardTitle = styled.h2`
 `;
 
 export default function Home() {
-  console.log("Home component rendering");
-
-  // Step 2: Pull the page slug
   useEffect(() => {
     const fetchSlug = async () => {
       const currentSlug = await getPageSlug();
@@ -266,9 +273,9 @@ export default function Home() {
       if (event.data.name === 'copyToClipboard') {
         const text = event.data.data;
         navigator.clipboard.writeText(text).then(() => {
-          console.log('Text copied to clipboard');
+          logger.debug('Text copied to clipboard');
         }).catch(err => {
-          console.error('Failed to copy text to clipboard', err);
+          logger.error('Failed to copy text to clipboard', err);
         });
       }
     };
@@ -279,7 +286,6 @@ export default function Home() {
 
   // Add direct DOM manipulation on first render to ensure visibility
   useEffect(() => {
-    console.log("Home component mounted");
     // Try to show a toast message to verify the component is working
     toast({
       title: "SEO Analyzer Ready",
@@ -298,15 +304,15 @@ export default function Home() {
   const mutation = useMutation({
     mutationFn: analyzeSEO,
     onSuccess: (data) => {
-      console.log("Received analysis results:", data);
+      logger.debug("Received analysis results:", data);
       setResults(data);
       setSelectedCategory(null); // Reset selected category on new analysis
 
       // Inspect the checks data
-      console.log("Checks data:", data.checks);
+      logger.debug("Checks data:", data.checks);
     },
     onError: (error) => {
-      console.error("Error analyzing SEO:", error);
+      logger.error("Error analyzing SEO:", error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -358,24 +364,16 @@ export default function Home() {
       });
     }
   };
-
-  type SiteInfo = {
-    siteId: string;
-    siteName: string;
-    shortName: string;
-    domains: { url: string; default: boolean }[];
-  };
   
-  const getSiteInfo = async (): Promise<SiteInfo | null> => {
+  const getSiteInfo = async (): Promise<WebflowSiteInfo | null> => {
     try {
       const siteInfo = await webflow.getSiteInfo();
-      console.log("Received site info:", siteInfo);
       if (siteInfo?.shortName) {
         setStagingName(siteInfo.shortName);
       }
-      return siteInfo as SiteInfo;
+      return siteInfo as WebflowSiteInfo;
     } catch (error) {
-      console.error(`Error getting site info: ${error}`);
+      logger.error(`Error getting site info:`, error); // Keep error logs but use logger
       toast({
         variant: "destructive",
         title: "Error",
@@ -389,11 +387,11 @@ export default function Home() {
     try {
       // Force a double-check of the API URL
       const apiBaseUrl = getApiBaseUrl();
-      console.log("API base URL for request:", apiBaseUrl);
+      logger.debug("API base URL for request:", apiBaseUrl);
 
       const siteInfo = await getSiteInfo();
       if (!siteInfo || !siteInfo.domains || siteInfo.domains.length === 0) {
-        console.error("No domains found in site info");
+        logger.error("No domains found in site info");
         toast({
           variant: "destructive",
           title: "Error",
@@ -410,7 +408,7 @@ export default function Home() {
         if (defaultDomain) {
           url = defaultDomain.url;
         } else {
-          console.error("No default domain found in site info");
+          logger.error("No default domain found in site info");
           toast({
             variant: "destructive",
             title: "Error",
@@ -435,14 +433,14 @@ export default function Home() {
           
           // Add the slug with leading slash
           url = `${url}/${slug}`;
-          console.log("Full page URL with slug:", url);
+          logger.debug("Full page URL with slug:", url);
         } else {
-          console.log("No slug available, using domain URL only:", url);
+          logger.debug("No slug available, using domain URL only:", url);
         }
         
         // Add debugging message
-        console.log(`Using API base URL: ${getApiBaseUrl()}`);
-        console.log(`Using target URL: ${url}`);
+        logger.debug(`Using API base URL: ${getApiBaseUrl()}`);
+        logger.debug(`Using target URL: ${url}`);
         
         // Wrap in try-catch and provide useful error message
         try {
@@ -450,16 +448,16 @@ export default function Home() {
           const testConnection = await fetch(`${apiBaseUrl}/api/analyze`, {
             method: "HEAD"
           }).catch(err => {
-            console.warn("Test connection to Worker failed:", err);
+            logger.warn("Test connection to Worker failed:", err);
             return null;
           });
           
-          console.log("Worker test connection result:", testConnection ? `${testConnection.status} ${testConnection.statusText}` : "Failed");
+          logger.debug("Worker test connection result:", testConnection ? `${testConnection.status} ${testConnection.statusText}` : "Failed");
           
           // Proceed with the actual mutation
           mutation.mutate({ keyphrase: values.keyphrase, url });
         } catch (apiError) {
-          console.error("API request failed:", apiError);
+          logger.error("API request failed:", apiError);
           toast({
             variant: "destructive",
             title: "Connection Error",
@@ -474,7 +472,7 @@ export default function Home() {
         });
       }
     } catch (error) {
-      console.error("Error submitting form:", error);
+      logger.error("Error submitting form:", error);
       toast({
         variant: "destructive", 
         title: "Error",
@@ -486,8 +484,10 @@ export default function Home() {
   // Group checks for the overview
   const groupedChecks = results ? groupChecksByCategory(results.checks) : null;
 
-  // Inspect the groupedChecks data
-  console.log("Grouped checks data:", groupedChecks);
+  // Only log groupedChecks when it contains data
+  if (groupedChecks) {
+    logger.debug("Grouped checks data:", groupedChecks);
+  }
 
   // Get checks for the selected category
   const selectedCategoryChecks = selectedCategory && groupedChecks 
@@ -513,29 +513,30 @@ export default function Home() {
             const urlObj = new URL(urlWithProtocol);
             return urlObj.hostname;
           } catch (e) {
-            console.warn("Invalid URL format:", url);
+            logger.warn("Invalid URL format:", url);
             return url; // Return original if parsing fails
           }
         })
         .filter(Boolean);
 
       if (domains.length > 0) {
-        console.log("Registering detected domains:", domains);
+        logger.debug("Processing domains for registration:", domains);
+        
         try {
           const result = await registerDomains(domains);
           
           if (result.success) {
-            console.log("Domains registered successfully");
+            logger.info(`Successfully registered ${domains.length} domains: ${domains.join(', ')}`);
           } else {
-            console.warn("Failed to register some domains:", result.message);
+            logger.warn("Failed to register some domains:", result.message);
           }
         } catch (err) {
           // Don't block the app if domain registration fails (it will just use the API's default allowed domains)
-          console.warn("Domain registration failed, continuing with default allowed domains");
+          logger.warn("Domain registration failed, continuing with default allowed domains");
         }
       }
     } catch (error) {
-      console.error("Error registering domains:", error);
+      logger.error("Error registering domains:", error);
     }
   };
 
@@ -564,7 +565,7 @@ export default function Home() {
           await registerDetectedDomains(detectedUrls);
         }
       } catch (error) {
-        console.error("Error getting URLs:", error);
+        logger.error("Error getting URLs:", error);
       }
     };
 
@@ -871,12 +872,12 @@ const copyToClipboard = async (text: string) => {
       document.body.removeChild(textArea);
       return true;
     } catch (err) {
-      console.error('DOM clipboard operation failed:', err);
+      logger.error('DOM clipboard operation failed:', err);
       document.body.removeChild(textArea);
       return false;
     }
   } catch (error) {
-    console.error('Clipboard write failed:', error);
+    logger.error('Clipboard write failed:', error);
     return false;
   }
 };

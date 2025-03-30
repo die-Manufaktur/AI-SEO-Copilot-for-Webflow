@@ -1,4 +1,4 @@
-import type { AnalyzeRequest, SEOAnalysisResult } from "./types";
+import { createLogger } from './utils';
 
 // Properly declare Vite's environment variable types once
 interface ImportMetaEnv {
@@ -9,31 +9,41 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
-// Helper function to determine the appropriate API URL based on environment
-const isWebflowExtension = process.env.VITE_WEBFLOW_EXTENSION === 'true';
 
+// Create a namespaced logger for the API module
+const logger = createLogger('API');
+
+// Helper function to determine the appropriate API URL based on environment
 export const getApiBaseUrl = (): string => {
-  if (isWebflowExtension) {
-    console.log('Using production API URL for Webflow Extension');
-    return 'https://seo-copilot-api.paul-130.workers.dev';
-  } 
-  
-  // In development mode - Vite sets import.meta.env.DEV to true in development
-  if (process.env.DEV) {
-    // Local development Worker URL
-    const localWorkerUrl = 'http://127.0.0.1:8787';
-    console.log('Using development Worker URL:', localWorkerUrl);
-    return localWorkerUrl;
+  // Try to get Webflow extension API URL first
+  try {
+    const isExtension = !!window.webflow;
+    if (isExtension) {
+      logger.info('Using production API URL for Webflow Extension');
+      return 'https://seo-copilot-api.paul-130.workers.dev';
+    }
+  } catch (e) {
+    // Not in Webflow extension context
   }
-  
-  // Fallback to production URL
-  console.log('Falling back to production API URL');
+
+  // Try to use local dev URL
+  try {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      const localWorkerUrl = 'http://localhost:8787';
+      logger.info('Using development Worker URL:', localWorkerUrl);
+      return localWorkerUrl;
+    }
+  } catch (e) {
+    // Error accessing window.location, fall back to production
+  }
+
+  logger.info('Falling back to production API URL');
   return 'https://seo-copilot-api.paul-130.workers.dev';
 };
 
 export async function analyzeSEO({ keyphrase, url }: { keyphrase: string; url: string }) {
   const baseUrl = getApiBaseUrl();
-  console.log(`Sending request to ${baseUrl}/api/analyze with data:`, { keyphrase, url });
+  logger.debug(`Sending request to ${baseUrl}/api/analyze with data:`, { keyphrase, url });
   
   try {
     const response = await fetch(`${baseUrl}/api/analyze`, {
@@ -52,25 +62,25 @@ export async function analyzeSEO({ keyphrase, url }: { keyphrase: string; url: s
       // Try to parse as JSON, but have a fallback for HTML errors
       try {
         const errorData = await response.json();
-        console.error("Error response from /api/analyze:", errorData);
+        logger.error("Error response from /api/analyze:", errorData);
         throw new Error(errorData.message || "Failed to analyze SEO");
       } catch (parseError) {
         // If we couldn't parse JSON, get the text from the cloned response
         try {
           const errorText = await responseClone.text();
-          console.error("Non-JSON error response:", errorText.substring(0, 150) + "...");
+          logger.error("Non-JSON error response:", errorText.substring(0, 150) + "...");
         } catch (textError) {
-          console.error("Could not read error response content");
+          logger.error("Could not read error response content");
         }
         throw new Error(`Server returned ${response.status}: ${response.statusText}`);
       }
     }
 
     const data = await response.json();
-    console.log("Received response from /api/analyze:", data);
+    logger.debug("Received response from /api/analyze:", data);
     return data;
   } catch (error) {
-    console.error("API request failed:", error);
+    logger.error("API request failed:", error);
     throw new Error(error instanceof Error ? error.message : "Network error");
   }
 }
@@ -99,9 +109,9 @@ export async function fetchOAuthToken(authCode: string): Promise<string> {
  */
 export async function registerDomains(domains: string[]): Promise<{ success: boolean; message: string }> {
   const baseUrl = getApiBaseUrl();
+  logger.info(`Registering domains at ${baseUrl}/api/register-domains:`, domains);
   
   try {
-    console.log(`Registering domains at ${baseUrl}/api/register-domains:`, domains);
     const response = await fetch(`${baseUrl}/api/register-domains`, {
       method: "POST",
       headers: {
@@ -113,20 +123,20 @@ export async function registerDomains(domains: string[]): Promise<{ success: boo
     const data = await response.json();
     
     if (!response.ok) {
-      console.error("Failed to register domains:", data);
+      logger.error("Failed to register domains:", data);
       return { 
         success: false, 
         message: data.message || "Failed to register domains" 
       };
     }
 
-    console.log("Domains registered successfully:", data);
+    logger.info("Domains registered successfully:", data);
     return { 
       success: true, 
       message: data.message || "Domains registered successfully" 
     };
   } catch (error) {
-    console.error("Error registering domains:", error);
+    logger.error("Error registering domains:", error);
     return { 
       success: false, 
       message: `Error registering domains: ${error instanceof Error ? error.message : String(error)}` 

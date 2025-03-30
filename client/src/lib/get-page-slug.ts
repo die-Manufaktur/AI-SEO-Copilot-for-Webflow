@@ -1,15 +1,23 @@
+import { createLogger } from './utils';
+
+// Create a namespaced logger for the page slug functionality
+const logger = createLogger('PageSlug');
+
+/**
+ * Get the current page slug from Webflow
+ * @returns The page slug
+ */
 export async function getPageSlug(): Promise<string> {
   try {
-    // Get the current page
-    const currentPage = await webflow.getCurrentPage() as Page;
+    const page = await webflow.getCurrentPage();
+    const pageSlug = await page.getSlug();
     
-    // Get the slug of the page
-    const pageSlug = await currentPage.getSlug();
+    // Only log in debug mode as this is diagnostic information
+    logger.debug('Page slug retrieved:', pageSlug);
     
-    console.log('Page Slug:', pageSlug);
     return pageSlug;
   } catch (error) {
-    console.error('Error getting page slug:', error);
+    logger.error('Error getting page slug:', error);
     throw new Error('Failed to get page slug');
   }
 }
