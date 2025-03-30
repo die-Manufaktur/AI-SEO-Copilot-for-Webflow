@@ -30,7 +30,7 @@
     "autoprefixer": "^10.4.21",
     "concurrently": "^9.1.2",
     "cross-env": "^7.0.3",
-    "esbuild": "^0.25.1",
+    "esbuild": "^0.25.2",
     "ip": "^2.0.1",
     "ip-cidr": "^4.0.2",
     "lucide-react": "^0.479.0",
