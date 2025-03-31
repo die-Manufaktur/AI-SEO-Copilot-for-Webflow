@@ -820,17 +820,17 @@ export function isPrivateIP(ipStr: string): boolean {
 const hasValidOpenAIKey = (env: any): boolean =>
   !!env.OPENAI_API_KEY && ('' + env.OPENAI_API_KEY).startsWith('sk-')
 
-// Update getGPTRecommendation to use env binding for configuration and instantiate OpenAI locally
-export async function getGPTRecommendation(
+// Replace getGPTRecommendation with getAIRecommendation
+export async function getAIRecommendation(
   checkType: string,
   keyphrase: string,
   env: any,  // env binding
   context?: string
 ): Promise<string> {
-  const useGPT = env.USE_GPT_RECOMMENDATIONS !== 'false'
-  if (!useGPT || !hasValidOpenAIKey(env)) {
-    console.log("GPT recommendations are disabled or API key is invalid")
-    return "GPT recommendations are currently disabled. Enable them by setting USE_GPT_RECOMMENDATIONS=true and providing a valid OPENAI_API_KEY."
+  const useAI = env.USE_AI_RECOMMENDATIONS !== 'false'
+  if (!useAI || !hasValidOpenAIKey(env)) {
+    console.log("AI recommendations are disabled or API key is invalid")
+    return "AI recommendations are currently disabled. Enable them by setting USE_AI_RECOMMENDATIONS=true and providing a valid OPENAI_API_KEY."
   }
 
   // Use local client instance instead of global variable
@@ -866,7 +866,7 @@ ${truncatedContext ? `Current content: ${truncatedContext}` : ''}`
     // ...update cache accordingly...
     return recommendation
   } catch (error: any) {
-    console.error("GPT API Error:", error)
+    console.error("AI API Error:", error)
     if (error.status === 401) {
       return "API key error. Please check your OpenAI API key and ensure it's valid."
     }
@@ -949,7 +949,7 @@ export async function analyzeSEOElements(url: string, keyphrase: string, env: an
         const checks: any[] = [];
         let passedChecks = 0, failedChecks = 0;
 
-        // Helper to add a check (with GPT integration if available)
+        // Helper to add a check (with AI integration if available)
         const addCheck = async (
             title: string,
             description: string,
@@ -960,7 +960,7 @@ export async function analyzeSEOElements(url: string, keyphrase: string, env: an
             let recommendation = "";
             if (!passed && !skipRecommendation) {
                 try {
-                    recommendation = await getGPTRecommendation(title, keyphrase, env, context);
+                    recommendation = await getAIRecommendation(title, keyphrase, env, context);
                 } catch (error) {
                     recommendation = analyzerFallbackRecommendations[title]
                         ? analyzerFallbackRecommendations[title]({ keyphrase })
@@ -1133,7 +1133,8 @@ export async function analyzeSEOElements(url: string, keyphrase: string, env: an
             "OpenGraph Image",
             "The page should have an OpenGraph image.",
             Boolean(scrapedData.ogMetadata.image),
-            scrapedData.ogMetadata.image
+            scrapedData.ogMetadata.image,
+            true  // Added skipRecommendation parameter set to true
         );
 
         const score = Math.round((passedChecks / checks.length) * 100);
