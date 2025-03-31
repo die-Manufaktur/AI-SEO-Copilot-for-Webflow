@@ -896,12 +896,16 @@ function calculateKeyphraseDensityFromAnalyzer(
 }
 
 function isHomePageFromAnalyzer(url: string): boolean {
-	try {
-		const urlObj = new URL(url);
-		return urlObj.pathname === "/" || urlObj.pathname === "";
-	} catch {
-		return false;
-	}
+  console.log(`Checking if homepage: ${url}`);
+  try {
+    const urlObj = new URL(url);
+    const result = urlObj.pathname === "/" || urlObj.pathname === "";
+    console.log(`Homepage check result: ${result}`);
+    return result;
+  } catch {
+    console.log(`Homepage check failed for URL: ${url}`);
+    return false;
+  }
 }
 
 // Seo analyzer constants
@@ -989,7 +993,7 @@ export async function analyzeSEOElements(url: string, keyphrase: string, env: an
         await addCheck(
             "Keyphrase in URL",
             "The URL should contain the focus keyphrase when appropriate.",
-            url.toLowerCase().includes(keyphrase.toLowerCase()),
+            isHomePageFromAnalyzer(url) || url.toLowerCase().includes(keyphrase.toLowerCase()),
             url
         );
 

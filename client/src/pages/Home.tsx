@@ -245,17 +245,50 @@ const CardTitle = styled.h2`
   font-weight: 500;
 `;
 
+// Add this function before the Home component
+const fetchPageInfo = async (setSlug: (slug: string | null) => void, setIsHomePage: (isHome: boolean) => void) => {
+  const currentSlug = await getPageSlug();
+  setSlug(currentSlug);
+  
+  try {
+    if (window.webflow) {
+      const currentPage = await webflow.getCurrentPage();
+      const isHome = await currentPage.isHomepage();
+      setIsHomePage(isHome);
+      logger.debug(`Current page homepage status: ${isHome}`);
+    }
+  } catch (error) {
+    logger.error("Error checking if page is homepage:", error);
+    setIsHomePage(false);
+  }
+};
+
 export default function Home() {
   useEffect(() => {
     const fetchSlug = async () => {
       const currentSlug = await getPageSlug();
       setSlug(currentSlug);
+      
+      // Also check if the current page is the homepage
+      try {
+        if (window.webflow) {
+          const currentPage = await webflow.getCurrentPage();
+          const isHome = await currentPage.isHomepage();
+          setIsHomePage(isHome);
+          logger.debug(`Current page homepage status: ${isHome}`);
+        }
+      } catch (error) {
+        logger.error("Error checking if page is homepage:", error);
+        setIsHomePage(false);
+      }
     };
     fetchSlug();
   }, []);
   
   const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
   const [slug, setSlug] = useState<string | null>(null);
+  const [isHomePage, setIsHomePage] = useState<boolean>(false);
   const [results, setResults] = useState<SEOAnalysisResult | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [stagingName, setStagingName] = useState<string>(''); // Move this inside the component
@@ -294,6 +327,79 @@ export default function Home() {
     });
   }, []);
 
+  // Add this effect near the other useEffect hooks
+  useEffect(() => {
+    // Subscribe to page changes in Webflow Designer
+    if (window.webflow) {
+      let currentPageId: string | null = null;
+      
+      // Get initial page ID
+      const getCurrentPageId = async () => {
+        try {
+          const currentPage = await webflow.getCurrentPage();
+          if (currentPage) {
+            currentPageId = currentPage.id;
+            logger.debug('Initial page ID:', currentPageId);
+          }
+        } catch (error) {
+          logger.error('Error getting initial page ID:', error);
+        }
+      };
+      
+      getCurrentPageId();
+      
+      const unsubscribe = window.webflow.subscribe('currentpage', async (event) => {
+        try {
+          // Get updated page info
+          const currentPage = await webflow.getCurrentPage();
+          // getCurrentPage returns the current page directly, no need to find it
+          const newCurrentPage = currentPage;
+          
+          if (newCurrentPage && newCurrentPage.id !== currentPageId) {
+            // Page has actually changed, update currentPageId and reload
+            logger.info('Page changed from', currentPageId, 'to', newCurrentPage.id);
+            currentPageId = newCurrentPage.id;
+            
+            // Use a small timeout to prevent potential race conditions
+            setTimeout(() => {
+              window.location.reload();
+            }, 100);
+          } else {
+            logger.debug('Ignoring currentpage event - same page or no page ID');
+          }
+        } catch (error) {
+          logger.error('Error handling page change:', error);
+        }
+      });
+      
+      // Clean up subscription when component unmounts
+      return () => {
+        unsubscribe();
+      };
+    }
+  }, []);
+
+  // Update the page change subscription
+  useEffect(() => {
+    if (window.webflow) {
+      // Subscribe to page changes in Webflow Designer
+      const unsubscribe = window.webflow.subscribe('currentpage', async () => {
+        try {
+          // When page changes, fetch new page info
+          await fetchPageInfo(setSlug, setIsHomePage);
+          logger.debug('Page changed, updated page info');
+        } catch (error) {
+          logger.error('Error handling page change:', error);
+        }
+      });
+      
+      // Clean up subscription when component unmounts
+      return () => {
+        unsubscribe();
+      };
+    }
+  }, []);
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -303,20 +409,24 @@ export default function Home() {
 
   const mutation = useMutation({
     mutationFn: analyzeSEO,
+    onMutate: () => {
+      logger.info('Starting SEO analysis...');
+      setIsLoading(true);
+    },
     onSuccess: (data) => {
-      logger.debug("Received analysis results:", data);
+      logger.info('SEO analysis completed successfully');
+      logger.debug('Analysis results:', data);
       setResults(data);
       setSelectedCategory(null); // Reset selected category on new analysis
-
-      // Inspect the checks data
-      logger.debug("Checks data:", data.checks);
+      setIsLoading(false);
     },
-    onError: (error) => {
-      logger.error("Error analyzing SEO:", error);
+    onError: (error: Error) => {
+      logger.error('SEO analysis failed:', error);
+      setIsLoading(false);
       toast({
         variant: "destructive",
-        title: "Error",
-        description: error.message
+        title: "Analysis Failed",
+        description: error.message || "Please check your connection and try again"
       });
     }
   });
@@ -441,6 +551,7 @@ export default function Home() {
         // Add debugging message
         logger.debug(`Using API base URL: ${getApiBaseUrl()}`);
         logger.debug(`Using target URL: ${url}`);
+        logger.debug(`Is homepage: ${isHomePage}`);
         
         // Wrap in try-catch and provide useful error message
         try {
@@ -454,8 +565,8 @@ export default function Home() {
           
           logger.debug("Worker test connection result:", testConnection ? `${testConnection.status} ${testConnection.statusText}` : "Failed");
           
-          // Proceed with the actual mutation
-          mutation.mutate({ keyphrase: values.keyphrase, url });
+          // Pass isHomePage to the SEO analysis
+          mutation.mutate({ keyphrase: values.keyphrase, url, isHomePage });
         } catch (apiError) {
           logger.error("API request failed:", apiError);
           toast({

@@ -58,76 +58,36 @@ export interface Logger {
  * @param options Logger configuration options
  * @returns Logger object with debug, info, warn, and error methods
  */
-export function createLogger(namespace: string, options?: LoggerOptions): Logger {
-  // Default to enabled in development mode
-  const isDevelopment = process.env?.MODE === 'development' || 
-                         process.env.NODE_ENV === 'development' ||
-                         window.location.hostname === 'localhost';
-                         
-  const isEnabled = options?.enabled ?? isDevelopment;
-  
-  // Set default minimum log level to 'warn' to reduce noise
-  // This effectively suppresses debug and info logs by default
-  const defaultMinLevel = isDevelopment ? 'info' : 'warn';
-  
-  const logLevels: Record<LogLevel, number> = {
-    debug: 0,
-    info: 1,
-    warn: 2,
-    error: 3
+export function createLogger(namespace: string) {
+  const logStyles = {
+    debug: 'color: #7f8c8d',
+    info: 'color: #2980b9',
+    warn: 'color: #f39c12',
+    error: 'color: #c0392b',
   };
-  
-  const minLevel = options?.minLevel || defaultMinLevel;
-  const minLevelValue = logLevels[minLevel];
 
-  // Special handling for domain registration logs to prevent duplication
-  const isDomainLogger = namespace === 'API' || namespace === 'Home';
+  const prefix = `[${namespace}]`;
 
-  const createLogMethod = (level: LogLevel) => {
-    return (message: any, ...args: any[]) => {
-      // Skip logging if level is below minimum level
-      if (!isEnabled || logLevels[level] < minLevelValue) {
-        return;
-      }
-      
-      // Special handling for domain registration messages
-      if (isDomainLogger && 
-          (typeof message === 'string' && 
-           (message.includes('domains') || message.includes('Domains')))) {
-        
-        // Create a unique key for this message to prevent duplicates
-        const msgKey = `${namespace}-${message}-${JSON.stringify(args)}`;
-        
-        // If this exact message was already shown, skip it
-        if (shownDomainRegistrations.has(msgKey)) {
-          return;
-        }
-        
-        // For domain registration successes, only show a single summary message
-        if (message.includes('Successfully registered') || 
-            message.includes('Domains registered successfully')) {
-          
-          // If we've shown any domain registration success message, skip
-          if (Array.from(shownDomainRegistrations).some(key => 
-              key.includes('Successfully registered') || 
-              key.includes('Domains registered successfully'))) {
-            return;
-          }
-        }
-        
-        // Mark this message as shown
-        shownDomainRegistrations.add(msgKey);
-      }
-
-      const prefix = `[${namespace}]`;
-      console[level](prefix, message, ...args);
-    };
-  };
+  // Force enable all console output in development mode
+  const isDev = process.env.DEV || 
+                window.location.hostname === 'localhost' || 
+                window.location.hostname === '127.0.0.1';
 
   return {
-    debug: createLogMethod('debug'),
-    info: createLogMethod('info'),
-    warn: createLogMethod('warn'),
-    error: createLogMethod('error')
+    debug: (...args: any[]) => {
+      // Always log in development, only if explicitly enabled in production
+      if (isDev || localStorage.getItem('debug') === 'true') {
+        console.log(`%c${prefix}`, logStyles.debug, ...args);
+      }
+    },
+    info: (...args: any[]) => {
+      console.log(`%c${prefix}`, logStyles.info, ...args);
+    },
+    warn: (...args: any[]) => {
+      console.warn(`%c${prefix}`, logStyles.warn, ...args);
+    },
+    error: (...args: any[]) => {
+      console.error(`%c${prefix}`, logStyles.error, ...args);
+    }
   };
 }
