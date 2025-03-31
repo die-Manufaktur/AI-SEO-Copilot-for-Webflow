@@ -1,0 +1,47 @@
+/* Footer styles matching the app's color scheme */
+#webflow-app-wrapper > div > footer {
+  width: 100%;
+  margin-top: 0.5rem !important;
+  background-color: var(--background2);
+  border-top: 1px solid var(--color-border);
+  margin-top: auto;
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+}
+
+.footer-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-evenly;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+}
+
+.footer-link {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: all 0.2s ease;
+  padding: 0.5rem;
+}
+
+.footer-link:hover {
+  color: var(--color-primary-dark, var(--color-primary));
+  text-decoration: underline;
+}
+
+.footer-icon {
+  display: flex;
+  align-items: center;
+  width: 1rem;
+  height: 1rem;
+}
+
+.footer-text {
+  font-size: 0.7rem;
+}

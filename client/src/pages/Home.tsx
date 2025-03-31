@@ -34,6 +34,7 @@ import { ProgressCircle } from "../components/ui/progress-circle";
 import { getLearnMoreUrl } from "../lib/docs-links";
 import styled from 'styled-components';
 import { createLogger } from "../lib/utils";
+import Footer from "../components/Footer";
 
 // Create a namespaced logger for the Home component
 const logger = createLogger('Home');
@@ -687,10 +688,10 @@ export default function Home() {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="min-h-screen bg-background p-4 md:p-6"
+      className="min-h-screen bg-background p-4 md:p-6 flex flex-col"
       style={{ color: "#FFFFFF" }} // Force white text for visibility
     >
-      <div className="mx-auto w-full max-w-3xl space-y-6">
+      <div className="mx-auto w-full max-w-3xl space-y-6 flex-grow">
         <motion.div
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -955,6 +956,7 @@ export default function Home() {
           )}
         </AnimatePresence>
       </div>
+      <Footer />
     </motion.div>
   );
 }
