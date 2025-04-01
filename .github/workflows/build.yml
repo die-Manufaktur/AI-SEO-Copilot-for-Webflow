@@ -11,33 +11,47 @@ jobs:
       contents: read
     name: Build Extension Bundle
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
       
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
         with:
-          node-version: '20'
-          
-      - name: Install pnpm
+          node-version: '18'
+          registry-url: 'https://registry.npmjs.org'
+      
+      - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
           version: 8
           run_install: false
           
-      - name: Setup pnpm store
+      - name: Get pnpm store directory
+        id: pnpm-cache
         shell: bash
         run: |
-          echo "STORE_PATH=/home/runner/.local/share/pnpm/store/v10" >> $GITHUB_ENV
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
 
       - uses: actions/cache@v3
         name: Setup pnpm cache
         with:
-          path: ${{ env.STORE_PATH }}
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
-        run: pnpm install
+        run: |
+          # Configure npm/pnpm with retry settings to avoid rate limiting issues
+          echo "registry=https://registry.npmjs.org/" > .npmrc
+          echo "fetch-retries=5" >> .npmrc
+          echo "fetch-retry-factor=5" >> .npmrc
+          echo "fetch-retry-mintimeout=15000" >> .npmrc
+          echo "fetch-retry-maxtimeout=120000" >> .npmrc
+          
+          # Use pnpm with no frozen lockfile to allow updates
+          pnpm install --no-frozen-lockfile
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         
       # Add environment check
       - name: Check required secrets
