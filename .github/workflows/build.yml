@@ -6,53 +6,41 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     permissions:
       contents: read
     name: Build Extension Bundle
+    strategy:
+      matrix:
+        node-version: [20]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
         with:
-          node-version: '18'
-          registry-url: 'https://registry.npmjs.org'
+          version: 10
       
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
         with:
-          version: 8
-          run_install: false
-          
-      - name: Get pnpm store directory
-        id: pnpm-cache
-        shell: bash
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+      
+      - name: Configure npm registry settings
         run: |
-          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
-
-      - uses: actions/cache@v3
-        name: Setup pnpm cache
-        with:
-          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-
+          # Create .npmrc with settings to avoid rate limiting issues
+          cat > .npmrc << EOF
+          registry=https://registry.npmjs.org/
+          fetch-retries=5
+          fetch-retry-factor=5
+          fetch-retry-mintimeout=15000
+          fetch-retry-maxtimeout=120000
+          EOF
+      
       - name: Install dependencies
-        run: |
-          # Configure npm/pnpm with retry settings to avoid rate limiting issues
-          echo "registry=https://registry.npmjs.org/" > .npmrc
-          echo "fetch-retries=5" >> .npmrc
-          echo "fetch-retry-factor=5" >> .npmrc
-          echo "fetch-retry-mintimeout=15000" >> .npmrc
-          echo "fetch-retry-maxtimeout=120000" >> .npmrc
-          
-          # Use pnpm with no frozen lockfile to allow updates
-          pnpm install --no-frozen-lockfile
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        
+        run: pnpm install --no-frozen-lockfile
+      
       # Add environment check
       - name: Check required secrets
         run: |
@@ -68,6 +56,7 @@ jobs:
           VITE_WEBFLOW_API_KEY: ${{ secrets.VITE_WEBFLOW_API_KEY }}
           VITE_WEBFLOW_SITE_ID: ${{ secrets.VITE_WEBFLOW_SITE_ID }}
           VITE_WEBFLOW_CLIENT_ID: ${{ secrets.VITE_WEBFLOW_CLIENT_ID }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           
       - name: Validate build output
         run: |
