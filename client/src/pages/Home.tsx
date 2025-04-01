@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation } from "@tanstack/react-query";
+import confetti from 'canvas-confetti';
 import { Card, CardContent, CardHeader, CardTitle as OriginalCardTitle } from "../components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel } from "../components/ui/form";
 import { Input } from "../components/ui/input";
@@ -265,6 +266,22 @@ const fetchPageInfo = async (setSlug: (slug: string | null) => void, setIsHomePa
 };
 
 export default function Home() {
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+  const [slug, setSlug] = useState<string | null>(null);
+  const [isHomePage, setIsHomePage] = useState<boolean>(false);
+  const [results, setResults] = useState<SEOAnalysisResult | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [stagingName, setStagingName] = useState<string>('');
+  const [currentUrl, setCurrentUrl] = useState<string>("");
+  const [urls, setUrls] = useState<string[]>([]);
+  // Add state for perfect score celebration
+  const [showedPerfectScoreMessage, setShowedPerfectScoreMessage] = useState<boolean>(false);
+  
+  // Calculate overall SEO score - moved up to avoid reference before declaration
+  const seoScore = results ? calculateSEOScore(results.checks) : 0;
+  const scoreRating = getScoreRatingText(seoScore);
+
   useEffect(() => {
     const fetchSlug = async () => {
       const currentSlug = await getPageSlug();
@@ -285,16 +302,6 @@ export default function Home() {
     };
     fetchSlug();
   }, []);
-  
-  const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
-  const [slug, setSlug] = useState<string | null>(null);
-  const [isHomePage, setIsHomePage] = useState<boolean>(false);
-  const [results, setResults] = useState<SEOAnalysisResult | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [stagingName, setStagingName] = useState<string>(''); // Move this inside the component
-  const [currentUrl, setCurrentUrl] = useState<string>("");
-  const [urls, setUrls] = useState<string[]>([]);
 
   // Move the event listener inside useEffect
   useEffect(() => {
@@ -400,6 +407,29 @@ export default function Home() {
       };
     }
   }, []);
+
+  // Add effect for perfect score celebration
+  useEffect(() => {
+    // Only run when we have results and the score is 100
+    if (results && seoScore === 100 && !showedPerfectScoreMessage) {
+      // Trigger confetti animation
+      confetti({
+        particleCount: 200,
+        spread: 100,
+        origin: { y: 0.6 }
+      });
+
+      // Remove toast notification - keep only the UI message
+      // toast({
+      //   title: "You are an absolute SEO legend!, well done!",
+      //   description: "Feel free to take a screenshot and brag about it on Linkedin. We might have a special something for you in return.",
+      //   duration: 10000, // Show this message longer
+      // });
+
+      // Mark as shown so we don't show it again
+      setShowedPerfectScoreMessage(true);
+    }
+  }, [results, seoScore, showedPerfectScoreMessage, toast]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -601,15 +631,6 @@ export default function Home() {
     logger.debug("Grouped checks data:", groupedChecks);
   }
 
-  // Get checks for the selected category
-  const selectedCategoryChecks = selectedCategory && groupedChecks 
-    ? groupedChecks[selectedCategory] || [] 
-    : [];
-
-  // Calculate overall SEO score
-  const seoScore = results ? calculateSEOScore(results.checks) : 0;
-  const scoreRating = getScoreRatingText(seoScore);
-
   // Function to extract domains from URLs and register them
   const registerDetectedDomains = async (detectedUrls: string[]) => {
     if (!detectedUrls || detectedUrls.length === 0) return;
@@ -684,6 +705,13 @@ export default function Home() {
     getUrls();
   }, []);
 
+  // Get checks for the selected category
+  const selectedCategoryChecks = selectedCategory && results ? 
+    results.checks.filter(check => {
+      const categories = groupChecksByCategory(results.checks);
+      return categories[selectedCategory]?.includes(check);
+    }) : [];
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -741,6 +769,56 @@ export default function Home() {
                       Analyze SEO
                     </Button>
                   </motion.div>
+                  {/* Only show test button in development environments */}
+                  {process.env.NODE_ENV !== 'production' && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-2"
+                      onClick={() => {
+                        // Mock a perfect score result
+                        const mockPerfectResult = results ? {
+                          ...results,
+                          checks: results.checks.map(check => ({
+                            ...check,
+                            passed: true
+                          })),
+                          passedChecks: results.checks.length,
+                          failedChecks: 0
+                        } : null;
+                        
+                        if (mockPerfectResult) {
+                          setResults(mockPerfectResult);
+                          
+                          // Trigger the confetti directly for immediate feedback
+                          confetti({
+                            particleCount: 200,
+                            spread: 100,
+                            origin: { y: 0.6 }
+                          });
+                          
+                          // Keep toast for test button only to provide feedback about test mode
+                          toast({
+                            title: "Test Mode Activated",
+                            description: "Perfect score simulation is now active.",
+                            duration: 3000,
+                          });
+                          
+                          // Set the state to prevent repeated toasts
+                          setShowedPerfectScoreMessage(true);
+                        } else {
+                          toast({
+                            title: "Test Failed",
+                            description: "Please run an analysis first to have result data to modify.",
+                            variant: "destructive"
+                          });
+                        }
+                      }}
+                    >
+                      🧪 Test 100 Score
+                    </Button>
+                  )}
                 </form>
               </Form>
             </CardContent>
@@ -782,6 +860,20 @@ export default function Home() {
                         <p className="text-sm text-muted-foreground mt-1">
                           {results.passedChecks} passed <CheckCircle className="inline-block h-4 w-4 text-greenText" style={{color: 'var(--greenText)', stroke: 'var(--greenText)'}} /> • {results.failedChecks} to improve <XCircle className="inline-block h-4 w-4 text-redText" style={{color: 'var(--redText)', stroke: 'var(--redText)'}} />
                         </p>
+                        
+                        {/* Perfect score celebration message */}
+                        {seoScore === 100 && (
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="mt-4 p-3 bg-green-100 dark:bg-green-900 rounded-md text-green-800 dark:text-green-100 font-medium"
+                          >
+                            You are an absolute SEO legend, well done! 🎉
+                            <p className="text-sm font-normal mt-1">
+                              Feel free to take a screenshot and brag about it on Linkedin. We might have a special something for you in return.
+                            </p>
+                          </motion.div>
+                        )}
                       </div>
                     </div>
                   )}
