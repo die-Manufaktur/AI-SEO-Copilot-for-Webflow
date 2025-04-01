@@ -1,7 +1,7 @@
 version: 2
 updates:
   # Node.js dependencies
-  - package-ecosystem: "yarn"
+  - package-ecosystem: "pnpm"
     directory: "/"
     schedule:
       interval: "weekly"
