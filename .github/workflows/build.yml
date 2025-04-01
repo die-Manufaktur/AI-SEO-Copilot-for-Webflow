@@ -57,6 +57,8 @@ jobs:
           VITE_WEBFLOW_SITE_ID: ${{ secrets.VITE_WEBFLOW_SITE_ID }}
           VITE_WEBFLOW_CLIENT_ID: ${{ secrets.VITE_WEBFLOW_CLIENT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          WEBFLOW_CLIENT_SECRET: ${{ secrets.WEBFLOW_CLIENT_SECRET }}
+          WEBFLOW_REDIRECT_URI: ${{ secrets.WEBFLOW_REDIRECT_URI }}
           
       - name: Validate build output
         run: |
