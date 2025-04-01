@@ -98,6 +98,9 @@ importers:
       '@webflow/webflow-cli':
         specifier: ^1.6.13
         version: 1.6.13
+      canvas-confetti:
+        specifier: ^1.9.3
+        version: 1.9.3
       cheerio:
         specifier: ^1.0.0
         version: 1.0.0
@@ -165,6 +168,9 @@ importers:
       '@testing-library/react':
         specifier: ^14.3.1
         version: 14.3.1(@types/react@19.0.12)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+      '@types/canvas-confetti':
+        specifier: ^1.9.0
+        version: 1.9.0
       '@types/cheerio':
         specifier: ^0.22.35
         version: 0.22.35
@@ -1958,6 +1964,9 @@ packages:
   '@types/babel__traverse@7.20.7':
     resolution: {integrity: sha512-dkO5fhS7+/oos4ciWxyEyjWe48zmG6wbCheo/G2ZnHx4fs3EU6YC6UM8rk56gAjNJ9P3MTH2jo5jb92/K6wbng==}
 
+  '@types/canvas-confetti@1.9.0':
+    resolution: {integrity: sha512-aBGj/dULrimR1XDZLtG9JwxX1b4HPRF6CX9Yfwh3NvstZEm1ZL7RBnel4keCPSqs1ANRu1u2Aoz9R+VmtjYuTg==}
+
   '@types/cheerio@0.22.35':
     resolution: {integrity: sha512-yD57BchKRvTV+JD53UZ6PD8KWY5g5rvvMLRnZR3EQBCZXiDT/HR+pKpMzFGlWNhFrXlo7VPZXtKvIEwZkAWOIA==}
 
@@ -2139,6 +2148,9 @@ packages:
 
   caniuse-lite@1.0.30001707:
     resolution: {integrity: sha512-3qtRjw/HQSMlDWf+X79N206fepf4SOOU6SQLMaq/0KkZLmSjPxAkBOQQ+FxbHKfHmYLZFfdWsO3KA90ceHPSnw==}
+
+  canvas-confetti@1.9.3:
+    resolution: {integrity: sha512-rFfTURMvmVEX1gyXFgn5QMn81bYk70qa0HLzcIOSVEyl57n6o9ItHeBtUSWdvKAPY0xlvBHno4/v3QPrT83q9g==}
 
   chalk@4.1.2:
     resolution: {integrity: sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA==}
@@ -4967,6 +4979,8 @@ snapshots:
     dependencies:
       '@babel/types': 7.27.0
 
+  '@types/canvas-confetti@1.9.0': {}
+
   '@types/cheerio@0.22.35':
     dependencies:
       '@types/node': 22.13.14
@@ -5148,6 +5162,8 @@ snapshots:
   camelize@1.0.1: {}
 
   caniuse-lite@1.0.30001707: {}
+
+  canvas-confetti@1.9.3: {}
 
   chalk@4.1.2:
     dependencies:
