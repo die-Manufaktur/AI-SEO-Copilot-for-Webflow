@@ -763,10 +763,10 @@ export default function Home() {
                     <Button
                       type="submit"
                       disabled={mutation.isPending}
-                      className="w-full h-11"
+                      className="w-full h-11 cursor-pointer"
                     >
                       {mutation.isPending && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
-                      Analyze SEO
+                      Start optimizing your SEO
                     </Button>
                   </motion.div>
                   {/* Only show test button in development environments */}
