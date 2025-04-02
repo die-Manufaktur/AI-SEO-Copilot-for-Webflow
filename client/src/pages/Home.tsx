@@ -448,17 +448,35 @@ export default function Home() {
       logger.info('SEO analysis completed successfully');
       logger.debug('Analysis results:', data);
       setResults(data);
-      setSelectedCategory(null); // Reset selected category on new analysis
+      setSelectedCategory(null); 
       setIsLoading(false);
     },
     onError: (error: Error) => {
       logger.error('SEO analysis failed:', error);
       setIsLoading(false);
-      toast({
-        variant: "destructive",
-        title: "Analysis Failed",
-        description: error.message || "Please check your connection and try again"
-      });
+      
+      // Check if the error message indicates an empty/unpublished page
+      if (error.message.includes('Failed to fetch page') || error.message.includes('500')) {
+        toast({
+          variant: "destructive",
+          title: "Unpublished Page",
+          description: "Hmm, it seems the page you are trying to analysis is empty. Can you make sure you published the page (top right corner button) and try again.",
+          // Increase duration so user has time to read
+          duration: 6000,
+          // Add custom styling
+          className: "bg-amber-50 dark:bg-amber-900 border-amber-200 dark:border-amber-800",
+          style: {
+            fontWeight: 500
+          }
+        });
+      } else {
+        // Default error toast for other errors
+        toast({
+          variant: "destructive", 
+          title: "Analysis Failed",
+          description: error.message || "Please check your connection and try again"
+        });
+      }
     }
   });
 

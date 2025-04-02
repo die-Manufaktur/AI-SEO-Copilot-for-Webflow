@@ -680,8 +680,7 @@ async function analyzeSEO(url: string, keyphrase: string, env: any): Promise<any
   try {
     console.log(`Analyzing SEO for URL: ${url} with keyphrase: ${keyphrase}`);
     
-    // Instead of using approaches that require vm.runInContext, let's use a more
-    // Cloudflare Worker-friendly approach to fetch and analyze the content
+    // Fetch the page content
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -693,10 +692,14 @@ async function analyzeSEO(url: string, keyphrase: string, env: any): Promise<any
     }
 
     
-    // Pass the env parameter to analyzeSEOElements
+    // Check if the page is empty or has minimal content
+    if (!html || html.trim().length < 100) {
+      throw new Error('Page appears to be empty or unpublished');
+    }
+
+    // Continue with existing analysis...
     const results = await analyzeSEOElements(url, keyphrase, env);
     
-    // Add the HTML content to the results for additional client-side processing if needed
     return {
       ...results,
       url,
