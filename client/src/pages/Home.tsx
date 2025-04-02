@@ -114,7 +114,7 @@ const getPriorityText = (priority: string) => {
 const groupChecksByCategory = (checks: SEOCheck[]) => {
   const categories = {
     "Meta SEO": ["Keyphrase in Title", "Keyphrase in Meta Description", "Keyphrase in URL", "Open Graph Title and Description"],
-    "Content Optimisation": ["Content Length on page", "Keyphrase Density", "Keyphrase in Introduction", "Keyphrase in H1 Heading", "Keyphrase in H2 Headings", "Heading Hierarchy"],
+    "Content Optimisation": ["Content Length", "Keyphrase Density", "Keyphrase in Introduction", "Keyphrase in H1 Heading", "Keyphrase in H2 Headings", "Heading Hierarchy"],
     "Links": ["Internal Links", "Outbound Links"],
     "Images and Assets": ["Image Alt Attributes", "Next-Gen Image Formats", "OpenGraph Image", "Image File Size"],
     "Technical SEO": ["Code Minification", "Schema Markup"]
