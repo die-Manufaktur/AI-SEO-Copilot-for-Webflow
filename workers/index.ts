@@ -103,7 +103,6 @@ async function handleOAuthTokenExchange(request: Request, env: any): Promise<Res
     const token = await fetchOAuthToken(code, env);
     return new Response(JSON.stringify({ token }), { status: 200 });
   } catch (error) {
-    console.error('Error handling OAuth token exchange:', error);
     return new Response(JSON.stringify({ error: 'Failed to exchange OAuth token' }), { status: 500 });
   }
 }
@@ -121,7 +120,6 @@ async function handleAuthRedirect(request: Request, env: any): Promise<Response>
     
     return Response.redirect(authorizeUrl.toString(), 302);
   } catch (error) {
-    console.error('Error creating authorization link:', error);
     return new Response(JSON.stringify({ error: 'Failed to create authorization link' }), { status: 500 });
   }
 }
@@ -149,7 +147,6 @@ async function handleAuthCallback(request: Request, env: any): Promise<Response>
 
     return new Response(JSON.stringify({ message: 'Authorization code received', token }), { status: 200 });
   } catch (error) {
-    console.error('Error handling auth callback:', error);
     return new Response(JSON.stringify({ error: 'Failed to handle auth callback' }), { status: 500 });
   }
 }
@@ -217,7 +214,6 @@ function getSuccessMessage(checkType: string, url: string): string {
 
 
 async function scrapeWebpage(url: string): Promise<any> {
-  console.log(`Scraping webpage: ${url}`);
   try {
     if (!url.startsWith("http://") && !url.startsWith("https://")) {
       url = `https://${url}`;
@@ -342,7 +338,6 @@ async function scrapeWebpage(url: string): Promise<any> {
             minified: scriptUrl.includes('.min.js') || scriptUrl.includes('-min.js')
           });
         } catch (e) {
-          console.log(`Error processing script URL: ${scriptUrl}`, e);
         }
       }
     }
@@ -388,7 +383,6 @@ async function scrapeWebpage(url: string): Promise<any> {
             minified: cssUrl.includes('.min.css') || cssUrl.includes('-min.css')
           });
         } catch (e) {
-          console.log(`Error processing CSS URL: ${cssUrl}`, e);
         }
       }
     }
@@ -439,7 +433,6 @@ const matches1 = Array.from(bodyContent.matchAll(pattern1));
 // Check if pattern1 found any matches
 if (matches1.length > 0) {
   matchesArray = matches1;
-  console.log(`${logPrefix} Found ${matchesArray.length} JSON-LD scripts with pattern 1`);
 }
 // Define remaining match variables that will be used later
 let matches2: RegExpMatchArray[] = [];
@@ -452,7 +445,6 @@ if (matchesArray.length === 0) {
   matches2 = Array.from(bodyContent.matchAll(pattern2));
   if (matches2.length > 0) {
     matchesArray = matches2;
-    console.log(`${logPrefix} Found ${matchesArray.length} JSON-LD scripts with pattern 2`);
   }
 }
 // Pattern 3: Most permissive - any script with ld+json anywhere in attributes
@@ -461,42 +453,35 @@ if (matchesArray.length === 0) {
   matches3 = Array.from(bodyContent.matchAll(pattern3));
   if (matches3.length > 0) {
     matchesArray = matches3;
-    console.log(`${logPrefix} Found ${matchesArray.length} JSON-LD scripts with pattern 3`);
   }
 }
 
 // Pattern 4: Exact pattern for specific cases (trying to match your exact format)
 if (matchesArray.length === 0) {
-  console.log(`${logPrefix} Trying with exact pattern match...`);
   // This pattern specifically looks for your script format with no whitespace between attributes
   const pattern4 = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi;
   matches4 = Array.from(bodyContent.matchAll(pattern4));
   if (matches4.length > 0) {
     matchesArray = matches4;
-    console.log(`${logPrefix} Found ${matchesArray.length} JSON-LD scripts with pattern 4 (exact match)`);
   }
 }
 
 // Pattern 5: Ultra-permissive pattern
 if (matchesArray.length === 0) {
-  console.log(`${logPrefix} Trying with ultra-permissive pattern...`);
   // Look for any script tag that might contain schema.org data
   const pattern5 = /<script[^>]*>([\s\S]*?@context[\s\S]*?schema\.org[\s\S]*?@type[\s\S]*?)<\/script>/gi;
   matches5 = Array.from(bodyContent.matchAll(pattern5));
   if (matches5.length > 0) {
     matchesArray = matches5;
-    console.log(`${logPrefix} Found ${matchesArray.length} JSON-LD scripts with pattern 5 (ultra-permissive)`);
   }
 }
 
 // If we still haven't found anything, look for raw JSON with schema.org in the HTML (without script tags)
 if (matchesArray.length === 0) {
-  console.log(`${logPrefix} Trying to find raw JSON blocks...`);
   // Look for JSON-like structures containing schema.org
   const rawJsonPattern = /(\{[\s\S]*?"@context"[\s\S]*?"schema\.org"[\s\S]*?"@type"[\s\S]*?\})/gi;
   const rawMatches = Array.from(bodyContent.matchAll(rawJsonPattern));
   if (rawMatches.length > 0) {
-    console.log(`${logPrefix} Found ${rawMatches.length} potential raw JSON blocks with schema.org references`);
     
     // Try to parse these as standalone JSON
     for (const rawMatch of rawMatches) {
@@ -511,17 +496,14 @@ if (matchesArray.length === 0) {
               'www.schema.org'
             ];
             if (allowedHosts.includes(contextUrl.host)) {
-              console.log(`${logPrefix} ✅ Successfully parsed raw JSON schema data: ${jsonData["@type"]}`);
               schema.detected = true;
               schema.jsonLdBlocks.push(jsonData);
               schema.types.push(jsonData["@type"]);
             }
           } catch (e) {
-            console.log(`${logPrefix} Invalid @context URL: ${jsonData["@context"]}`);
           }
         }
       } catch (e) {
-        console.log(`${logPrefix} Failed to parse potential raw JSON block`);
       }
     }
   }
@@ -529,7 +511,6 @@ if (matchesArray.length === 0) {
 
 // Additional diagnostic check - log a sample if schema not found
 if (matchesArray.length === 0) {
-  console.log(`${logPrefix} No JSON-LD scripts found with any pattern. Looking for fragments...`);
   // Look for any fragment containing "schema.org" in the HTML
   const schemaOrgIndex = bodyContent.indexOf('schema.org');
   if (schemaOrgIndex !== -1) {
@@ -537,55 +518,38 @@ if (matchesArray.length === 0) {
       Math.max(0, schemaOrgIndex - 100), 
       Math.min(bodyContent.length, schemaOrgIndex + 300)
     );
-    console.log(`${logPrefix} Found schema.org reference in HTML: ${contextFragment}`);
   } else {
-    console.log(`${logPrefix} No schema.org references found in the document.`);
   }
 }
 
 // Process any found scripts
-console.log(`${logPrefix} Found ${matchesArray.length} total potential JSON-LD scripts to process`);
     
-    console.log(`Found ${matchesArray.length} potential JSON-LD scripts in total`);
-
-    // Sample a portion of the page content to help with debugging
-    console.log(`DEBUG: Body content sample (first 300 chars): ${bodyContent.substring(0, 300)}`);
-    console.log(`DEBUG: HTML contains application/ld+json: ${bodyContent.includes('application/ld+json')}`);
-
     for (const match of matchesArray) {
       try {
         // Extract and trim the content inside the script tag
         const scriptContent = match[1].trim();
-        console.log(`Found script tag with content length: ${scriptContent.length} chars`);
         
         // Log the raw content to aid debugging
-        console.log(`Raw JSON-LD content sample:\n${scriptContent.substring(0, 150)}...`);
         
         // Try to parse the JSON
         try {
           const jsonData = JSON.parse(scriptContent);
-          console.log(`✅ Successfully parsed JSON-LD data`);
           
           schema.detected = true;
           schema.jsonLdBlocks.push(jsonData);
           
           // Log type information
-          console.log(`Schema @type: ${jsonData['@type'] || '(none found)'}`);
           
           if (jsonData['@type']) {
             schema.types.push(jsonData['@type']);
-            console.log(`Added schema type: ${jsonData['@type']}`);
           } else if (Array.isArray(jsonData)) {
-            console.log(`JSON-LD is an array with ${jsonData.length} items`);
             jsonData.forEach((item, index) => {
               if (item && item['@type']) {
                 schema.types.push(item['@type']);
-                console.log(`Added schema type from array[${index}]: ${item['@type']}`);
               }
             });
           }
         } catch (jsonError: unknown) {
-          console.error(`❌ JSON parse error:`, jsonError);
           // Try to identify the position of the error if it's an Error object
           if (jsonError instanceof Error && jsonError.message.includes('position')) {
             const position = parseInt(jsonError.message.match(/position (\d+)/)?.[1] || '0');
@@ -593,21 +557,16 @@ console.log(`${logPrefix} Found ${matchesArray.length} total potential JSON-LD s
               Math.max(0, position - 20),
               Math.min(scriptContent.length, position + 20)
             );
-            console.error(`Error context around position ${position}: ...${errorContext}...`);
           }
           throw jsonError; // Re-throw to be caught by the outer try-catch
         }
       } catch (e) {
-        console.error('❌ Error processing schema JSON:', e);
         if (match[1]) {
-          console.error('Schema content sample causing error:', match[1].substring(0, 300));
         }
       }
     }
 
     // After processing all scripts, log the final state
-    console.log(`Final schema detection state: ${schema.detected ? 'DETECTED ✓' : 'NOT DETECTED ✗'}`);
-    console.log(`Schema types found: ${schema.types.length > 0 ? schema.types.join(', ') : 'NONE'}`);
     
     // When processing schema markup, add debug info to the schema object
 // After all pattern matching attempts
@@ -671,7 +630,6 @@ if (matchesArray.length === 0) {
       schema
     };
   } catch (error: any) {
-    console.error(`Error scraping webpage: ${error.message}`);
     throw new Error(`Failed to scrape webpage: ${error.message}`);
   }
 }
@@ -679,7 +637,6 @@ if (matchesArray.length === 0) {
 // Update the check title in the analyzeSEO function to match the UI
 async function analyzeSEO(url: string, keyphrase: string, env: any): Promise<any> {
   try {
-    console.log(`Analyzing SEO for URL: ${url} with keyphrase: ${keyphrase}`);
     
     // Fetch the page content
     const response = await fetch(url, {
@@ -708,7 +665,6 @@ async function analyzeSEO(url: string, keyphrase: string, env: any): Promise<any
       keyphrase
     };
   } catch (error: unknown) {
-    console.error(`Error analyzing SEO:`, error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     throw new Error(`Failed to analyze SEO: ${errorMessage}`);
   }
@@ -732,58 +688,60 @@ async function handleRequest(request: Request, env: any): Promise<Response> {
     'Content-Type': 'application/json'
   };
   
-  console.log(`Handling request: ${request.method} ${path} from ${origin || 'unknown origin'}`);
-  
-  if (path === '/api/analyze' && request.method === 'HEAD') {
-    return new Response(null, { status: 200, headers: corsHeaders });
-  }
-
-  if (path === '/api/oauth/callback' && request.method === 'POST') {
-    return handleOAuthTokenExchange(request, env);
-  }
-
-  if (path === '/api/auth' && request.method === 'GET') {
-    return handleAuthRedirect(request, env);
-  }
-
-  if (path === '/api/callback' && request.method === 'GET') {
-    return handleAuthCallback(request, env);
-  }
   
   try {
-    if (path === '/api/analyze' && request.method === 'POST') {
-      const data = await request.json();
-      const { keyphrase, url } = data;
-      if (!keyphrase || !url) {
-        return new Response(JSON.stringify({ message: "Keyphrase and URL are required" }), { status: 400, headers: corsHeaders });
-      }
-      const results = await analyzeSEO(url, keyphrase, env);
-      return new Response(JSON.stringify(results), { status: 200, headers: corsHeaders });
-    } else if (path === '/api/register-domains' && request.method === 'POST') {
-      const data = await request.json();
-      const { domains } = data;
-      if (!domains || !Array.isArray(domains)) {
-        return new Response(JSON.stringify({ success: false, message: "Domains array is required" }), { status: 400, headers: corsHeaders });
-      }
-      return new Response(JSON.stringify({ success: true, message: `Successfully registered ${domains.length} domains.` }), { status: 200, headers: corsHeaders });
+    if (path === '/api/analyze' && request.method === 'HEAD') {
+      return new Response(null, { status: 200, headers: corsHeaders });
     }
-    else if (path === '/api/ping' && (request.method === 'GET' || request.method === 'HEAD')) {
-      const pingResponse = {
-        status: 'ok',
-        message: 'Worker is running',
-        timestamp: new Date().toISOString()
-      }
-      return new Response(JSON.stringify(pingResponse), { 
-        status: 200, 
-        headers: { 
-          ...corsHeaders,
-          'Cache-Control': 'public, max-age=60'  // Cache for 60 seconds 
-        } 
-      });
+
+    if (path === '/api/oauth/callback' && request.method === 'POST') {
+      return handleOAuthTokenExchange(request, env);
     }
-    return new Response(JSON.stringify({ message: "Route not found", path }), { status: 404, headers: corsHeaders });
+
+    if (path === '/api/auth' && request.method === 'GET') {
+      return handleAuthRedirect(request, env);
+    }
+
+    if (path === '/api/callback' && request.method === 'GET') {
+      return handleAuthCallback(request, env);
+    }
+    
+    try {
+      if (path === '/api/analyze' && request.method === 'POST') {
+        const data = await request.json();
+        const { keyphrase, url } = data;
+        if (!keyphrase || !url) {
+          return new Response(JSON.stringify({ message: "Keyphrase and URL are required" }), { status: 400, headers: corsHeaders });
+        }
+        const results = await analyzeSEO(url, keyphrase, env);
+        return new Response(JSON.stringify(results), { status: 200, headers: corsHeaders });
+      } else if (path === '/api/register-domains' && request.method === 'POST') {
+        const data = await request.json();
+        const { domains } = data;
+        if (!domains || !Array.isArray(domains)) {
+          return new Response(JSON.stringify({ success: false, message: "Domains array is required" }), { status: 400, headers: corsHeaders });
+        }
+        return new Response(JSON.stringify({ success: true, message: `Successfully registered ${domains.length} domains.` }), { status: 200, headers: corsHeaders });
+      }
+      else if (path === '/api/ping' && (request.method === 'GET' || request.method === 'HEAD')) {
+        const pingResponse = {
+          status: 'ok',
+          message: 'Worker is running',
+          timestamp: new Date().toISOString()
+        }
+        return new Response(JSON.stringify(pingResponse), { 
+          status: 200, 
+          headers: { 
+            ...corsHeaders,
+            'Cache-Control': 'public, max-age=60'  // Cache for 60 seconds 
+          } 
+        });
+      }
+      return new Response(JSON.stringify({ message: "Route not found", path }), { status: 404, headers: corsHeaders });
+    } catch (error: any) {
+      return new Response(JSON.stringify({ message: "Internal server error", error: error.message }), { status: 500, headers: corsHeaders });
+    }
   } catch (error: any) {
-    console.error("Error processing request:", error);
     return new Response(JSON.stringify({ message: "Internal server error", error: error.message }), { status: 500, headers: corsHeaders });
   }
 }
@@ -795,11 +753,9 @@ const ENFORCE_ALLOWLIST = process.env.ENFORCE_DOMAIN_ALLOWLIST !== 'false';
 export function addDomainToAllowlist(domain: string): boolean {
   domain = domain.toLowerCase().trim();
   if (ALLOWED_DOMAINS.includes(domain)) {
-    console.log(`Domain already in allowlist: ${domain}`);
     return false;
   }
   ALLOWED_DOMAINS.push(domain);
-  console.log(`Added ${domain} to allowlist. Current list has ${ALLOWED_DOMAINS.length} domains.`);
   return true;
 }
 
@@ -828,16 +784,13 @@ export function isValidUrl(urlString: string): boolean {
     }
     const url = new URL(urlString);
     if (url.protocol !== 'https:') {
-      console.log(`Rejected non-HTTPS URL: ${urlString}`);
       return false;
     }
     if (ENFORCE_ALLOWLIST && !isAllowedDomain(url.hostname)) {
-      console.warn(`Domain not in allowlist: ${url.hostname}`);
       return false;
     }
     const pathname = url.pathname;
     if (pathname.includes('../') || pathname.includes('/..')) {
-      console.warn(`Path traversal detected in URL path: ${pathname}`);
       return false;
     }
     return true;
@@ -850,16 +803,13 @@ export function isAllowedDomain(domain: string): boolean {
   if (!ENFORCE_ALLOWLIST) return true;
   if (ALLOWED_DOMAINS.length === 0) return true;
   domain = domain.toLowerCase();
-  console.log(`Checking if domain '${domain}' is in allowlist:`, JSON.stringify(ALLOWED_DOMAINS));
   if (ALLOWED_DOMAINS.includes(domain)) {
-    console.log(`Domain '${domain}' found in allowlist (exact match)`);
     return true;
   }
   const matchedWildcard = ALLOWED_DOMAINS.find(allowedDomain => {
     if (allowedDomain.startsWith('*.')) {
       const baseDomain = allowedDomain.substring(2);
       const matches = domain.endsWith(baseDomain) && domain.length > baseDomain.length;
-      if (matches) console.log(`Domain '${domain}' matches wildcard '${allowedDomain}'`);
       return matches;
     }
     return false;
@@ -906,31 +856,21 @@ export function validateIPAddress(address: string): boolean {
 
 export function validateUrl(url: string): boolean {
   try {
-    console.log(`validateUrl - Checking URL: ${url}`);
     const urlObj = new URL(url);
     const protocol = urlObj.protocol.toLowerCase();
-    console.log(`validateUrl - Protocol detected: ${protocol}`);
     if (protocol !== 'https:') {
-      console.log(`Rejected non-HTTPS URL in validateUrl: ${url}`);
       return false;
     }
     const hostname = urlObj.hostname;
-    console.log(`validateUrl - Hostname: ${hostname}`);
     if (ENFORCE_ALLOWLIST && !isAllowedDomain(hostname)) {
-      console.warn(`Domain not in allowlist: ${hostname}`);
       return false;
     }
-    console.log(`validateUrl - Domain allowlist check passed`);
     if (isIPv4Format(hostname) || isIPv6Format(hostname)) {
-      console.log(`validateUrl - Hostname is an IP address: ${hostname}`);
       const ipValid = validateIPAddress(hostname);
-      console.log(`validateUrl - IP validation result: ${ipValid}`);
       return ipValid;
     }
-    console.log(`validateUrl - Validation successful for: ${url}`);
     return true;
   } catch (e) {
-    console.error(`validateUrl - Error validating URL: ${e}`);
     return false;
   }
 }
@@ -948,7 +888,6 @@ export function isPrivateIP(ipStr: string): boolean {
       const cidr = new IPCIDR(range);
       return cidr.contains(ipStr);
     } catch (error) {
-      console.error(`Error checking IP range ${range}:`, error);
       return false;
     }
   });
@@ -998,7 +937,6 @@ export async function getAIRecommendation(
 ): Promise<string> {
   const useAI = env.USE_AI_RECOMMENDATIONS !== 'false'
   if (!useAI || !hasValidOpenAIKey(env)) {
-    console.log("AI recommendations are disabled or API key is invalid")
     return "AI recommendations are currently disabled. Enable them by setting USE_AI_RECOMMENDATIONS=true and providing a valid OPENAI_API_KEY."
   }
 
@@ -1034,7 +972,6 @@ ${truncatedContext ? `Current content: ${truncatedContext}` : ''}`
     // ...update cache accordingly...
     return recommendation
   } catch (error: any) {
-    console.error("AI API Error:", error)
     if (error.status === 401) {
       return "API key error. Please check your OpenAI API key and ensure it's valid."
     }
@@ -1050,14 +987,11 @@ function escapeRegExpFromAnalyzer(str: string): string {
 
 
 function isHomePageFromAnalyzer(url: string): boolean {
-  console.log(`Checking if homepage: ${url}`);
   try {
     const urlObj = new URL(url);
     const result = urlObj.pathname === "/" || urlObj.pathname === "";
-    console.log(`Homepage check result: ${result}`);
     return result;
   } catch {
-    console.log(`Homepage check failed for URL: ${url}`);
     return false;
   }
 }
@@ -1097,7 +1031,6 @@ const analyzerFallbackRecommendations: Record<string, (params: any) => string> =
 };
 
 export async function analyzeSEOElements(url: string, keyphrase: string, env: any) {
-    console.log(`[SEO Analyzer] Starting analysis for URL: ${url} with keyphrase: ${keyphrase}`);
     const startTime = Date.now();
 
     try {
@@ -1360,10 +1293,8 @@ Content type indicators:
 
         const score = Math.round((passedChecks / checks.length) * 100);
 
-        console.log(`[SEO Analyzer] Analysis completed in ${Date.now() - startTime}ms`);
         return { checks, passedChecks, failedChecks, url, score, timestamp: new Date().toISOString() };
     } catch (error: any) {
-        console.error(`[SEO Analyzer] Error during analysis:`, error);
         throw error;
     }
 }
