@@ -502,11 +502,22 @@ if (matchesArray.length === 0) {
       try {
         const potentialJson = rawMatch[1];
         const jsonData = JSON.parse(potentialJson);
-        if (jsonData["@context"] && jsonData["@context"].includes("schema.org") && jsonData["@type"]) {
-          console.log(`${logPrefix} ✅ Successfully parsed raw JSON schema data: ${jsonData["@type"]}`);
-          schema.detected = true;
-          schema.jsonLdBlocks.push(jsonData);
-          schema.types.push(jsonData["@type"]);
+        if (jsonData["@context"] && jsonData["@type"]) {
+          try {
+            const contextUrl = new URL(jsonData["@context"]);
+            const allowedHosts = [
+              'schema.org',
+              'www.schema.org'
+            ];
+            if (allowedHosts.includes(contextUrl.host)) {
+              console.log(`${logPrefix} ✅ Successfully parsed raw JSON schema data: ${jsonData["@type"]}`);
+              schema.detected = true;
+              schema.jsonLdBlocks.push(jsonData);
+              schema.types.push(jsonData["@type"]);
+            }
+          } catch (e) {
+            console.log(`${logPrefix} Invalid @context URL: ${jsonData["@context"]}`);
+          }
         }
       } catch (e) {
         console.log(`${logPrefix} Failed to parse potential raw JSON block`);
