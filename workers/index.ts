@@ -616,7 +616,14 @@ if (matchesArray.length === 0) {
     patternsChecked: 5,
     foundMatches: false,
     bodyContentSample: bodyContent.substring(0, 300),
-    hasSchemaOrgReference: bodyContent.includes('schema.org'),
+    hasSchemaOrgReference: (() => {
+      try {
+        const url = new URL(bodyContent);
+        return url.host === 'schema.org' || url.host.endsWith('.schema.org');
+      } catch (e) {
+        return false;
+      }
+    })(),
     documentLength: bodyContent.length
   };
 } else {
