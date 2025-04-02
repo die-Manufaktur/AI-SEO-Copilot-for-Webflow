@@ -192,24 +192,25 @@ function isHomePage(url: string): boolean {
 // Update success messages with new check names
 function getSuccessMessage(checkType: string, url: string): string {
   const messages: Record<string, string> = {
-    "Keyphrase in Title": "Great job! Your title includes the target keyphrase.",
-    "Keyphrase in Meta Description": "Perfect! Your meta description effectively uses the keyphrase.",
-    "Keyphrase in URL": isHomePage(url) ? "All good here, since it's the homepage! ✨" : "Excellent! Your URL is SEO-friendly with the keyphrase.",
-    "Content Length on page": "Well done! Your content length is good for SEO.",
-    "Keyphrase Density": "Perfect! Your keyphrase density is within the optimal range.",
-    "Keyphrase in Introduction": "Excellent! You've included the keyphrase in your introduction.",
-    "Image Alt Attributes": "Well done! Your images are properly optimized with the keyphrase.",
-    "Internal Links": "Perfect! You have a good number of internal links.",
-    "Outbound Links": "Excellent! You've included relevant outbound links.",
-    "Next-Gen Image Formats": "Excellent! Your images use modern, optimized formats.",
-    "OpenGraph Image": "Great job! Your page has a properly configured OpenGraph image.",
-    "Open Graph Title and Description": "Perfect! Open Graph title and description are well configured.",
-    "Keyphrase in H1 Heading": "Excellent! Your main H1 heading effectively includes the keyphrase.",
-    "Keyphrase in H2 Headings": "Great job! Your H2 subheadings include the keyphrase, reinforcing your topic focus.",
-    "Heading Hierarchy": "Great job! Your page has a proper heading tag hierarchy.",
-    "Code Minification": "Excellent! Your JavaScript and CSS files are properly minified for better performance.",
-    "Schema Markup": "Great job! Your page has schema markup implemented, making it easier for search engines to understand your content.",
-    "Image File Size": "Great job! All your images are well-optimized, keeping your page loading times fast."
+    "Keyphrase in Title": "Nice work! Your title nails it with the keyphrase. 👍",
+    "Keyphrase in Meta Description": "Awesome! Your meta description is spot on with the keyphrase.",
+    "Keyphrase in URL": isHomePage(url) ? "You're all set! No need for a keyphrase since it's the homepage. ✨" : "Boom! Your URL is clean, readable, and SEO-friendly.",
+    "Content Length": "Great job! Your content is just the right length for SEO and readers alike.",
+    "Keyphrase Density": "Perfect balance! Your keyphrase appears just the right amount of times.",
+    "Keyphrase in Introduction": "Love it! You got the keyphrase in right where it matters—at the start.",
+    "Image Alt Attributes": "Nice! Your images are optimized with descriptive alt text. 👌",
+    "Internal Links": "You're crushing it! Your internal links are helping users (and Google) navigate smoothly.",
+    "Outbound Links": "Great move! Linking to relevant sources makes your content even stronger.",
+    "Next-Gen Image Formats": "Smart choice! Your images are using modern formats for faster load times.",
+    "OG Image": "Looks good! Your Open Graph image is set up and ready for sharing.",
+    "OG Title and Description": "Spot on! Your Open Graph title and description are well configured.",
+    "Keyphrase in H1 Heading": "Nice! Your H1 heading highlights the keyphrase perfectly.",
+    "Keyphrase in H2 Headings": "Great thinking! Using the keyphrase in H2s reinforces your topic.",
+    "Heading Hierarchy": "Smooth structure! Your headings follow a clear, logical order.",
+    "Code Minification": "Awesome! Your code is minified for speed and efficiency. 🚀",
+    "Schema Markup": "Nice touch! Schema markup is in place, making your content even easier for search engines to understand.",
+    "Image File Size": "Perfect! Your images are well-optimized for a fast-loading page.",
+    "Page Indexability": "You're all set! Search engines can find and index your page without a problem.",
   };
   return messages[checkType] || "Good job!";
 }
@@ -1152,10 +1153,10 @@ export async function analyzeSEOElements(url: string, keyphrase: string, env: an
             url
         );
 
-        // 4. Content Length Check
-        const wordCount = scrapedData.content.split(/\s+/).filter(Boolean).length;
+        // 4. Content Length Check - Update the check title to match success messages
+        const wordCount = scrapedData.content.trim().split(/\s+/).length;
         await addCheck(
-            "Content Length on page",
+            "Content Length",  // This should match exactly with the success message key
             "The content should be at least 300 words long.",
             wordCount >= 300,
             `Current word count: ${wordCount}`
