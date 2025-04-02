@@ -1,7 +1,7 @@
 version: 2
 updates:
   # Node.js dependencies
-  - package-ecosystem: "pnpm"
+  - package-ecosystem: "npm"
     directory: "/"
     schedule:
       interval: "weekly"
