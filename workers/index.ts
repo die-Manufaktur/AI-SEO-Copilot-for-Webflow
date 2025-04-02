@@ -6,44 +6,7 @@ import { URL } from "url";
 
 export {}; // Ensure this file is treated as a module
 
-// ===== Types & Interfaces =====
-interface FetchEvent extends Event {
-  request: Request;
-  respondWith(response: Response | Promise<Response>): void;
-}
 
-interface ScrapedData {
-  title: string;
-  metaDescription: string;
-  content: string;
-  paragraphs: string[];
-  subheadings: string[];
-  headings: Array<{ level: number; text: string }>;
-  images: Array<{ 
-    src: string; 
-    alt: string; 
-    size?: number;
-  }>;
-  internalLinks: string[];
-  outboundLinks: string[];
-  ogMetadata: {
-    title: string;
-    description: string;
-    image: string;
-    imageWidth: string;
-    imageHeight: string;
-  };
-  resources: {
-    js: Array<{ url: string; content?: string; minified?: boolean }>;
-    css: Array<{ url: string; content?: string; minified?: boolean }>;
-  };
-  schema: {
-    detected: boolean;
-    types: string[];
-    jsonLdBlocks: any[];
-    microdataTypes: string[];
-  };
-}
 
 // ===== Constants =====
 const ALLOWED_DOMAINS = [
@@ -225,26 +188,6 @@ function isHomePage(url: string): boolean {
 }
 
 // Update check types and priorities to match Home.tsx
-const checkPriorities: Record<string, 'high' | 'medium' | 'low'> = {
-  "Keyphrase in Title": "high",
-  "Keyphrase in Meta Description": "high",
-  "Keyphrase in URL": "medium",
-  "Content Length on page": "high",  // Updated name
-  "Keyphrase Density": "medium",
-  "Keyphrase in Introduction": "medium",
-  "Keyphrase in H1 Heading": "high",
-  "Keyphrase in H2 Headings": "medium",
-  "Heading Hierarchy": "high",
-  "Image Alt Attributes": "low",
-  "Internal Links": "medium",
-  "Outbound Links": "low",
-  "Next-Gen Image Formats": "low",
-  "OpenGraph Image": "medium",  // Updated to OpenGraph instead of OG
-  "Open Graph Title and Description": "medium",  // Updated to match Home.tsx
-  "Code Minification": "low",
-  "Schema Markup": "medium",
-  "Image File Size": "medium"
-};
 
 // Update success messages with new check names
 function getSuccessMessage(checkType: string, url: string): string {
@@ -271,20 +214,6 @@ function getSuccessMessage(checkType: string, url: string): string {
   return messages[checkType] || "Good job!";
 }
 
-const fallbackRecommendations: Record<string, (...args: any[]) => string> = {
-  "Keyphrase in Title": (keyphrase: string, title: string) => 
-    `Consider rewriting your title to include '${keyphrase}', preferably at the beginning. Here is a better title: "${keyphrase} - ${title}"`,
-  "Keyphrase in Meta Description": (keyphrase: string, metaDescription: string) =>
-    `Add '${keyphrase}' to your meta description in a natural way that encourages clicks. Here is a better meta description: "${metaDescription ? metaDescription.substring(0, 50) : 'Learn about'} ${keyphrase} ${metaDescription ? metaDescription.substring(50, 100) : 'and discover how it can help you'}."`,
-  "Keyphrase in Introduction": (keyphrase: string) =>
-    `Mention '${keyphrase}' in your first paragraph to establish relevance early.`,
-  "Image Alt Attributes": (keyphrase: string) =>
-    `Add descriptive alt text containing '${keyphrase}' to at least one relevant image.`,
-  "Internal Links": () =>
-    `Add links to other relevant pages on your site to improve navigation and SEO.`,
-  "Outbound Links": () =>
-    `Link to reputable external sources to increase your content's credibility.`
-};
 
 async function scrapeWebpage(url: string): Promise<any> {
   console.log(`Scraping webpage: ${url}`);
@@ -422,14 +351,12 @@ async function scrapeWebpage(url: string): Promise<any> {
     for (const match of Array.from(inlineScriptMatches)) {
       const scriptContent = match[1]?.trim();
       if (scriptContent && scriptContent.length > 0) {
-        // Check if script is minified by looking for newlines and multiple spaces
-        const isMinified = !scriptContent.includes('\n') && 
-                          !(/\s{2,}/).test(scriptContent) &&
-                          scriptContent.length > 50;
+        // Use the centralized isMinified function with the 30% threshold
+        const scriptMinified = isMinified(scriptContent);
         resources.js.push({
           url: 'inline-script',
           content: scriptContent,
-          minified: isMinified
+          minified: scriptMinified
         });
       }
     }
@@ -470,14 +397,12 @@ async function scrapeWebpage(url: string): Promise<any> {
     for (const match of Array.from(inlineStyleMatches)) {
       const styleContent = match[1]?.trim();
       if (styleContent && styleContent.length > 0) {
-        // Check if style is minified
-        const isMinified = !styleContent.includes('\n') && 
-                          !(/\s{2,}/).test(styleContent) &&
-                          styleContent.length > 50;
+        // Use the centralized isMinified function with the 30% threshold
+        const styleMinified = isMinified(styleContent);
         resources.css.push({
           url: 'inline-style',
           content: styleContent,
-          minified: isMinified
+          minified: styleMinified
         });
       }
     }
@@ -487,30 +412,220 @@ async function scrapeWebpage(url: string): Promise<any> {
       detected: false,
       types: [] as string[],
       jsonLdBlocks: [] as any[],
-      microdataTypes: [] as string[]
+      microdataTypes: [] as string[],
+      debug: {} as {
+        patternsChecked?: number;
+        foundMatches?: boolean;
+        bodyContentSample?: string;
+        hasSchemaOrgReference?: boolean;
+        documentLength?: number;
+        detectionMethod?: string;
+        matchCount?: number;
+        sampleContent?: string;
+      }
     };
     
     // Extract JSON-LD schema
-    const schemaJsonMatches = bodyContent.matchAll(/<script\s+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
-    for (const match of schemaJsonMatches) {
+// Try multiple regex patterns from most specific to most permissive
+let matchesArray: RegExpMatchArray[] = [];
+
+// Create a consistent logging prefix
+const logPrefix = '[SEO Analyzer]';
+
+// Declare all match variables at the top level so they're accessible later
+const pattern1 = /<script\s+type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+const matches1 = Array.from(bodyContent.matchAll(pattern1));
+// Check if pattern1 found any matches
+if (matches1.length > 0) {
+  matchesArray = matches1;
+  console.log(`${logPrefix} Found ${matchesArray.length} JSON-LD scripts with pattern 1`);
+}
+// Define remaining match variables that will be used later
+let matches2: RegExpMatchArray[] = [];
+let matches3: RegExpMatchArray[] = [];
+let matches4: RegExpMatchArray[] = [];
+let matches5: RegExpMatchArray[] = [];
+// Pattern 2: More permissive to handle different attribute ordering
+if (matchesArray.length === 0) {
+  const pattern2 = /<script[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  matches2 = Array.from(bodyContent.matchAll(pattern2));
+  if (matches2.length > 0) {
+    matchesArray = matches2;
+    console.log(`${logPrefix} Found ${matchesArray.length} JSON-LD scripts with pattern 2`);
+  }
+}
+// Pattern 3: Most permissive - any script with ld+json anywhere in attributes
+if (matchesArray.length === 0) {
+  const pattern3 = /<script[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi;
+  matches3 = Array.from(bodyContent.matchAll(pattern3));
+  if (matches3.length > 0) {
+    matchesArray = matches3;
+    console.log(`${logPrefix} Found ${matchesArray.length} JSON-LD scripts with pattern 3`);
+  }
+}
+
+// Pattern 4: Exact pattern for specific cases (trying to match your exact format)
+if (matchesArray.length === 0) {
+  console.log(`${logPrefix} Trying with exact pattern match...`);
+  // This pattern specifically looks for your script format with no whitespace between attributes
+  const pattern4 = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi;
+  matches4 = Array.from(bodyContent.matchAll(pattern4));
+  if (matches4.length > 0) {
+    matchesArray = matches4;
+    console.log(`${logPrefix} Found ${matchesArray.length} JSON-LD scripts with pattern 4 (exact match)`);
+  }
+}
+
+// Pattern 5: Ultra-permissive pattern
+if (matchesArray.length === 0) {
+  console.log(`${logPrefix} Trying with ultra-permissive pattern...`);
+  // Look for any script tag that might contain schema.org data
+  const pattern5 = /<script[^>]*>([\s\S]*?@context[\s\S]*?schema\.org[\s\S]*?@type[\s\S]*?)<\/script>/gi;
+  matches5 = Array.from(bodyContent.matchAll(pattern5));
+  if (matches5.length > 0) {
+    matchesArray = matches5;
+    console.log(`${logPrefix} Found ${matchesArray.length} JSON-LD scripts with pattern 5 (ultra-permissive)`);
+  }
+}
+
+// If we still haven't found anything, look for raw JSON with schema.org in the HTML (without script tags)
+if (matchesArray.length === 0) {
+  console.log(`${logPrefix} Trying to find raw JSON blocks...`);
+  // Look for JSON-like structures containing schema.org
+  const rawJsonPattern = /(\{[\s\S]*?"@context"[\s\S]*?"schema\.org"[\s\S]*?"@type"[\s\S]*?\})/gi;
+  const rawMatches = Array.from(bodyContent.matchAll(rawJsonPattern));
+  if (rawMatches.length > 0) {
+    console.log(`${logPrefix} Found ${rawMatches.length} potential raw JSON blocks with schema.org references`);
+    
+    // Try to parse these as standalone JSON
+    for (const rawMatch of rawMatches) {
       try {
-        const jsonData = JSON.parse(match[1]);
-        schema.detected = true;
-        schema.jsonLdBlocks.push(jsonData);
-        if (jsonData['@type']) {
-          schema.types.push(jsonData['@type']);
-        } else if (Array.isArray(jsonData)) {
-          jsonData.forEach(item => {
-            if (item && item['@type']) {
-              schema.types.push(item['@type']);
-            }
-          });
+        const potentialJson = rawMatch[1];
+        const jsonData = JSON.parse(potentialJson);
+        if (jsonData["@context"] && jsonData["@context"].includes("schema.org") && jsonData["@type"]) {
+          console.log(`${logPrefix} ✅ Successfully parsed raw JSON schema data: ${jsonData["@type"]}`);
+          schema.detected = true;
+          schema.jsonLdBlocks.push(jsonData);
+          schema.types.push(jsonData["@type"]);
         }
       } catch (e) {
-        console.log('Error parsing schema JSON:', e);
+        console.log(`${logPrefix} Failed to parse potential raw JSON block`);
       }
     }
+  }
+}
+
+// Additional diagnostic check - log a sample if schema not found
+if (matchesArray.length === 0) {
+  console.log(`${logPrefix} No JSON-LD scripts found with any pattern. Looking for fragments...`);
+  // Look for any fragment containing "schema.org" in the HTML
+  const schemaOrgIndex = bodyContent.indexOf('schema.org');
+  if (schemaOrgIndex !== -1) {
+    const contextFragment = bodyContent.substring(
+      Math.max(0, schemaOrgIndex - 100), 
+      Math.min(bodyContent.length, schemaOrgIndex + 300)
+    );
+    console.log(`${logPrefix} Found schema.org reference in HTML: ${contextFragment}`);
+  } else {
+    console.log(`${logPrefix} No schema.org references found in the document.`);
+  }
+}
+
+// Process any found scripts
+console.log(`${logPrefix} Found ${matchesArray.length} total potential JSON-LD scripts to process`);
     
+    console.log(`Found ${matchesArray.length} potential JSON-LD scripts in total`);
+
+    // Sample a portion of the page content to help with debugging
+    console.log(`DEBUG: Body content sample (first 300 chars): ${bodyContent.substring(0, 300)}`);
+    console.log(`DEBUG: HTML contains application/ld+json: ${bodyContent.includes('application/ld+json')}`);
+
+    for (const match of matchesArray) {
+      try {
+        // Extract and trim the content inside the script tag
+        const scriptContent = match[1].trim();
+        console.log(`Found script tag with content length: ${scriptContent.length} chars`);
+        
+        // Log the raw content to aid debugging
+        console.log(`Raw JSON-LD content sample:\n${scriptContent.substring(0, 150)}...`);
+        
+        // Try to parse the JSON
+        try {
+          const jsonData = JSON.parse(scriptContent);
+          console.log(`✅ Successfully parsed JSON-LD data`);
+          
+          schema.detected = true;
+          schema.jsonLdBlocks.push(jsonData);
+          
+          // Log type information
+          console.log(`Schema @type: ${jsonData['@type'] || '(none found)'}`);
+          
+          if (jsonData['@type']) {
+            schema.types.push(jsonData['@type']);
+            console.log(`Added schema type: ${jsonData['@type']}`);
+          } else if (Array.isArray(jsonData)) {
+            console.log(`JSON-LD is an array with ${jsonData.length} items`);
+            jsonData.forEach((item, index) => {
+              if (item && item['@type']) {
+                schema.types.push(item['@type']);
+                console.log(`Added schema type from array[${index}]: ${item['@type']}`);
+              }
+            });
+          }
+        } catch (jsonError: unknown) {
+          console.error(`❌ JSON parse error:`, jsonError);
+          // Try to identify the position of the error if it's an Error object
+          if (jsonError instanceof Error && jsonError.message.includes('position')) {
+            const position = parseInt(jsonError.message.match(/position (\d+)/)?.[1] || '0');
+            const errorContext = scriptContent.substring(
+              Math.max(0, position - 20),
+              Math.min(scriptContent.length, position + 20)
+            );
+            console.error(`Error context around position ${position}: ...${errorContext}...`);
+          }
+          throw jsonError; // Re-throw to be caught by the outer try-catch
+        }
+      } catch (e) {
+        console.error('❌ Error processing schema JSON:', e);
+        if (match[1]) {
+          console.error('Schema content sample causing error:', match[1].substring(0, 300));
+        }
+      }
+    }
+
+    // After processing all scripts, log the final state
+    console.log(`Final schema detection state: ${schema.detected ? 'DETECTED ✓' : 'NOT DETECTED ✗'}`);
+    console.log(`Schema types found: ${schema.types.length > 0 ? schema.types.join(', ') : 'NONE'}`);
+    
+    // When processing schema markup, add debug info to the schema object
+// After all pattern matching attempts
+if (matchesArray.length === 0) {
+  // No schema found, add debug info
+  schema.debug = {
+    patternsChecked: 5,
+    foundMatches: false,
+    bodyContentSample: bodyContent.substring(0, 300),
+    hasSchemaOrgReference: bodyContent.includes('schema.org'),
+    documentLength: bodyContent.length
+  };
+} else {
+  // Schema found, add information about which pattern worked
+  let detectionMethod = "unknown";
+  if (matches1 && matches1.length > 0) detectionMethod = "pattern1 (standard)";
+  else if (matches2 && matches2.length > 0) detectionMethod = "pattern2 (permissive ordering)";
+  else if (matches3 && matches3.length > 0) detectionMethod = "pattern3 (any ld+json)";
+  else if (matches4 && matches4.length > 0) detectionMethod = "pattern4 (exact match)";
+  else if (matches5 && matches5.length > 0) detectionMethod = "pattern5 (ultra-permissive)";
+  
+  schema.debug = {
+    patternsChecked: 5,
+    foundMatches: true,
+    detectionMethod,
+    matchCount: matchesArray.length,
+    sampleContent: matchesArray[0][1].substring(0, 150) + "..."
+  };
+}
+
     // Extract Microdata schema
     const microdataMatches = bodyContent.matchAll(/<[^>]+\s+itemscope[^>]*>/gi);
     for (const match of microdataMatches) {
@@ -559,7 +674,6 @@ async function analyzeSEO(url: string, keyphrase: string, env: any): Promise<any
       throw new Error(`Failed to fetch page: ${response.status} ${response.statusText}`);
     }
 
-    const html = await response.text();
     
     // Pass the env parameter to analyzeSEOElements
     const results = await analyzeSEOElements(url, keyphrase, env);
@@ -817,6 +931,38 @@ export function isPrivateIP(ipStr: string): boolean {
   });
 }
 
+// Centralized minification detection function with configurable threshold
+function isMinified(code: string, minificationThreshold: number = 30): boolean {
+  if (!code || code.length < 50) return true;
+
+  // Remove comments to avoid skewing the results
+  code = code.replace(/\/\*[\s\S]*?\*\/|([^:]|^)\/\/.*$/gm, '$1');
+
+  // Calculate metrics
+  const newlineRatio = (code.match(/\n/g) || []).length / code.length;
+  const whitespaceRatio = (code.match(/\s/g) || []).length / code.length;
+  const lines = code.split('\n').filter(line => line.trim().length > 0);
+  const avgLineLength = lines.length > 0 ? code.length / lines.length : 0;
+
+  // Base threshold values at 50% minification threshold
+  const baseNewlineRatioThreshold = 0.05;      // 5%
+  const baseWhitespaceRatioThreshold = 0.2;    // 20%
+  const baseAvgLineLengthThreshold = 300;      // characters
+  
+  // Scale thresholds based on minificationThreshold
+  const scaleFactor = minificationThreshold / 50;
+  const newlineRatioThreshold = baseNewlineRatioThreshold * (2 - scaleFactor);
+  const whitespaceRatioThreshold = baseWhitespaceRatioThreshold * (2 - scaleFactor);
+  const avgLineLengthThreshold = baseAvgLineLengthThreshold * scaleFactor;
+
+  // More robust checks for minification
+  const isLikelyMinified = 
+    (newlineRatio < newlineRatioThreshold && whitespaceRatio < whitespaceRatioThreshold) || 
+    avgLineLength > avgLineLengthThreshold;
+
+  return isLikelyMinified;
+}
+
 const hasValidOpenAIKey = (env: any): boolean =>
   !!env.OPENAI_API_KEY && ('' + env.OPENAI_API_KEY).startsWith('sk-')
 
@@ -837,7 +983,6 @@ export async function getAIRecommendation(
   const client = new OpenAI({ apiKey: env.OPENAI_API_KEY })
 
   try {
-    const cacheKey = `${checkType}_${keyphrase}_${context?.substring(0, 50) || ''}`
     const truncatedContext = context && context.length > 300 
       ? context.substring(0, 300) + "..." 
       : context
@@ -880,20 +1025,6 @@ function escapeRegExpFromAnalyzer(str: string): string {
 	return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function calculateKeyphraseDensityFromAnalyzer(
-	content: string,
-	keyphrase: string
-): { density: number; occurrences: number; totalWords: number } {
-	const normalizedContent = content.toLowerCase().trim();
-	const normalizedKeyphrase = keyphrase.toLowerCase().trim();
-	const escapedKeyphrase = escapeRegExpFromAnalyzer(normalizedKeyphrase);
-	const totalWords = normalizedContent.split(/\s+/).filter(word => word.length > 0).length;
-	const regex = new RegExp(`\\b${escapedKeyphrase}\\b`, 'gi');
-	const matches = normalizedContent.match(regex) || [];
-	const occurrences = matches.length;
-	const density = (occurrences * (normalizedKeyphrase.split(/\s+/).length)) / totalWords * 100;
-	return { density, occurrences, totalWords };
-}
 
 function isHomePageFromAnalyzer(url: string): boolean {
   console.log(`Checking if homepage: ${url}`);
@@ -931,13 +1062,15 @@ const analyzerCheckPriorities: Record<string, 'high' | 'medium' | 'low'> = {
 };
 
 const analyzerFallbackRecommendations: Record<string, (params: any) => string> = {
-	"Keyphrase in Title": ({ keyphrase, title }) =>
-		`Consider rewriting your title to include '${keyphrase}', preferably at the beginning.`,
-	"Keyphrase in Meta Description": ({ keyphrase }) =>
-		`Add '${keyphrase}' to your meta description naturally to boost click-through rates.`,
-	"Keyphrase in Introduction": ({ keyphrase }) =>
-		`Mention '${keyphrase}' in your first paragraph to establish relevance early.`,
-	// ... add additional fallback recommendations as needed ...
+    "Keyphrase in Title": ({ keyphrase }) =>
+        `Consider rewriting your title to include '${keyphrase}', preferably at the beginning.`,
+    "Keyphrase in Meta Description": ({ keyphrase }) =>
+        `Add '${keyphrase}' to your meta description naturally to boost click-through rates.`,
+    "Keyphrase in Introduction": ({ keyphrase }) =>
+        `Mention '${keyphrase}' in your first paragraph to establish relevance early.`,
+    "Schema Markup": () =>
+        `Add structured data markup using JSON-LD format in a script tag with type="application/ld+json". Include appropriate schema types from schema.org relevant to your content. Test your markup with Google's Rich Results Test tool.`,
+    // ... add additional fallback recommendations as needed ...
 };
 
 export async function analyzeSEOElements(url: string, keyphrase: string, env: any) {
@@ -1017,7 +1150,6 @@ export async function analyzeSEOElements(url: string, keyphrase: string, env: an
 
         // 6. Headings Analysis
         const h1s = scrapedData.headings.filter((h: { level: number; text: string }) => h.level === 1);
-        const h2s = scrapedData.headings.filter((h: { level: number; text: string }) => h.level === 2);
         
         await addCheck(
             "Keyphrase in H1 Heading",
@@ -1083,22 +1215,88 @@ export async function analyzeSEOElements(url: string, keyphrase: string, env: an
         );
 
         // 11. Code Minification Check
-        const jsMinified = scrapedData.resources.js.every((js: { url: string; content?: string; minified?: boolean }) => js.minified);
-        const cssMinified = scrapedData.resources.css.every((css: { url: string; content?: string; minified?: boolean }) => css.minified);
+        const jsResources = scrapedData.resources.js;
+        const cssResources = scrapedData.resources.css;
+        const totalResources = jsResources.length + cssResources.length;
+
+        // Use the isMinified function for consistent detection
+        const minifiedJs = jsResources.filter((js: {url: string; content?: string; minified?: boolean}) => {
+          // For URLs containing .min.js or -min.js, trust the filename
+          if (js.url && (js.url.includes('.min.js') || js.url.includes('-min.js'))) {
+            return true;
+          }
+          // Otherwise use our consistent detection method
+          return js.content ? isMinified(js.content) : false;
+        }).length;
+        
+        const minifiedCss = cssResources.filter((css: {url: string; content?: string; minified?: boolean}) => {
+          // For URLs containing .min.css or -min.css, trust the filename
+          if (css.url && (css.url.includes('.min.css') || css.url.includes('-min.css'))) {
+            return true;
+          }
+          // Otherwise use our consistent detection method
+          return css.content ? isMinified(css.content) : false;
+        }).length;
+        
+        const totalMinified = minifiedJs + minifiedCss;
+        const minificationPercentage = totalResources > 0 
+          ? Math.round((totalMinified / totalResources) * 100) 
+          : 0;
+        
+        const minificationPasses = minificationPercentage >= 30;
+        
         await addCheck(
             "Code Minification",
-            "JavaScript and CSS code should be minified for performance.",
-            jsMinified && cssMinified,
-            `JS minified: ${jsMinified}, CSS minified: ${cssMinified}`
+            minificationPasses
+              ? `Your JavaScript and CSS resources are well optimized. ${minificationPercentage}% are minified.`
+              : `${minificationPercentage}% of your JavaScript and CSS resources are minified. Aim for at least 30% minification.`,
+            minificationPasses,
+            `JS: ${minifiedJs}/${jsResources.length} minified, CSS: ${minifiedCss}/${cssResources.length} minified. Total: ${minificationPercentage}%`,
+            true
         );
 
         // 12. Schema Markup Check
+        const hasSchemaMarkup = scrapedData.schema.detected;
+        const schemaTypesDetected = scrapedData.schema.types;
+        
+        // Define subheadings here so it can be used in schema context
+        const subheadings = scrapedData.headings.filter((h: { level: number; text: string }) => h.level === 2);
+
+        // Create context for recommendation
+        let schemaContext = "";
+        if (hasSchemaMarkup) {
+          schemaContext = `Schema markup found on page. Types detected: ${schemaTypesDetected.join(', ') || 'Unknown'}`;
+        } else {
+          // Create detailed context to help generate a relevant recommendation
+          schemaContext = `
+No schema markup detected on page.
+Page title: ${scrapedData.title}
+Meta description: ${scrapedData.metaDescription}
+URL: ${url}
+Content type indicators:
+- First H1: ${h1s.length > 0 ? h1s[0].text : 'None'}
+- First few H2s: ${subheadings.slice(0, 3).map((h: { level: number; text: string }) => h.text).join(', ')}
+- Has images: ${scrapedData.images.length > 0 ? 'Yes' : 'No'}
+- Is homepage: ${isHomePageFromAnalyzer(url) ? 'Yes' : 'No'}
+- Content preview: ${scrapedData.paragraphs.slice(0, 2).join(' ').substring(0, 200)}...
+`;
+        }
+
         await addCheck(
-            "Schema Markup",
-            "Page should have schema markup for better search engine understanding.",
-            scrapedData.schema.detected,
-            JSON.stringify(scrapedData.schema)
+          "Schema Markup",
+          hasSchemaMarkup ?
+            `Your page has schema markup implemented (${schemaTypesDetected.join(', ') || 'Unknown type'})` :
+            "Your page is missing schema markup (structured data)",
+          hasSchemaMarkup,
+          schemaContext,
+          true // Skip GPT recommendation as we're using our custom one
         );
+
+        // If the check failed, add our custom recommendation
+        const schemaCheck = checks.find(check => check.title === "Schema Markup");
+        if (schemaCheck) {
+          schemaCheck.recommendation = generateSchemaMarkupRecommendation(scrapedData, url);
+        }
 
         // 13. Keyphrase in Introduction Check
         const introduction = scrapedData.paragraphs.length > 0 ? scrapedData.paragraphs[0] : '';
@@ -1108,9 +1306,9 @@ export async function analyzeSEOElements(url: string, keyphrase: string, env: an
             introduction.toLowerCase().includes(keyphrase.toLowerCase()),
             introduction
         );
-
+        
         // 14. Keyphrase in H2 Headings Check
-        const subheadings = scrapedData.headings.filter((h: { level: number; text: string }) => h.level === 2);
+        // subheadings already defined above
         await addCheck(
             "Keyphrase in H2 Headings",
             "At least one H2 heading should contain the keyphrase.",
@@ -1147,71 +1345,53 @@ export async function analyzeSEOElements(url: string, keyphrase: string, env: an
     }
 }
 
-async function getImageSize(imageUrl: string, baseUrl: URL): Promise<number | undefined> {
-  try {
-    const fullUrl = new URL(imageUrl, baseUrl.origin).toString();
-    const response = await fetch(fullUrl, { method: 'HEAD' });
-    if (response.ok) {
-      const contentLength = response.headers.get('content-length');
-      if (contentLength) {
-        return parseInt(contentLength, 10);
-      }
-    }
-    return undefined;
-  } catch (error) {
-    console.log(`Error getting size for image ${imageUrl}:`, error);
-    return undefined;
+// Add helper function at the top level
+function generateSchemaMarkupRecommendation(data: any, pageUrl: string): string {
+  // Determine page type based on content
+  const isHome = isHomePageFromAnalyzer(pageUrl);
+  const h1Text = data.headings.find((h: {level: number}) => h.level === 1)?.text || '';
+  const hasProducts = h1Text.toLowerCase().includes('product') || 
+                     data.content.toLowerCase().includes('price') || 
+                     data.content.toLowerCase().includes('buy now');
+  const hasBlog = pageUrl.includes('blog') || 
+                 h1Text.toLowerCase().includes('article') || 
+                 data.headings.some((h: {level: number; text: string}) => 
+                   h.level === 2 && h.text.toLowerCase().includes('post'));
+                   
+  // Generate appropriate recommendation
+  let recommendation = "Add schema markup to help search engines understand your content:\n\n";
+  
+  if (isHome) {
+    recommendation += `**Recommended Schema Type: WebSite or Organization**\n\n`;
+    recommendation += `For your homepage, implement schema.org/WebSite or schema.org/Organization markup to establish your site's identity. Include your site name, URL, and logo.`;
+  } else if (hasProducts) {
+    recommendation += `**Recommended Schema Type: Product**\n\n`;
+    recommendation += `For product pages, implement schema.org/Product markup including:
+- name
+- description
+- price
+- availability
+- product images
+This will enhance visibility in search results and potentially enable rich snippets.`;
+  } else if (hasBlog) {
+    recommendation += `**Recommended Schema Type: Article or BlogPosting**\n\n`;
+    recommendation += `For this content, implement schema.org/Article or schema.org/BlogPosting markup including:
+- headline
+- author
+- datePublished
+- image
+- description
+This will improve how your content appears in search results.`;
+  } else {
+    recommendation += `**Recommended Schema Types: WebPage plus contextual type**\n\n`;
+    recommendation += `Implement basic schema.org/WebPage markup plus a more specific type based on your content:
+- FAQPage for Q&A content
+- HowTo for instructions
+- LocalBusiness if this represents a physical location
+Include all required properties for your chosen type.`;
   }
-}
-
-function isMinified(code: string): boolean {
-  if (!code || code.length < 50) return true;
-
-  // Remove comments to avoid skewing the results
-  code = code.replace(/\/\*[\s\S]*?\*\/|([^:]|^)\/\/.*$/gm, '$1');
-
-  const newlineRatio = (code.match(/\n/g) || []).length / code.length;
-  const whitespaceRatio = (code.match(/\s/g) || []).length / code.length;
-  const lines = code.split('\n').filter(line => line.trim().length > 0);
-  const avgLineLength = lines.length > 0 ? code.length / lines.length : 0;
-
-  // More robust checks for minification
-  const isLikelyMinified = (newlineRatio < 0.05 && whitespaceRatio < 0.2) || avgLineLength > 300;
-
-  return isLikelyMinified;
-}
-
-function getMetaDescriptionRecommendation(description: string, keyphrase: string): string | undefined {
-  if (!description) return 'Add a meta description that includes your keyphrase';
-  if (description.length < 120) return 'Meta description is too short. Aim for 120-156 characters';
-  if (description.length > 156) return 'Meta description is too long. Keep it under 156 characters';
-  if (!description.toLowerCase().includes(keyphrase.toLowerCase())) {
-    return `Include "${keyphrase}" in your meta description`;
-  }
-  return undefined;
-}
-
-function getOpenGraphRecommendation(title?: string, description?: string, image?: string): string | undefined {
-  const missing = [];
-  if (!title) missing.push('og:title');
-  if (!description) missing.push('og:description');
-  if (!image) missing.push('og:image');
-  return missing.length > 0 ? `Add missing OpenGraph tags: ${missing.join(', ')}` : undefined;
-}
-
-function getHeadingStructureRecommendation(h1Count: number, h2Count: number): string | undefined {
-  if (h1Count === 0) return 'Add an H1 heading to your page';
-  if (h1Count > 1) return 'Remove extra H1 headings - keep only one H1 per page';
-  if (h2Count === 0) return 'Add H2 headings to structure your content';
-  return undefined;
-}
-
-function getImageAltRecommendation(images: HTMLImageElement[]): string | undefined {
-  const missingAlt = images.filter(img => !img.hasAttribute('alt') || img.getAttribute('alt')?.trim() === '');
-  if (missingAlt.length > 0) {
-    return `Add descriptive alt text to ${missingAlt.length} image${missingAlt.length > 1 ? 's' : ''}`;
-  }
-  return undefined;
+  
+  return recommendation;
 }
 
 export default { fetch: handleRequest }
