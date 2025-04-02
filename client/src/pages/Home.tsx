@@ -209,12 +209,12 @@ const calculateSEOScore = (checks: SEOCheck[]): number => {
 
 // Get score rating text
 const getScoreRatingText = (score: number): string => {
-  if (score >= 90) return "Excellent";
-  if (score >= 80) return "Very Good";
-  if (score >= 70) return "Good";
-  if (score >= 60) return "Fair";
-  if (score >= 50) return "Needs Work";
-  return "Poor";
+  if (score >= 91) return "Excellent - Your site is highly optimized! Keep up the great work.";
+  if (score >= 76) return "Very Good - Your SEO is strong! Just a few tweaks can make it even better.";
+  if (score >= 61) return "Good - You're on the right track! Focus on key refinements to improve further.";
+  if (score >= 41) return "Fair - A solid start! Addressing key SEO areas will boost your rankings.";
+  if (score >= 21) return "Needs Work - There’s potential! Improving key areas will make a big impact.";
+  return "Poor - No worries! Focus on essential fixes to see quick improvements.";
 };
 
 const CategoryHeader = styled.div`

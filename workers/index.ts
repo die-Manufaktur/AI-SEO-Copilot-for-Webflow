@@ -693,6 +693,7 @@ async function analyzeSEO(url: string, keyphrase: string, env: any): Promise<any
 
     
     // Check if the page is empty or has minimal content
+    const html = await response.text();
     if (!html || html.trim().length < 100) {
       throw new Error('Page appears to be empty or unpublished');
     }
