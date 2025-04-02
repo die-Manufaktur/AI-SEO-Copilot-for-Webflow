@@ -58,7 +58,7 @@ export interface Logger {
  * @param options Logger configuration options
  * @returns Logger object with debug, info, warn, and error methods
  */
-export function createLogger(namespace: string) {
+export function createLogger(prefix: string) {
   const logStyles = {
     debug: 'color: #7f8c8d',
     info: 'color: #2980b9',
@@ -66,19 +66,20 @@ export function createLogger(namespace: string) {
     error: 'color: #c0392b',
   };
 
-  const prefix = `[${namespace}]`;
-
-  // Force enable all console output in development mode
-  const isDev = process.env.DEV || 
-                window.location.hostname === 'localhost' || 
-                window.location.hostname === '127.0.0.1';
-
+  // In production, return no-op functions for all log levels
+  if (process.env.NODE_ENV === 'production') {
+    return {
+      debug: () => {},
+      info: () => {},
+      warn: () => {},
+      error: () => {}
+    };
+  }
+  
+  // In development, maintain existing logging behavior
   return {
     debug: (...args: any[]) => {
-      // Always log in development, only if explicitly enabled in production
-      if (isDev || localStorage.getItem('debug') === 'true') {
-        console.log(`%c${prefix}`, logStyles.debug, ...args);
-      }
+      console.log(`%c${prefix}`, logStyles.debug, ...args);
     },
     info: (...args: any[]) => {
       console.log(`%c${prefix}`, logStyles.info, ...args);

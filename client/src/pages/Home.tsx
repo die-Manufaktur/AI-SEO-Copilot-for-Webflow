@@ -34,11 +34,7 @@ import type { SEOAnalysisResult, SEOCheck } from "../lib/types";
 import { ProgressCircle } from "../components/ui/progress-circle";
 import { getLearnMoreUrl } from "../lib/docs-links";
 import styled from 'styled-components';
-import { createLogger } from "../lib/utils";
 import Footer from "../components/Footer";
-
-// Create a namespaced logger for the Home component
-const logger = createLogger('Home');
 
 const formSchema = z.object({
   keyphrase: z.string().min(2, "Keyphrase must be at least 2 characters")
@@ -114,16 +110,11 @@ const getPriorityText = (priority: string) => {
 const groupChecksByCategory = (checks: SEOCheck[]) => {
   const categories = {
     "Meta SEO": ["Keyphrase in Title", "Keyphrase in Meta Description", "Keyphrase in URL", "Open Graph Title and Description"],
-    "Content Optimisation": ["Content Length on page", "Keyphrase Density", "Keyphrase in Introduction", "Keyphrase in H1 Heading", "Keyphrase in H2 Headings", "Heading Hierarchy"],
+    "Content Optimisation": ["Content Length", "Keyphrase Density", "Keyphrase in Introduction", "Keyphrase in H1 Heading", "Keyphrase in H2 Headings", "Heading Hierarchy"],
     "Links": ["Internal Links", "Outbound Links"],
     "Images and Assets": ["Image Alt Attributes", "Next-Gen Image Formats", "OpenGraph Image", "Image File Size"],
     "Technical SEO": ["Code Minification", "Schema Markup"]
   };
-
-  // Add a debug log only if checks exist
-  if (checks && checks.length > 0) {
-    logger.debug("Checks to categorize:", checks.map(c => c.title));
-  }
 
   const grouped: Record<string, SEOCheck[]> = {};
 
@@ -141,14 +132,6 @@ const groupChecksByCategory = (checks: SEOCheck[]) => {
       }
     }
   });
-
-  // Log the final categorization only if there are meaningful results
-  const hasChecks = Object.values(grouped).some(categoryChecks => categoryChecks.length > 0);
-  if (hasChecks) {
-    logger.debug("Final categorization:", Object.entries(grouped).map(([category, checks]) => 
-      `${category}: ${checks.length} items (${checks.map(c => c.title).join(', ')})`
-    ));
-  }
 
   return grouped;
 };
@@ -209,12 +192,12 @@ const calculateSEOScore = (checks: SEOCheck[]): number => {
 
 // Get score rating text
 const getScoreRatingText = (score: number): string => {
-  if (score >= 90) return "Excellent";
-  if (score >= 80) return "Very Good";
-  if (score >= 70) return "Good";
-  if (score >= 60) return "Fair";
-  if (score >= 50) return "Needs Work";
-  return "Poor";
+  if (score >= 91) return "Excellent - Your site is highly optimized! Keep up the great work.";
+  if (score >= 76) return "Very Good - Your SEO is strong! Just a few tweaks can make it even better.";
+  if (score >= 61) return "Good - You're on the right track! Focus on key refinements to improve further.";
+  if (score >= 41) return "Fair - A solid start! Addressing key SEO areas will boost your rankings.";
+  if (score >= 21) return "Needs Work - There’s potential! Improving key areas will make a big impact.";
+  return "Poor - No worries! Focus on essential fixes to see quick improvements.";
 };
 
 const CategoryHeader = styled.div`
@@ -257,10 +240,8 @@ const fetchPageInfo = async (setSlug: (slug: string | null) => void, setIsHomePa
       const currentPage = await webflow.getCurrentPage();
       const isHome = await currentPage.isHomepage();
       setIsHomePage(isHome);
-      logger.debug(`Current page homepage status: ${isHome}`);
     }
   } catch (error) {
-    logger.error("Error checking if page is homepage:", error);
     setIsHomePage(false);
   }
 };
@@ -293,10 +274,8 @@ export default function Home() {
           const currentPage = await webflow.getCurrentPage();
           const isHome = await currentPage.isHomepage();
           setIsHomePage(isHome);
-          logger.debug(`Current page homepage status: ${isHome}`);
         }
       } catch (error) {
-        logger.error("Error checking if page is homepage:", error);
         setIsHomePage(false);
       }
     };
@@ -314,9 +293,7 @@ export default function Home() {
       if (event.data.name === 'copyToClipboard') {
         const text = event.data.data;
         navigator.clipboard.writeText(text).then(() => {
-          logger.debug('Text copied to clipboard');
         }).catch(err => {
-          logger.error('Failed to copy text to clipboard', err);
         });
       }
     };
@@ -347,10 +324,8 @@ export default function Home() {
           const currentPage = await webflow.getCurrentPage();
           if (currentPage) {
             currentPageId = currentPage.id;
-            logger.debug('Initial page ID:', currentPageId);
           }
         } catch (error) {
-          logger.error('Error getting initial page ID:', error);
         }
       };
       
@@ -365,18 +340,14 @@ export default function Home() {
           
           if (newCurrentPage && newCurrentPage.id !== currentPageId) {
             // Page has actually changed, update currentPageId and reload
-            logger.info('Page changed from', currentPageId, 'to', newCurrentPage.id);
             currentPageId = newCurrentPage.id;
             
             // Use a small timeout to prevent potential race conditions
             setTimeout(() => {
               window.location.reload();
             }, 100);
-          } else {
-            logger.debug('Ignoring currentpage event - same page or no page ID');
           }
         } catch (error) {
-          logger.error('Error handling page change:', error);
         }
       });
       
@@ -395,9 +366,7 @@ export default function Home() {
         try {
           // When page changes, fetch new page info
           await fetchPageInfo(setSlug, setIsHomePage);
-          logger.debug('Page changed, updated page info');
         } catch (error) {
-          logger.error('Error handling page change:', error);
         }
       });
       
@@ -441,24 +410,38 @@ export default function Home() {
   const mutation = useMutation({
     mutationFn: analyzeSEO,
     onMutate: () => {
-      logger.info('Starting SEO analysis...');
       setIsLoading(true);
     },
     onSuccess: (data) => {
-      logger.info('SEO analysis completed successfully');
-      logger.debug('Analysis results:', data);
       setResults(data);
-      setSelectedCategory(null); // Reset selected category on new analysis
+      setSelectedCategory(null); 
       setIsLoading(false);
     },
     onError: (error: Error) => {
-      logger.error('SEO analysis failed:', error);
       setIsLoading(false);
-      toast({
-        variant: "destructive",
-        title: "Analysis Failed",
-        description: error.message || "Please check your connection and try again"
-      });
+      
+      // Check if the error message indicates an empty/unpublished page
+      if (error.message.includes('Failed to fetch page') || error.message.includes('500')) {
+        toast({
+          variant: "destructive",
+          title: "Unpublished Page",
+          description: "Hmm, it seems the page you are trying to analysis is empty. Can you make sure you published the page (top right corner button) and try again.",
+          // Increase duration so user has time to read
+          duration: 6000,
+          // Add custom styling
+          className: "bg-amber-50 dark:bg-amber-900 border-amber-200 dark:border-amber-800",
+          style: {
+            fontWeight: 500
+          }
+        });
+      } else {
+        // Default error toast for other errors
+        toast({
+          variant: "destructive", 
+          title: "Analysis Failed",
+          description: error.message || "Please check your connection and try again"
+        });
+      }
     }
   });
 
@@ -514,7 +497,6 @@ export default function Home() {
       }
       return siteInfo as WebflowSiteInfo;
     } catch (error) {
-      logger.error(`Error getting site info:`, error); // Keep error logs but use logger
       toast({
         variant: "destructive",
         title: "Error",
@@ -528,11 +510,9 @@ export default function Home() {
     try {
       // Force a double-check of the API URL
       const apiBaseUrl = getApiBaseUrl();
-      logger.debug("API base URL for request:", apiBaseUrl);
 
       const siteInfo = await getSiteInfo();
       if (!siteInfo || !siteInfo.domains || siteInfo.domains.length === 0) {
-        logger.error("No domains found in site info");
         toast({
           variant: "destructive",
           title: "Error",
@@ -549,7 +529,6 @@ export default function Home() {
         if (defaultDomain) {
           url = defaultDomain.url;
         } else {
-          logger.error("No default domain found in site info");
           toast({
             variant: "destructive",
             title: "Error",
@@ -574,15 +553,8 @@ export default function Home() {
           
           // Add the slug with leading slash
           url = `${url}/${slug}`;
-          logger.debug("Full page URL with slug:", url);
         } else {
-          logger.debug("No slug available, using domain URL only:", url);
         }
-        
-        // Add debugging message
-        logger.debug(`Using API base URL: ${getApiBaseUrl()}`);
-        logger.debug(`Using target URL: ${url}`);
-        logger.debug(`Is homepage: ${isHomePage}`);
         
         // Wrap in try-catch and provide useful error message
         try {
@@ -590,16 +562,12 @@ export default function Home() {
           const testConnection = await fetch(`${apiBaseUrl}/api/analyze`, {
             method: "HEAD"
           }).catch(err => {
-            logger.warn("Test connection to Worker failed:", err);
             return null;
           });
-          
-          logger.debug("Worker test connection result:", testConnection ? `${testConnection.status} ${testConnection.statusText}` : "Failed");
           
           // Pass isHomePage to the SEO analysis
           mutation.mutate({ keyphrase: values.keyphrase, url, isHomePage });
         } catch (apiError) {
-          logger.error("API request failed:", apiError);
           toast({
             variant: "destructive",
             title: "Connection Error",
@@ -614,7 +582,6 @@ export default function Home() {
         });
       }
     } catch (error) {
-      logger.error("Error submitting form:", error);
       toast({
         variant: "destructive", 
         title: "Error",
@@ -625,11 +592,6 @@ export default function Home() {
 
   // Group checks for the overview
   const groupedChecks = results ? groupChecksByCategory(results.checks) : null;
-
-  // Only log groupedChecks when it contains data
-  if (groupedChecks) {
-    logger.debug("Grouped checks data:", groupedChecks);
-  }
 
   // Function to extract domains from URLs and register them
   const registerDetectedDomains = async (detectedUrls: string[]) => {
@@ -646,30 +608,24 @@ export default function Home() {
             const urlObj = new URL(urlWithProtocol);
             return urlObj.hostname;
           } catch (e) {
-            logger.warn("Invalid URL format:", url);
             return url; // Return original if parsing fails
           }
         })
         .filter(Boolean);
 
       if (domains.length > 0) {
-        logger.debug("Processing domains for registration:", domains);
         
         try {
           const result = await registerDomains(domains);
           
           if (result.success) {
-            logger.info(`Successfully registered ${domains.length} domains: ${domains.join(', ')}`);
           } else {
-            logger.warn("Failed to register some domains:", result.message);
           }
         } catch (err) {
           // Don't block the app if domain registration fails (it will just use the API's default allowed domains)
-          logger.warn("Domain registration failed, continuing with default allowed domains");
         }
       }
     } catch (error) {
-      logger.error("Error registering domains:", error);
     }
   };
 
@@ -698,7 +654,6 @@ export default function Home() {
           await registerDetectedDomains(detectedUrls);
         }
       } catch (error) {
-        logger.error("Error getting URLs:", error);
       }
     };
 
@@ -763,10 +718,10 @@ export default function Home() {
                     <Button
                       type="submit"
                       disabled={mutation.isPending}
-                      className="w-full h-11"
+                      className="w-full h-11 cursor-pointer"
                     >
                       {mutation.isPending && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
-                      Analyze SEO
+                      Start optimizing your SEO
                     </Button>
                   </motion.div>
                   {/* Only show test button in development environments */}
@@ -1077,12 +1032,10 @@ const copyToClipboard = async (text: string) => {
       document.body.removeChild(textArea);
       return true;
     } catch (err) {
-      logger.error('DOM clipboard operation failed:', err);
       document.body.removeChild(textArea);
       return false;
     }
   } catch (error) {
-    logger.error('Clipboard write failed:', error);
     return false;
   }
 };
