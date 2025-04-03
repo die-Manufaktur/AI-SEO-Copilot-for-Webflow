@@ -15,8 +15,7 @@
     "start-dev": "concurrently \"pnpm dev:worker\" \"pnpm dev\"",
     "dev:watch-css": "tailwindcss -i ./client/src/index.css -o ./client/src/output.css --watch",
     "dev:all": "concurrently \"pnpm dev:worker\" \"pnpm dev:watch-css\" \"pnpm dev\"",
-    "prebuild": "node scripts/check-env.js",
-    "dev:enhanced": "cross-env VITE_FAST_REFRESH=true FORCE_COLOR=1 concurrently -n \"react,worker,webflow\" -c \"green,blue,magenta\" \"vite --force --clearScreen=false\" \"nodemon --watch workers --ext ts,js --exec 'wrangler dev workers/index.ts --env development'\" \"webflow extension serve\""
+    "prebuild": "node scripts/check-env.js"
   },
   "devDependencies": {
     "@testing-library/react": "^14.3.1",
