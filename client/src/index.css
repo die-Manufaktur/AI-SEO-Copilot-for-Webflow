@@ -89,9 +89,25 @@ p, span {
   color: var(--text2);
 }
 
-/* Add utility class for background2 */
+/* Add utility class for all backgrounds */
+.bg-background {
+  background-color: var(--background);
+}
+
 .bg-background2 {
   background-color: var(--background2);
+}
+
+.bg-background3 {
+  background-color: var(--background3);
+}
+
+.bg-background4 {
+  background-color: var(--background4);
+}
+
+.bg-background5 {
+  background-color: var(--background5);
 }
 
 /* Force visibility for critical containers */
