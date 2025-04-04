@@ -828,12 +828,17 @@ export async function analyzeSEOElements(url: string, keyphrase: string, env: an
         );
 
         // 5. Keyphrase Density
-        const { density } = calculateKeyphraseDensity(scrapedData.content, keyphrase);
+        const { density, occurrences, totalWords } = calculateKeyphraseDensity(scrapedData.content, keyphrase);
+        const densityInRange = density >= 0.5 && density <= 2.5;
+        const densityMessage = densityInRange
+            ? "Keyphrase density is optimal."
+            : `Keyphrase density should be between 0.5% and 2.5%. Current density: ${density.toFixed(1)}% (${occurrences} occurrences in ${totalWords} words)`;
+            
         await addCheck(
             "Keyphrase Density",
-            "Keyphrase density should be between 1% and 3%.",
-            density >= 1 && density <= 3,
-            `Current density: ${density.toFixed(1)}%`
+            densityMessage,
+            densityInRange,
+            `Current density: ${density.toFixed(1)}%, ${occurrences} occurrences in ${totalWords} words`
         );
 
         // 6. Headings Analysis
@@ -883,7 +888,6 @@ export async function analyzeSEOElements(url: string, keyphrase: string, env: an
         console.log("- Meta Description:", apiData.metaDescription || "(empty)");
         console.log("- Scraped OG Description:", scrapedData.ogMetadata.description || "(empty)");
         
-        // Debug logging - check results
         console.log("[SEO Analyzer] Title Check Results:");
         console.log("- Has OG Title Direct:", hasOgTitleDirect);
         console.log("- Has OG Title From Page Title:", hasOgTitleFromPageTitle);
