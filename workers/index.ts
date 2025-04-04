@@ -844,11 +844,35 @@ export async function analyzeSEOElements(url: string, keyphrase: string, env: an
         // 6. Headings Analysis
         const h1s = scrapedData.headings.filter((h: { level: number; text: string }) => h.level === 1);
         
+        // Enhanced H1 check to verify keyphrase presence and ensure single H1 per page
+        const hasKeyphraseInH1 = h1s.some((h: { level: number; text: string }) => h.text.toLowerCase().includes(keyphrase.toLowerCase()));
+        const hasSingleH1 = h1s.length === 1;
+        
+        // Pass the check only if there is exactly one H1 and it contains the keyphrase
+        const h1CheckPassed = hasSingleH1 && hasKeyphraseInH1;
+        
+        // Create a more detailed context for the recommendation
+        const h1Context = JSON.stringify({
+            h1Count: h1s.length,
+            h1Texts: h1s.map((h: { level: number; text: string }) => h.text),
+            hasSingleH1: hasSingleH1,
+            hasKeyphraseInH1: hasKeyphraseInH1
+        });
+        
+        // Determine the appropriate description based on the scenario
+        let h1Description = "The page should have exactly one H1 heading containing the focus keyphrase.";
+        
+        if (!hasSingleH1) {
+            h1Description = `The page has ${h1s.length} H1 headings. Ideally, there should be exactly one.`;
+        } else if (!hasKeyphraseInH1) {
+            h1Description = "The H1 heading should contain the focus keyphrase.";
+        }
+        
         await addCheck(
             "Keyphrase in H1 Heading",
-            "The main heading (H1) should contain the focus keyphrase.",
-            h1s.some((h: { level: number; text: string }) => h.text.toLowerCase().includes(keyphrase.toLowerCase())),
-            h1s.map((h: { level: number; text: string }) => h.text).join(', ')
+            h1Description,
+            h1CheckPassed,
+            h1Context
         );
 
         // 7. OpenGraph Tags - Use API data if available
