@@ -6,6 +6,9 @@ compatibility_flags = ["nodejs_compat"]
 # Account configuration (uncomment and set if needed)
 # account_id = "c130aef39c1c8e06d07c94bbadbe2bd7"
 
+[observability.logs]
+enabled = true
+
 [env.production]
 workers_dev = true
 

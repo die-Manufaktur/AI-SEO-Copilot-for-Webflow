@@ -33,8 +33,20 @@ export const getApiBaseUrl = (): string => {
   return 'https://seo-copilot-api.paul-130.workers.dev';
 };
 
-export async function analyzeSEO({ keyphrase, url, isHomePage }: { keyphrase: string; url: string; isHomePage: boolean }) {
+export async function analyzeSEO({ 
+  keyphrase, 
+  url, 
+  isHomePage, 
+  debug = true 
+}: { 
+  keyphrase: string; 
+  url: string; 
+  isHomePage: boolean;
+  debug?: boolean;
+}) {
   const apiBaseUrl = getApiBaseUrl();
+  console.log("[SEO Analyzer] Starting analysis with settings:", { keyphrase, url, isHomePage, debug });
+  console.log(`[SEO Analyzer] Using API endpoint: ${apiBaseUrl}/api/analyze`);
   
   try {
     const response = await fetch(`${apiBaseUrl}/api/analyze`, {
@@ -42,16 +54,43 @@ export async function analyzeSEO({ keyphrase, url, isHomePage }: { keyphrase: st
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ keyphrase, url }),
+      body: JSON.stringify({ keyphrase, url, debug }),
     });
     
     if (!response.ok) {
       const errorText = await response.text();
+      console.error("[SEO Analyzer] API error response:", errorText);
       throw new Error(`API request failed with status ${response.status}: ${errorText}`);
     }
     
-    return await response.json();
+    const result = await response.json();
+    console.log("[SEO Analyzer] Analysis results received:", result);
+    
+    // Extract and log OpenGraph specific data to help debug
+    if (result && result.checks) {
+      const ogCheck = result.checks.find((check: any) => 
+        check.title === "Open Graph Title and Description" || 
+        check.title === "OpenGraph Title and Description"
+      );
+      
+      if (ogCheck) {
+        console.log("[SEO Analyzer] OpenGraph check details:", ogCheck);
+        try {
+          // Try to parse context data if it's a JSON string
+          const contextData = typeof ogCheck.context === 'string' ? 
+            JSON.parse(ogCheck.context) : ogCheck.context;
+          console.log("[SEO Analyzer] OpenGraph data:", contextData);
+        } catch (e) {
+          console.log("[SEO Analyzer] OpenGraph check context (raw):", ogCheck.context);
+        }
+      } else {
+        console.log("[SEO Analyzer] No OpenGraph check found in results");
+      }
+    }
+    
+    return result;
   } catch (error) {
+    console.error("[SEO Analyzer] Analysis failed:", error);
     throw error; // Re-throw to allow handling by the caller
   }
 }

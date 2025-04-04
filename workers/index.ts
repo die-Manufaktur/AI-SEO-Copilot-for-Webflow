@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 import * as ip from "ip";
 import IPCIDR from "ip-cidr";
 import { URL } from "url";
+import { Page } from 'openai/pagination.mjs';
 
 export {}; // Ensure this file is treated as a module
 
@@ -159,6 +160,23 @@ function escapeRegExp(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// Helper function to get meta description via Webflow Designer API
+async function getMetaDescriptionFromAPI(): Promise<string | null> {
+  try {
+    const currentPage = await webflow.getCurrentPage();
+    const pageId = currentPage?.id;
+    if (!pageId) {
+      return null;
+    }
+    
+    const metaDescription = await currentPage.getDescription();
+    return metaDescription || null;
+  } catch (error) {
+    console.error("Error fetching meta description from Webflow API:", error);
+    return null;
+  }
+}
+
 function calculateKeyphraseDensity(content: string, keyphrase: string): {
   density: number;
   occurrences: number;
@@ -225,8 +243,24 @@ async function scrapeWebpage(url: string): Promise<any> {
     // Extract title and meta description
     const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
     const title = titleMatch ? titleMatch[1].trim() : "";
-    const metaDescriptionMatch = html.match(/<meta\s+name=["']description["']\s+content=["'](.*?)["']/i);
-    const metaDescription = metaDescriptionMatch ? metaDescriptionMatch[1].trim() : "";
+    
+    const metaDescriptionMatches = [
+      html.match(/<meta\s+name=["']description["'][^>]*content=["'](.*?)["']/i),
+      html.match(/<meta\s+content=["'](.*?)["'][^>]*name=["']description["']/i),
+      html.match(/<meta\s+property=["']og:description["'][^>]*content=["'](.*?)["']/i),
+      html.match(/<meta\s+content=["'](.*?)["'][^>]*property=["']og:description["']/i)
+    ];
+    
+    let metaDescription = "";
+    for (const match of metaDescriptionMatches) {
+      if (match && match[1]) {
+        metaDescription = match[1].trim();
+        break;
+      }
+    }
+    
+    // Add this after extracting meta description
+    console.log("Debug - Meta Description Found:", metaDescription);
     
     // Extract OpenGraph metadata
     const ogMetadata: Record<string, string> = {
@@ -238,22 +272,22 @@ async function scrapeWebpage(url: string): Promise<any> {
     };
     
     // Extract OG title
-    const ogTitleMatch = html.match(/<meta\s+property=["']og:title["']\s+content=["'](.*?)["']/i);
+    const ogTitleMatch = html.match(/<meta\s+property=["']og:title["'][^>]*content=["'](.*?)["']/i);
     if (ogTitleMatch) ogMetadata.title = ogTitleMatch[1].trim();
     
     // Extract OG description
-    const ogDescMatch = html.match(/<meta\s+property=["']og:description["']\s+content=["'](.*?)["']/i);
+    const ogDescMatch = html.match(/<meta\s+property=["']og:description["'][^>]*content=["'](.*?)["']/i);
     if (ogDescMatch) ogMetadata.description = ogDescMatch[1].trim();
     
     // Extract OG image
-    const ogImageMatch = html.match(/<meta\s+property=["']og:image["']\s+content=["'](.*?)["']/i);
+    const ogImageMatch = html.match(/<meta\s+property=["']og:image["'][^>]*content=["'](.*?)["']/i);
     if (ogImageMatch) ogMetadata.image = ogImageMatch[1].trim();
     
     // Extract OG image dimensions
-    const ogImageWidthMatch = html.match(/<meta\s+property=["']og:image:width["']\s+content=["'](.*?)["']/i);
+    const ogImageWidthMatch = html.match(/<meta\s+property=["']og:image:width["'][^>]*content=["'](.*?)["']/i);
     if (ogImageWidthMatch) ogMetadata.imageWidth = ogImageWidthMatch[1].trim();
     
-    const ogImageHeightMatch = html.match(/<meta\s+property=["']og:image:height["']\s+content=["'](.*?)["']/i);
+    const ogImageHeightMatch = html.match(/<meta\s+property=["']og:image:height["'][^>]*content=["'](.*?)["']/i);
     if (ogImageHeightMatch) ogMetadata.imageHeight = ogImageHeightMatch[1].trim();
     
     // Extract body content
@@ -634,40 +668,484 @@ if (matchesArray.length === 0) {
   }
 }
 
-// Update the check title in the analyzeSEO function to match the UI
-async function analyzeSEO(url: string, keyphrase: string, env: any): Promise<any> {
-  try {
-    
-    // Fetch the page content
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-      },
-    });
+export async function analyzeSEOElements(url: string, keyphrase: string, env: any) {
+    const startTime = Date.now();
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch page: ${response.status} ${response.statusText}`);
+    try {
+        // Check if Webflow Designer API is available
+        const hasDesignerAPI = typeof window !== 'undefined' && await hasWebflowDesignerData();
+        
+        // Get data via scraping (fallback method)
+        const scrapedData = await scrapeWebpage(url);
+        
+        // Initialize API data container
+        const apiData: Record<string, any> = {};
+        
+        // If Designer API is available, fetch data from it
+        if (hasDesignerAPI && window.webflow) {
+            try {
+                const currentPage = await webflow.getCurrentPage();
+                
+                const [
+                        pageTitle, 
+                        pageDescription,
+                        pageSlug,
+                        ogTitle,
+                        usesPageTitleAsOgTitle,
+                        ogDescription,
+                        usesDescriptionAsOgDescription,
+                        ogImage,
+                        searchTitle,
+                        usesPageTitleAsSearchTitle,
+                        searchDescription,
+                        usesDescriptionAsSearchDescription,
+                        searchImage,
+                        excludedFromSearch,
+                        publishPath
+                    ] = await Promise.all([
+                        currentPage.getTitle().catch(() => null),
+                        currentPage.getDescription().catch(() => null),
+                        currentPage.getSlug().catch(() => null),
+                        currentPage.getOpenGraphTitle().catch(() => null),
+                        currentPage.usesTitleAsOpenGraphTitle().catch(() => null),
+                        currentPage.getOpenGraphDescription().catch(() => null),
+                        currentPage.usesDescriptionAsOpenGraphDescription().catch(() => null),
+                        currentPage.getOpenGraphImage().catch(() => null),
+                        currentPage.getSearchTitle().catch(() => null),
+                        currentPage.usesTitleAsSearchTitle().catch(() => null),
+                        currentPage.getSearchDescription().catch(() => null),
+                        currentPage.usesDescriptionAsSearchDescription().catch(() => null),
+                        currentPage.getSearchImage().catch(() => null),
+                        currentPage.isExcludedFromSearch().catch(() => null),
+                        currentPage.getPublishPath().catch(() => null)
+                    ]);
+                    
+                    // Store all API results
+                    apiData.title = pageTitle;
+                    apiData.metaDescription = pageDescription;
+                    apiData.slug = pageSlug;
+                    apiData.ogTitle = ogTitle;
+                    apiData.usesPageTitleAsOgTitle = usesPageTitleAsOgTitle;
+                    apiData.ogDescription = ogDescription;
+                    apiData.usesDescriptionAsOgDescription = usesDescriptionAsOgDescription;
+                    apiData.ogImage = ogImage;
+                    apiData.searchTitle = searchTitle;
+                    apiData.usesPageTitleAsSearchTitle = usesPageTitleAsSearchTitle;
+                    apiData.searchDescription = searchDescription;
+                    apiData.usesDescriptionAsSearchDescription = usesDescriptionAsSearchDescription;
+                    apiData.searchImage = searchImage;
+                    apiData.excludedFromSearch = excludedFromSearch;
+                    apiData.publishPath = publishPath;
+
+                // Debug log
+                console.log("Debug - Webflow API Data:", {
+                    title: apiData.title,
+                    description: apiData.metaDescription,
+                    ogTitle: apiData.ogTitle,
+                    ogDescription: apiData.ogDescription
+                });
+            } catch (apiError) {
+                console.error("Error fetching data from Webflow Designer API:", apiError);
+            }
+        }
+        
+        const checks: any[] = [];
+        let passedChecks = 0, failedChecks = 0;
+
+        // Helper to add a check (with AI integration if available)
+        const addCheck = async (
+            title: string,
+            description: string,
+            passed: boolean,
+            context?: string,
+            skipRecommendation = false
+        ) => {
+            let recommendation = "";
+            if (!passed && !skipRecommendation) {
+                try {
+                    recommendation = await getAIRecommendation(title, keyphrase, env, context);
+                } catch (error) {
+                    recommendation = analyzerFallbackRecommendations[title]
+                        ? analyzerFallbackRecommendations[title]({ keyphrase })
+                        : `Consider optimizing your content for "${keyphrase}" in relation to ${title.toLowerCase()}.'`;
+                }
+            }
+            const successDescription = passed ? getSuccessMessage(title, url) : description;
+            const priority = analyzerCheckPriorities[title] || "medium";
+            checks.push({ title, description: successDescription, passed, recommendation, priority });
+            passed ? passedChecks++ : failedChecks++;
+        };
+
+        // Prioritize API data over scraped data
+        const pageTitle = apiData.title || scrapedData.title;
+        const metaDescription = apiData.metaDescription || scrapedData.metaDescription;
+        
+        // Update Open Graph data with API values if available
+        if (apiData.ogTitle || apiData.ogDescription || apiData.ogImage) {
+            scrapedData.ogMetadata = scrapedData.ogMetadata || {};
+            if (apiData.ogTitle) scrapedData.ogMetadata.title = apiData.ogTitle;
+            if (apiData.ogDescription) scrapedData.ogMetadata.description = apiData.ogDescription;
+            if (apiData.ogImage) scrapedData.ogMetadata.image = apiData.ogImage;
+        }
+
+        // 1. Title Analysis
+        await addCheck(
+            "Keyphrase in Title",
+            "The page title should contain the focus keyphrase.",
+            pageTitle.toLowerCase().includes(keyphrase.toLowerCase()),
+            pageTitle
+        );
+
+        // 2. Meta Description Analysis
+        await addCheck(
+            "Keyphrase in Meta Description",
+            "The meta description should contain the focus keyphrase.",
+            metaDescription.toLowerCase().includes(keyphrase.toLowerCase()),
+            metaDescription
+        );
+
+        // 3. URL Analysis
+        // Use API slug if available
+        const pageSlug = apiData.slug || null;
+        const urlForCheck = pageSlug 
+            ? new URL(url).origin + '/' + pageSlug
+            : url;
+            
+        await addCheck(
+            "Keyphrase in URL",
+            "The URL should contain the focus keyphrase when appropriate.",
+            isHomePageFromAnalyzer(urlForCheck) || urlForCheck.toLowerCase().includes(keyphrase.toLowerCase()),
+            urlForCheck
+        );
+
+        // 4. Content Length Check - Update the check title to match success messages
+        const wordCount = scrapedData.content.trim().split(/\s+/).length;
+        await addCheck(
+            "Content Length",  // This should match exactly with the success message key
+            "The content should be at least 300 words long.",
+            wordCount >= 300,
+            `Current word count: ${wordCount}`
+        );
+
+        // 5. Keyphrase Density
+        const { density } = calculateKeyphraseDensity(scrapedData.content, keyphrase);
+        await addCheck(
+            "Keyphrase Density",
+            "Keyphrase density should be between 1% and 3%.",
+            density >= 1 && density <= 3,
+            `Current density: ${density.toFixed(1)}%`
+        );
+
+        // 6. Headings Analysis
+        const h1s = scrapedData.headings.filter((h: { level: number; text: string }) => h.level === 1);
+        
+        await addCheck(
+            "Keyphrase in H1 Heading",
+            "The main heading (H1) should contain the focus keyphrase.",
+            h1s.some((h: { level: number; text: string }) => h.text.toLowerCase().includes(keyphrase.toLowerCase())),
+            h1s.map((h: { level: number; text: string }) => h.text).join(', ')
+        );
+
+        // 7. OpenGraph Tags - Use API data if available
+        console.log("=== OpenGraph Title and Description Check - DEBUG ===");
+        
+        // Get OpenGraph title from all possible sources
+        const hasOgTitleDirect = Boolean(apiData.ogTitle);
+        const hasOgTitleFromPageTitle = Boolean(apiData.usesPageTitleAsOgTitle && apiData.title);
+        const hasOgTitleFromScraping = Boolean(scrapedData.ogMetadata.title);
+        
+        // Get OpenGraph description from all possible sources
+        const hasOgDescriptionDirect = Boolean(apiData.ogDescription);
+        const hasOgDescriptionFromMetaDesc = Boolean(apiData.usesDescriptionAsOgDescription && apiData.metaDescription);
+        const hasOgDescriptionFromScraping = Boolean(scrapedData.ogMetadata.description);
+        
+        // Overall availability checks
+        const hasOgTitle = hasOgTitleDirect || hasOgTitleFromPageTitle || hasOgTitleFromScraping;
+        const hasOgDescription = hasOgDescriptionDirect || hasOgDescriptionFromMetaDesc || hasOgDescriptionFromScraping;
+        
+        // Simplified check - either have direct OG meta tags or have fallbacks
+        const titleCheckPasses = hasOgTitleDirect || hasOgTitleFromScraping || apiData.usesPageTitleAsOgTitle;
+        const descriptionCheckPasses = hasOgDescriptionDirect || hasOgDescriptionFromScraping || apiData.usesDescriptionAsOgDescription;
+        
+        // The overall check passes if both title and description are available
+        const ogCheckPassed = titleCheckPasses && descriptionCheckPasses;
+        
+        // Debug logging - detailed info for each data point
+        console.log("[SEO Analyzer] OG Title Sources:");
+        console.log("- Direct OG Title:", apiData.ogTitle || "(empty)");
+        console.log("- Uses Page Title as OG:", apiData.usesPageTitleAsOgTitle);
+        console.log("- Page Title:", apiData.title || "(empty)");
+        console.log("- Scraped OG Title:", scrapedData.ogMetadata.title || "(empty)");
+        
+        console.log("[SEO Analyzer] OG Description Sources:");
+        console.log("- Direct OG Description:", apiData.ogDescription || "(empty)");
+        console.log("- Uses Description as OG:", apiData.usesDescriptionAsOgDescription);
+        console.log("- Meta Description:", apiData.metaDescription || "(empty)");
+        console.log("- Scraped OG Description:", scrapedData.ogMetadata.description || "(empty)");
+        
+        // Debug logging - check results
+        console.log("[SEO Analyzer] Title Check Results:");
+        console.log("- Has OG Title Direct:", hasOgTitleDirect);
+        console.log("- Has OG Title From Page Title:", hasOgTitleFromPageTitle);
+        console.log("- Has OG Title From Scraping:", hasOgTitleFromScraping);
+        console.log("- Title Check Passes:", titleCheckPasses);
+        
+        console.log("[SEO Analyzer] Description Check Results:");
+        console.log("- Has OG Description Direct:", hasOgDescriptionDirect);
+        console.log("- Has OG Description From Meta Desc:", hasOgDescriptionFromMetaDesc);
+        console.log("- Has OG Description From Scraping:", hasOgDescriptionFromScraping);
+        console.log("- Description Check Passes:", descriptionCheckPasses);
+        
+        console.log("[SEO Analyzer] FINAL RESULT:", ogCheckPassed ? "PASSED ✅" : "FAILED ❌");
+        
+        await addCheck(
+            "Open Graph Title and Description",
+            "OpenGraph meta tags should be present and optimized.",
+            ogCheckPassed,
+            JSON.stringify({
+                title: hasOgTitle ? (apiData.ogTitle || apiData.title || scrapedData.ogMetadata.title) : "(missing)",
+                description: hasOgDescription ? (apiData.ogDescription || apiData.metaDescription || scrapedData.ogMetadata.description) : "(missing)",
+                usesPageTitleAsOgTitle: apiData.usesPageTitleAsOgTitle,
+                usesDescriptionAsOgDescription: apiData.usesDescriptionAsOgDescription,
+                titleCheckPasses,
+                descriptionCheckPasses
+            }, null, 2)
+        );
+
+        // 8. Image Analysis
+        await addCheck(
+            "Image Alt Attributes",
+            "Images should have descriptive alt text.",
+            scrapedData.images.every((img: { src: string; alt: string; size?: number }) => img.alt?.length > 0),
+            JSON.stringify(scrapedData.images)
+        );
+
+        // 8a. Next-Gen Image Formats Check
+        const nextGenFormats = ['webp', 'avif'];
+        const hasNextGenImages = scrapedData.images.some((img: { src: string }) => 
+            nextGenFormats.some(format => img.src.toLowerCase().endsWith(`.${format}`))
+        );
+        await addCheck(
+            "Next-Gen Image Formats",
+            "Images should use modern formats like WebP or AVIF for better performance.",
+            hasNextGenImages,
+            JSON.stringify(scrapedData.images.map((img: { src: string; alt: string; size?: number }) => ({ src: img.src })))
+        );
+
+        // 8b. Image File Size Check
+        const MAX_IMAGE_SIZE = 500 * 1024; // 500KB
+        const allImagesOptimized = scrapedData.images.every((img: { size?: number }) => 
+            !img.size || img.size <= MAX_IMAGE_SIZE
+        );
+        await addCheck(
+            "Image File Size",
+            "Images should be optimized and under 500KB for better page load times.",
+            allImagesOptimized,
+            JSON.stringify(scrapedData.images.map((img: { src: string; alt: string; size?: number }) => ({ src: img.src, size: img.size })))
+        );
+
+        // 9. Links Analysis
+        await addCheck(
+            "Internal Links",
+            "Page should have internal links for good site structure.",
+            scrapedData.internalLinks.length > 0,
+            `Internal links found: ${scrapedData.internalLinks.length}`
+        );
+
+        // 10. Outbound Links Analysis
+        await addCheck(
+          "Outbound Links",
+          "Page should have relevant outbound links to authoritative sources.",
+          scrapedData.outboundLinks.length > 0,
+          `Outbound links found: ${scrapedData.outboundLinks.length}`
+        );
+
+        // 11. Code Minification Check
+        const jsResources = scrapedData.resources.js;
+        const cssResources = scrapedData.resources.css;
+        const totalResources = jsResources.length + cssResources.length;
+
+        // Use the isMinified function for consistent detection
+        const minifiedJs = jsResources.filter((js: {url: string; content?: string; minified?: boolean}) => {
+          // For URLs containing .min.js or -min.js, trust the filename
+          if (js.url && (js.url.includes('.min.js') || js.url.includes('-min.js'))) {
+            return true;
+          }
+          // Otherwise use our consistent detection method
+          return js.content ? isMinified(js.content) : false;
+        }).length;
+        
+        const minifiedCss = cssResources.filter((css: {url: string; content?: string; minified?: boolean}) => {
+          // For URLs containing .min.css or -min.css, trust the filename
+          if (css.url && (css.url.includes('.min.css') || css.url.includes('-min.css'))) {
+            return true;
+          }
+          // Otherwise use our consistent detection method
+          return css.content ? isMinified(css.content) : false;
+        }).length;
+        
+        const totalMinified = minifiedJs + minifiedCss;
+        const minificationPercentage = totalResources > 0 
+          ? Math.round((totalMinified / totalResources) * 100) 
+          : 0;
+        
+        const minificationPasses = minificationPercentage >= 30;
+        
+        await addCheck(
+            "Code Minification",
+            minificationPasses
+              ? `Your JavaScript and CSS resources are well optimized. ${minificationPercentage}% are minified.`
+              : `${minificationPercentage}% of your JavaScript and CSS resources are minified. Aim for at least 30% minification.`,
+            minificationPasses,
+            `JS: ${minifiedJs}/${jsResources.length} minified, CSS: ${minifiedCss}/${cssResources.length} minified. Total: ${minificationPercentage}%`,
+            true
+        );
+
+        // 12. Schema Markup Check
+        const hasSchemaMarkup = scrapedData.schema.detected;
+        const schemaTypesDetected = scrapedData.schema.types;
+        
+        // Define subheadings here so it can be used in schema context
+        const subheadings = scrapedData.headings.filter((h: { level: number; text: string }) => h.level === 2);
+
+        // Create context for recommendation
+        let schemaContext = "";
+        if (hasSchemaMarkup) {
+          schemaContext = `Schema markup found on page. Types detected: ${schemaTypesDetected.join(', ') || 'Unknown'}`;
+        } else {
+          // Create detailed context to help generate a relevant recommendation
+          schemaContext = `
+No schema markup detected on page.
+Page title: ${pageTitle}
+Meta description: ${metaDescription}
+URL: ${url}
+Content type indicators:
+- First H1: ${h1s.length > 0 ? h1s[0].text : 'None'}
+- First few H2s: ${subheadings.slice(0, 3).map((h: { level: number; text: string }) => h.text).join(', ')}
+- Has images: ${scrapedData.images.length > 0 ? 'Yes' : 'No'}
+- Is homepage: ${isHomePageFromAnalyzer(url) ? 'Yes' : 'No'}
+- Content preview: ${scrapedData.paragraphs.slice(0, 2).join(' ').substring(0, 200)}...
+`;
+        }
+
+        await addCheck(
+          "Schema Markup",
+          hasSchemaMarkup ?
+            `Your page has schema markup implemented (${schemaTypesDetected.join(', ') || 'Unknown type'})` :
+            "Your page is missing schema markup (structured data)",
+          hasSchemaMarkup,
+          schemaContext,
+          true // Skip GPT recommendation as we're using our custom one
+        );
+
+        // If the check failed, add our custom recommendation
+        const schemaCheck = checks.find(check => check.title === "Schema Markup");
+        if (schemaCheck) {
+          schemaCheck.recommendation = generateSchemaMarkupRecommendation(scrapedData, url);
+        }
+
+        // 13. Keyphrase in Introduction Check
+        const introduction = scrapedData.paragraphs.length > 0 ? scrapedData.paragraphs[0] : '';
+        await addCheck(
+            "Keyphrase in Introduction",
+            "The keyphrase should appear in the introduction paragraph.",
+            introduction.toLowerCase().includes(keyphrase.toLowerCase()),
+            introduction
+        );
+        
+        // 14. Keyphrase in H2 Headings Check
+        // subheadings already defined above
+        await addCheck(
+            "Keyphrase in H2 Headings",
+            "At least one H2 heading should contain the keyphrase.",
+            subheadings.some((h: { level: number; text: string }) => h.text.toLowerCase().includes(keyphrase.toLowerCase())),
+            subheadings.map((h: { level: number; text: string }) => h.text).join(', ')
+        );
+
+        // 15. Heading Hierarchy Check
+        const h1Count = scrapedData.headings.filter((h: { level: number }) => h.level === 1).length;
+        const h2Count = scrapedData.headings.filter((h: { level: number; text: string }) => h.level === 2).length;
+        await addCheck(
+            "Heading Hierarchy",
+            "The page should have one H1 and multiple H2 headings.",
+            h1Count === 1 && h2Count > 0,
+            `H1 count: ${h1Count}, H2 count: ${h2Count}`
+        );
+
+        // 16. OpenGraph Image Check - Use API data if available
+        const hasOgImage = apiData.ogImage || scrapedData.ogMetadata.image;
+        
+        await addCheck(
+            "OpenGraph Image",
+            "The page should have an OpenGraph image.",
+            Boolean(hasOgImage),
+            hasOgImage || "No OpenGraph image found",
+            true
+        );
+
+        const score = Math.round((passedChecks / checks.length) * 100);
+
+        return { 
+            checks, 
+            passedChecks, 
+            failedChecks, 
+            url, 
+            score, 
+            timestamp: new Date().toISOString(),
+            apiDataUsed: Object.keys(apiData).length > 0  // Flag indicating if API data was used
+        };
+    } catch (error: any) {
+        throw error;
     }
+}
 
-    
-    // Check if the page is empty or has minimal content
-    const html = await response.text();
-    if (!html || html.trim().length < 100) {
-      throw new Error('Page appears to be empty or unpublished');
-    }
-
-    // Continue with existing analysis...
-    const results = await analyzeSEOElements(url, keyphrase, env);
-    
-    return {
-      ...results,
-      url,
-      keyphrase
-    };
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to analyze SEO: ${errorMessage}`);
+// Add helper function at the top level
+function generateSchemaMarkupRecommendation(data: any, pageUrl: string): string {
+  // Determine page type based on content
+  const isHome = isHomePageFromAnalyzer(pageUrl);
+  const h1Text = data.headings.find((h: {level: number}) => h.level === 1)?.text || '';
+  const hasProducts = h1Text.toLowerCase().includes('product') || 
+                     data.content.toLowerCase().includes('price') || 
+                     data.content.toLowerCase().includes('buy now');
+  const hasBlog = pageUrl.includes('blog') || 
+                 h1Text.toLowerCase().includes('article') || 
+                 data.headings.some((h: {level: number; text: string}) => 
+                   h.level === 2 && h.text.toLowerCase().includes('post'));
+                   
+  // Generate appropriate recommendation
+  let recommendation = "Add schema markup to help search engines understand your content:\n\n";
+  
+  if (isHome) {
+    recommendation += `**Recommended Schema Type: WebSite or Organization**\n\n`;
+    recommendation += `For your homepage, implement schema.org/WebSite or schema.org/Organization markup to establish your site's identity. Include your site name, URL, and logo.`;
+  } else if (hasProducts) {
+    recommendation += `**Recommended Schema Type: Product**\n\n`;
+    recommendation += `For product pages, implement schema.org/Product markup including:
+- name
+- description
+- price
+- availability
+- product images
+This will enhance visibility in search results and potentially enable rich snippets.`;
+  } else if (hasBlog) {
+    recommendation += `**Recommended Schema Type: Article or BlogPosting**\n\n`;
+    recommendation += `For this content, implement schema.org/Article or schema.org/BlogPosting markup including:
+- headline
+- author
+- datePublished
+- image
+- description
+This will improve how your content appears in search results.`;
+  } else {
+    recommendation += `**Recommended Schema Types: WebPage plus contextual type**\n\n`;
+    recommendation += `Implement basic schema.org/WebPage markup plus a more specific type based on your content:
+- FAQPage for Q&A content
+- HowTo for instructions
+- LocalBusiness if this represents a physical location
+Include all required properties for your chosen type.`;
   }
+  
+  return recommendation;
 }
 
 // Worker event handler
@@ -713,7 +1191,7 @@ async function handleRequest(request: Request, env: any): Promise<Response> {
         if (!keyphrase || !url) {
           return new Response(JSON.stringify({ message: "Keyphrase and URL are required" }), { status: 400, headers: corsHeaders });
         }
-        const results = await analyzeSEO(url, keyphrase, env);
+        const results = await analyzeSEOElements(url, keyphrase, env);
         return new Response(JSON.stringify(results), { status: 200, headers: corsHeaders });
       } else if (path === '/api/register-domains' && request.method === 'POST') {
         const data = await request.json();
@@ -1030,322 +1508,17 @@ const analyzerFallbackRecommendations: Record<string, (params: any) => string> =
     // ... add additional fallback recommendations as needed ...
 };
 
-export async function analyzeSEOElements(url: string, keyphrase: string, env: any) {
-    const startTime = Date.now();
-
-    try {
-        const scrapedData = await scrapeWebpage(url);
-        const checks: any[] = [];
-        let passedChecks = 0, failedChecks = 0;
-
-        // Helper to add a check (with AI integration if available)
-        const addCheck = async (
-            title: string,
-            description: string,
-            passed: boolean,
-            context?: string,
-            skipRecommendation = false
-        ) => {
-            let recommendation = "";
-            if (!passed && !skipRecommendation) {
-                try {
-                    recommendation = await getAIRecommendation(title, keyphrase, env, context);
-                } catch (error) {
-                    recommendation = analyzerFallbackRecommendations[title]
-                        ? analyzerFallbackRecommendations[title]({ keyphrase })
-                        : `Consider optimizing your content for "${keyphrase}" in relation to ${title.toLowerCase()}.`;
-                }
-            }
-            const successDescription = passed ? getSuccessMessage(title, url) : description;
-            const priority = analyzerCheckPriorities[title] || "medium";
-            checks.push({ title, description: successDescription, passed, recommendation, priority });
-            passed ? passedChecks++ : failedChecks++;
-        };
-
-        // 1. Title Analysis
-        await addCheck(
-            "Keyphrase in Title",
-            "The page title should contain the focus keyphrase.",
-            scrapedData.title.toLowerCase().includes(keyphrase.toLowerCase()),
-            scrapedData.title
-        );
-
-        // 2. Meta Description Analysis
-        await addCheck(
-            "Keyphrase in Meta Description",
-            "The meta description should contain the focus keyphrase.",
-            scrapedData.metaDescription.toLowerCase().includes(keyphrase.toLowerCase()),
-            scrapedData.metaDescription
-        );
-
-        // 3. URL Analysis
-        await addCheck(
-            "Keyphrase in URL",
-            "The URL should contain the focus keyphrase when appropriate.",
-            isHomePageFromAnalyzer(url) || url.toLowerCase().includes(keyphrase.toLowerCase()),
-            url
-        );
-
-        // 4. Content Length Check - Update the check title to match success messages
-        const wordCount = scrapedData.content.trim().split(/\s+/).length;
-        await addCheck(
-            "Content Length",  // This should match exactly with the success message key
-            "The content should be at least 300 words long.",
-            wordCount >= 300,
-            `Current word count: ${wordCount}`
-        );
-
-        // 5. Keyphrase Density
-        const { density } = calculateKeyphraseDensity(scrapedData.content, keyphrase);
-        await addCheck(
-            "Keyphrase Density",
-            "Keyphrase density should be between 1% and 3%.",
-            density >= 1 && density <= 3,
-            `Current density: ${density.toFixed(1)}%`
-        );
-
-        // 6. Headings Analysis
-        const h1s = scrapedData.headings.filter((h: { level: number; text: string }) => h.level === 1);
-        
-        await addCheck(
-            "Keyphrase in H1 Heading",
-            "The main heading (H1) should contain the focus keyphrase.",
-            h1s.some((h: { level: number; text: string }) => h.text.toLowerCase().includes(keyphrase.toLowerCase())),
-            h1s.map((h: { level: number; text: string }) => h.text).join(', ')
-        );
-
-        // 7. OpenGraph Tags
-        await addCheck(
-            "Open Graph Title and Description",
-            "OpenGraph meta tags should be present and optimized.",
-            Boolean(scrapedData.ogMetadata.title && scrapedData.ogMetadata.description),
-            JSON.stringify(scrapedData.ogMetadata)
-        );
-
-        // 8. Image Analysis
-        await addCheck(
-            "Image Alt Attributes",
-            "Images should have descriptive alt text.",
-            scrapedData.images.every((img: { src: string; alt: string; size?: number }) => img.alt?.length > 0),
-            JSON.stringify(scrapedData.images)
-        );
-
-        // 8a. Next-Gen Image Formats Check
-        const nextGenFormats = ['webp', 'avif'];
-        const hasNextGenImages = scrapedData.images.some((img: { src: string }) => 
-            nextGenFormats.some(format => img.src.toLowerCase().endsWith(`.${format}`))
-        );
-        await addCheck(
-            "Next-Gen Image Formats",
-            "Images should use modern formats like WebP or AVIF for better performance.",
-            hasNextGenImages,
-            JSON.stringify(scrapedData.images.map((img: { src: string; alt: string; size?: number }) => ({ src: img.src })))
-        );
-
-        // 8b. Image File Size Check
-        const MAX_IMAGE_SIZE = 500 * 1024; // 500KB
-        const allImagesOptimized = scrapedData.images.every((img: { size?: number }) => 
-            !img.size || img.size <= MAX_IMAGE_SIZE
-        );
-        await addCheck(
-            "Image File Size",
-            "Images should be optimized and under 500KB for better page load times.",
-            allImagesOptimized,
-            JSON.stringify(scrapedData.images.map((img: { src: string; alt: string; size?: number }) => ({ src: img.src, size: img.size })))
-        );
-
-        // 9. Links Analysis
-        await addCheck(
-            "Internal Links",
-            "Page should have internal links for good site structure.",
-            scrapedData.internalLinks.length > 0,
-            `Internal links found: ${scrapedData.internalLinks.length}`
-        );
-
-        // 10. Outbound Links Analysis
-        await addCheck(
-          "Outbound Links",
-          "Page should have relevant outbound links to authoritative sources.",
-          scrapedData.outboundLinks.length > 0,
-          `Outbound links found: ${scrapedData.outboundLinks.length}`
-        );
-
-        // 11. Code Minification Check
-        const jsResources = scrapedData.resources.js;
-        const cssResources = scrapedData.resources.css;
-        const totalResources = jsResources.length + cssResources.length;
-
-        // Use the isMinified function for consistent detection
-        const minifiedJs = jsResources.filter((js: {url: string; content?: string; minified?: boolean}) => {
-          // For URLs containing .min.js or -min.js, trust the filename
-          if (js.url && (js.url.includes('.min.js') || js.url.includes('-min.js'))) {
-            return true;
-          }
-          // Otherwise use our consistent detection method
-          return js.content ? isMinified(js.content) : false;
-        }).length;
-        
-        const minifiedCss = cssResources.filter((css: {url: string; content?: string; minified?: boolean}) => {
-          // For URLs containing .min.css or -min.css, trust the filename
-          if (css.url && (css.url.includes('.min.css') || css.url.includes('-min.css'))) {
-            return true;
-          }
-          // Otherwise use our consistent detection method
-          return css.content ? isMinified(css.content) : false;
-        }).length;
-        
-        const totalMinified = minifiedJs + minifiedCss;
-        const minificationPercentage = totalResources > 0 
-          ? Math.round((totalMinified / totalResources) * 100) 
-          : 0;
-        
-        const minificationPasses = minificationPercentage >= 30;
-        
-        await addCheck(
-            "Code Minification",
-            minificationPasses
-              ? `Your JavaScript and CSS resources are well optimized. ${minificationPercentage}% are minified.`
-              : `${minificationPercentage}% of your JavaScript and CSS resources are minified. Aim for at least 30% minification.`,
-            minificationPasses,
-            `JS: ${minifiedJs}/${jsResources.length} minified, CSS: ${minifiedCss}/${cssResources.length} minified. Total: ${minificationPercentage}%`,
-            true
-        );
-
-        // 12. Schema Markup Check
-        const hasSchemaMarkup = scrapedData.schema.detected;
-        const schemaTypesDetected = scrapedData.schema.types;
-        
-        // Define subheadings here so it can be used in schema context
-        const subheadings = scrapedData.headings.filter((h: { level: number; text: string }) => h.level === 2);
-
-        // Create context for recommendation
-        let schemaContext = "";
-        if (hasSchemaMarkup) {
-          schemaContext = `Schema markup found on page. Types detected: ${schemaTypesDetected.join(', ') || 'Unknown'}`;
-        } else {
-          // Create detailed context to help generate a relevant recommendation
-          schemaContext = `
-No schema markup detected on page.
-Page title: ${scrapedData.title}
-Meta description: ${scrapedData.metaDescription}
-URL: ${url}
-Content type indicators:
-- First H1: ${h1s.length > 0 ? h1s[0].text : 'None'}
-- First few H2s: ${subheadings.slice(0, 3).map((h: { level: number; text: string }) => h.text).join(', ')}
-- Has images: ${scrapedData.images.length > 0 ? 'Yes' : 'No'}
-- Is homepage: ${isHomePageFromAnalyzer(url) ? 'Yes' : 'No'}
-- Content preview: ${scrapedData.paragraphs.slice(0, 2).join(' ').substring(0, 200)}...
-`;
-        }
-
-        await addCheck(
-          "Schema Markup",
-          hasSchemaMarkup ?
-            `Your page has schema markup implemented (${schemaTypesDetected.join(', ') || 'Unknown type'})` :
-            "Your page is missing schema markup (structured data)",
-          hasSchemaMarkup,
-          schemaContext,
-          true // Skip GPT recommendation as we're using our custom one
-        );
-
-        // If the check failed, add our custom recommendation
-        const schemaCheck = checks.find(check => check.title === "Schema Markup");
-        if (schemaCheck) {
-          schemaCheck.recommendation = generateSchemaMarkupRecommendation(scrapedData, url);
-        }
-
-        // 13. Keyphrase in Introduction Check
-        const introduction = scrapedData.paragraphs.length > 0 ? scrapedData.paragraphs[0] : '';
-        await addCheck(
-            "Keyphrase in Introduction",
-            "The keyphrase should appear in the introduction paragraph.",
-            introduction.toLowerCase().includes(keyphrase.toLowerCase()),
-            introduction
-        );
-        
-        // 14. Keyphrase in H2 Headings Check
-        // subheadings already defined above
-        await addCheck(
-            "Keyphrase in H2 Headings",
-            "At least one H2 heading should contain the keyphrase.",
-            subheadings.some((h: { level: number; text: string }) => h.text.toLowerCase().includes(keyphrase.toLowerCase())),
-            subheadings.map((h: { level: number; text: string }) => h.text).join(', ')
-        );
-
-        // 15. Heading Hierarchy Check
-        const h1Count = scrapedData.headings.filter((h: { level: number }) => h.level === 1).length;
-        const h2Count = scrapedData.headings.filter((h: { level: number; text: string }) => h.level === 2).length;
-        await addCheck(
-            "Heading Hierarchy",
-            "The page should have one H1 and multiple H2 headings.",
-            h1Count === 1 && h2Count > 0,
-            `H1 count: ${h1Count}, H2 count: ${h2Count}`
-        );
-
-        // 16. OpenGraph Image Check
-        await addCheck(
-            "OpenGraph Image",
-            "The page should have an OpenGraph image.",
-            Boolean(scrapedData.ogMetadata.image),
-            scrapedData.ogMetadata.image,
-            true  // Added skipRecommendation parameter set to true
-        );
-
-        const score = Math.round((passedChecks / checks.length) * 100);
-
-        return { checks, passedChecks, failedChecks, url, score, timestamp: new Date().toISOString() };
-    } catch (error: any) {
-        throw error;
-    }
-}
-
-// Add helper function at the top level
-function generateSchemaMarkupRecommendation(data: any, pageUrl: string): string {
-  // Determine page type based on content
-  const isHome = isHomePageFromAnalyzer(pageUrl);
-  const h1Text = data.headings.find((h: {level: number}) => h.level === 1)?.text || '';
-  const hasProducts = h1Text.toLowerCase().includes('product') || 
-                     data.content.toLowerCase().includes('price') || 
-                     data.content.toLowerCase().includes('buy now');
-  const hasBlog = pageUrl.includes('blog') || 
-                 h1Text.toLowerCase().includes('article') || 
-                 data.headings.some((h: {level: number; text: string}) => 
-                   h.level === 2 && h.text.toLowerCase().includes('post'));
-                   
-  // Generate appropriate recommendation
-  let recommendation = "Add schema markup to help search engines understand your content:\n\n";
-  
-  if (isHome) {
-    recommendation += `**Recommended Schema Type: WebSite or Organization**\n\n`;
-    recommendation += `For your homepage, implement schema.org/WebSite or schema.org/Organization markup to establish your site's identity. Include your site name, URL, and logo.`;
-  } else if (hasProducts) {
-    recommendation += `**Recommended Schema Type: Product**\n\n`;
-    recommendation += `For product pages, implement schema.org/Product markup including:
-- name
-- description
-- price
-- availability
-- product images
-This will enhance visibility in search results and potentially enable rich snippets.`;
-  } else if (hasBlog) {
-    recommendation += `**Recommended Schema Type: Article or BlogPosting**\n\n`;
-    recommendation += `For this content, implement schema.org/Article or schema.org/BlogPosting markup including:
-- headline
-- author
-- datePublished
-- image
-- description
-This will improve how your content appears in search results.`;
-  } else {
-    recommendation += `**Recommended Schema Types: WebPage plus contextual type**\n\n`;
-    recommendation += `Implement basic schema.org/WebPage markup plus a more specific type based on your content:
-- FAQPage for Q&A content
-- HowTo for instructions
-- LocalBusiness if this represents a physical location
-Include all required properties for your chosen type.`;
+// Helper function to check if a page has Webflow Designer API data available
+async function hasWebflowDesignerData(): Promise<boolean> {
+  try {
+    // Get the current page and check if it has the expected methods
+    const currentPage = await webflow.getCurrentPage();
+    // Use bracket notation to avoid TypeScript errors with potential missing methods
+    return currentPage && typeof (currentPage as any).getDescription === 'function';
+  } catch (error) {
+    console.error("Error checking for Webflow Designer API:", error);
+    return false;
   }
-  
-  return recommendation;
 }
 
 export default { fetch: handleRequest }
