@@ -21,6 +21,21 @@ interface WebflowPage {
   id: string;
   name: string;
   path: string;
+  getTitle(): Promise<string>;
+  getDescription(): Promise<string>;
+  getSlug(): Promise<string>;
+  getOpenGraphTitle(): Promise<string>;
+  usesTitleAsOpenGraphTitle(): Promise<boolean>;
+  getOpenGraphDescription(): Promise<string>;
+  usesDescriptionAsOpenGraphDescription(): Promise<boolean>;
+  getOpenGraphImage(): Promise<string>;
+  getSearchTitle(): Promise<string>;
+  usesTitleAsSearchTitle(): Promise<boolean>;
+  getSearchDescription(): Promise<string>;
+  usesDescriptionAsSearchDescription(): Promise<boolean>;
+  getSearchImage(): Promise<string>;
+  isExcludedFromSearch(): Promise<boolean>;
+  getPublishPath(): Promise<string>;
 }
 
 // Webflow API Extension Interface
