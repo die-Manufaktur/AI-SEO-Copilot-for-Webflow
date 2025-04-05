@@ -425,7 +425,7 @@ export default function Home() {
         toast({
           variant: "destructive",
           title: "Unpublished Page",
-          description: "Hmm, it seems the page you are trying to analysis is empty. Can you make sure you published the page (top right corner button) and try again.",
+          description: "It seems the page you are trying to analyze is empty. Can you make sure you published the page (top right corner button) and try again.",
           // Increase duration so user has time to read
           duration: 6000,
           // Add custom styling

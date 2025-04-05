@@ -290,23 +290,40 @@ async function scrapeWebpage(url: string): Promise<any> {
     const ogImageHeightMatch = html.match(/<meta\s+property=["']og:image:height["'][^>]*content=["'](.*?)["']/i);
     if (ogImageHeightMatch) ogMetadata.imageHeight = ogImageHeightMatch[1].trim();
     
+    // Replace browser DOM-dependent code with regex-based parsing
     // Extract body content
-    const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
-    const bodyContent = bodyMatch ? bodyMatch[1] : "";
+    const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    const bodyContent = bodyMatch ? bodyMatch[1] : html;
     const content = bodyContent.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-    
-    // Extract paragraphs
-    const paragraphs: string[] = [];
-    const paragraphMatches = bodyContent.matchAll(/<p[^>]*>(.*?)<\/p>/gi);
-    for (const match of paragraphMatches) {
-      const text = match[1].replace(/<[^>]+>/g, ' ').trim();
-      if (text) paragraphs.push(text);
-    }
+    console.log("Extracted content:", content.substring(0, 200) + "...");
+
+    console.log("Scraping paragraphs...");
+    // Use regex to extract paragraphs instead of DOM API
+    const paragraphRegex = /<p[^>]*>([\s\S]*?)<\/p>/gi;
+    const paragraphMatches = [...bodyContent.matchAll(paragraphRegex)];
+    console.log("Total p tags found:", paragraphMatches.length);
+
+    // Extract paragraphs with parent context
+    const paragraphs = paragraphMatches
+      .map(match => {
+        const text = match[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        // Try to get parent element class (simplified)
+        const fullMatch = match[0];
+        const parentClassMatch = bodyContent.substring(
+          Math.max(0, bodyContent.indexOf(fullMatch) - 200), 
+          bodyContent.indexOf(fullMatch)
+        ).match(/<([a-z0-9]+)[^>]*class=["']([^"']+)["'][^>]*>[^<]*$/i);
+        
+        const parentClass = parentClassMatch ? parentClassMatch[2] : 'no-parent-class';
+        console.log(`Paragraph found in ${parentClass}:`, text.substring(0, 100) + (text.length > 100 ? '...' : ''));
+        return text;
+      })
+      .filter(text => text.length > 0);
     
     // Extract headings
     const headings: Array<{ level: number; text: string }> = [];
     for (let i = 1; i <= 6; i++) {
-      const headingMatches = bodyContent.matchAll(new RegExp(`<h${i}[^>]*>(.*?)</h${i}>`, 'gi'));
+      const headingMatches = html.matchAll(new RegExp(`<h${i}[^>]*>(.*?)</h${i}>`, 'gi'));
       for (const match of headingMatches) {
         const text = match[1].replace(/<[^>]+>/g, ' ').trim();
         if (text) headings.push({ level: i, text });
@@ -315,7 +332,7 @@ async function scrapeWebpage(url: string): Promise<any> {
     
     // Extract images with sizes
     const images: Array<{ src: string; alt: string; size?: number }> = [];
-    const imageMatches = bodyContent.matchAll(/<img[^>]*src=["'](.*?)["'][^>]*alt=["'](.*?)["'][^>]*>/gi);
+    const imageMatches = html.matchAll(/<img[^>]*src=["'](.*?)["'][^>]*alt=["'](.*?)["'][^>]*>/gi);
     for (const match of imageMatches) {
       images.push({ src: match[1], alt: match[2] });
     }
@@ -324,7 +341,7 @@ async function scrapeWebpage(url: string): Promise<any> {
     const baseUrl = new URL(url);
     const internalLinks: string[] = [];
     const outboundLinks: string[] = [];
-    const linkMatches = bodyContent.matchAll(/<a[^>]*href=["'](.*?)["'][^>]*>/gi);
+    const linkMatches = html.matchAll(/<a[^>]*href=["'](.*?)["'][^>]*>/gi);
     for (const match of linkMatches) {
       try {
         const href = match[1];
@@ -347,7 +364,7 @@ async function scrapeWebpage(url: string): Promise<any> {
     };
     
     // Extract JavaScript files
-    const scriptMatches = bodyContent.matchAll(/<script[^>]*src=["'](.*?)["'][^>]*>/gi);
+    const scriptMatches = html.matchAll(/<script[^>]*src=["'](.*?)["'][^>]*>/gi);
     for (const match of Array.from(scriptMatches)) {
       const scriptUrl = match[1];
       if (scriptUrl) {
@@ -377,7 +394,7 @@ async function scrapeWebpage(url: string): Promise<any> {
     }
     
     // Extract inline scripts - replace sanitizeHtml with manual extraction
-    const inlineScriptMatches = bodyContent.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi);
+    const inlineScriptMatches = html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi);
     for (const match of Array.from(inlineScriptMatches)) {
       const scriptContent = match[1]?.trim();
       if (scriptContent && scriptContent.length > 0) {
@@ -392,7 +409,7 @@ async function scrapeWebpage(url: string): Promise<any> {
     }
     
     // Extract CSS files
-    const cssMatches = bodyContent.matchAll(/<link[^>]*rel=["']stylesheet["'][^>]*href=["'](.*?)["'][^>]*>/gi);
+    const cssMatches = html.matchAll(/<link[^>]*rel=["']stylesheet["'][^>]*href=["'](.*?)["'][^>]*>/gi);
     for (const match of Array.from(cssMatches)) {
       const cssUrl = match[1];
       if (cssUrl) {
@@ -422,7 +439,7 @@ async function scrapeWebpage(url: string): Promise<any> {
     }
     
     // Extract inline styles
-    const inlineStyleMatches = bodyContent.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi);
+    const inlineStyleMatches = html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi);
     for (const match of Array.from(inlineStyleMatches)) {
       const styleContent = match[1]?.trim();
       if (styleContent && styleContent.length > 0) {
@@ -463,7 +480,7 @@ const logPrefix = '[SEO Analyzer]';
 
 // Declare all match variables at the top level so they're accessible later
 const pattern1 = /<script\s+type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
-const matches1 = Array.from(bodyContent.matchAll(pattern1));
+const matches1 = Array.from(html.matchAll(pattern1));
 // Check if pattern1 found any matches
 if (matches1.length > 0) {
   matchesArray = matches1;
@@ -476,7 +493,7 @@ let matches5: RegExpMatchArray[] = [];
 // Pattern 2: More permissive to handle different attribute ordering
 if (matchesArray.length === 0) {
   const pattern2 = /<script[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
-  matches2 = Array.from(bodyContent.matchAll(pattern2));
+  matches2 = Array.from(html.matchAll(pattern2));
   if (matches2.length > 0) {
     matchesArray = matches2;
   }
@@ -484,7 +501,7 @@ if (matchesArray.length === 0) {
 // Pattern 3: Most permissive - any script with ld+json anywhere in attributes
 if (matchesArray.length === 0) {
   const pattern3 = /<script[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi;
-  matches3 = Array.from(bodyContent.matchAll(pattern3));
+  matches3 = Array.from(html.matchAll(pattern3));
   if (matches3.length > 0) {
     matchesArray = matches3;
   }
@@ -494,7 +511,7 @@ if (matchesArray.length === 0) {
 if (matchesArray.length === 0) {
   // This pattern specifically looks for your script format with no whitespace between attributes
   const pattern4 = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi;
-  matches4 = Array.from(bodyContent.matchAll(pattern4));
+  matches4 = Array.from(html.matchAll(pattern4));
   if (matches4.length > 0) {
     matchesArray = matches4;
   }
@@ -504,7 +521,7 @@ if (matchesArray.length === 0) {
 if (matchesArray.length === 0) {
   // Look for any script tag that might contain schema.org data
   const pattern5 = /<script[^>]*>([\s\S]*?@context[\s\S]*?schema\.org[\s\S]*?@type[\s\S]*?)<\/script>/gi;
-  matches5 = Array.from(bodyContent.matchAll(pattern5));
+  matches5 = Array.from(html.matchAll(pattern5));
   if (matches5.length > 0) {
     matchesArray = matches5;
   }
@@ -514,7 +531,7 @@ if (matchesArray.length === 0) {
 if (matchesArray.length === 0) {
   // Look for JSON-like structures containing schema.org
   const rawJsonPattern = /(\{[\s\S]*?"@context"[\s\S]*?"schema\.org"[\s\S]*?"@type"[\s\S]*?\})/gi;
-  const rawMatches = Array.from(bodyContent.matchAll(rawJsonPattern));
+  const rawMatches = Array.from(html.matchAll(rawJsonPattern));
   if (rawMatches.length > 0) {
     
     // Try to parse these as standalone JSON
@@ -546,11 +563,11 @@ if (matchesArray.length === 0) {
 // Additional diagnostic check - log a sample if schema not found
 if (matchesArray.length === 0) {
   // Look for any fragment containing "schema.org" in the HTML
-  const schemaOrgIndex = bodyContent.indexOf('schema.org');
+  const schemaOrgIndex = html.indexOf('schema.org');
   if (schemaOrgIndex !== -1) {
-    const contextFragment = bodyContent.substring(
+    const contextFragment = html.substring(
       Math.max(0, schemaOrgIndex - 100), 
-      Math.min(bodyContent.length, schemaOrgIndex + 300)
+      Math.min(html.length, schemaOrgIndex + 300)
     );
   } else {
   }
@@ -609,16 +626,16 @@ if (matchesArray.length === 0) {
   schema.debug = {
     patternsChecked: 5,
     foundMatches: false,
-    bodyContentSample: bodyContent.substring(0, 300),
+    bodyContentSample: html.substring(0, 300),
     hasSchemaOrgReference: (() => {
       try {
-        const url = new URL(bodyContent);
+        const url = new URL(html);
         return url.host === 'schema.org' || url.host.endsWith('.schema.org');
       } catch (e) {
         return false;
       }
     })(),
-    documentLength: bodyContent.length
+    documentLength: html.length
   };
 } else {
   // Schema found, add information about which pattern worked
@@ -639,7 +656,7 @@ if (matchesArray.length === 0) {
 }
 
     // Extract Microdata schema
-    const microdataMatches = bodyContent.matchAll(/<[^>]+\s+itemscope[^>]*>/gi);
+    const microdataMatches = html.matchAll(/<[^>]+\s+itemscope[^>]*>/gi);
     for (const match of microdataMatches) {
       const itemTypeMatch = match[0].match(/itemtype=["'](.*?)["']/i);
       if (itemTypeMatch) {
@@ -668,87 +685,106 @@ if (matchesArray.length === 0) {
   }
 }
 
+// Function to extract paragraphs using Webflow Designer API
+async function extractParagraphsFromWebflow(): Promise<string[]> {
+  try {
+    if (typeof webflow === 'undefined') {
+      console.log("Webflow API not available");
+      return [];
+    }
+
+    console.log("Using Webflow Designer API to extract paragraphs");
+    const paragraphs: string[] = [];
+    
+    // Get all elements from the current page
+    const allElements = await webflow.getAllElements();
+    console.log("Total elements found:", allElements.length);
+    
+    // First pass: collect direct paragraphs
+    for (const element of allElements) {
+      if (!element) continue;
+      
+      // Check if element is a paragraph
+      const isParagraph = ('tagName' in element && (element as { tagName: string }).tagName.toLowerCase() === 'p') ||
+      (Array.isArray(element.customAttributes) && element.customAttributes.some(attr =>
+          attr.name === 'data-element-type' && attr.value === 'paragraph'
+        ));
+
+      if (isParagraph && element.textContent) {
+        const text = typeof element.textContent === 'string' ? (element.textContent as string).trim() : '';
+        if (text.length >= 30) { // Only collect substantial paragraphs
+          console.log("Found paragraph:", text.substring(0, 100) + (text.length > 100 ? '...' : ''));
+          paragraphs.push(text);
+        }
+      }
+    }
+    
+    // Second pass: check containers for text content
+    if (paragraphs.length === 0) {
+      for (const element of allElements) {
+        if (!element || !element.children) continue;
+        
+        try {
+          const children = element.children;
+          for (const child of Array.isArray(children) ? children : []) {
+            if (!child) continue;
+            
+            if ((child.type === 'string' || child.tagName?.toLowerCase() === 'p') && child.textContent) {
+              const text = child.textContent.trim();
+              if (text.length >= 30) {
+                console.log("Found text in container:", text.substring(0, 100) + (text.length > 100 ? '...' : ''));
+                paragraphs.push(text);
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Error accessing children:', e);
+        }
+      }
+    }
+    
+    console.log(`Found ${paragraphs.length} paragraphs using Webflow API`);
+    return paragraphs;
+  } catch (error) {
+    console.error("Error extracting paragraphs from Webflow:", error);
+    return [];
+  }
+}
+
 export async function analyzeSEOElements(url: string, keyphrase: string, env: any) {
     const startTime = Date.now();
 
     try {
-        // Check if Webflow Designer API is available
-        const hasDesignerAPI = typeof window !== 'undefined' && await hasWebflowDesignerData();
-        
+        // Initialize API data with default empty values
+        const apiData = {
+            title: '',
+            metaDescription: '',
+            ogTitle: '',
+            ogDescription: '',
+            ogImage: '',
+            usesPageTitleAsOgTitle: false,
+            usesDescriptionAsOgDescription: false,
+            slug: ''
+        };
+
         // Get data via scraping (fallback method)
         const scrapedData = await scrapeWebpage(url);
         
-        // Initialize API data container
-        const apiData: Record<string, any> = {};
-        
-        // If Designer API is available, fetch data from it
-        if (hasDesignerAPI && window.webflow) {
+        // IMPORTANT: Webflow API is not directly accessible in Workers
+        // We need to receive this data from the client side
+        if (env.webflowData) {
             try {
-                const currentPage = await webflow.getCurrentPage();
-                
-                const [
-                        pageTitle, 
-                        pageDescription,
-                        pageSlug,
-                        ogTitle,
-                        usesPageTitleAsOgTitle,
-                        ogDescription,
-                        usesDescriptionAsOgDescription,
-                        ogImage,
-                        searchTitle,
-                        usesPageTitleAsSearchTitle,
-                        searchDescription,
-                        usesDescriptionAsSearchDescription,
-                        searchImage,
-                        excludedFromSearch,
-                        publishPath
-                    ] = await Promise.all([
-                        currentPage.getTitle().catch(() => null),
-                        currentPage.getDescription().catch(() => null),
-                        currentPage.getSlug().catch(() => null),
-                        currentPage.getOpenGraphTitle().catch(() => null),
-                        currentPage.usesTitleAsOpenGraphTitle().catch(() => null),
-                        currentPage.getOpenGraphDescription().catch(() => null),
-                        currentPage.usesDescriptionAsOpenGraphDescription().catch(() => null),
-                        currentPage.getOpenGraphImage().catch(() => null),
-                        currentPage.getSearchTitle().catch(() => null),
-                        currentPage.usesTitleAsSearchTitle().catch(() => null),
-                        currentPage.getSearchDescription().catch(() => null),
-                        currentPage.usesDescriptionAsSearchDescription().catch(() => null),
-                        currentPage.getSearchImage().catch(() => null),
-                        currentPage.isExcludedFromSearch().catch(() => null),
-                        currentPage.getPublishPath().catch(() => null)
-                    ]);
-                    
-                    // Store all API results
-                    apiData.title = pageTitle;
-                    apiData.metaDescription = pageDescription;
-                    apiData.slug = pageSlug;
-                    apiData.ogTitle = ogTitle;
-                    apiData.usesPageTitleAsOgTitle = usesPageTitleAsOgTitle;
-                    apiData.ogDescription = ogDescription;
-                    apiData.usesDescriptionAsOgDescription = usesDescriptionAsOgDescription;
-                    apiData.ogImage = ogImage;
-                    apiData.searchTitle = searchTitle;
-                    apiData.usesPageTitleAsSearchTitle = usesPageTitleAsSearchTitle;
-                    apiData.searchDescription = searchDescription;
-                    apiData.usesDescriptionAsSearchDescription = usesDescriptionAsSearchDescription;
-                    apiData.searchImage = searchImage;
-                    apiData.excludedFromSearch = excludedFromSearch;
-                    apiData.publishPath = publishPath;
-
-                // Debug log
-                console.log("Debug - Webflow API Data:", {
-                    title: apiData.title,
-                    description: apiData.metaDescription,
-                    ogTitle: apiData.ogTitle,
-                    ogDescription: apiData.ogDescription
-                });
+                const webflowParagraphs = env.webflowData.paragraphs || [];
+                if (webflowParagraphs.length > 0) {
+                    console.log("Using paragraphs from Webflow API data");
+                    scrapedData.paragraphs = webflowParagraphs;
+                }
             } catch (apiError) {
-                console.error("Error fetching data from Webflow Designer API:", apiError);
+                console.error("Error processing Webflow data:", apiError);
+                // Continue with scraped data
             }
         }
-        
+
         const checks: any[] = [];
         let passedChecks = 0, failedChecks = 0;
 
@@ -1043,17 +1079,17 @@ export async function analyzeSEOElements(url: string, keyphrase: string, env: an
         } else {
           // Create detailed context to help generate a relevant recommendation
           schemaContext = `
-No schema markup detected on page.
-Page title: ${pageTitle}
-Meta description: ${metaDescription}
-URL: ${url}
-Content type indicators:
-- First H1: ${h1s.length > 0 ? h1s[0].text : 'None'}
-- First few H2s: ${subheadings.slice(0, 3).map((h: { level: number; text: string }) => h.text).join(', ')}
-- Has images: ${scrapedData.images.length > 0 ? 'Yes' : 'No'}
-- Is homepage: ${isHomePageFromAnalyzer(url) ? 'Yes' : 'No'}
-- Content preview: ${scrapedData.paragraphs.slice(0, 2).join(' ').substring(0, 200)}...
-`;
+          No schema markup detected on page.
+          Page title: ${pageTitle}
+          Meta description: ${metaDescription}
+          URL: ${url}
+          Content type indicators:
+          - First H1: ${h1s.length > 0 ? h1s[0].text : 'None'}
+          - First few H2s: ${subheadings.slice(0, 3).map((h: { level: number; text: string }) => h.text).join(', ')}
+          - Has images: ${scrapedData.images.length > 0 ? 'Yes' : 'No'}
+          - Is homepage: ${isHomePageFromAnalyzer(url) ? 'Yes' : 'No'}
+          - Content preview: ${scrapedData.paragraphs.slice(0, 2).join(' ').substring(0, 200)}...
+          `;
         }
 
         await addCheck(
@@ -1073,21 +1109,149 @@ Content type indicators:
         }
 
         // 13. Keyphrase in Introduction Check
-        const introduction = scrapedData.paragraphs.length > 0 ? scrapedData.paragraphs[0] : '';
+        console.log("Analyzing introduction paragraphs...");
+
+        // Improved introduction detection
+        let keyphraseInIntro = false;
+        let introContext = "No suitable introduction paragraph found";
+
+        // Print all paragraphs for debugging
+        console.log("All paragraphs:");
+        scrapedData.paragraphs.forEach((p: string, idx: number) => {
+          if (p.length > 30) {
+            console.log(`Paragraph ${idx}: ${p.substring(0, 100)}${p.length > 100 ? '...' : ''}`);
+          }
+        });
+
+        // Find a suitable introduction paragraph
+        // Look through the first few paragraphs
+        const potentialIntros = scrapedData.paragraphs
+          .filter((p: string) => p.length >= 50) // Only substantial paragraphs
+          .slice(0, 5); // Check the first 5 paragraphs
+
+        console.log(`Found ${potentialIntros.length} potential introduction paragraphs`);
+
+        if (potentialIntros.length > 0) {
+          // Try different matching techniques for each potential intro paragraph
+          for (const paragraph of potentialIntros) {
+            const normalizedParagraph = paragraph.toLowerCase().trim();
+            const normalizedKeyphrase = keyphrase.toLowerCase().trim();
+            
+            // Try multiple matching strategies
+            const exactMatch = normalizedParagraph.includes(normalizedKeyphrase);
+            
+            // Allow for singular/plural variations (simple version - just add/remove 's')
+            const keyphraseWithS = normalizedKeyphrase.endsWith('s') ? 
+              normalizedKeyphrase : `${normalizedKeyphrase}s`;
+            const keyphraseWithoutS = normalizedKeyphrase.endsWith('s') ? 
+              normalizedKeyphrase.slice(0, -1) : normalizedKeyphrase;
+            
+            const pluralMatch = normalizedParagraph.includes(keyphraseWithS);
+            const singularMatch = normalizedParagraph.includes(keyphraseWithoutS);
+            
+            // Words in any order (for multi-word keyphrases)
+            const keyphraseWords = normalizedKeyphrase.split(/\s+/);
+            const allWordsIncluded = keyphraseWords.length > 1 && 
+              keyphraseWords.every(word => normalizedParagraph.includes(word));
+            
+            // Successful if any matching technique works
+            if (exactMatch || pluralMatch || singularMatch || allWordsIncluded) {
+              keyphraseInIntro = true;
+              introContext = paragraph;
+              console.log("✅ Found keyphrase in introduction paragraph:", paragraph.substring(0, 100));
+              
+              // Log which matching technique worked
+              if (exactMatch) console.log("- Matched by exact match");
+              if (pluralMatch) console.log("- Matched by plural form");
+              if (singularMatch) console.log("- Matched by singular form");
+              if (allWordsIncluded) console.log("- Matched by all words included");
+              
+              break;
+            }
+          }
+          
+          if (!keyphraseInIntro) {
+            introContext = potentialIntros[0]; // Use the first substantial paragraph anyway
+            console.log("❌ Keyphrase not found in any introduction paragraph");
+          }
+        } else {
+          console.log("No substantial paragraphs found for introduction check");
+        }
+
         await addCheck(
-            "Keyphrase in Introduction",
-            "The keyphrase should appear in the introduction paragraph.",
-            introduction.toLowerCase().includes(keyphrase.toLowerCase()),
-            introduction
+          "Keyphrase in Introduction",
+          keyphraseInIntro
+            ? "The focus keyphrase appears naturally in the first paragraph"
+            : "The focus keyphrase should appear in the first paragraph to establish topic relevance early",
+          keyphraseInIntro,
+          introContext
         );
-        
+              
         // 14. Keyphrase in H2 Headings Check
-        // subheadings already defined above
+        console.log("Analyzing H2 headings for keyphrase:", keyphrase);
+
+        // Get all H2 headings from the page
+        const h2Headings = scrapedData.headings.filter((h: { level: number; text: string }) => h.level === 2);
+
+        // Log all H2s found for debugging
+        console.log(`Found ${h2Headings.length} H2 headings:`);
+        h2Headings.forEach((h: { text: string }, idx: number) => {
+            console.log(`H2 #${idx + 1}: "${h.text}"`);
+        });
+
+        // Improved keyphrase in H2 detection
+        let keyphraseInH2 = false;
+        let matchedH2 = '';
+
+        if (h2Headings.length > 0) {
+            // Try different matching techniques for each H2
+            for (const heading of h2Headings) {
+                const normalizedHeading = heading.text.toLowerCase().trim();
+                const normalizedKeyphrase = keyphrase.toLowerCase().trim();
+                
+                // Try multiple matching strategies (similar to our introduction check)
+                const exactMatch = normalizedHeading.includes(normalizedKeyphrase);
+                
+                // Allow for singular/plural variations
+                const keyphraseWithS = normalizedKeyphrase.endsWith('s') ? 
+                    normalizedKeyphrase : `${normalizedKeyphrase}s`;
+                const keyphraseWithoutS = normalizedKeyphrase.endsWith('s') ? 
+                    normalizedKeyphrase.slice(0, -1) : normalizedKeyphrase;
+                
+                const pluralMatch = normalizedHeading.includes(keyphraseWithS);
+                const singularMatch = normalizedHeading.includes(keyphraseWithoutS);
+                
+                // Words in any order (for multi-word keyphrases)
+                const keyphraseWords = normalizedKeyphrase.split(/\s+/);
+                const allWordsIncluded = keyphraseWords.length > 1 && 
+                    keyphraseWords.every(word => normalizedHeading.includes(word));
+                
+                // Successful if any matching technique works
+                if (exactMatch || pluralMatch || singularMatch || allWordsIncluded) {
+                    keyphraseInH2 = true;
+                    matchedH2 = heading.text;
+                    console.log(`✅ Found keyphrase in H2 heading: "${heading.text}"`);
+                    
+                    // Log which matching technique worked
+                    if (exactMatch) console.log("- Matched by exact match");
+                    if (pluralMatch) console.log("- Matched by plural form");
+                    if (singularMatch) console.log("- Matched by singular form");
+                    if (allWordsIncluded) console.log("- Matched by all words included");
+                    
+                    break;
+                }
+            }
+        }
+
+        if (!keyphraseInH2) {
+            console.log("❌ Keyphrase not found in any H2 heading");
+        }
+
         await addCheck(
             "Keyphrase in H2 Headings",
-            "At least one H2 heading should contain the keyphrase.",
-            subheadings.some((h: { level: number; text: string }) => h.text.toLowerCase().includes(keyphrase.toLowerCase())),
-            subheadings.map((h: { level: number; text: string }) => h.text).join(', ')
+            "At least one H2 heading should contain the focus keyphrase.",
+            keyphraseInH2,
+            `H2 headings: ${h2Headings.map((h: { text: string }) => h.text).join(', ')}${keyphraseInH2 ? `\nMatched in: "${matchedH2}"` : ''}`
         );
 
         // 15. Heading Hierarchy Check

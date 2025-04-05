@@ -95,6 +95,60 @@ export async function analyzeSEO({
   }
 }
 
+export async function analyzePage(keyphrase: string, url: string) {
+  const apiUrl = getApiBaseUrl();
+  
+  // Get Webflow data if available
+  let webflowData = null;
+  if (window.webflow) {
+    try {
+      const allElements = await window.webflow.getAllElements();
+      const paragraphs = [];
+      
+      // Process elements to find paragraphs
+      for (const element of allElements) {
+        if (!element) continue;
+        
+        const isParagraph = element.tagName?.toLowerCase() === 'p' || 
+          (element.customAttributes?.some(attr => 
+            attr.name === 'data-element-type' && attr.value === 'paragraph'
+          ));
+
+        if (isParagraph && element.textContent) {
+          const text = element.textContent.trim();
+          if (text.length >= 30) {
+            paragraphs.push(text);
+          }
+        }
+      }
+      
+      webflowData = {
+        paragraphs
+      };
+    } catch (error) {
+      console.error('Error getting Webflow data:', error);
+    }
+  }
+  
+  const response = await fetch(`${apiUrl}/api/analyze`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      keyphrase,
+      url,
+      webflowData // Include Webflow data in the request
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error('API request failed');
+  }
+
+  return response.json();
+}
+
 export async function fetchOAuthToken(authCode: string): Promise<string> {
   const response = await fetch('/api/oauth/callback', {
     method: 'POST',
