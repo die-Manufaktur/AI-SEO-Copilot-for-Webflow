@@ -977,35 +977,134 @@ export async function analyzeSEOElements(url: string, keyphrase: string, env: an
         );
 
         // 8. Image Analysis
+        const imageCheckContext = { images: [] };
+        let imageAltTextValid = true;
+        let hasNextGenImages = false;
+        let allImagesOptimized = true;
+        const MAX_IMAGE_SIZE = 500 * 1024; // 500KB
+        const nextGenFormats = ['webp', 'avif'];
+
+        try {
+            // Use Webflow Designer API to get all assets
+            if (typeof webflow !== 'undefined') {
+                console.log("Using Webflow Designer API to analyze images");
+                const assets = await webflow.getAllAssets();
+                console.log(`Found ${assets.length} assets via Webflow Designer API`);
+                
+                // Process each asset to get more detailed information
+                for (const asset of assets) {
+                    if (!asset) continue;
+                    
+                    try {
+                        // Extract image data from the asset
+                        const imageData: { src: string; alt: string; size?: number; mimeType?: string } = {
+                            src: await asset.getUrl() || '',
+                            alt: await asset.getAltText() || ''
+                        };
+                        
+                        // Get mime type to determine format
+                        try {
+                            const mimeType = await asset.getMimeType();
+                            imageData.mimeType = mimeType;
+                            
+                            // Check if it's a next-gen format based on mime type
+                            if (mimeType && (
+                                mimeType.includes('webp') || 
+                                mimeType.includes('avif')
+                            )) {
+                                hasNextGenImages = true;
+                            }
+                        } catch (mimeError) {
+                            console.error("Error getting mime type:", mimeError);
+                            // Fallback: Check file extension
+                            const fileExt = imageData.src.split('.').pop()?.toLowerCase();
+                            if (fileExt && nextGenFormats.includes(fileExt)) {
+                                hasNextGenImages = true;
+                            }
+                        }
+                        
+                        // Get file size if available
+                        try {
+                            // Get file size by fetching the image
+                            const imageUrl = await asset.getUrl();
+                            if (imageUrl) {
+                                const response = await fetch(imageUrl, { method: 'HEAD' });
+                                if (response.ok) {
+                                    const contentLength = response.headers.get('content-length');
+                                    if (contentLength) {
+                                        imageData.size = parseInt(contentLength, 10);
+                                        
+                                        // Check if image exceeds maximum size
+                                        if (imageData.size > MAX_IMAGE_SIZE) {
+                                            allImagesOptimized = false;
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (sizeError) {
+                            console.error("Error getting file size:", sizeError);
+                        }
+                        
+                        // Check alt text
+                        if (!imageData.alt || imageData.alt.trim().length === 0) {
+                            imageAltTextValid = false;
+                        }
+                        
+                        // Add to context for reporting
+                        imageCheckContext.images.push(imageData);
+                    } catch (assetError) {
+                        console.error("Error processing asset:", assetError);
+                    }
+                }
+                
+                console.log(`Processed ${imageCheckContext.images.length} images via Webflow Designer API`);
+            } else {
+                // Fallback to scraped data if Webflow API is unavailable
+                console.log("Webflow Designer API not available, falling back to scraped data");
+                imageCheckContext.images = scrapedData.images;
+                imageAltTextValid = scrapedData.images.every((img: { alt: string }) => img.alt?.length > 0);
+                hasNextGenImages = scrapedData.images.some((img: { src: string }) => 
+                    nextGenFormats.some(format => img.src.toLowerCase().endsWith(`.${format}`))
+                );
+                allImagesOptimized = scrapedData.images.every((img: { size?: number }) => 
+                    !img.size || img.size <= MAX_IMAGE_SIZE
+                );
+            }
+        } catch (error) {
+            console.error("Error using Webflow Designer API for image analysis:", error);
+            // Fallback to scraped data on error
+            imageCheckContext.images = scrapedData.images;
+            imageAltTextValid = scrapedData.images.every((img: { alt: string }) => img.alt?.length > 0);
+            hasNextGenImages = scrapedData.images.some((img: { src: string }) => 
+                nextGenFormats.some(format => img.src.toLowerCase().endsWith(`.${format}`))
+            );
+            allImagesOptimized = scrapedData.images.every((img: { size?: number }) => 
+                !img.size || img.size <= MAX_IMAGE_SIZE
+            );
+        }
+
+        // Apply Image Alt Text Check
         await addCheck(
             "Image Alt Attributes",
             "Images should have descriptive alt text.",
-            scrapedData.images.every((img: { src: string; alt: string; size?: number }) => img.alt?.length > 0),
-            JSON.stringify(scrapedData.images)
+            imageAltTextValid,
+            JSON.stringify(imageCheckContext.images)
         );
 
-        // 8a. Next-Gen Image Formats Check
-        const nextGenFormats = ['webp', 'avif'];
-        const hasNextGenImages = scrapedData.images.some((img: { src: string }) => 
-            nextGenFormats.some(format => img.src.toLowerCase().endsWith(`.${format}`))
-        );
+        // Apply Next-Gen Image Formats Check
         await addCheck(
             "Next-Gen Image Formats",
             "Images should use modern formats like WebP or AVIF for better performance.",
             hasNextGenImages,
-            JSON.stringify(scrapedData.images.map((img: { src: string; alt: string; size?: number }) => ({ src: img.src })))
+            JSON.stringify(imageCheckContext.images.map((img: { src: string }) => ({ src: img.src })))
         );
 
-        // 8b. Image File Size Check
-        const MAX_IMAGE_SIZE = 500 * 1024; // 500KB
-        const allImagesOptimized = scrapedData.images.every((img: { size?: number }) => 
-            !img.size || img.size <= MAX_IMAGE_SIZE
-        );
+        // Apply Image File Size Check
         await addCheck(
             "Image File Size",
             "Images should be optimized and under 500KB for better page load times.",
             allImagesOptimized,
-            JSON.stringify(scrapedData.images.map((img: { src: string; alt: string; size?: number }) => ({ src: img.src, size: img.size })))
+            JSON.stringify(imageCheckContext.images.map((img: { src: string; size?: number }) => ({ src: img.src, size: img.size })))
         );
 
         // 9. Links Analysis
