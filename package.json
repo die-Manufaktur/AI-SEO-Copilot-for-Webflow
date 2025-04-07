@@ -45,7 +45,7 @@
     "vite": "^5.4.17",
     "vite-plugin-svgr": "^3.3.0",
     "vite-tsconfig-paths": "^4.3.2",
-    "wrangler": "^4.7.2"
+    "wrangler": "^4.8.0"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",
@@ -89,14 +89,14 @@
     "framer-motion": "^12.6.3",
     "input-otp": "^1.4.2",
     "net": "^1.0.2",
-    "openai": "^4.91.1",
+    "openai": "^4.92.0",
     "react": "^19.1.0",
-    "react-day-picker": "^9.6.4",
+    "react-day-picker": "^9.6.5",
     "react-dom": "^19.1.0",
     "react-resizable-panels": "^2.1.7",
     "sanitize-html": "^2.15.0",
     "styled-components": "^6.1.17",
-    "tailwind-merge": "^3.1.0",
+    "tailwind-merge": "^3.2.0",
     "vaul": "^1.1.2",
     "wouter": "^3.6.0",
     "zod": "^3.24.2"
