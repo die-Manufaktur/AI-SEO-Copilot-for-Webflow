@@ -91,7 +91,7 @@
     "net": "^1.0.2",
     "openai": "^4.91.1",
     "react": "^19.1.0",
-    "react-day-picker": "^9.6.4",
+    "react-day-picker": "^9.6.5",
     "react-dom": "^19.1.0",
     "react-resizable-panels": "^2.1.7",
     "sanitize-html": "^2.15.0",
