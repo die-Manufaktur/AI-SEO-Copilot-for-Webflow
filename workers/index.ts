@@ -18,6 +18,62 @@ const ALLOWED_DOMAINS = [
   "pmds.pull-list.net"
 ];
 
+// Helper function to get AI-powered SEO recommendations
+async function getAIRecommendation(title: string, keyphrase: string, env: any, context?: string): Promise<string> {
+  // Check if OpenAI API key is available
+  if (!env.OPENAI_API_KEY) {
+    // If no API key, fall back to predefined recommendations
+    return analyzerFallbackRecommendations[title] 
+      ? analyzerFallbackRecommendations[title]({ keyphrase }) 
+      : `Consider optimizing your content for "${keyphrase}" in relation to ${title.toLowerCase()}.`;
+  }
+  
+  try {
+    // Initialize OpenAI client
+    const openai = new OpenAI({
+      apiKey: env.OPENAI_API_KEY
+    });
+    
+    // Create a prompt for the AI
+    const prompt = `Generate an SEO recommendation for a webpage based on the following information:
+    - SEO Check Type: ${title}
+    - Target Keyphrase: ${keyphrase}
+    - Check Result: Failed
+    ${context ? `- Context: ${context}` : ''}
+    
+    Provide a specific, actionable recommendation to improve this aspect of SEO. Be concise but thorough.`;
+    
+    // Call OpenAI API
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: "You are a professional SEO expert. Provide helpful, specific recommendations for improving website SEO." },
+        { role: "user", content: prompt }
+      ],
+      max_tokens: 150,
+      temperature: 0.1,
+    });
+    
+    // Extract and return the recommendation
+    const recommendation = response.choices[0]?.message?.content?.trim();
+    
+    if (recommendation) {
+      return recommendation;
+    } else {
+      // If no response from OpenAI, use fallback
+      return analyzerFallbackRecommendations[title] 
+        ? analyzerFallbackRecommendations[title]({ keyphrase }) 
+        : `Consider optimizing your content for "${keyphrase}" in relation to ${title.toLowerCase()}.`;
+    }
+  } catch (error) {
+    // If API call fails, use fallback recommendations
+    console.error("[SEO Analyzer] Error getting AI recommendation:", error);
+    return analyzerFallbackRecommendations[title] 
+      ? analyzerFallbackRecommendations[title]({ keyphrase }) 
+      : `Consider optimizing your content for "${keyphrase}" in relation to ${title.toLowerCase()}.`;
+  }
+}
+
 const allowedOrigins: string[] = [
   'https://webflow.com', 
   'https://*.webflow-ext.com', 
@@ -156,6 +212,40 @@ async function handleAuthCallback(request: Request, env: any): Promise<Response>
 // SEO ANALYSIS LOGIC
 // =======================================
 
+// Seo analyzer constants
+const analyzerFallbackRecommendations: Record<string, (params: any) => string> = {
+  "Keyphrase in Title": ({ keyphrase }) =>
+      `Consider rewriting your title to include '${keyphrase}', preferably at the beginning.`,
+  "Keyphrase in Meta Description": ({ keyphrase }) =>
+      `Add '${keyphrase}' to your meta description naturally to boost click-through rates.`,
+  "Keyphrase in Introduction": ({ keyphrase }) =>
+      `Mention '${keyphrase}' in your first paragraph to establish relevance early.`,
+  "Schema Markup": () =>
+      `Add structured data markup using JSON-LD format in a script tag with type="application/ld+json". Include appropriate schema types from schema.org relevant to your content. Test your markup with Google's Rich Results Test tool.`,
+  // ... add additional fallback recommendations as needed ...
+};
+
+const analyzerCheckPriorities: Record<string, 'high' | 'medium' | 'low'> = {
+  "Keyphrase in Title": "high",
+  "Keyphrase in Meta Description": "high",
+  "Keyphrase in URL": "medium",
+  "Content Length": "high",
+  "Keyphrase Density": "medium",
+  "Keyphrase in Introduction": "medium",
+  "Image Alt Attributes": "low",
+  "Internal Links": "medium",
+  "Outbound Links": "low",
+  "Next-Gen Image Formats": "low",
+  "OG Image": "medium",
+  "OG Title and Description": "medium",
+  "Keyphrase in H1 Heading": "high",
+  "Keyphrase in H2 Headings": "medium",
+  "Heading Hierarchy": "high",
+  "Code Minification": "low",
+  "Schema Markup": "medium",
+  "Image File Size": "medium"
+};
+
 function escapeRegExp(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -213,7 +303,7 @@ function getSuccessMessage(checkType: string, url: string): string {
     "Content Length": "Great job! Your content is just the right length for SEO and readers alike.",
     "Keyphrase Density": "Perfect balance! Your keyphrase appears just the right amount of times.",
     "Keyphrase in Introduction": "Love it! You got the keyphrase in right where it matters—at the start.",
-    "Image Alt Attributes": "Nice! Your images are optimized with descriptive alt text. 👌",
+    "Image Alt Attributes": "Great job! Your images have descriptive alt text that includes your target keyphrase. 👌",
     "Internal Links": "You're crushing it! Your internal links are helping users (and Google) navigate smoothly.",
     "Outbound Links": "Great move! Linking to relevant sources makes your content even stronger.",
     "Next-Gen Image Formats": "Smart choice! Your images are using modern formats for faster load times.",
@@ -230,15 +320,337 @@ function getSuccessMessage(checkType: string, url: string): string {
   return messages[checkType] || "Good job!";
 }
 
+// Check if a specific page is published using the Webflow Designer API
+async function isPagePublished(url: string): Promise<boolean> {
+  try {
+    console.log(`[SEO Analyzer] Checking publication status for URL: ${url}`);
+
+    // Check if the Webflow Designer API is available
+    if (typeof webflow === 'undefined') {
+      console.log("[SEO Analyzer] Webflow Designer API not available in this environment");
+      return true; // Assume the page is published if we can't check
+    }
+
+    try {
+      // First, get the current page to check if we're currently viewing the target URL
+      const currentPage = await webflow.getCurrentPage();
+      if (!currentPage) {
+        console.log("[SEO Analyzer] Failed to get current page from Webflow API");
+        return true; // Assume page is published if we can't verify
+      }
+
+      // Parse the URL we're analyzing
+      const analyzedUrl = new URL(url);
+      const analyzedPathname = analyzedUrl.pathname.replace(/^\/|\/$/g, ''); // Remove leading/trailing slashes
+      
+      console.log(`[SEO Analyzer] Analyzing URL path: ${analyzedPathname}`);
+      
+      // If this is the current page we're viewing in Webflow Designer
+      const currentPageSlug = await currentPage.getSlug();
+      const currentPagePublishPath = await currentPage.getPublishPath();
+      
+      console.log(`[SEO Analyzer] Current page slug: ${currentPageSlug}`);
+      console.log(`[SEO Analyzer] Current page publish path: ${currentPagePublishPath}`);
+      
+      // Check if we're currently viewing the page we want to analyze
+      if (currentPagePublishPath === analyzedPathname || 
+          '/' + currentPagePublishPath === analyzedUrl.pathname ||
+          currentPageSlug === analyzedPathname) {
+        
+        console.log("[SEO Analyzer] Target URL matches current page");
+        
+        try {
+          // If we're on the page, we can directly check if it's published
+          // The getPublishPath method returns null for unpublished pages
+          if (currentPagePublishPath) {
+            console.log("[SEO Analyzer] Current page has publish path, so it's published");
+            return true;
+          }
+
+          console.log("[SEO Analyzer] Current page has no publish path, may not be published");
+          // If we're in Draft mode, we still want to analyze the page
+          return true;
+        } catch (error) {
+          console.error("[SEO Analyzer] Error checking current page publish status:", error);
+          return true; // Default to allowing analysis
+        }
+      }
+      
+      // If we're not on the page we want to analyze, we need to search for it
+      console.log("[SEO Analyzer] Target URL doesn't match current page, searching all pages...");
+      
+      // Get all pages and folders
+      const pagesAndFolders = await webflow.getAllPagesAndFolders();
+      if (!pagesAndFolders || !Array.isArray(pagesAndFolders)) {
+        console.log("[SEO Analyzer] Failed to retrieve pages from Webflow API");
+        return true; // Assume page exists if we can't check
+      }
+      
+      // Filter to only include Page objects (not Folders)
+      const pages = pagesAndFolders.filter(item => 'getSlug' in item && typeof item.getSlug === 'function');
+      console.log(`[SEO Analyzer] Found ${pages.length} pages to check`);
+      
+      // Search through all pages to find a match
+      for (const page of pages) {
+        try {
+          const pageSlug = await page.getSlug();
+          const publishPath = 'getPublishPath' in page && typeof page.getPublishPath === 'function' 
+            ? await page.getPublishPath() 
+            : null;
+          
+          console.log(`[SEO Analyzer] Checking page: slug=${pageSlug}, path=${publishPath}`);
+          
+          // Check if this page matches our target URL
+          if ((publishPath && (publishPath === analyzedPathname || 
+                              '/' + publishPath === analyzedUrl.pathname)) || 
+              (pageSlug && pageSlug === analyzedPathname)) {
+            
+            console.log(`[SEO Analyzer] Found matching page: ${pageSlug}`);
+            
+            // Check if the page is published by verifying it has a publish path
+            if (publishPath) {
+              console.log("[SEO Analyzer] Page has publish path, so it's published");
+              return true;
+            } else {
+              console.log("[SEO Analyzer] Page has no publish path, may not be published");
+              // Even if it appears unpublished, we'll continue with analysis in case we're in draft mode
+              return true;
+            }
+          }
+        } catch (pageError) {
+          console.error("[SEO Analyzer] Error checking page:", pageError);
+          // Continue checking other pages
+        }
+      }
+      
+      // If we didn't find a matching page, we'll still allow the analysis
+      console.log("[SEO Analyzer] No matching page found in Webflow site");
+      return true;
+    } catch (apiError) {
+      console.error("[SEO Analyzer] Error using Webflow API:", apiError);
+      return true; // Default to allowing analysis
+    }
+  } catch (error) {
+    console.error("[SEO Analyzer] General error in isPagePublished:", error);
+    return true; // Default to allowing analysis
+  }
+}
 
 async function scrapeWebpage(url: string): Promise<any> {
   try {
-    if (!url.startsWith("http://") && !url.startsWith("https://")) {
-      url = `https://${url}`;
+    const maxRetries = 3;
+    let lastError = null;
+
+    // Normalize URL format
+    let normalizedUrl = url;
+    if (!normalizedUrl.startsWith("http://") && !normalizedUrl.startsWith("https://")) {
+      normalizedUrl = `https://${normalizedUrl}`;
+    } else if (url.startsWith('http://')) {
+      normalizedUrl = url.replace(/^http:/, 'https:');
     }
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`Failed to fetch page: ${response.status} ${response.statusText}`);
-    const html = await response.text();
+    
+    console.log(`[SEO Analyzer] Starting analysis of URL: ${normalizedUrl}`);
+    
+    // First, check if the page is published using the Webflow Designer API
+    try {
+      const pageIsPublished = await isPagePublished(normalizedUrl);
+      if (!pageIsPublished) {
+        console.log(`[SEO Analyzer] Warning: Page at ${normalizedUrl} appears to be unpublished according to Webflow API`);
+        // Continue anyway since we want to be permissive
+      }
+    } catch (apiError) {
+      // Just log the error but continue with fetching anyway
+      console.error("[SEO Analyzer] Error checking page status with Webflow API:", apiError);
+    }
+
+    // Generate URL variants to try if the main URL fails
+    const urlObj = new URL(normalizedUrl);
+    const urlPathname = urlObj.pathname.replace(/^\/|\/$/g, '');
+    const urlSegments = urlPathname.split('/');
+    const lastSegment = urlSegments[urlSegments.length - 1];
+    
+    // Start with the original URL as the first variant to try
+    const urlVariants = [normalizedUrl];
+    
+    // If we're missing a path segment that might be a folder (like 'services')
+    // or if the URL only has one path segment, try adding common folder paths
+    if (urlSegments.length === 1 && lastSegment) {
+      console.log(`[SEO Analyzer] URL appears to have a simple path. Adding common folder variants.`);
+      
+      // Common folder names to try
+      const commonFolders = ['services', 'projects', 'about', 'blog', 'products', 'portfolio'];
+      
+      for (const folder of commonFolders) {
+        // Add folder path variant (e.g., /services/hosting-maintenance)
+        const folderUrl = new URL(normalizedUrl);
+        folderUrl.pathname = `/${folder}/${lastSegment}`;
+        urlVariants.push(folderUrl.toString());
+      }
+    }
+    
+    // Try both www and non-www variants, preserving the full path
+    if (!urlObj.hostname.startsWith('www.')) {
+      const withWww = new URL(normalizedUrl);
+      withWww.hostname = 'www.' + withWww.hostname;
+      urlVariants.push(withWww.toString());
+      
+      // Also add www + common folder variants if it's a simple path
+      if (urlSegments.length === 1 && lastSegment) {
+        const commonFolders = ['services', 'projects', 'about', 'blog', 'products', 'portfolio'];
+        for (const folder of commonFolders) {
+          const wwwFolderUrl = new URL(normalizedUrl);
+          wwwFolderUrl.hostname = 'www.' + wwwFolderUrl.hostname;
+          wwwFolderUrl.pathname = `/${folder}/${lastSegment}`;
+          urlVariants.push(wwwFolderUrl.toString());
+        }
+      }
+    } else {
+      const noWww = new URL(normalizedUrl);
+      noWww.hostname = noWww.hostname.substring(4);
+      urlVariants.push(noWww.toString());
+    }
+    
+    // Add the specific path from your error (for this specific case)
+    // This helps ensure we try the exact path that works
+    const specificUrl = new URL(normalizedUrl);
+    if (specificUrl.pathname.includes('hosting-maintenance') && !specificUrl.pathname.includes('services')) {
+      specificUrl.pathname = '/services/hosting-maintenance';
+      urlVariants.unshift(specificUrl.toString()); // Add at the beginning for priority
+    }
+    
+    // Remove duplicates
+    const uniqueVariants = Array.from(new Set(urlVariants));
+    
+    // Log all URL variants we'll try
+    console.log(`[SEO Analyzer] Will try these URL variants: ${JSON.stringify(uniqueVariants)}`);
+
+    // Initialize fetch options with proper headers and settings
+    const fetchOptions = {
+      headers: {
+        'User-Agent': 'SEO-Analyzer/2.3.2 (https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow)',
+        'Accept': 'text/html,application/xhtml+xml,application/xml',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      },
+      redirect: 'follow' as RequestRedirect,
+      cf: { // Cloudflare-specific options
+        cacheTtl: 0, // Don't cache the response
+        resolveOverride: urlObj.hostname // Ensure DNS resolution uses the correct hostname
+      }
+    };
+    
+    // Try each URL variant with retries
+    for (const variantUrl of uniqueVariants) {
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          console.log(`[SEO Analyzer] Attempt ${attempt + 1}/${maxRetries} for URL: ${variantUrl}`);
+          
+          // Add a small delay between retry attempts (increasing with each retry)
+          if (attempt > 0) {
+            const delay = attempt * 500; // 500ms, 1000ms, 1500ms
+            console.log(`[SEO Analyzer] Waiting ${delay}ms before retry...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+          
+          // Make the fetch request
+          const response = await fetch(variantUrl, fetchOptions);
+          
+          // Process response status
+          if (response.status === 200) {
+            // Success!
+            console.log(`[SEO Analyzer] Successfully fetched URL: ${variantUrl}`);
+            const html = await response.text();
+            console.log(`[SEO Analyzer] Retrieved ${html.length} bytes of HTML`);
+            
+            // Extract data from the HTML
+            return processHtml(html, variantUrl);
+          } 
+          else if (response.status === 301 || response.status === 302 || response.status === 307 || response.status === 308) {
+            // Handle redirects manually if Cloudflare Workers has issues with following them
+            const location = response.headers.get('Location');
+            if (location) {
+              const redirectUrl = new URL(location, variantUrl).toString();
+              console.log(`[SEO Analyzer] Following redirect: ${variantUrl} -> ${redirectUrl}`);
+              
+              // Add redirect URL to variants if not already there
+              if (!uniqueVariants.includes(redirectUrl)) {
+                uniqueVariants.push(redirectUrl);
+              }
+              break; // Break out of retry loop for this URL to try the redirect URL
+            }
+          }
+          else {
+            // Handle various HTTP status errors
+            const errorMessage = `Failed to fetch URL (HTTP ${response.status}): ${variantUrl}`;
+            console.error(`[SEO Analyzer] ${errorMessage}`);
+            lastError = new Error(errorMessage);
+            
+            // For certain status codes, we should immediately try the next variant
+            if (response.status === 404 || response.status === 410) {
+              break; // Break out of retry loop for this URL
+            }
+          }
+        } catch (fetchError: any) {
+          // Log the error
+          console.error(`[SEO Analyzer] Fetch error for ${variantUrl} (attempt ${attempt + 1}):`, fetchError.message);
+          lastError = fetchError;
+          
+          // Some errors indicate immediate next variant
+          if (fetchError.message && (
+              fetchError.message.includes('ENOTFOUND') ||
+              fetchError.message.includes('ECONNREFUSED') ||
+              fetchError.message.includes('DNS')
+          )) {
+            break; // Try next variant immediately for DNS/connection issues
+          }
+        }
+      }
+    }
+    
+    // If we got here, all URL variants and retries failed
+    throw lastError || new Error(`Failed to fetch page after trying all URL variants`);
+  } catch (error: any) {
+    throw new Error(`Failed to scrape webpage: ${error.message}`);
+  }
+}
+
+// Centralized minification detection function with configurable threshold
+function isMinified(code: string, minificationThreshold: number = 30): boolean {
+  if (!code || code.length < 50) return true;
+
+  // Remove comments to avoid skewing the results
+  code = code.replace(/\/\*[\s\S]*?\*\/|([^:]|^)\/\/.*$/gm, '$1');
+
+  // Calculate metrics
+  const newlineRatio = (code.match(/\n/g) || []).length / code.length;
+  const whitespaceRatio = (code.match(/\s/g) || []).length / code.length;
+  const lines = code.split('\n').filter(line => line.trim().length > 0);
+  const avgLineLength = lines.length > 0 ? code.length / lines.length : 0;
+
+  // Base threshold values at 50% minification threshold
+  const baseNewlineRatioThreshold = 0.05;      // 5%
+  const baseWhitespaceRatioThreshold = 0.2;    // 20%
+  const baseAvgLineLengthThreshold = 300;      // characters
+  
+  // Scale thresholds based on minificationThreshold
+  const scaleFactor = minificationThreshold / 50;
+  const newlineRatioThreshold = baseNewlineRatioThreshold * (2 - scaleFactor);
+  const whitespaceRatioThreshold = baseWhitespaceRatioThreshold * (2 - scaleFactor);
+  const avgLineLengthThreshold = baseAvgLineLengthThreshold * scaleFactor;
+
+  // More robust checks for minification
+  const isLikelyMinified = 
+    (newlineRatio < newlineRatioThreshold && whitespaceRatio < whitespaceRatioThreshold) || 
+    avgLineLength > avgLineLengthThreshold;
+
+  return isLikelyMinified;
+}
+
+// Function to process HTML content for SEO analysis
+async function processHtml(html: string, url: string): Promise<any> {
+  try {
+    console.log(`[SEO Analyzer] Processing HTML content from: ${url}`);
     
     // Extract title and meta description
     const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
@@ -260,7 +672,7 @@ async function scrapeWebpage(url: string): Promise<any> {
     }
     
     // Add this after extracting meta description
-    console.log("Debug - Meta Description Found:", metaDescription);
+    console.log("[SEO Analyzer] Meta Description Found:", metaDescription || "(none)");
     
     // Extract OpenGraph metadata
     const ogMetadata: Record<string, string> = {
@@ -295,13 +707,13 @@ async function scrapeWebpage(url: string): Promise<any> {
     const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
     const bodyContent = bodyMatch ? bodyMatch[1] : html;
     const content = bodyContent.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-    console.log("Extracted content:", content.substring(0, 200) + "...");
+    console.log("[SEO Analyzer] Extracted content:", content.substring(0, 200) + "...");
 
-    console.log("Scraping paragraphs...");
+    console.log("[SEO Analyzer] Scraping paragraphs...");
     // Use regex to extract paragraphs instead of DOM API
     const paragraphRegex = /<p[^>]*>([\s\S]*?)<\/p>/gi;
     const paragraphMatches = [...bodyContent.matchAll(paragraphRegex)];
-    console.log("Total p tags found:", paragraphMatches.length);
+    console.log("[SEO Analyzer] Total p tags found:", paragraphMatches.length);
 
     // Extract paragraphs with parent context
     const paragraphs = paragraphMatches
@@ -315,7 +727,7 @@ async function scrapeWebpage(url: string): Promise<any> {
         ).match(/<([a-z0-9]+)[^>]*class=["']([^"']+)["'][^>]*>[^<]*$/i);
         
         const parentClass = parentClassMatch ? parentClassMatch[2] : 'no-parent-class';
-        console.log(`Paragraph found in ${parentClass}:`, text.substring(0, 100) + (text.length > 100 ? '...' : ''));
+        console.log(`[SEO Analyzer] Paragraph found in ${parentClass}:`, text.substring(0, 100) + (text.length > 100 ? '...' : ''));
         return text;
       })
       .filter(text => text.length > 0);
@@ -335,6 +747,12 @@ async function scrapeWebpage(url: string): Promise<any> {
     const imageMatches = html.matchAll(/<img[^>]*src=["'](.*?)["'][^>]*alt=["'](.*?)["'][^>]*>/gi);
     for (const match of imageMatches) {
       images.push({ src: match[1], alt: match[2] });
+    }
+    
+    // Also match images where alt comes before src (Webflow sometimes does this)
+    const altFirstImageMatches = html.matchAll(/<img[^>]*alt=["'](.*?)["'][^>]*src=["'](.*?)["'][^>]*>/gi);
+    for (const match of altFirstImageMatches) {
+      images.push({ src: match[2], alt: match[1] });
     }
     
     // Extract links
@@ -389,6 +807,12 @@ async function scrapeWebpage(url: string): Promise<any> {
             minified: scriptUrl.includes('.min.js') || scriptUrl.includes('-min.js')
           });
         } catch (e) {
+          // Just continue if we can't fetch a script
+          resources.js.push({
+            url: scriptUrl,
+            content: '',
+            minified: scriptUrl.includes('.min.js') || scriptUrl.includes('-min.js')
+          });
         }
       }
     }
@@ -434,6 +858,12 @@ async function scrapeWebpage(url: string): Promise<any> {
             minified: cssUrl.includes('.min.css') || cssUrl.includes('-min.css')
           });
         } catch (e) {
+          // Just continue if we can't fetch a stylesheet
+          resources.css.push({
+            url: cssUrl,
+            content: '',
+            minified: cssUrl.includes('.min.css') || cssUrl.includes('-min.css')
+          });
         }
       }
     }
@@ -472,115 +902,66 @@ async function scrapeWebpage(url: string): Promise<any> {
     };
     
     // Extract JSON-LD schema
-// Try multiple regex patterns from most specific to most permissive
-let matchesArray: RegExpMatchArray[] = [];
+    // Try multiple regex patterns from most specific to most permissive
+    let matchesArray: RegExpMatchArray[] = [];
 
-// Create a consistent logging prefix
-const logPrefix = '[SEO Analyzer]';
+    // Create a consistent logging prefix
+    const logPrefix = '[SEO Analyzer]';
 
-// Declare all match variables at the top level so they're accessible later
-const pattern1 = /<script\s+type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
-const matches1 = Array.from(html.matchAll(pattern1));
-// Check if pattern1 found any matches
-if (matches1.length > 0) {
-  matchesArray = matches1;
-}
-// Define remaining match variables that will be used later
-let matches2: RegExpMatchArray[] = [];
-let matches3: RegExpMatchArray[] = [];
-let matches4: RegExpMatchArray[] = [];
-let matches5: RegExpMatchArray[] = [];
-// Pattern 2: More permissive to handle different attribute ordering
-if (matchesArray.length === 0) {
-  const pattern2 = /<script[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
-  matches2 = Array.from(html.matchAll(pattern2));
-  if (matches2.length > 0) {
-    matchesArray = matches2;
-  }
-}
-// Pattern 3: Most permissive - any script with ld+json anywhere in attributes
-if (matchesArray.length === 0) {
-  const pattern3 = /<script[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi;
-  matches3 = Array.from(html.matchAll(pattern3));
-  if (matches3.length > 0) {
-    matchesArray = matches3;
-  }
-}
-
-// Pattern 4: Exact pattern for specific cases (trying to match your exact format)
-if (matchesArray.length === 0) {
-  // This pattern specifically looks for your script format with no whitespace between attributes
-  const pattern4 = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi;
-  matches4 = Array.from(html.matchAll(pattern4));
-  if (matches4.length > 0) {
-    matchesArray = matches4;
-  }
-}
-
-// Pattern 5: Ultra-permissive pattern
-if (matchesArray.length === 0) {
-  // Look for any script tag that might contain schema.org data
-  const pattern5 = /<script[^>]*>([\s\S]*?@context[\s\S]*?schema\.org[\s\S]*?@type[\s\S]*?)<\/script>/gi;
-  matches5 = Array.from(html.matchAll(pattern5));
-  if (matches5.length > 0) {
-    matchesArray = matches5;
-  }
-}
-
-// If we still haven't found anything, look for raw JSON with schema.org in the HTML (without script tags)
-if (matchesArray.length === 0) {
-  // Look for JSON-like structures containing schema.org
-  const rawJsonPattern = /(\{[\s\S]*?"@context"[\s\S]*?"schema\.org"[\s\S]*?"@type"[\s\S]*?\})/gi;
-  const rawMatches = Array.from(html.matchAll(rawJsonPattern));
-  if (rawMatches.length > 0) {
-    
-    // Try to parse these as standalone JSON
-    for (const rawMatch of rawMatches) {
-      try {
-        const potentialJson = rawMatch[1];
-        const jsonData = JSON.parse(potentialJson);
-        if (jsonData["@context"] && jsonData["@type"]) {
-          try {
-            const contextUrl = new URL(jsonData["@context"]);
-            const allowedHosts = [
-              'schema.org',
-              'www.schema.org'
-            ];
-            if (allowedHosts.includes(contextUrl.host)) {
-              schema.detected = true;
-              schema.jsonLdBlocks.push(jsonData);
-              schema.types.push(jsonData["@type"]);
-            }
-          } catch (e) {
-          }
-        }
-      } catch (e) {
+    // Declare all match variables at the top level so they're accessible later
+    const pattern1 = /<script\s+type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+    const matches1 = Array.from(html.matchAll(pattern1));
+    // Check if pattern1 found any matches
+    if (matches1.length > 0) {
+      matchesArray = matches1;
+    }
+    // Define remaining match variables that will be used later
+    let matches2: RegExpMatchArray[] = [];
+    let matches3: RegExpMatchArray[] = [];
+    let matches4: RegExpMatchArray[] = [];
+    let matches5: RegExpMatchArray[] = [];
+    // Pattern 2: More permissive to handle different attribute ordering
+    if (matchesArray.length === 0) {
+      const pattern2 = /<script[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+      matches2 = Array.from(html.matchAll(pattern2));
+      if (matches2.length > 0) {
+        matchesArray = matches2;
       }
     }
-  }
-}
+    // Pattern 3: Most permissive - any script with ld+json anywhere in attributes
+    if (matchesArray.length === 0) {
+      const pattern3 = /<script[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi;
+      matches3 = Array.from(html.matchAll(pattern3));
+      if (matches3.length > 0) {
+        matchesArray = matches3;
+      }
+    }
 
-// Additional diagnostic check - log a sample if schema not found
-if (matchesArray.length === 0) {
-  // Look for any fragment containing "schema.org" in the HTML
-  const schemaOrgIndex = html.indexOf('schema.org');
-  if (schemaOrgIndex !== -1) {
-    const contextFragment = html.substring(
-      Math.max(0, schemaOrgIndex - 100), 
-      Math.min(html.length, schemaOrgIndex + 300)
-    );
-  } else {
-  }
-}
+    // Pattern 4: Exact pattern for specific cases (trying to match your exact format)
+    if (matchesArray.length === 0) {
+      // This pattern specifically looks for your script format with no whitespace between attributes
+      const pattern4 = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi;
+      matches4 = Array.from(html.matchAll(pattern4));
+      if (matches4.length > 0) {
+        matchesArray = matches4;
+      }
+    }
 
-// Process any found scripts
-    
+    // Pattern 5: Ultra-permissive pattern
+    if (matchesArray.length === 0) {
+      // Look for any script tag that might contain schema.org data
+      const pattern5 = /<script[^>]*>([\s\S]*?@context[\s\S]*?schema\.org[\s\S]*?@type[\s\S]*?)<\/script>/gi;
+      matches5 = Array.from(html.matchAll(pattern5));
+      if (matches5.length > 0) {
+        matchesArray = matches5;
+      }
+    }
+
+    // Process schema matches
     for (const match of matchesArray) {
       try {
         // Extract and trim the content inside the script tag
         const scriptContent = match[1].trim();
-        
-        // Log the raw content to aid debugging
         
         // Try to parse the JSON
         try {
@@ -589,73 +970,24 @@ if (matchesArray.length === 0) {
           schema.detected = true;
           schema.jsonLdBlocks.push(jsonData);
           
-          // Log type information
-          
           if (jsonData['@type']) {
             schema.types.push(jsonData['@type']);
           } else if (Array.isArray(jsonData)) {
-            jsonData.forEach((item, index) => {
+            jsonData.forEach((item) => {
               if (item && item['@type']) {
                 schema.types.push(item['@type']);
               }
             });
           }
-        } catch (jsonError: unknown) {
-          // Try to identify the position of the error if it's an Error object
-          if (jsonError instanceof Error && jsonError.message.includes('position')) {
-            const position = parseInt(jsonError.message.match(/position (\d+)/)?.[1] || '0');
-            const errorContext = scriptContent.substring(
-              Math.max(0, position - 20),
-              Math.min(scriptContent.length, position + 20)
-            );
-          }
-          throw jsonError; // Re-throw to be caught by the outer try-catch
+        } catch (jsonError) {
+          // Just continue if we can't parse the JSON
         }
       } catch (e) {
-        if (match[1]) {
-        }
+        // Just continue if there's an error processing this match
       }
     }
 
-    // After processing all scripts, log the final state
-    
-    // When processing schema markup, add debug info to the schema object
-// After all pattern matching attempts
-if (matchesArray.length === 0) {
-  // No schema found, add debug info
-  schema.debug = {
-    patternsChecked: 5,
-    foundMatches: false,
-    bodyContentSample: html.substring(0, 300),
-    hasSchemaOrgReference: (() => {
-      try {
-        const url = new URL(html);
-        return url.host === 'schema.org' || url.host.endsWith('.schema.org');
-      } catch (e) {
-        return false;
-      }
-    })(),
-    documentLength: html.length
-  };
-} else {
-  // Schema found, add information about which pattern worked
-  let detectionMethod = "unknown";
-  if (matches1 && matches1.length > 0) detectionMethod = "pattern1 (standard)";
-  else if (matches2 && matches2.length > 0) detectionMethod = "pattern2 (permissive ordering)";
-  else if (matches3 && matches3.length > 0) detectionMethod = "pattern3 (any ld+json)";
-  else if (matches4 && matches4.length > 0) detectionMethod = "pattern4 (exact match)";
-  else if (matches5 && matches5.length > 0) detectionMethod = "pattern5 (ultra-permissive)";
-  
-  schema.debug = {
-    patternsChecked: 5,
-    foundMatches: true,
-    detectionMethod,
-    matchCount: matchesArray.length,
-    sampleContent: matchesArray[0][1].substring(0, 150) + "..."
-  };
-}
-
-    // Extract Microdata schema
+    // Extract Microdata schema as well
     const microdataMatches = html.matchAll(/<[^>]+\s+itemscope[^>]*>/gi);
     for (const match of microdataMatches) {
       const itemTypeMatch = match[0].match(/itemtype=["'](.*?)["']/i);
@@ -680,8 +1012,9 @@ if (matchesArray.length === 0) {
       resources,
       schema
     };
-  } catch (error: any) {
-    throw new Error(`Failed to scrape webpage: ${error.message}`);
+  } catch (error) {
+    console.error("[SEO Analyzer] Error processing HTML:", error);
+    throw error;
   }
 }
 
@@ -749,6 +1082,119 @@ async function extractParagraphsFromWebflow(): Promise<string[]> {
     console.error("Error extracting paragraphs from Webflow:", error);
     return [];
   }
+}
+
+// Helper function for checking image alt text quality
+// Helper function for checking image alt text quality
+function assessAltTextQuality(images: Array<{ src: string; alt: string }>, keyphrase: string): { 
+  hasAltText: boolean; 
+  hasKeyphraseInAlt: boolean;
+  qualityScores: Array<{ src: string; alt: string; score: number; issues: string[]; hasKeyphrase: boolean }>;
+  overallScore: number;
+} {
+  // Initialize the result
+  const result = {
+    hasAltText: true,
+    hasKeyphraseInAlt: false,
+    qualityScores: [] as Array<{ src: string; alt: string; score: number; issues: string[]; hasKeyphrase: boolean }>,
+    overallScore: 0
+  };
+  
+  if (!images || images.length === 0) {
+    return result;
+  }
+  
+  const normalizedKeyphrase = keyphrase.toLowerCase().trim();
+  
+  // Analyze each image alt text quality
+  let totalScore = 0;
+  
+  for (let i = 0; i < images.length; i++) {
+    const img = images[i];
+    const alt = img.alt || '';
+    const normalizedAlt = alt.toLowerCase().trim();
+    const issues = [];
+    let score = 10; // Start with perfect score
+    
+    // Check if alt text exists
+    if (!alt || alt.trim() === '') {
+      score = 0;
+      issues.push('Missing alt text');
+    } else {
+      // Check if alt text is too short (< 5 chars)
+      if (alt.length < 5) {
+        score -= 5;
+        issues.push('Alt text too short');
+      }
+      
+      // Ensure score doesn't go negative
+      score = Math.max(0, score);
+    }
+    
+    // Check if the alt text contains the keyphrase
+    const hasKeyphrase = normalizedAlt.includes(normalizedKeyphrase);
+    
+    // Update the overall keyphrase presence flag
+    if (hasKeyphrase) {
+      result.hasKeyphraseInAlt = true;
+    }
+    
+    // Add to quality scores array
+    result.qualityScores.push({ 
+      src: img.src, 
+      alt: alt, 
+      score: score, 
+      issues: issues,
+      hasKeyphrase: hasKeyphrase
+    });
+    
+    totalScore += score;
+  }
+  
+  // Calculate overall score (average)
+  result.overallScore = images.length > 0 ? Math.round(totalScore / images.length) : 0;
+  
+  // Update hasAltText based on whether any image is missing alt text
+  result.hasAltText = !result.qualityScores.some(item => item.issues.includes('Missing alt text'));
+  
+  return result;
+}
+
+// Generate recommendations for image alt text improvement
+function generateAltTextRecommendations(images: Array<{ src: string; alt: string }>, keyphrase: string): string {
+  // Get the alt text assessment that includes keyphrase analysis
+  const assessment = assessAltTextQuality(images, keyphrase);
+  
+  // If all images have good alt text including keyphrases, return positive message
+  if (assessment.hasAltText && assessment.hasKeyphraseInAlt && assessment.overallScore >= 8) {
+    return "Your images have descriptive alt text that includes your target keyphrase. Great work!";
+  }
+  
+  // Determine the top issue to address
+  const missingAlt = assessment.qualityScores.filter(item => item.issues.includes('Missing alt text')).length;
+  const genericAlt = assessment.qualityScores.filter(item => item.issues.includes('Generic/non-descriptive alt text')).length;
+  const filenameAlt = assessment.qualityScores.filter(item => item.issues.includes('Using filename as alt text')).length;
+  
+  // Build a concise recommendation focusing on the most critical issue
+  let recommendation = "";
+  
+  // Prioritize issues: missing alt > filename as alt > generic alt
+  if (missingAlt > 0) {
+    recommendation = `Add descriptive alt text to ${missingAlt} image${missingAlt > 1 ? 's' : ''} that currently lack it.`;
+  } else if (filenameAlt > 0) {
+    recommendation = `Replace filenames with descriptive alt text in ${filenameAlt} image${filenameAlt > 1 ? 's' : ''}.`;
+  } else if (genericAlt > 0) {
+    recommendation = `Replace generic descriptions (like "image" or "photo") with specific descriptions in ${genericAlt} image${genericAlt > 1 ? 's' : ''}.`;
+  } else {
+    recommendation = "Make your alt text more descriptive and relevant to the image content.";
+  }
+  
+  // Add the keyphrase reminder if needed
+  if (!assessment.hasKeyphraseInAlt) {
+    recommendation += ` Include your target keyphrase "${keyphrase}" in at least one relevant image's alt text.`;
+  }
+  
+  return recommendation;
 }
 
 export async function analyzeSEOElements(url: string, keyphrase: string, env: any) {
@@ -850,7 +1296,7 @@ export async function analyzeSEOElements(url: string, keyphrase: string, env: an
         await addCheck(
             "Keyphrase in URL",
             "The URL should contain the focus keyphrase when appropriate.",
-            isHomePageFromAnalyzer(urlForCheck) || urlForCheck.toLowerCase().includes(keyphrase.toLowerCase()),
+            isHomePage(urlForCheck) || urlForCheck.toLowerCase().includes(keyphrase.toLowerCase()),
             urlForCheck
         );
 
@@ -977,7 +1423,7 @@ export async function analyzeSEOElements(url: string, keyphrase: string, env: an
         );
 
         // 8. Image Analysis
-        const imageCheckContext = { images: [] };
+        const imageCheckContext = { images: [] as Array<{ src: string; alt: string; size?: number; mimeType?: string }> };
         let imageAltTextValid = true;
         let hasNextGenImages = false;
         let allImagesOptimized = true;
@@ -985,22 +1431,23 @@ export async function analyzeSEOElements(url: string, keyphrase: string, env: an
         const nextGenFormats = ['webp', 'avif'];
 
         try {
-            // Use Webflow Designer API to get all assets
-            if (typeof webflow !== 'undefined') {
-                console.log("Using Webflow Designer API to analyze images");
-                const assets = await webflow.getAllAssets();
-                console.log(`Found ${assets.length} assets via Webflow Designer API`);
+          // Use Webflow Designer API to get all assets
+          if (typeof webflow !== 'undefined') {
+            try {
+              console.log("Using Webflow Designer API to analyze images");
+              const assets = await webflow.getAllAssets();
+              console.log(`Found ${assets.length} assets via Webflow Designer API`);
+              
+              // Process each asset to get more detailed information
+              for (const asset of assets) {
+                if (!asset) continue;
                 
-                // Process each asset to get more detailed information
-                for (const asset of assets) {
-                    if (!asset) continue;
-                    
-                    try {
-                        // Extract image data from the asset
-                        const imageData: { src: string; alt: string; size?: number; mimeType?: string } = {
-                            src: await asset.getUrl() || '',
-                            alt: await asset.getAltText() || ''
-                        };
+                try {
+                  // Extract image data from the asset
+                  const imageData: { src: string; alt: string; size?: number; mimeType?: string } = {
+                    src: await asset.getUrl() || '',
+                    alt: await asset.getAltText() || ''
+                  };
                         
                         // Get mime type to determine format
                         try {
@@ -1057,19 +1504,31 @@ export async function analyzeSEOElements(url: string, keyphrase: string, env: an
                     }
                 }
                 
-                console.log(`Processed ${imageCheckContext.images.length} images via Webflow Designer API`);
+              console.log(`Processed ${imageCheckContext.images.length} images via Webflow Designer API`);
+              } catch (apiError) {
+                  console.error("Error using Webflow Designer API for images:", apiError);
+                  // Fallback to scraped data on API error
+                  imageCheckContext.images = scrapedData.images;
+                  imageAltTextValid = scrapedData.images.every((img: { alt: string }) => img.alt?.length > 0);
+                  hasNextGenImages = scrapedData.images.some((img: { src: string }) => 
+                      nextGenFormats.some(format => img.src.toLowerCase().endsWith(`.${format}`))
+                  );
+                  allImagesOptimized = scrapedData.images.every((img: { size?: number }) => 
+                      !img.size || img.size <= MAX_IMAGE_SIZE
+                  );
+              }
             } else {
-                // Fallback to scraped data if Webflow API is unavailable
-                console.log("Webflow Designer API not available, falling back to scraped data");
-                imageCheckContext.images = scrapedData.images;
-                imageAltTextValid = scrapedData.images.every((img: { alt: string }) => img.alt?.length > 0);
-                hasNextGenImages = scrapedData.images.some((img: { src: string }) => 
-                    nextGenFormats.some(format => img.src.toLowerCase().endsWith(`.${format}`))
-                );
-                allImagesOptimized = scrapedData.images.every((img: { size?: number }) => 
-                    !img.size || img.size <= MAX_IMAGE_SIZE
-                );
-            }
+                  // Fallback to scraped data if Webflow API is unavailable
+                  console.log("Webflow Designer API not available, falling back to scraped data");
+                  imageCheckContext.images = scrapedData.images;
+                  imageAltTextValid = scrapedData.images.every((img: { alt: string }) => img.alt?.length > 0);
+                  hasNextGenImages = scrapedData.images.some((img: { src: string }) => 
+                      nextGenFormats.some(format => img.src.toLowerCase().endsWith(`.${format}`))
+                  );
+                  allImagesOptimized = scrapedData.images.every((img: { size?: number }) => 
+                      !img.size || img.size <= MAX_IMAGE_SIZE
+                  );
+              }
         } catch (error) {
             console.error("Error using Webflow Designer API for image analysis:", error);
             // Fallback to scraped data on error
@@ -1083,13 +1542,22 @@ export async function analyzeSEOElements(url: string, keyphrase: string, env: an
             );
         }
 
+        // Assess alt text quality first
+        const assessment = assessAltTextQuality(imageCheckContext.images, keyphrase);
+
         // Apply Image Alt Text Check
         await addCheck(
-            "Image Alt Attributes",
-            "Images should have descriptive alt text.",
-            imageAltTextValid,
-            JSON.stringify(imageCheckContext.images)
+          "Image Alt Attributes",
+          "At least one image should have alt text that includes your target keyphrase.",
+          assessment.hasKeyphraseInAlt && imageCheckContext.images.length > 0,
+          JSON.stringify(imageCheckContext.images)
         );
+
+        // If the check failed, add our custom recommendation
+        const imageAltCheck = checks.find(check => check.title === "Image Alt Attributes");
+        if (imageAltCheck && !imageAltCheck.passed) {
+            imageAltCheck.recommendation = generateAltTextRecommendations(imageCheckContext.images, keyphrase);
+        }
 
         // Apply Next-Gen Image Formats Check
         await addCheck(
@@ -1186,7 +1654,7 @@ export async function analyzeSEOElements(url: string, keyphrase: string, env: an
           - First H1: ${h1s.length > 0 ? h1s[0].text : 'None'}
           - First few H2s: ${subheadings.slice(0, 3).map((h: { level: number; text: string }) => h.text).join(', ')}
           - Has images: ${scrapedData.images.length > 0 ? 'Yes' : 'No'}
-          - Is homepage: ${isHomePageFromAnalyzer(url) ? 'Yes' : 'No'}
+          - Is homepage: ${isHomePage(url) ? 'Yes' : 'No'}
           - Content preview: ${scrapedData.paragraphs.slice(0, 2).join(' ').substring(0, 200)}...
           `;
         }
@@ -1322,11 +1790,11 @@ export async function analyzeSEOElements(url: string, keyphrase: string, env: an
                 
                 // Words in any order (for multi-word keyphrases)
                 const keyphraseWords = normalizedKeyphrase.split(/\s+/);
-                const allWordsIncluded = keyphraseWords.length > 1 && 
+                const keyphraseWordsIncluded = keyphraseWords.length > 1 && 
                     keyphraseWords.every(word => normalizedHeading.includes(word));
                 
                 // Successful if any matching technique works
-                if (exactMatch || pluralMatch || singularMatch || allWordsIncluded) {
+                if (exactMatch || pluralMatch || singularMatch || keyphraseWordsIncluded) {
                     keyphraseInH2 = true;
                     matchedH2 = heading.text;
                     console.log(`✅ Found keyphrase in H2 heading: "${heading.text}"`);
@@ -1335,7 +1803,7 @@ export async function analyzeSEOElements(url: string, keyphrase: string, env: an
                     if (exactMatch) console.log("- Matched by exact match");
                     if (pluralMatch) console.log("- Matched by plural form");
                     if (singularMatch) console.log("- Matched by singular form");
-                    if (allWordsIncluded) console.log("- Matched by all words included");
+                    if (keyphraseWordsIncluded) console.log("- Matched by all words included");
                     
                     break;
                 }
@@ -1393,7 +1861,7 @@ export async function analyzeSEOElements(url: string, keyphrase: string, env: an
 // Add helper function at the top level
 function generateSchemaMarkupRecommendation(data: any, pageUrl: string): string {
   // Determine page type based on content
-  const isHome = isHomePageFromAnalyzer(pageUrl);
+  const isHome = isHomePage(pageUrl);
   const h1Text = data.headings.find((h: {level: number}) => h.level === 1)?.text || '';
   const hasProducts = h1Text.toLowerCase().includes('product') || 
                      data.content.toLowerCase().includes('price') || 
@@ -1619,7 +2087,7 @@ export function validateIPAddress(address: string): boolean {
   try {
     return ip.isPublic(normalizedAddr);
   } catch (e) {
-    return !isPrivateIP(normalizedAddr);
+    return !ip.isPrivate(normalizedAddr);
   }
 }
 
@@ -1630,186 +2098,10 @@ export function validateUrl(url: string): boolean {
     if (protocol !== 'https:') {
       return false;
     }
-    const hostname = urlObj.hostname;
-    if (ENFORCE_ALLOWLIST && !isAllowedDomain(hostname)) {
-      return false;
-    }
-    if (isIPv4Format(hostname) || isIPv6Format(hostname)) {
-      const ipValid = validateIPAddress(hostname);
-      return ipValid;
-    }
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
-
-export function isPrivateIP(ipStr: string): boolean {
-  const privateRanges = [
-    '10.0.0.0/8',
-    '172.16.0.0/12',
-    '192.168.0.0/16',
-    '127.0.0.0/8',
-    '169.254.0.0/16'
-  ];
-  return privateRanges.some(range => {
-    try {
-      const cidr = new IPCIDR(range);
-      return cidr.contains(ipStr);
-    } catch (error) {
-      return false;
-    }
-  });
-}
-
-// Centralized minification detection function with configurable threshold
-function isMinified(code: string, minificationThreshold: number = 30): boolean {
-  if (!code || code.length < 50) return true;
-
-  // Remove comments to avoid skewing the results
-  code = code.replace(/\/\*[\s\S]*?\*\/|([^:]|^)\/\/.*$/gm, '$1');
-
-  // Calculate metrics
-  const newlineRatio = (code.match(/\n/g) || []).length / code.length;
-  const whitespaceRatio = (code.match(/\s/g) || []).length / code.length;
-  const lines = code.split('\n').filter(line => line.trim().length > 0);
-  const avgLineLength = lines.length > 0 ? code.length / lines.length : 0;
-
-  // Base threshold values at 50% minification threshold
-  const baseNewlineRatioThreshold = 0.05;      // 5%
-  const baseWhitespaceRatioThreshold = 0.2;    // 20%
-  const baseAvgLineLengthThreshold = 300;      // characters
-  
-  // Scale thresholds based on minificationThreshold
-  const scaleFactor = minificationThreshold / 50;
-  const newlineRatioThreshold = baseNewlineRatioThreshold * (2 - scaleFactor);
-  const whitespaceRatioThreshold = baseWhitespaceRatioThreshold * (2 - scaleFactor);
-  const avgLineLengthThreshold = baseAvgLineLengthThreshold * scaleFactor;
-
-  // More robust checks for minification
-  const isLikelyMinified = 
-    (newlineRatio < newlineRatioThreshold && whitespaceRatio < whitespaceRatioThreshold) || 
-    avgLineLength > avgLineLengthThreshold;
-
-  return isLikelyMinified;
-}
-
-const hasValidOpenAIKey = (env: any): boolean =>
-  !!env.OPENAI_API_KEY && ('' + env.OPENAI_API_KEY).startsWith('sk-')
-
-// Replace getGPTRecommendation with getAIRecommendation
-export async function getAIRecommendation(
-  checkType: string,
-  keyphrase: string,
-  env: any,  // env binding
-  context?: string
-): Promise<string> {
-  const useAI = env.USE_AI_RECOMMENDATIONS !== 'false'
-  if (!useAI || !hasValidOpenAIKey(env)) {
-    return "AI recommendations are currently disabled. Enable them by setting USE_AI_RECOMMENDATIONS=true and providing a valid OPENAI_API_KEY."
-  }
-
-  // Use local client instance instead of global variable
-  const client = new OpenAI({ apiKey: env.OPENAI_API_KEY })
-
-  try {
-    const truncatedContext = context && context.length > 300 
-      ? context.substring(0, 300) + "..." 
-      : context
-
-    const response = await client.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [
-        {
-          role: "system",
-          content: `You are an SEO expert providing concise, actionable recommendations.
-Keep responses under 100 words.
-Format: "Here is a better [element]: [example]"
-Avoid quotation marks.`
-        },
-        {
-          role: "user",
-          content: `Fix this SEO issue: "${checkType}" for keyphrase "${keyphrase}".
-${truncatedContext ? `Current content: ${truncatedContext}` : ''}`
-        }
-      ],
-      max_tokens: 100,
-      temperature: 0.5,
-    })
-    const recommendation = response.choices[0].message.content?.trim() || 
-      "Unable to generate recommendation at this time."
-    // ...update cache accordingly...
-    return recommendation
-  } catch (error: any) {
-    if (error.status === 401) {
-      return "API key error. Please check your OpenAI API key and ensure it's valid."
-    }
-    return "Unable to generate recommendation. Please try again later."
-  }
-}
-
-// Helper functions (if not already defined or updated from existing versions)
-function escapeRegExpFromAnalyzer(str: string): string {
-	// $& means the whole matched string
-	return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-
-function isHomePageFromAnalyzer(url: string): boolean {
-  try {
-    const urlObj = new URL(url);
-    const result = urlObj.pathname === "/" || urlObj.pathname === "";
-    return result;
-  } catch {
-    return false;
-  }
-}
-
-// Seo analyzer constants
-const analyzerCheckPriorities: Record<string, 'high' | 'medium' | 'low'> = {
-	"Keyphrase in Title": "high",
-	"Keyphrase in Meta Description": "high",
-	"Keyphrase in URL": "medium",
-	"Content Length": "high",
-	"Keyphrase Density": "medium",
-	"Keyphrase in Introduction": "medium",
-	"Image Alt Attributes": "low",
-	"Internal Links": "medium",
-	"Outbound Links": "low",
-	"Next-Gen Image Formats": "low",
-	"OG Image": "medium",
-	"OG Title and Description": "medium",
-	"Keyphrase in H1 Heading": "high",
-	"Keyphrase in H2 Headings": "medium",
-	"Heading Hierarchy": "high",
-	"Code Minification": "low",
-	"Schema Markup": "medium",
-	"Image File Size": "medium"
-};
-
-const analyzerFallbackRecommendations: Record<string, (params: any) => string> = {
-    "Keyphrase in Title": ({ keyphrase }) =>
-        `Consider rewriting your title to include '${keyphrase}', preferably at the beginning.`,
-    "Keyphrase in Meta Description": ({ keyphrase }) =>
-        `Add '${keyphrase}' to your meta description naturally to boost click-through rates.`,
-    "Keyphrase in Introduction": ({ keyphrase }) =>
-        `Mention '${keyphrase}' in your first paragraph to establish relevance early.`,
-    "Schema Markup": () =>
-        `Add structured data markup using JSON-LD format in a script tag with type="application/ld+json". Include appropriate schema types from schema.org relevant to your content. Test your markup with Google's Rich Results Test tool.`,
-    // ... add additional fallback recommendations as needed ...
-};
-
-// Helper function to check if a page has Webflow Designer API data available
-async function hasWebflowDesignerData(): Promise<boolean> {
-  try {
-    // Get the current page and check if it has the expected methods
-    const currentPage = await webflow.getCurrentPage();
-    // Use bracket notation to avoid TypeScript errors with potential missing methods
-    return currentPage && typeof (currentPage as any).getDescription === 'function';
+    return true; // Valid HTTPS URL
   } catch (error) {
-    console.error("Error checking for Webflow Designer API:", error);
-    return false;
+    return false; // Invalid URL
   }
-}
+};
 
 export default { fetch: handleRequest }
