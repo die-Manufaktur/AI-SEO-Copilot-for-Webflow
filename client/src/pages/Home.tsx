@@ -109,10 +109,10 @@ const getPriorityText = (priority: string) => {
 // Group checks by category
 const groupChecksByCategory = (checks: SEOCheck[]) => {
   const categories = {
-    "Meta SEO": ["Keyphrase in Title", "Keyphrase in Meta Description", "Keyphrase in URL", "Open Graph Title and Description"],
+    "Meta SEO": ["Keyphrase in Title", "Keyphrase in Meta Description", "Keyphrase in URL", "OG Title and Description"],
     "Content Optimisation": ["Content Length", "Keyphrase Density", "Keyphrase in Introduction", "Keyphrase in H1 Heading", "Keyphrase in H2 Headings", "Heading Hierarchy"],
     "Links": ["Internal Links", "Outbound Links"],
-    "Images and Assets": ["Image Alt Attributes", "Next-Gen Image Formats", "OpenGraph Image", "Image File Size"],
+    "Images and Assets": ["Image Alt Attributes", "Next-Gen Image Formats", "OG Image", "Image File Size"],
     "Technical SEO": ["Code Minification", "Schema Markup"]
   };
 
@@ -387,13 +387,6 @@ export default function Home() {
         spread: 100,
         origin: { y: 0.6 }
       });
-
-      // Remove toast notification - keep only the UI message
-      // toast({
-      //   title: "You are an absolute SEO legend!, well done!",
-      //   description: "Feel free to take a screenshot and brag about it on Linkedin. We might have a special something for you in return.",
-      //   duration: 10000, // Show this message longer
-      // });
 
       // Mark as shown so we don't show it again
       setShowedPerfectScoreMessage(true);

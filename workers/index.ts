@@ -45,7 +45,7 @@ async function getAIRecommendation(title: string, keyphrase: string, env: any, c
     
     // Call OpenAI API
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-3.5-turbo",
       messages: [
         { role: "system", content: "You are a professional SEO expert. Provide helpful, specific recommendations for improving website SEO." },
         { role: "user", content: prompt }
@@ -81,6 +81,8 @@ const allowedOrigins: string[] = [
   'http://localhost:1337',  // For local development
   'http://localhost:5173'   // For Vite development server
 ];
+
+export {}; // Ensure this file is treated as a module
 
 // Create a pattern to test domains against
 const createDomainPattern = (domain: string): RegExp => {
@@ -671,7 +673,6 @@ async function processHtml(html: string, url: string): Promise<any> {
       }
     }
     
-    // Add this after extracting meta description
     console.log("[SEO Analyzer] Meta Description Found:", metaDescription || "(none)");
     
     // Extract OpenGraph metadata
@@ -682,27 +683,50 @@ async function processHtml(html: string, url: string): Promise<any> {
       imageWidth: "",
       imageHeight: ""
     };
-    
-    // Extract OG title
-    const ogTitleMatch = html.match(/<meta\s+property=["']og:title["'][^>]*content=["'](.*?)["']/i);
+
+    // Extract OG title - Fix the regex to properly match the content
+    const ogTitleMatch = html.match(/<meta\s+property=["']og:title["']\s+content=["']([^"']+)["']\s*\/?>/i) || 
+                         html.match(/<meta\s+content=["']([^"']+)["']\s+property=["']og:title["']\s*\/?>/i);
     if (ogTitleMatch) ogMetadata.title = ogTitleMatch[1].trim();
-    
-    // Extract OG description
-    const ogDescMatch = html.match(/<meta\s+property=["']og:description["'][^>]*content=["'](.*?)["']/i);
+
+    // Extract OG description - Improved regex pattern
+    const ogDescMatch = html.match(/<meta\s+property=["']og:description["']\s+content=["']([^"']+)["']\s*\/?>/i) ||
+                        html.match(/<meta\s+content=["']([^"']+)["']\s+property=["']og:description["']\s*\/?>/i);
     if (ogDescMatch) ogMetadata.description = ogDescMatch[1].trim();
-    
-    // Extract OG image
-    const ogImageMatch = html.match(/<meta\s+property=["']og:image["'][^>]*content=["'](.*?)["']/i);
+
+    // Extract OG image - Improved regex pattern
+    const ogImageMatch = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']\s*\/?>/i) ||
+                         html.match(/<meta\s+content=["']([^"']+)["']\s+property=["']og:image["']\s*\/?>/i);
     if (ogImageMatch) ogMetadata.image = ogImageMatch[1].trim();
-    
-    // Extract OG image dimensions
-    const ogImageWidthMatch = html.match(/<meta\s+property=["']og:image:width["'][^>]*content=["'](.*?)["']/i);
+
+    // Extract OG image dimensions - Improved regex patterns
+    const ogImageWidthMatch = html.match(/<meta\s+property=["']og:image:width["']\s+content=["']([^"']+)["']\s*\/?>/i) ||
+                              html.match(/<meta\s+content=["']([^"']+)["']\s+property=["']og:image:width["']\s*\/?>/i);
     if (ogImageWidthMatch) ogMetadata.imageWidth = ogImageWidthMatch[1].trim();
-    
-    const ogImageHeightMatch = html.match(/<meta\s+property=["']og:image:height["'][^>]*content=["'](.*?)["']/i);
+
+    const ogImageHeightMatch = html.match(/<meta\s+property=["']og:image:height["']\s+content=["']([^"']+)["']\s*\/?>/i) ||
+                               html.match(/<meta\s+content=["']([^"']+)["']\s+property=["']og:image:height["']\s*\/?>/i);
     if (ogImageHeightMatch) ogMetadata.imageHeight = ogImageHeightMatch[1].trim();
+
+    // Try more flexible matching if the strict patterns didn't match
+    if (!ogTitleMatch) {
+      const flexMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["'][^>]*>/i) ||
+                        html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:title["'][^>]*>/i);
+      if (flexMatch) ogMetadata.title = flexMatch[1].trim();
+    }
+
+    if (!ogDescMatch) {
+      const flexMatch = html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["'][^>]*>/i) ||
+                       html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:description["'][^>]*>/i);
+      if (flexMatch) ogMetadata.description = flexMatch[1].trim();
+    }
+
+    if (!ogImageMatch) {
+      const flexMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["'][^>]*>/i) ||
+                       html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["'][^>]*>/i);
+      if (flexMatch) ogMetadata.image = flexMatch[1].trim();
+    }
     
-    // Replace browser DOM-dependent code with regex-based parsing
     // Extract body content
     const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
     const bodyContent = bodyMatch ? bodyMatch[1] : html;
@@ -1359,67 +1383,28 @@ export async function analyzeSEOElements(url: string, keyphrase: string, env: an
 
         // 7. OpenGraph Tags - Use API data if available
         console.log("=== OpenGraph Title and Description Check - DEBUG ===");
-        
-        // Get OpenGraph title from all possible sources
-        const hasOgTitleDirect = Boolean(apiData.ogTitle);
-        const hasOgTitleFromPageTitle = Boolean(apiData.usesPageTitleAsOgTitle && apiData.title);
-        const hasOgTitleFromScraping = Boolean(scrapedData.ogMetadata.title);
-        
-        // Get OpenGraph description from all possible sources
-        const hasOgDescriptionDirect = Boolean(apiData.ogDescription);
-        const hasOgDescriptionFromMetaDesc = Boolean(apiData.usesDescriptionAsOgDescription && apiData.metaDescription);
-        const hasOgDescriptionFromScraping = Boolean(scrapedData.ogMetadata.description);
-        
-        // Overall availability checks
-        const hasOgTitle = hasOgTitleDirect || hasOgTitleFromPageTitle || hasOgTitleFromScraping;
-        const hasOgDescription = hasOgDescriptionDirect || hasOgDescriptionFromMetaDesc || hasOgDescriptionFromScraping;
-        
-        // Simplified check - either have direct OG meta tags or have fallbacks
-        const titleCheckPasses = hasOgTitleDirect || hasOgTitleFromScraping || apiData.usesPageTitleAsOgTitle;
-        const descriptionCheckPasses = hasOgDescriptionDirect || hasOgDescriptionFromScraping || apiData.usesDescriptionAsOgDescription;
-        
-        // The overall check passes if both title and description are available
-        const ogCheckPassed = titleCheckPasses && descriptionCheckPasses;
-        
-        // Debug logging - detailed info for each data point
-        console.log("[SEO Analyzer] OG Title Sources:");
-        console.log("- Direct OG Title:", apiData.ogTitle || "(empty)");
-        console.log("- Uses Page Title as OG:", apiData.usesPageTitleAsOgTitle);
-        console.log("- Page Title:", apiData.title || "(empty)");
-        console.log("- Scraped OG Title:", scrapedData.ogMetadata.title || "(empty)");
-        
-        console.log("[SEO Analyzer] OG Description Sources:");
-        console.log("- Direct OG Description:", apiData.ogDescription || "(empty)");
-        console.log("- Uses Description as OG:", apiData.usesDescriptionAsOgDescription);
-        console.log("- Meta Description:", apiData.metaDescription || "(empty)");
-        console.log("- Scraped OG Description:", scrapedData.ogMetadata.description || "(empty)");
-        
-        console.log("[SEO Analyzer] Title Check Results:");
-        console.log("- Has OG Title Direct:", hasOgTitleDirect);
-        console.log("- Has OG Title From Page Title:", hasOgTitleFromPageTitle);
-        console.log("- Has OG Title From Scraping:", hasOgTitleFromScraping);
-        console.log("- Title Check Passes:", titleCheckPasses);
-        
-        console.log("[SEO Analyzer] Description Check Results:");
-        console.log("- Has OG Description Direct:", hasOgDescriptionDirect);
-        console.log("- Has OG Description From Meta Desc:", hasOgDescriptionFromMetaDesc);
-        console.log("- Has OG Description From Scraping:", hasOgDescriptionFromScraping);
-        console.log("- Description Check Passes:", descriptionCheckPasses);
-        
-        console.log("[SEO Analyzer] FINAL RESULT:", ogCheckPassed ? "PASSED ✅" : "FAILED ❌");
-        
+        const hasOGTitle = Boolean(scrapedData.ogMetadata.title);
+        const hasOGDescription = Boolean(scrapedData.ogMetadata.description);
+        const ogTitleLength = scrapedData.ogMetadata.title.length;
+        const ogDescLength = scrapedData.ogMetadata.description.length;
+      
+        const ogCheckPassed = hasOGTitle && hasOGDescription &&
+          ogTitleLength >= 10 && ogTitleLength <= 70 &&
+          ogDescLength >= 100 && ogDescLength <= 200;
+
         await addCheck(
-            "Open Graph Title and Description",
-            "OpenGraph meta tags should be present and optimized.",
+            "OG Title and Description",
+            ogCheckPassed
+                ? "Open Graph title and description are properly set with optimal lengths"
+                : "Open Graph title and/or description need optimization",
             ogCheckPassed,
             JSON.stringify({
-                title: hasOgTitle ? (apiData.ogTitle || apiData.title || scrapedData.ogMetadata.title) : "(missing)",
-                description: hasOgDescription ? (apiData.ogDescription || apiData.metaDescription || scrapedData.ogMetadata.description) : "(missing)",
+                title: apiData.ogTitle || scrapedData.ogMetadata.title || "(using page title)",
+                description: apiData.ogDescription || scrapedData.ogMetadata.description || "(using meta description)",
                 usesPageTitleAsOgTitle: apiData.usesPageTitleAsOgTitle,
-                usesDescriptionAsOgDescription: apiData.usesDescriptionAsOgDescription,
-                titleCheckPasses,
-                descriptionCheckPasses
-            }, null, 2)
+                usesDescriptionAsOgDescription: apiData.usesDescriptionAsOgDescription
+            }),
+            true  // Changed from false to true to skip the AI recommendation
         );
 
         // 8. Image Analysis
@@ -1833,12 +1818,25 @@ export async function analyzeSEOElements(url: string, keyphrase: string, env: an
 
         // 16. OpenGraph Image Check - Use API data if available
         const hasOgImage = apiData.ogImage || scrapedData.ogMetadata.image;
+        const validOGImageSize = Boolean(
+          scrapedData.ogMetadata.imageWidth &&
+          scrapedData.ogMetadata.imageHeight &&
+          parseInt(scrapedData.ogMetadata.imageWidth) >= 1200 &&
+          parseInt(scrapedData.ogMetadata.imageHeight) >= 630
+        );
+        const currentSize = hasOgImage ?
+          `Current image size: ${scrapedData.ogMetadata.imageWidth || 'unknown'}x${scrapedData.ogMetadata.imageHeight || 'unknown'}px.` :
+          'No OG image found.';
         
         await addCheck(
-            "OpenGraph Image",
-            "The page should have an OpenGraph image.",
-            Boolean(hasOgImage),
-            hasOgImage || "No OpenGraph image found",
+            "OG Image",
+            hasOgImage
+              ? (validOGImageSize
+                ? `Open Graph image is present with recommended dimensions (1200x630 or larger). ${currentSize}`
+                : `Open Graph image is present. ${currentSize} Recommended size is at least 1200x630px for optimal social sharing.`)
+              : `Open Graph image is missing. ${currentSize} Add an OG image with dimensions of at least 1200x630px.`,
+            hasOgImage, // Changed to only check for image presence
+            `Current Open Graph image: ${scrapedData.ogMetadata.image || 'none'}. ${currentSize}`,
             true
         );
 
@@ -1849,9 +1847,17 @@ export async function analyzeSEOElements(url: string, keyphrase: string, env: an
             passedChecks, 
             failedChecks, 
             url, 
-            score, 
+            score,
+            // Ensure ogData is always defined with default values if needed
+            ogData: {
+                title: scrapedData.ogMetadata?.title || '',
+                description: scrapedData.ogMetadata?.description || '',
+                image: scrapedData.ogMetadata?.image || '',
+                imageWidth: scrapedData.ogMetadata?.imageWidth || '',
+                imageHeight: scrapedData.ogMetadata?.imageHeight || ''
+            },
             timestamp: new Date().toISOString(),
-            apiDataUsed: Object.keys(apiData).length > 0  // Flag indicating if API data was used
+            apiDataUsed: Object.keys(apiData).length > 0
         };
     } catch (error: any) {
         throw error;
