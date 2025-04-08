@@ -649,6 +649,57 @@ function isMinified(code: string, minificationThreshold: number = 30): boolean {
   return isLikelyMinified;
 }
 
+// Function to detect schema markup in HTML content
+function detectSchemaMarkup(html: string): { 
+  hasSchema: boolean;
+  schemaTypes: string[];
+  schemaCount: number;
+} {
+  // Look for JSON-LD script tags
+  const schemaRegex = /<script\s+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  const matches = [...html.matchAll(schemaRegex)];
+  
+  const result = {
+    hasSchema: false,
+    schemaTypes: [] as string[],
+    schemaCount: 0
+  };
+  
+  // Process each schema found
+  matches.forEach(match => {
+    try {
+      const jsonContent = match[1]?.trim();
+      if (jsonContent) {
+        const schemaData = JSON.parse(jsonContent);
+        result.hasSchema = true;
+        result.schemaCount++;
+        
+        // Extract schema type(s)
+        const extractType = (obj: any): string | null => {
+          if (obj && typeof obj === 'object') {
+            if (obj['@type']) {
+              return obj['@type'];
+            } else if (obj['@graph'] && Array.isArray(obj['@graph'])) {
+              return obj['@graph'].map((item: any) => item['@type']).filter(Boolean).join(', ');
+            }
+          }
+          return null;
+        };
+        
+        const schemaType = extractType(schemaData);
+        if (schemaType && !result.schemaTypes.includes(schemaType)) {
+          result.schemaTypes.push(schemaType);
+        }
+      }
+    } catch (error) {
+      // Invalid JSON in schema markup
+      console.error("Error parsing schema markup:", error);
+    }
+  });
+  
+  return result;
+}
+
 // Function to process HTML content for SEO analysis
 async function processHtml(html: string, url: string): Promise<any> {
   try {
@@ -1021,7 +1072,10 @@ async function processHtml(html: string, url: string): Promise<any> {
         schema.microdataTypes.push(...types);
       }
     }
-    
+
+    // Add schema markup detection
+    const schemaMarkup = detectSchemaMarkup(html);
+
     return {
       title,
       metaDescription,
@@ -1034,7 +1088,8 @@ async function processHtml(html: string, url: string): Promise<any> {
       url,
       ogMetadata,
       resources,
-      schema
+      schema,
+      schemaMarkup
     };
   } catch (error) {
     console.error("[SEO Analyzer] Error processing HTML:", error);
@@ -1617,12 +1672,9 @@ export async function analyzeSEOElements(url: string, keyphrase: string, env: an
             true
         );
 
-        // 12. Schema Markup Check
+        // 12. Add schema markup check
         const hasSchemaMarkup = scrapedData.schema.detected;
         const schemaTypesDetected = scrapedData.schema.types;
-        
-        // Define subheadings here so it can be used in schema context
-        const subheadings = scrapedData.headings.filter((h: { level: number; text: string }) => h.level === 2);
 
         // Create context for recommendation
         let schemaContext = "";
@@ -1630,18 +1682,37 @@ export async function analyzeSEOElements(url: string, keyphrase: string, env: an
           schemaContext = `Schema markup found on page. Types detected: ${schemaTypesDetected.join(', ') || 'Unknown'}`;
         } else {
           // Create detailed context to help generate a relevant recommendation
+          const h1Tags = scrapedData.headings.filter((h: { level: number; text: string }) => h.level === 1);
+          const h2Tags = scrapedData.headings.filter((h: { level: number; text: string }) => h.level === 2);
           schemaContext = `
           No schema markup detected on page.
-          Page title: ${pageTitle}
-          Meta description: ${metaDescription}
+          Page title: ${scrapedData.title}
+          Meta description: ${scrapedData.metaDescription}
           URL: ${url}
           Content type indicators:
-          - First H1: ${h1s.length > 0 ? h1s[0].text : 'None'}
-          - First few H2s: ${subheadings.slice(0, 3).map((h: { level: number; text: string }) => h.text).join(', ')}
+          - First H1: ${h1Tags.length > 0 ? h1Tags[0].text : 'None'}
+          - First few H2s: ${h2Tags.slice(0, 3).map((h: { level: number; text: string }) => h.text).join(', ')}
           - Has images: ${scrapedData.images.length > 0 ? 'Yes' : 'No'}
           - Is homepage: ${isHomePage(url) ? 'Yes' : 'No'}
           - Content preview: ${scrapedData.paragraphs.slice(0, 2).join(' ').substring(0, 200)}...
           `;
+        }
+
+        // For schema markup, always use our custom recommendation instead of GPT
+        let schemaRecommendation = "";
+        if (hasSchemaMarkup) {
+          schemaRecommendation = `Your page has schema markup implemented. The following schema types were detected:\n\n`;
+          if (schemaTypesDetected.length > 0) {
+            schemaTypesDetected.forEach((type: string, index: number) => {
+              schemaRecommendation += `${index + 1}. **${type}** - This helps search engines understand that your content represents a ${type.toLowerCase()}\n`;
+            });
+            schemaRecommendation += `\nYou can further optimize your schema markup by ensuring all required properties are included for each type.`;
+          } else {
+            schemaRecommendation += `Schema markup was detected but the specific type couldn't be determined. Consider using more specific schema types from schema.org.`;
+          }
+        } else {
+          // Use our custom recommendation generator instead of GPT
+          schemaRecommendation = generateSchemaMarkupRecommendation(scrapedData, url);
         }
 
         await addCheck(
@@ -1654,10 +1725,10 @@ export async function analyzeSEOElements(url: string, keyphrase: string, env: an
           true // Skip GPT recommendation as we're using our custom one
         );
 
-        // If the check failed, add our custom recommendation
+        // If the check failed, add our custom recommendation with specific image information
         const schemaCheck = checks.find(check => check.title === "Schema Markup");
         if (schemaCheck) {
-          schemaCheck.recommendation = generateSchemaMarkupRecommendation(scrapedData, url);
+          schemaCheck.recommendation = schemaRecommendation;
         }
 
         // 13. Keyphrase in Introduction Check
