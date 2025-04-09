@@ -7,7 +7,50 @@ import { Page } from 'openai/pagination.mjs';
 
 export {}; // Ensure this file is treated as a module
 
-
+// Add utility function for extracting full text content from HTML elements with nested children
+/**
+ * Extracts the complete text content from HTML elements, including text within nested elements
+ * @param html The HTML string to extract text from
+ * @param tagPattern The regex pattern to match the desired tag (e.g., h1, p, etc.)
+ * @returns An array of extracted text strings
+ */
+function extractFullTextContent(html: string, tagPattern: RegExp): string[] {
+  const results: string[] = [];
+  let match;
+  
+  // Find all instances of the pattern in HTML
+  while ((match = tagPattern.exec(html)) !== null) {
+    if (match[1]) {
+      // Extract the content between opening and closing tags
+      const fullTagContent = match[1];
+      
+      // Improved debugging - log the raw content found
+      console.log(`[SEO Analyzer] Found tag content: ${fullTagContent.substring(0, 50)}${fullTagContent.length > 50 ? '...' : ''}`);
+      
+      // Strip HTML tags but preserve the text content
+      // This approach handles nested elements by removing tags but keeping their text
+      const textContent = fullTagContent
+        .replace(/<[^>]+>/g, ' ')  // Replace tags with spaces
+        .replace(/\s+/g, ' ')      // Replace multiple spaces with single space
+        .trim();
+      
+      // Additional debugging for the extracted text
+      console.log(`[SEO Analyzer] Extracted text: "${textContent}"`);
+      
+      if (textContent) {
+        results.push(textContent);
+      }
+    }
+  }
+  
+  // Add debug log for all extracted results
+  console.log(`[SEO Analyzer] Total extracted items: ${results.length}`);
+  if (results.length > 0) {
+    console.log(`[SEO Analyzer] First extracted item: "${results[0]}"`);
+  }
+  
+  return results;
+}
 
 // ===== Constants =====
 const ALLOWED_DOMAINS = [
@@ -807,14 +850,19 @@ async function processHtml(html: string, url: string): Promise<any> {
       })
       .filter(text => text.length > 0);
     
-    // Extract headings
+    // Extract headings - UPDATED to properly handle nested elements with spans
     const headings: Array<{ level: number; text: string }> = [];
     for (let i = 1; i <= 6; i++) {
-      const headingMatches = html.matchAll(new RegExp(`<h${i}[^>]*>(.*?)</h${i}>`, 'gi'));
-      for (const match of headingMatches) {
-        const text = match[1].replace(/<[^>]+>/g, ' ').trim();
-        if (text) headings.push({ level: i, text });
-      }
+      // Create pattern that captures the full content between opening and closing tags
+      const headingPattern = new RegExp(`<h${i}[^>]*>(.*?)<\\/h${i}>`, 'gi');
+      
+      // Extract full text content including nested elements using our utility function
+      const headingTexts = extractFullTextContent(html, headingPattern);
+      
+      // Add all found headings to the list
+      headingTexts.forEach(text => {
+        headings.push({ level: i, text });
+      });
     }
     
     // Extract images with sizes
@@ -1406,33 +1454,38 @@ export async function analyzeSEOElements(url: string, keyphrase: string, env: an
         const h1s = scrapedData.headings.filter((h: { level: number; text: string }) => h.level === 1);
         
         // Enhanced H1 check to verify keyphrase presence and ensure single H1 per page
-        const hasKeyphraseInH1 = h1s.some((h: { level: number; text: string }) => h.text.toLowerCase().includes(keyphrase.toLowerCase()));
-        const hasSingleH1 = h1s.length === 1;
+        const h1Check = {
+            title: "Keyphrase in H1 Heading",
+            description: "The H1 heading should contain the focus keyphrase.",
+            passed: false
+        };
         
-        // Pass the check only if there is exactly one H1 and it contains the keyphrase
-        const h1CheckPassed = hasSingleH1 && hasKeyphraseInH1;
-        
-        // Create a more detailed context for the recommendation
-        const h1Context = JSON.stringify({
-            h1Count: h1s.length,
-            h1Texts: h1s.map((h: { level: number; text: string }) => h.text),
-            hasSingleH1: hasSingleH1,
-            hasKeyphraseInH1: hasKeyphraseInH1
+        // Specific debug for H1 headings
+        console.log(`[SEO Analyzer] Found ${h1s.length} H1 headings`);
+        h1s.forEach((h: { text: string }, i: number) => {
+            console.log(`[SEO Analyzer] H1 #${i + 1}: "${h.text}"`);
         });
         
-        // Determine the appropriate description based on the scenario
-        let h1Description = "The page should have exactly one H1 heading containing the focus keyphrase.";
+        // Check if any H1 contains the keyphrase (case-insensitive)
+        const normalizedKeyphrase = keyphrase.toLowerCase();
+        const h1ContainsKeyphrase = h1s.some((h: { text: string }) => {
+            const normalizedH1 = h.text.toLowerCase();
+            const containsKeyphrase = normalizedH1.includes(normalizedKeyphrase);
+            console.log(`[SEO Analyzer] H1 "${h.text}" contains keyphrase "${keyphrase}": ${containsKeyphrase}`);
+            return containsKeyphrase;
+        });
         
-        if (!hasSingleH1) {
-            h1Description = `The page has ${h1s.length} H1 headings. Ideally, there should be exactly one.`;
-        } else if (!hasKeyphraseInH1) {
-            h1Description = "The H1 heading should contain the focus keyphrase.";
-        }
+        h1Check.passed = h1ContainsKeyphrase;
+        
+        // Context for recommendation
+        const h1Context = h1s.length === 0 
+            ? "No H1 heading found on the page." 
+            : h1s.map((h: { text: string }) => h.text).join("; ");
         
         await addCheck(
-            "Keyphrase in H1 Heading",
-            h1Description,
-            h1CheckPassed,
+            h1Check.title,
+            h1Check.description,
+            h1Check.passed,
             h1Context
         );
 
