@@ -1,9 +1,7 @@
 // ===== Imports =====
 import OpenAI from 'openai';
 import * as ip from "ip";
-import IPCIDR from "ip-cidr";
 import { URL } from "url";
-import { Page } from 'openai/pagination.mjs';
 
 export {}; // Ensure this file is treated as a module
 
@@ -1145,73 +1143,6 @@ async function processHtml(html: string, url: string): Promise<any> {
   }
 }
 
-// Function to extract paragraphs using Webflow Designer API
-async function extractParagraphsFromWebflow(): Promise<string[]> {
-  try {
-    if (typeof webflow === 'undefined') {
-      console.log("Webflow API not available");
-      return [];
-    }
-
-    console.log("Using Webflow Designer API to extract paragraphs");
-    const paragraphs: string[] = [];
-    
-    // Get all elements from the current page
-    const allElements = await webflow.getAllElements();
-    console.log("Total elements found:", allElements.length);
-    
-    // First pass: collect direct paragraphs
-    for (const element of allElements) {
-      if (!element) continue;
-      
-      // Check if element is a paragraph
-      const isParagraph = ('tagName' in element && (element as { tagName: string }).tagName.toLowerCase() === 'p') ||
-      (Array.isArray(element.customAttributes) && element.customAttributes.some(attr =>
-          attr.name === 'data-element-type' && attr.value === 'paragraph'
-        ));
-
-      if (isParagraph && element.textContent) {
-        const text = typeof element.textContent === 'string' ? (element.textContent as string).trim() : '';
-        if (text.length >= 30) { // Only collect substantial paragraphs
-          console.log("Found paragraph:", text.substring(0, 100) + (text.length > 100 ? '...' : ''));
-          paragraphs.push(text);
-        }
-      }
-    }
-    
-    // Second pass: check containers for text content
-    if (paragraphs.length === 0) {
-      for (const element of allElements) {
-        if (!element || !element.children) continue;
-        
-        try {
-          const children = element.children;
-          for (const child of Array.isArray(children) ? children : []) {
-            if (!child) continue;
-            
-            if ((child.type === 'string' || child.tagName?.toLowerCase() === 'p') && child.textContent) {
-              const text = child.textContent.trim();
-              if (text.length >= 30) {
-                console.log("Found text in container:", text.substring(0, 100) + (text.length > 100 ? '...' : ''));
-                paragraphs.push(text);
-              }
-            }
-          }
-        } catch (e) {
-          console.warn('Error accessing children:', e);
-        }
-      }
-    }
-    
-    console.log(`Found ${paragraphs.length} paragraphs using Webflow API`);
-    return paragraphs;
-  } catch (error) {
-    console.error("Error extracting paragraphs from Webflow:", error);
-    return [];
-  }
-}
-
-// Helper function for checking image alt text quality
 // Helper function for checking image alt text quality
 function assessAltTextQuality(images: Array<{ src: string; alt: string }>, keyphrase: string): { 
   hasAltText: boolean; 
@@ -1512,7 +1443,7 @@ export async function analyzeSEOElements(url: string, keyphrase: string, env: an
                 usesPageTitleAsOgTitle: apiData.usesPageTitleAsOgTitle,
                 usesDescriptionAsOgDescription: apiData.usesDescriptionAsOgDescription
             }),
-            true  // Changed from false to true to skip the AI recommendation
+            false
         );
 
         // 8. Image Analysis
