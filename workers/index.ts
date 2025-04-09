@@ -61,57 +61,52 @@ const ALLOWED_DOMAINS = [
 
 // Helper function to get AI-powered SEO recommendations
 async function getAIRecommendation(title: string, keyphrase: string, env: any, context?: string): Promise<string> {
-  // Check if OpenAI API key is available
-  if (!env.OPENAI_API_KEY) {
-    // If no API key, fall back to predefined recommendations
-    return analyzerFallbackRecommendations[title] 
-      ? analyzerFallbackRecommendations[title]({ keyphrase }) 
-      : `Consider optimizing your content for "${keyphrase}" in relation to ${title.toLowerCase()}.`;
-  }
-  
   try {
     // Initialize OpenAI client
     const openai = new OpenAI({
       apiKey: env.OPENAI_API_KEY
     });
     
-    // Create a prompt for the AI
-    const prompt = `Generate an SEO recommendation for a webpage based on the following information:
-    - SEO Check Type: ${title}
-    - Target Keyphrase: ${keyphrase}
-    - Check Result: Failed
-    ${context ? `- Context: ${context}` : ''}
+    // Create a prompt focused on getting just the actual suggestion text
+    const prompt = `For a webpage about "${keyphrase}" that failed the "${title}" SEO check, provide ONLY the exact text to use (no explanations).
     
-    Provide a specific, actionable recommendation to improve this aspect of SEO. Be concise but thorough.`;
+    Additional context: ${context || 'No additional context'}
     
-    // Call OpenAI API
+    Examples:
+    - For "Keyphrase in Title": "Web Development Projects - Portfolio Examples"
+    - For "Keyphrase in Meta Description": "Explore our web development projects showcasing responsive design and UX optimization."
+    - For "Image Alt Attributes": "Add descriptive alt text containing the keyphrase to your images."
+    
+    Provide ONLY the text to use, preceded by the word "Recommendation:" and no other text.`;
+    
+    // Call OpenAI API with stricter constraints
     const response = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [
-        { role: "system", content: "You are a professional SEO expert. Provide helpful, specific recommendations for improving website SEO." },
+        { role: "system", content: "You provide only the exact text to use for SEO elements with no explanations or formatting." },
         { role: "user", content: prompt }
       ],
-      max_tokens: 150,
-      temperature: 0.1,
+      max_tokens: 60, // Reduced token limit for more concise responses
+      temperature: 0, // Lower temperature for more predictable responses
     });
     
-    // Extract and return the recommendation
-    const recommendation = response.choices[0]?.message?.content?.trim();
+    // Extract and clean the recommendation
+    let recommendation = response.choices[0]?.message?.content?.trim() || '';
     
-    if (recommendation) {
-      return recommendation;
-    } else {
-      // If no response from OpenAI, use fallback
-      return analyzerFallbackRecommendations[title] 
-        ? analyzerFallbackRecommendations[title]({ keyphrase }) 
-        : `Consider optimizing your content for "${keyphrase}" in relation to ${title.toLowerCase()}.`;
-    }
+    // Strip common explanatory phrases and formatting
+    recommendation = recommendation
+      .replace(/^I recommend /i, '')
+      .replace(/^You should /i, '')
+      .replace(/^Consider /i, '')
+      .replace(/^Suggested /i, '')
+      .replace(/^Here'?s /i, '')
+      .replace(/^["']|["']$/g, '') // Remove surrounding quotes
+      .replace(/:\s*$/, ''); // Remove trailing colon
+    
+    return recommendation || `Add "${keyphrase}" to your ${title.toLowerCase()}`;
   } catch (error) {
-    // If API call fails, use fallback recommendations
     console.error("[SEO Analyzer] Error getting AI recommendation:", error);
-    return analyzerFallbackRecommendations[title] 
-      ? analyzerFallbackRecommendations[title]({ keyphrase }) 
-      : `Consider optimizing your content for "${keyphrase}" in relation to ${title.toLowerCase()}.`;
+    return `${keyphrase.charAt(0).toUpperCase() + keyphrase.slice(1)} - Your Website`;
   }
 }
 
@@ -1218,43 +1213,6 @@ function assessAltTextQuality(images: Array<{ src: string; alt: string }>, keyph
   return result;
 }
 
-// Generate recommendations for image alt text improvement
-function generateAltTextRecommendations(images: Array<{ src: string; alt: string }>, keyphrase: string): string {
-  // Get the alt text assessment that includes keyphrase analysis
-  const assessment = assessAltTextQuality(images, keyphrase);
-  
-  // If all images have good alt text including keyphrases, return positive message
-  if (assessment.hasAltText && assessment.hasKeyphraseInAlt && assessment.overallScore >= 8) {
-    return "Your images have descriptive alt text that includes your target keyphrase. Great work!";
-  }
-  
-  // Determine the top issue to address
-  const missingAlt = assessment.qualityScores.filter(item => item.issues.includes('Missing alt text')).length;
-  const genericAlt = assessment.qualityScores.filter(item => item.issues.includes('Generic/non-descriptive alt text')).length;
-  const filenameAlt = assessment.qualityScores.filter(item => item.issues.includes('Using filename as alt text')).length;
-  
-  // Build a concise recommendation focusing on the most critical issue
-  let recommendation = "";
-  
-  // Prioritize issues: missing alt > filename as alt > generic alt
-  if (missingAlt > 0) {
-    recommendation = `Add descriptive alt text to ${missingAlt} image${missingAlt > 1 ? 's' : ''} that currently lack it.`;
-  } else if (filenameAlt > 0) {
-    recommendation = `Replace filenames with descriptive alt text in ${filenameAlt} image${filenameAlt > 1 ? 's' : ''}.`;
-  } else if (genericAlt > 0) {
-    recommendation = `Replace generic descriptions (like "image" or "photo") with specific descriptions in ${genericAlt} image${genericAlt > 1 ? 's' : ''}.`;
-  } else {
-    recommendation = "Make your alt text more descriptive and relevant to the image content.";
-  }
-  
-  // Add the keyphrase reminder if needed
-  if (!assessment.hasKeyphraseInAlt) {
-    recommendation += ` Include your target keyphrase "${keyphrase}" in at least one relevant image's alt text.`;
-  }
-  
-  return recommendation;
-}
-
 export async function analyzeSEOElements(url: string, keyphrase: string, env: any) {
     const startTime = Date.now();
 
@@ -1580,7 +1538,18 @@ export async function analyzeSEOElements(url: string, keyphrase: string, env: an
         // If the check failed, add our custom recommendation
         const imageAltCheck = checks.find(check => check.title === "Image Alt Attributes");
         if (imageAltCheck && !imageAltCheck.passed) {
-            imageAltCheck.recommendation = generateAltTextRecommendations(imageCheckContext.images, keyphrase);
+            // Create detailed context for better recommendations
+            const missingAltCount = imageCheckContext.images.filter(img => !img.alt || img.alt.trim() === '').length;
+            const totalImages = imageCheckContext.images.length;
+            const context = `Page has ${totalImages} images. ${missingAltCount} images missing alt text. Target keyphrase: "${keyphrase}"`;
+            
+            // Use the existing AI recommendation function instead of custom generator
+            imageAltCheck.recommendation = await getAIRecommendation(
+                "Image Alt Attributes", 
+                keyphrase, 
+                env, 
+                context
+            );
         }
 
         // Apply Next-Gen Image Formats Check
