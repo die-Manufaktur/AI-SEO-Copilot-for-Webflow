@@ -24,11 +24,5 @@
       "path": "/",
       "description": "Analyze and improve your website's SEO"
     }
-  ],
-  "dashboard": {
-    "size": {
-      "width": 500,
-      "height": 800
-    }
-  }
+  ]
 }
