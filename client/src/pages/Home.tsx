@@ -246,6 +246,51 @@ const fetchPageInfo = async (setSlug: (slug: string | null) => void, setIsHomePa
   }
 };
 
+// Add this function near the copyCleanToClipboard function
+const formatRecommendationForDisplay = (text: string | undefined): string => {
+  if (!text) return '';
+
+  // Handle Recommendation: prefix consistently
+  let formattedText = text.replace(/^Recommendation:\s*/i, '');
+  
+  // Remove all double quotes
+  formattedText = formattedText.replace(/"/g, '');
+  
+  // Special handling for Image Alt Attributes - simplify to one suggestion
+  if (text.includes('Image Alt Attributes') || formattedText.toLowerCase().includes('alt tag') || formattedText.toLowerCase().includes('alt text')) {
+    // Try to find the first specific suggestion
+    const suggestionMatches = formattedText.match(/['']([^'']*)['']|Consider using ['']([^'']*)['']|add alt text ['']([^'']*)['']|could be ['']([^'']*)['']|such as ['']([^'']*)['']|like ['']([^'']*)['']/i);
+    
+    if (suggestionMatches) {
+      // Find the first non-undefined capture group (the actual suggestion)
+      const suggestion = suggestionMatches.slice(1).find(match => match !== undefined);
+      if (suggestion) {
+        // Format as a clean, single suggestion
+        return `Recommendation: Use alt text that describes the image content and includes your keyphrase when relevant: ${suggestion}`;
+      }
+    }
+  }
+  
+  // Only handle single quotes if needed (no more double quote handling)
+  const hasOpeningSingleQuote = (formattedText.match(/'/g) || []).length % 2 !== 0;
+  if (hasOpeningSingleQuote) {
+    formattedText += "'";
+  }
+  
+  // Check for abrupt truncation (ends with comma, colon, or starts a list without finishing)
+  if (formattedText.endsWith(',') || formattedText.endsWith(':') || 
+      formattedText.match(/[0-9]\.\s*$/)) {
+    formattedText += '...';
+  }
+  
+  // Ensure consistent prefix
+  if (!formattedText.startsWith('Recommendation:')) {
+    formattedText = 'Recommendation: ' + formattedText;
+  }
+  
+  return formattedText;
+};
+
 export default function Home() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -945,7 +990,7 @@ export default function Home() {
                                 className="mt-4 text-sm p-4 bg-background3 rounded-md w-full"
                                 style={{ backgroundColor: 'var(--background3)' }}
                               >
-                                {check.recommendation}
+                                {formatRecommendationForDisplay(check.recommendation)}
                               </motion.div>
                             )}
                           </motion.div>
