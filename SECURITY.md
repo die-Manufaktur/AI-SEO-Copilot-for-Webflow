@@ -7,11 +7,12 @@ currently being supported with security updates.
 
 | Version        | Supported          |
 | -------        | ------------------ |
+| v2.4.12beta    | :white_check_mark: |
 | v2.3.2         | :white_check_mark: |
-| v2.2.0         | :white_check_mark: |
-| v2.1.4         | :white_check_mark: |
-| v2.0.0         | :white_check_mark: |
+| v2.2.0         | :x:                |
+| v2.1.4         | :x:                |
+| v2.0.0         | :x:                |
 
 ## Reporting a Vulnerability
 
-If you don't have the ability to create an issue, just email the contact person for this repo.
+Please report all bugs here: https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/issues
