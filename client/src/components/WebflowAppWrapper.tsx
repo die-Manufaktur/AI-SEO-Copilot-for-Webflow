@@ -10,11 +10,10 @@ interface WebflowAppWrapperProps {
 
 export default function WebflowAppWrapper({ children }: WebflowAppWrapperProps) {
   useEffect(() => {
-    // Set extension size to "large" when component mounts
     if (webflow && webflow.setExtensionSize) {
       try {
         webflow.setExtensionSize({
-          width: 500,
+          width: 540,
           height: 720
         });
       } catch (error) {
