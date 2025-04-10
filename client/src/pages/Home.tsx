@@ -441,26 +441,26 @@ export default function Home() {
   const copyCleanToClipboard = async (text: string | undefined) => {
     if (!text) return;
 
-    // Extract just the text of the suggestion, not the explanation
-    let cleanText = "";
+    // First remove "Recommendation:" prefix if present
+    let cleanText = text.replace(/^Recommendation:\s*/i, '');
 
     // Try to extract the specific text suggestion from various formats
-    if (text.includes("Here is a better")) {
+    if (cleanText.includes("Here is a better")) {
       // Format: "Here is a better [element]: [example]"
-      const match = text.match(/Here is a better [^:]+:\s*(.*)/);
-      cleanText = match ? match[1].trim() : text;
-    } else if (text.includes("Utilize") && text.includes("as an H")) {
+      const match = cleanText.match(/Here is a better [^:]+:\s*(.*)/);
+      cleanText = match ? match[1].trim() : cleanText;
+    } else if (cleanText.includes("Utilize") && cleanText.includes("as an H")) {
       // Format: "Utilize 'Example text' as an H1/H2 heading..."
-      const match = text.match(/Utilize ['"]([^'"]+)['"]/);
-      cleanText = match ? match[1].trim() : text;
-    } else if (text.includes("Add an H")) {
+      const match = cleanText.match(/Utilize ['"]([^'"]+)['"]/);
+      cleanText = match ? match[1].trim() : cleanText;
+    } else if (cleanText.includes("Add an H")) {
       // Format: "Add an H1/H2 with 'Example text'..."
-      const match = text.match(/with ['"]([^'"]+)['"]/);
-      cleanText = match ? match[1].trim() : text;
+      const match = cleanText.match(/with ['"]([^'"]+)['"]/);
+      cleanText = match ? match[1].trim() : cleanText;
     } else {
       // Default extraction of text inside quotes
-      const quotedText = text.match(/['"]([^'"]+)['"]/);
-      cleanText = quotedText ? quotedText[1].trim() : text;
+      const quotedText = cleanText.match(/['"]([^'"]+)['"]/);
+      cleanText = quotedText ? quotedText[1].trim() : cleanText;
     }
 
     // Clean up any remaining quotes
