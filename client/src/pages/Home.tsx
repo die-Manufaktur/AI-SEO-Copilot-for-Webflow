@@ -943,6 +943,7 @@ export default function Home() {
                                 animate={{ opacity: 1, height: "auto" }}
                                 exit={{ opacity: 0, height: 0 }}
                                 className="mt-4 text-sm p-4 bg-background3 rounded-md w-full"
+                                style={{ backgroundColor: 'var(--background3)' }}
                               >
                                 {check.recommendation}
                               </motion.div>
