@@ -75,7 +75,10 @@ const shouldShowCopyButton = (checkTitle: string) => {
          !checkTitle.toLowerCase().includes("heading hierarchy") &&
          !checkTitle.toLowerCase().includes("code minification") &&
          !checkTitle.toLowerCase().includes("schema markup") &&
-         !checkTitle.toLowerCase().includes("image file size");
+         !checkTitle.toLowerCase().includes("image file size") &&
+         !checkTitle.toLowerCase().includes("image alt attributes") &&
+         !checkTitle.toLowerCase().includes("og title") &&
+         !checkTitle.toLowerCase().includes("og description");
 };
 
 // Get priority icon based on priority level
@@ -247,8 +250,15 @@ const fetchPageInfo = async (setSlug: (slug: string | null) => void, setIsHomePa
 };
 
 // Add this function near the copyCleanToClipboard function
-const formatRecommendationForDisplay = (text: string | undefined): string => {
+const formatRecommendationForDisplay = (text: string | undefined, checkTitle: string): string => {
   if (!text) return '';
+
+  // Special handling for OG Title and Description recommendations
+  if (checkTitle.toLowerCase().includes('og title') || 
+      checkTitle.toLowerCase().includes('og description') ||
+      checkTitle.toLowerCase().includes('open graph')) {
+    return "Recommendation: Configure your Open Graph settings in Webflow to use your existing page title and description. This ensures your content displays correctly when shared on social media.";
+  }
 
   // Handle Recommendation: prefix consistently
   let formattedText = text.replace(/^Recommendation:\s*/i, '');
@@ -283,13 +293,19 @@ const formatRecommendationForDisplay = (text: string | undefined): string => {
     formattedText += '...';
   }
   
-  // Ensure consistent prefix
-  if (!formattedText.startsWith('Recommendation:')) {
-    formattedText = 'Recommendation: ' + formattedText;
-  }
-  
   return formattedText;
 };
+
+// Add this function to the file that manages your UI components
+function extractTextAfterColon(text: string): string {
+  const colonIndex = text.indexOf(':');
+  if (colonIndex !== -1) {
+    // Extract everything after the first colon, and trim any leading/trailing whitespace
+    return text.substring(colonIndex + 1).trim();
+  }
+  // Return the original text if no colon is found
+  return text;
+}
 
 export default function Home() {
   const { toast } = useToast();
@@ -486,31 +502,47 @@ export default function Home() {
   const copyCleanToClipboard = async (text: string | undefined) => {
     if (!text) return;
 
-    // First remove "Recommendation:" prefix if present
-    let cleanText = text.replace(/^Recommendation:\s*/i, '');
-
-    // Try to extract the specific text suggestion from various formats
-    if (cleanText.includes("Here is a better")) {
-      // Format: "Here is a better [element]: [example]"
-      const match = cleanText.match(/Here is a better [^:]+:\s*(.*)/);
-      cleanText = match ? match[1].trim() : cleanText;
-    } else if (cleanText.includes("Utilize") && cleanText.includes("as an H")) {
-      // Format: "Utilize 'Example text' as an H1/H2 heading..."
-      const match = cleanText.match(/Utilize ['"]([^'"]+)['"]/);
-      cleanText = match ? match[1].trim() : cleanText;
-    } else if (cleanText.includes("Add an H")) {
-      // Format: "Add an H1/H2 with 'Example text'..."
-      const match = cleanText.match(/with ['"]([^'"]+)['"]/);
-      cleanText = match ? match[1].trim() : cleanText;
-    } else {
-      // Default extraction of text inside quotes
-      const quotedText = cleanText.match(/['"]([^'"]+)['"]/);
-      cleanText = quotedText ? quotedText[1].trim() : cleanText;
+    // Extract text after the colon, with special handling for multiple colons
+    let cleanText = text;
+    
+    // Special handling for the "Keyphrase in H2 Headings" check
+    if (text.toLowerCase().includes("keyphrase in h2 headings")) {
+      // This suggestion format has a specific pattern we need to handle
+      // Format: "Include keyphrase in H2 headings: H2 headings: Actual suggestions"
+      
+      // First, look for the pattern "H2 headings:" which comes before the actual suggestions
+      const h2HeadingsIndex = text.indexOf("H2 headings:");
+      
+      if (h2HeadingsIndex !== -1) {
+        // Extract everything after "H2 headings:" (plus its length)
+        cleanText = text.substring(h2HeadingsIndex + "H2 headings:".length).trim();
+      } else {
+        // Fallback: just extract after the second colon if the specific pattern isn't found
+        const parts = text.split(':');
+        if (parts.length > 2) {
+          cleanText = parts.slice(2).join(':').trim();
+        } else {
+          cleanText = extractTextAfterColon(text);
+        }
+      }
+    } 
+    // Special handling for "Keyphrase in Introduction"
+    else if (text.toLowerCase().includes("keyphrase in introduction")) {
+      const parts = text.split(':');
+      if (parts.length > 2) {
+        cleanText = parts.slice(2).join(':').trim();
+      } else {
+        cleanText = extractTextAfterColon(text);
+      }
     }
-
-    // Clean up any remaining quotes
-    cleanText = cleanText.replace(/^"|"$/g, '');
-
+    else {
+      // Normal case - use existing function
+      cleanText = extractTextAfterColon(text);
+    }
+    
+    // Remove surrounding double quotes if present
+    cleanText = cleanText.replace(/^"(.*)"$/, '$1');
+    
     const success = await copyToClipboard(cleanText);
     if (success) {
       toast({
@@ -966,7 +998,6 @@ export default function Home() {
                                           size="sm"
                                           className="flex items-center gap-2"
                                           onClick={async () => {
-                                            // Use copyCleanToClipboard instead of direct copyToClipboard
                                             await copyCleanToClipboard(check.recommendation || '');
                                           }}
                                         >
@@ -990,7 +1021,7 @@ export default function Home() {
                                 className="mt-4 text-sm p-4 bg-background3 rounded-md w-full"
                                 style={{ backgroundColor: 'var(--background3)' }}
                               >
-                                {formatRecommendationForDisplay(check.recommendation)}
+                                {formatRecommendationForDisplay(check.recommendation, check.title)}
                               </motion.div>
                             )}
                           </motion.div>

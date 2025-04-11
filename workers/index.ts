@@ -66,42 +66,32 @@ async function getAIRecommendation(title: string, keyphrase: string, env: any, c
     const openai = new OpenAI({
       apiKey: env.OPENAI_API_KEY
     });
+
+    // Limit the context length to reduce token usage
+    const truncatedContext = context && context.length > 300 
+      ? context.substring(0, 300) + "..." 
+      : context;
     
     // Create a prompt focused on getting just the actual suggestion text
-    const prompt = `For a webpage about "${keyphrase}" that failed the "${title}" SEO check, provide ONLY the exact text to use (no explanations).
-    
-    Additional context: ${context || 'No additional context'}
-    
-    Examples:
-    - For "Keyphrase in Title": "Web Development Projects - Portfolio Examples"
-    - For "Keyphrase in Meta Description": "Explore our web development projects showcasing responsive design and UX optimization."
-    - For "Image Alt Attributes": "Add descriptive alt text containing the keyphrase to your images."
-    
-    Provide ONLY the text to use, preceded by the word "Recommendation:" and no other text.`;
+    const prompt = `Fix this SEO issue: "${title}" for keyphrase "${keyphrase}".
+         ${truncatedContext ? `Current content: ${truncatedContext}` : ''}`;
     
     // Call OpenAI API with stricter constraints
     const response = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [
-        { role: "system", content: "You provide only the exact text to use for SEO elements with no explanations or formatting." },
+        { role: "system", content: `You are an SEO expert providing concise, actionable recommendations.
+         Keep responses under 100 words.
+         Format: "[short keyphrase advice]: [example]"
+         Avoid quotation marks.` },
         { role: "user", content: prompt }
       ],
-      max_tokens: 60, // Reduced token limit for more concise responses
-      temperature: 0, // Lower temperature for more predictable responses
+      max_tokens: 120, // Reduced token limit for more concise responses
+      temperature: 0.2, // Lower temperature for more predictable responses
     });
     
     // Extract and clean the recommendation
     let recommendation = response.choices[0]?.message?.content?.trim() || '';
-    
-    // Strip common explanatory phrases and formatting
-    recommendation = recommendation
-      .replace(/^I recommend /i, '')
-      .replace(/^You should /i, '')
-      .replace(/^Consider /i, '')
-      .replace(/^Suggested /i, '')
-      .replace(/^Here'?s /i, '')
-      .replace(/^["']|["']$/g, '') // Remove surrounding quotes
-      .replace(/:\s*$/, ''); // Remove trailing colon
     
     return recommendation || `Add "${keyphrase}" to your ${title.toLowerCase()}`;
   } catch (error) {
