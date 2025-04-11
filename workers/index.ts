@@ -59,51 +59,104 @@ const ALLOWED_DOMAINS = [
   "pmds.pull-list.net"
 ];
 
+// Define a cache object at the module level
+const recommendationCache: Record<string, { recommendation: string; timestamp: number }> = {};
+
 // Helper function to get AI-powered SEO recommendations
-async function getAIRecommendation(title: string, keyphrase: string, env: any, context?: string): Promise<string> {
+async function getAIRecommendation(title: string, keyphrase: string, env: any, context?: string, additionalContext?: string): Promise<string> {
   try {
+    // Create a cache key for this request
+    const cacheKey = `${title}-${keyphrase}-${context?.substring(0, 50) || ''}`;
+    
+    // Check if we have a cached response that's less than 15 minutes old
+    if (recommendationCache[cacheKey] && (Date.now() - recommendationCache[cacheKey].timestamp) < 900000) { // 15 minutes
+      return recommendationCache[cacheKey].recommendation;
+    }
+
     // Initialize OpenAI client
     const openai = new OpenAI({
       apiKey: env.OPENAI_API_KEY
     });
     
-    // Create a prompt focused on getting just the actual suggestion text
-    const prompt = `For a webpage about "${keyphrase}" that failed the "${title}" SEO check, provide ONLY the exact text to use (no explanations).
+    // Limit the context length to reduce token usage
+    const truncatedContext = context && context.length > 300 
+      ? context.substring(0, 300) + "..." 
+      : context;
     
-    Additional context: ${context || 'No additional context'}
+    // Truncate additional context if provided
+    const truncatedAdditionalContext = additionalContext && additionalContext.length > 200
+      ? additionalContext.substring(0, 200) + "..."
+      : additionalContext;
     
-    Examples:
-    - For "Keyphrase in Title": "Web Development Projects - Portfolio Examples"
-    - For "Keyphrase in Meta Description": "Explore our web development projects showcasing responsive design and UX optimization."
-    - For "Image Alt Attributes": "Add descriptive alt text containing the keyphrase to your images."
+    // Define an array of introduction phrases for variety
+    const introductionPhrases = [
+      "Here is a better [element]: [example]",
+      "Try this improved [element]: [example]",
+      "Recommended [element]: [example]",
+      "Optimize your [element] with: [example]",
+      "Better [element] suggestion: [example]",
+      "Enhanced [element]: [example]"
+    ];
     
-    Provide ONLY the text to use, preceded by the word "Recommendation:" and no other text.`;
+    // Randomly select an introduction phrase
+    const selectedIntroPhrase = introductionPhrases[Math.floor(Math.random() * introductionPhrases.length)];
     
-    // Call OpenAI API with stricter constraints
+    const systemContent = `You are an SEO expert providing concise, actionable recommendations.
+         Keep responses under 100 words.
+         Format: "${selectedIntroPhrase}"
+         Avoid quotation marks.`;
+    
+    const userContent = `Fix this SEO issue: "${title}" for keyphrase "${keyphrase}".
+         ${truncatedContext ? `Current content: ${truncatedContext}` : ''}
+         ${truncatedAdditionalContext ? `Additional context: ${truncatedAdditionalContext}` : ''}`;
+    
     const response = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+      model: "gpt-3.5-turbo", // Use the most cost-effective model
       messages: [
-        { role: "system", content: "You provide only the exact text to use for SEO elements with no explanations or formatting." },
-        { role: "user", content: prompt }
+        {
+          role: "system",
+          content: systemContent
+        },
+        {
+          role: "user",
+          content: userContent
+        }
       ],
-      max_tokens: 60, // Reduced token limit for more concise responses
-      temperature: 0, // Lower temperature for more predictable responses
+      max_tokens: 100, // How many tokens the response can use
+      temperature: 0.5, // Lower temperature for more predictable outputs
     });
-    
-    // Extract and clean the recommendation
-    let recommendation = response.choices[0]?.message?.content?.trim() || '';
-    
-    // Strip common explanatory phrases and formatting
-    recommendation = recommendation
+
+    const recommendation = response.choices[0].message.content?.trim() || 
+      "Unable to generate recommendation at this time.";
+
+    // Cache the response
+    recommendationCache[cacheKey] = {
+      recommendation,
+      timestamp: Date.now()
+    };
+
+    // Clean the recommendation - initial cleaning
+    let cleanedRecommendation = recommendation
       .replace(/^I recommend /i, '')
       .replace(/^You should /i, '')
       .replace(/^Consider /i, '')
       .replace(/^Suggested /i, '')
       .replace(/^Here'?s /i, '')
       .replace(/^["']|["']$/g, '') // Remove surrounding quotes
-      .replace(/:\s*$/, ''); // Remove trailing colon
+      .replace(/:\s*$/, '')
+      .replace(/["']([^"']+)["']/g, '$1') // Remove quotes around any text
+      .replace(/`([^`]+)`/g, '$1')  
+      // Remove "Here is a better X:" prefix if followed by "Example:"
+      .replace(/^Here is a better [^:]+:\s*Example:\s*/i, '')
+      // Remove "Better X:" if followed by "Example:"
+      .replace(/^Better [^:]+:\s*Example:\s*/i, '')
+      // Remove "Example:" prefix if it appears after another introduction
+      .replace(/^([^:]+):\s*Example:\s*/i, '$1: ')
+      // Remove duplicate labels like "Title: Meta Description:"
+      .replace(/^([^:]+):\s*([^:]+):\s*/i, '$1: ')
+      .replace(/^([A-Za-z\s]{1,20}):\s*([A-Za-z\s]{1,20}):\s*/i, '$1: ');
     
-    return recommendation || `Add "${keyphrase}" to your ${title.toLowerCase()}`;
+    return cleanedRecommendation || `Add "${keyphrase}" to your ${title.toLowerCase()}`;
   } catch (error) {
     console.error("[SEO Analyzer] Error getting AI recommendation:", error);
     return `${keyphrase.charAt(0).toUpperCase() + keyphrase.slice(1)} - Your Website`;

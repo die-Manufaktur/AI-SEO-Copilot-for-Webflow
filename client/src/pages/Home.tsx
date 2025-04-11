@@ -283,11 +283,6 @@ const formatRecommendationForDisplay = (text: string | undefined): string => {
     formattedText += '...';
   }
   
-  // Ensure consistent prefix
-  if (!formattedText.startsWith('Recommendation:')) {
-    formattedText = 'Recommendation: ' + formattedText;
-  }
-  
   return formattedText;
 };
 
