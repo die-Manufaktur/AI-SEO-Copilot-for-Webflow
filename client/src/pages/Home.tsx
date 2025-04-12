@@ -281,11 +281,9 @@ const formatRecommendationForDisplay = (text: string | undefined, checkTitle: st
     }
   }
   
-  // Only handle single quotes if needed (no more double quote handling)
-  const hasOpeningSingleQuote = (formattedText.match(/'/g) || []).length % 2 !== 0;
-  if (hasOpeningSingleQuote) {
-    formattedText += "'";
-  }
+  // Remove any surrounding quotes (both single and double)
+  formattedText = formattedText.replace(/^['"]/, ''); // Remove quote at beginning if present
+  formattedText = formattedText.replace(/['"]$/, ''); // Remove quote at end if present
   
   // Check for abrupt truncation (ends with comma, colon, or starts a list without finishing)
   if (formattedText.endsWith(',') || formattedText.endsWith(':') || 
@@ -315,7 +313,6 @@ export default function Home() {
   const [results, setResults] = useState<SEOAnalysisResult | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [stagingName, setStagingName] = useState<string>('');
-  const [currentUrl, setCurrentUrl] = useState<string>("");
   const [urls, setUrls] = useState<string[]>([]);
   // Add state for perfect score celebration
   const [showedPerfectScoreMessage, setShowedPerfectScoreMessage] = useState<boolean>(false);
@@ -505,43 +502,36 @@ export default function Home() {
     // Extract text after the colon, with special handling for multiple colons
     let cleanText = text;
     
-    // Special handling for the "Keyphrase in H2 Headings" check
-    if (text.toLowerCase().includes("keyphrase in h2 headings")) {
-      // This suggestion format has a specific pattern we need to handle
-      // Format: "Include keyphrase in H2 headings: H2 headings: Actual suggestions"
-      
-      // First, look for the pattern "H2 headings:" which comes before the actual suggestions
-      const h2HeadingsIndex = text.indexOf("H2 headings:");
-      
-      if (h2HeadingsIndex !== -1) {
-        // Extract everything after "H2 headings:" (plus its length)
-        cleanText = text.substring(h2HeadingsIndex + "H2 headings:".length).trim();
-      } else {
-        // Fallback: just extract after the second colon if the specific pattern isn't found
+    // Special handling for "Keyphrase in Introduction" which has a unique format
+    if (text.toLowerCase().includes("keyphrase in introduction")) {
+      // Check if there's a newline character indicating the format "Title\nRecommendation"
+      const newlineIndex = text.indexOf('\n');
+      if (newlineIndex !== -1) {
+        // Extract everything after the newline
+        cleanText = text.substring(newlineIndex + 1).trim();
+      } 
+      // If there's no newline but there are colons, use the existing logic
+      else {
         const parts = text.split(':');
         if (parts.length > 2) {
           cleanText = parts.slice(2).join(':').trim();
-        } else {
-          cleanText = extractTextAfterColon(text);
+        } else if (parts.length === 2) {
+          cleanText = parts[1].trim();
         }
       }
-    } 
-    // Special handling for "Keyphrase in Introduction"
-    else if (text.toLowerCase().includes("keyphrase in introduction")) {
-      const parts = text.split(':');
-      if (parts.length > 2) {
-        cleanText = parts.slice(2).join(':').trim();
-      } else {
-        cleanText = extractTextAfterColon(text);
-      }
     }
+    // All other cases including H1 and H2 Headings use simple extraction
     else {
       // Normal case - use existing function
       cleanText = extractTextAfterColon(text);
     }
     
+    // Remove any HTML tags that might be present
+    cleanText = cleanText.replace(/<[^>]*>/g, '');
+    
     // Remove surrounding double quotes if present
-    cleanText = cleanText.replace(/^"(.*)"$/, '$1');
+    cleanText = cleanText.replace(/^"/, ''); // Remove quote at beginning if present
+    cleanText = cleanText.replace(/"$/, ''); // Remove quote at end if present
     
     const success = await copyToClipboard(cleanText);
     if (success) {
