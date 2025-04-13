@@ -5,7 +5,7 @@
   "main": "client/src/main.tsx",
   "type": "module",
   "scripts": {
-    "build": "vite build && esbuild workers/index.ts --platform=browser --packages=external --bundle --external:ip --external:ip-cidr --format=esm --outdir=public && webflow extension bundle",
+    "build": "vite build && webflow extension bundle",
     "dev": "concurrently -r \"vite --force\" \"webflow extension serve\"",
     "start": "NODE_ENV=production node public/index.js",
     "check": "tsc",

@@ -1,7 +1,7 @@
 {
   "name": "AI SEO Copilot",
   "short_name": "AI SEO Copilot",
-  "description": "Advanced SEO analysis tool performing 11 comprehensive checks including title optimization, meta description analysis, content verification, keyword density, and image optimization. Get AI-powered recommendations for better rankings.",
+  "description": "Advanced SEO analysis tool performing 18 comprehensive checks including title optimization, meta description analysis, content verification, keyword density, and image optimization. Get AI-powered recommendations for better rankings.",
   "version": "2.0.0",
   "start_url": "/",
   "display": "standalone",
