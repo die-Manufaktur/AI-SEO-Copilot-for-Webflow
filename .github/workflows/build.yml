@@ -1,35 +1,34 @@
-name: Build and Deploy
+name: Build, Test, and Deploy
 
 on:
   push:
     branches: ["main"]
 
 jobs:
-  build:
+  build_test_deploy:
     runs-on: ubuntu-22.04
     permissions:
       contents: read
-    name: Build Extension Bundle
+    name: Build, Test, and Deploy
     strategy:
       matrix:
         node-version: [20]
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
           run_install: false
-      
+
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
-      
+
       - name: Configure npm registry settings
         run: |
-          # Create .npmrc with settings to avoid rate limiting issues
           cat > .npmrc << EOF
           registry=https://registry.npmjs.org/
           fetch-retries=5
@@ -37,17 +36,27 @@ jobs:
           fetch-retry-mintimeout=15000
           fetch-retry-maxtimeout=120000
           EOF
-      
+
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
-      
-      # Add environment check
-      - name: Check required secrets
+
+      - name: Check required secrets for build
         run: |
-          [ -n "${{ secrets.VITE_WEBFLOW_CLIENT_ID }}" ] || exit 1
-          [ -n "${{ secrets.OPENAI_API_KEY }}" ] || exit 1
-      
-      - name: Build application
+          echo "Checking build secrets..."
+          [ -n "${{ secrets.VITE_WEBFLOW_CLIENT_ID }}" ] || (echo "VITE_WEBFLOW_CLIENT_ID secret is missing!" && exit 1)
+          # OPENAI_API_KEY might be needed during build if used in frontend, otherwise only for worker
+          # [ -n "${{ secrets.OPENAI_API_KEY }}" ] || (echo "OPENAI_API_KEY secret is missing!" && exit 1)
+        env:
+          VITE_WEBFLOW_CLIENT_ID: ${{ secrets.VITE_WEBFLOW_CLIENT_ID }}
+          # OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }} # Uncomment if needed for build
+
+      - name: Run tests
+        run: pnpm test
+        env:
+          NODE_ENV: test
+          # Add other necessary test environment variables here
+
+      - name: Build application bundle
         run: pnpm build
         env:
           NODE_ENV: production
@@ -56,17 +65,14 @@ jobs:
           VITE_WEBFLOW_API_KEY: ${{ secrets.VITE_WEBFLOW_API_KEY }}
           VITE_WEBFLOW_SITE_ID: ${{ secrets.VITE_WEBFLOW_SITE_ID }}
           VITE_WEBFLOW_CLIENT_ID: ${{ secrets.VITE_WEBFLOW_CLIENT_ID }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          WEBFLOW_CLIENT_SECRET: ${{ secrets.WEBFLOW_CLIENT_SECRET }}
-          WEBFLOW_REDIRECT_URI: ${{ secrets.WEBFLOW_REDIRECT_URI }}
-          
+
       - name: Validate build output
         run: |
           if [ ! -d "public" ]; then
             echo "Build output directory (public) is missing"
             exit 1
           fi
-          
+
       - name: Create bundle archive
         run: zip -r bundle.zip public/
 
@@ -76,3 +82,26 @@ jobs:
           name: bundle
           path: bundle.zip
           retention-days: 5
+
+      - name: Check required secrets for deployment
+        run: |
+          echo "Checking deployment secrets..."
+          [ -n "${{ secrets.CLOUDFLARE_API_TOKEN }}" ] || (echo "CLOUDFLARE_API_TOKEN secret is missing!" && exit 1)
+          [ -n "${{ secrets.OPENAI_API_KEY }}" ] || (echo "OPENAI_API_KEY secret is missing!" && exit 1) # Needed for worker runtime
+          # Add checks for any other secrets the production worker needs
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Deploy Worker to Production
+        run: pnpm wrangler deploy workers/index.ts --env production
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          # Pass required secrets as environment variables for wrangler deploy
+          # These will be set as secrets on the worker, not just build-time vars
+          # Ensure these match the [env.production.vars] in wrangler.toml if they are runtime vars
+          # Or use `wrangler secret put` if they are actual secrets
+          # Example using vars (less secure for sensitive keys like OpenAI):
+          # OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # For actual secrets, it's better to set them via Cloudflare dashboard or `wrangler secret put` commands
+          # This deploy command assumes secrets like OPENAI_API_KEY are already configured on the Cloudflare worker.

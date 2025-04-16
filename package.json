@@ -15,7 +15,8 @@
     "start-dev": "concurrently \"pnpm dev:worker\" \"pnpm dev\"",
     "dev:watch-css": "tailwindcss -i ./client/src/index.css -o ./client/src/output.css --watch",
     "dev:all": "concurrently \"pnpm dev:worker\" \"pnpm dev:watch-css\" \"pnpm dev\"",
-    "prebuild": "node scripts/check-env.js"
+    "prebuild": "node scripts/check-env.js",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@testing-library/react": "^14.3.1",
