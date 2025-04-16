@@ -50,7 +50,7 @@ jobs:
           VITE_WEBFLOW_CLIENT_ID: ${{ secrets.VITE_WEBFLOW_CLIENT_ID }}
 
       - name: Run tests
-        run: pnpm test
+        run: pnpm exec vitest run
         env:
           NODE_ENV: test
           # Add other necessary test environment variables here
