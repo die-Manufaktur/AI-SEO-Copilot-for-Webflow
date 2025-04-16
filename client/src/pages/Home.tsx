@@ -82,7 +82,7 @@ const shouldShowCopyButton = (checkTitle: string) => {
 };
 
 // Get priority icon based on priority level
-const getPriorityIcon = (priority: string, className: string = "h-4 w-4") => {
+export const getPriorityIcon = (priority: string, className: string = "h-4 w-4") => {
   switch (priority) {
     case 'high':
       return <AlertTriangle className={`${className} text-redText`} style={{color: 'var(--redText)', stroke: 'var(--redText)'}} />;

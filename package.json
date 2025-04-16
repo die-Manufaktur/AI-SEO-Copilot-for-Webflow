@@ -19,6 +19,7 @@
     "test": "vitest run"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^14.3.1",
     "@types/canvas-confetti": "^1.9.0",
     "@types/cheerio": "^0.22.35",
@@ -34,6 +35,7 @@
     "esbuild": "^0.25.2",
     "ip": "^2.0.1",
     "ip-cidr": "^4.0.2",
+    "jsdom": "^26.1.0",
     "lucide-react": "^0.479.0",
     "node-fetch": "3.3.1",
     "nodemon": "^3.1.9",
