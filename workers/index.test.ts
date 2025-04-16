@@ -22,11 +22,14 @@ function extractFullTextContent(html: string, tagPattern: RegExp): string[] {
             // Extract the content between opening and closing tags
             const fullTagContent = match[1];
 
-            // Replace <br> tags with spaces first
-            const contentWithBreaksAsSpaces = fullTagContent.replace(/<br\s*\/?>/gi, ' ');
+            // 1. Remove script blocks entirely to prevent script injection issues
+            const contentWithoutScripts = fullTagContent.replace(/<script[^>]*>.*?<\/script>/gis, '');
 
-            // Strip remaining HTML tags and normalize whitespace
-            const textContent = contentWithBreaksAsSpaces // Use the modified content
+            // 2. Replace <br> tags with spaces
+            const contentWithBreaksAsSpaces = contentWithoutScripts.replace(/<br\s*\/?>/gi, ' ');
+
+            // 3. Strip remaining HTML tags and normalize whitespace
+            const textContent = contentWithBreaksAsSpaces
                 .replace(/<[^>]+>/g, '')   // Replace other tags with empty string
                 .replace(/\s+/g, ' ')      // Replace multiple spaces with single space
                 .trim();
