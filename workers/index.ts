@@ -122,8 +122,10 @@ async function getAIRecommendation(title: string, keyphrase: string, env: any, c
           content: userContent
         }
       ],
-      max_tokens: 100, // How many tokens the response can use
-      temperature: 0.5, // Lower temperature for more predictable outputs
+      max_tokens: 120, // Reduced token limit for more concise responses
+      temperature: 0.2, // Lower temperature for more predictable responses
+      max_tokens: 120, // Reduced token limit for more concise responses
+      temperature: 0.2, // Lower temperature for more predictable responses
     });
 
     const recommendation = response.choices[0].message.content?.trim() || 
