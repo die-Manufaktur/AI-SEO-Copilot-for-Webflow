@@ -1,15 +1,17 @@
-name: Build, Test, and Deploy
+name: Deploy to Production
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main"] # Keep this trigger for post-merge deployment
 
 jobs:
   build_test_deploy:
     runs-on: ubuntu-22.04
     permissions:
-      contents: read
-    name: Build, Test, and Deploy
+      contents: read # Keep read for checkout
+      # Add write permission if you want the workflow to create releases/tags for the bundle
+      # contents: write
+    name: Build, Test, and Deploy to Production
     strategy:
       matrix:
         node-version: [20]
@@ -44,17 +46,13 @@ jobs:
         run: |
           echo "Checking build secrets..."
           [ -n "${{ secrets.VITE_WEBFLOW_CLIENT_ID }}" ] || (echo "VITE_WEBFLOW_CLIENT_ID secret is missing!" && exit 1)
-          # OPENAI_API_KEY might be needed during build if used in frontend, otherwise only for worker
-          # [ -n "${{ secrets.OPENAI_API_KEY }}" ] || (echo "OPENAI_API_KEY secret is missing!" && exit 1)
         env:
           VITE_WEBFLOW_CLIENT_ID: ${{ secrets.VITE_WEBFLOW_CLIENT_ID }}
-          # OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }} # Uncomment if needed for build
 
-      - name: Run tests
+      - name: Run tests before deploy
         run: pnpm test
         env:
           NODE_ENV: test
-          # Add other necessary test environment variables here
 
       - name: Build application bundle
         run: pnpm build
@@ -81,14 +79,13 @@ jobs:
         with:
           name: bundle
           path: bundle.zip
-          retention-days: 5
+          retention-days: 5 # Or longer if needed for releases
 
       - name: Check required secrets for deployment
         run: |
           echo "Checking deployment secrets..."
           [ -n "${{ secrets.CLOUDFLARE_API_TOKEN }}" ] || (echo "CLOUDFLARE_API_TOKEN secret is missing!" && exit 1)
-          [ -n "${{ secrets.OPENAI_API_KEY }}" ] || (echo "OPENAI_API_KEY secret is missing!" && exit 1) # Needed for worker runtime
-          # Add checks for any other secrets the production worker needs
+          [ -n "${{ secrets.OPENAI_API_KEY }}" ] || (echo "OPENAI_API_KEY secret is missing!" && exit 1)
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -97,11 +94,26 @@ jobs:
         run: pnpm wrangler deploy workers/index.ts --env production
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          # Pass required secrets as environment variables for wrangler deploy
-          # These will be set as secrets on the worker, not just build-time vars
-          # Ensure these match the [env.production.vars] in wrangler.toml if they are runtime vars
-          # Or use `wrangler secret put` if they are actual secrets
-          # Example using vars (less secure for sensitive keys like OpenAI):
-          # OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          # For actual secrets, it's better to set them via Cloudflare dashboard or `wrangler secret put` commands
-          # This deploy command assumes secrets like OPENAI_API_KEY are already configured on the Cloudflare worker.
+          # OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }} # Ensure secrets are set in Cloudflare dashboard or via wrangler secret put
+
+      # Optional: Create a GitHub Release with the bundle.zip
+      # - name: Create Release
+      #   id: create_release
+      #   uses: actions/create-release@v1
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions
+      #   with:
+      #     tag_name: ${{ github.run_number }} # Or use semantic versioning
+      #     release_name: Release ${{ github.run_number }}
+      #     draft: false
+      #     prerelease: false
+      #
+      # - name: Upload Release Asset
+      #   uses: actions/upload-release-asset@v1
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   with:
+      #     upload_url: ${{ steps.create_release.outputs.upload_url }}
+      #     asset_path: ./bundle.zip
+      #     asset_name: bundle.zip
+      #     asset_content_type: application/zip
