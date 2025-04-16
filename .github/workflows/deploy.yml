@@ -86,13 +86,13 @@ jobs:
           echo "Checking deployment secrets..."
           [ -n "${{ secrets.CLOUDFLARE_API_TOKEN }}" ] || (echo "CLOUDFLARE_API_TOKEN secret is missing!" && exit 1)
           [ -n "${{ secrets.OPENAI_API_KEY }}" ] || (echo "OPENAI_API_KEY secret is missing!" && exit 1)
+          [ -n "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" ] || (echo "CLOUDFLARE_ACCOUNT_ID secret is missing!" && exit 1) # Check is good
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }} # Env var available here
 
       - name: Deploy Worker to Production
         run: pnpm wrangler deploy workers/index.ts --env production
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
