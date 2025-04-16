@@ -1,0 +1,119 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: ["main"] # Keep this trigger for post-merge deployment
+
+jobs:
+  build_test_deploy:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read # Keep read for checkout
+      # Add write permission if you want the workflow to create releases/tags for the bundle
+      # contents: write
+    name: Build, Test, and Deploy to Production
+    strategy:
+      matrix:
+        node-version: [20]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - name: Configure npm registry settings
+        run: |
+          cat > .npmrc << EOF
+          registry=https://registry.npmjs.org/
+          fetch-retries=5
+          fetch-retry-factor=5
+          fetch-retry-mintimeout=15000
+          fetch-retry-maxtimeout=120000
+          EOF
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Check required secrets for build
+        run: |
+          echo "Checking build secrets..."
+          [ -n "${{ secrets.VITE_WEBFLOW_CLIENT_ID }}" ] || (echo "VITE_WEBFLOW_CLIENT_ID secret is missing!" && exit 1)
+        env:
+          VITE_WEBFLOW_CLIENT_ID: ${{ secrets.VITE_WEBFLOW_CLIENT_ID }}
+
+      - name: Run tests before deploy
+        run: pnpm test
+        env:
+          NODE_ENV: test
+
+      - name: Build application bundle
+        run: pnpm build
+        env:
+          NODE_ENV: production
+          VITE_WEBFLOW_EXTENSION: true
+          USE_GPT_RECOMMENDATIONS: true
+          VITE_WEBFLOW_API_KEY: ${{ secrets.VITE_WEBFLOW_API_KEY }}
+          VITE_WEBFLOW_SITE_ID: ${{ secrets.VITE_WEBFLOW_SITE_ID }}
+          VITE_WEBFLOW_CLIENT_ID: ${{ secrets.VITE_WEBFLOW_CLIENT_ID }}
+
+      - name: Validate build output
+        run: |
+          if [ ! -d "public" ]; then
+            echo "Build output directory (public) is missing"
+            exit 1
+          fi
+
+      - name: Create bundle archive
+        run: zip -r bundle.zip public/
+
+      - name: Upload bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle
+          path: bundle.zip
+          retention-days: 5 # Or longer if needed for releases
+
+      - name: Check required secrets for deployment
+        run: |
+          echo "Checking deployment secrets..."
+          [ -n "${{ secrets.CLOUDFLARE_API_TOKEN }}" ] || (echo "CLOUDFLARE_API_TOKEN secret is missing!" && exit 1)
+          [ -n "${{ secrets.OPENAI_API_KEY }}" ] || (echo "OPENAI_API_KEY secret is missing!" && exit 1)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Deploy Worker to Production
+        run: pnpm wrangler deploy workers/index.ts --env production
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          # OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }} # Ensure secrets are set in Cloudflare dashboard or via wrangler secret put
+
+      # Optional: Create a GitHub Release with the bundle.zip
+      # - name: Create Release
+      #   id: create_release
+      #   uses: actions/create-release@v1
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions
+      #   with:
+      #     tag_name: ${{ github.run_number }} # Or use semantic versioning
+      #     release_name: Release ${{ github.run_number }}
+      #     draft: false
+      #     prerelease: false
+      #
+      # - name: Upload Release Asset
+      #   uses: actions/upload-release-asset@v1
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   with:
+      #     upload_url: ${{ steps.create_release.outputs.upload_url }}
+      #     asset_path: ./bundle.zip
+      #     asset_name: bundle.zip
+      #     asset_content_type: application/zip
