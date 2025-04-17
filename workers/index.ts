@@ -12,41 +12,42 @@ export {}; // Ensure this file is treated as a module
  * @param tagPattern The regex pattern to match the desired tag (e.g., h1, p, etc.)
  * @returns An array of extracted text strings
  */
-function extractFullTextContent(html: string, tagPattern: RegExp): string[] {
+export function extractFullTextContent(html: string, tagPattern: RegExp): string[] {
   const results: string[] = [];
   let match;
-  
+
   // Find all instances of the pattern in HTML
   while ((match = tagPattern.exec(html)) !== null) {
     if (match[1]) {
       // Extract the content between opening and closing tags
       const fullTagContent = match[1];
-      
+
       // Improved debugging - log the raw content found
       console.log(`[SEO Analyzer] Found tag content: ${fullTagContent.substring(0, 50)}${fullTagContent.length > 50 ? '...' : ''}`);
-      
+
       // Strip HTML tags but preserve the text content
-      // This approach handles nested elements by removing tags but keeping their text
       const textContent = fullTagContent
+        .replace(/<!--.*?-->/gs, '') // Remove comments first
         .replace(/<[^>]+>/g, ' ')  // Replace tags with spaces
         .replace(/\s+/g, ' ')      // Replace multiple spaces with single space
+        .replace(/\s+([.,!?;:])/g, '$1') // Remove space before punctuation
         .trim();
-      
+
       // Additional debugging for the extracted text
       console.log(`[SEO Analyzer] Extracted text: "${textContent}"`);
-      
+
       if (textContent) {
         results.push(textContent);
       }
     }
   }
-  
+
   // Add debug log for all extracted results
   console.log(`[SEO Analyzer] Total extracted items: ${results.length}`);
   if (results.length > 0) {
     console.log(`[SEO Analyzer] First extracted item: "${results[0]}"`);
   }
-  
+
   return results;
 }
 
@@ -59,36 +60,23 @@ const ALLOWED_DOMAINS = [
   "pmds.pull-list.net"
 ];
 
-// Define a cache object at the module level
-const recommendationCache: Record<string, { recommendation: string; timestamp: number }> = {};
-
 // Helper function to get AI-powered SEO recommendations
-async function getAIRecommendation(title: string, keyphrase: string, env: any, context?: string, additionalContext?: string): Promise<string> {
+export async function getAIRecommendation(title: string, keyphrase: string, env: any, context?: string, additionalContext?: string): Promise<string> {
   try {
-    // Create a cache key for this request
-    const cacheKey = `${title}-${keyphrase}-${context?.substring(0, 50) || ''}`;
-    
-    // Check if we have a cached response that's less than 15 minutes old
-    if (recommendationCache[cacheKey] && (Date.now() - recommendationCache[cacheKey].timestamp) < 900000) { // 15 minutes
-      return recommendationCache[cacheKey].recommendation;
-    }
-
     // Initialize OpenAI client
     const openai = new OpenAI({
       apiKey: env.OPENAI_API_KEY
     });
-    
-    // Limit the context length to reduce token usage
-    const truncatedContext = context && context.length > 300 
-      ? context.substring(0, 300) + "..." 
+
+    // ... (context truncation logic remains the same) ...
+    const truncatedContext = context && context.length > 300
+      ? context.substring(0, 300) + "..."
       : context;
-    
-    // Truncate additional context if provided
     const truncatedAdditionalContext = additionalContext && additionalContext.length > 200
       ? additionalContext.substring(0, 200) + "..."
       : additionalContext;
-    
-    // Define an array of introduction phrases for variety
+
+    // ... (introduction phrases and system/user content remain the same) ...
     const introductionPhrases = [
       "Here is a better [element]: [example]",
       "Try this improved [element]: [example]",
@@ -97,68 +85,61 @@ async function getAIRecommendation(title: string, keyphrase: string, env: any, c
       "Better [element] suggestion: [example]",
       "Enhanced [element]: [example]"
     ];
-    
-    // Randomly select an introduction phrase
     const selectedIntroPhrase = introductionPhrases[Math.floor(Math.random() * introductionPhrases.length)];
-    
     const systemContent = `You are an SEO expert providing concise, actionable recommendations.
          Keep responses under 100 words.
          Format: "${selectedIntroPhrase}"
          Avoid quotation marks.`;
-    
     const userContent = `Fix this SEO issue: "${title}" for keyphrase "${keyphrase}".
          ${truncatedContext ? `Current content: ${truncatedContext}` : ''}
          ${truncatedAdditionalContext ? `Additional context: ${truncatedAdditionalContext}` : ''}`;
-    
+
+
     const response = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo", // Use the most cost-effective model
+      model: "gpt-3.5-turbo",
       messages: [
-        {
-          role: "system",
-          content: systemContent
-        },
-        {
-          role: "user",
-          content: userContent
-        }
+        { role: "system", content: systemContent },
+        { role: "user", content: userContent }
       ],
-      max_tokens: 120, // Reduced token limit for more concise responses
-      temperature: 0.2, // Lower temperature for more predictable responses
+      max_tokens: 120,
+      temperature: 0.2,
     });
 
-    const recommendation = response.choices[0].message.content?.trim() || 
-      "Unable to generate recommendation at this time.";
+    const rawRecommendation = response.choices[0].message.content;
 
-    // Cache the response
-    recommendationCache[cacheKey] = {
-      recommendation,
-      timestamp: Date.now()
-    };
+    // Handle null/undefined/empty raw recommendation *before* cleaning
+    if (!rawRecommendation || rawRecommendation.trim() === '') {
+        console.log("[SEO Analyzer] OpenAI returned empty recommendation, using fallback.");
+        // Return the specific fallback for empty AI response
+        return `Add "${keyphrase}" to your ${title.toLowerCase()}`;
+    }
 
-    // Clean the recommendation - initial cleaning
+    const recommendation = rawRecommendation.trim(); // Now we know it's a non-empty string
+
+    // Clean the recommendation - Refined logic
     let cleanedRecommendation = recommendation
-      .replace(/^I recommend /i, '')
-      .replace(/^You should /i, '')
-      .replace(/^Consider /i, '')
-      .replace(/^Suggested /i, '')
-      .replace(/^Here'?s /i, '')
-      .replace(/^["']|["']$/g, '') // Remove surrounding quotes
+      // Remove surrounding quotes FIRST
+      .replace(/^["']|["']$/g, '')
+      // Remove common conversational prefixes
+      .replace(/^(?:I recommend|You should|Consider|Suggested|Here'?s|Recommendation:|Suggestion:|Update:|Fix:)\s+/i, '')
+      // Remove the specific intro patterns used in the prompt (match element name loosely)
+      .replace(/^(?:Here is a better|A better|Try this improved|Try this|Recommended|Optimize your|Better|Enhanced|Improved)\s+.+?:\s*/i, '')
+      // ADDED: Remove potential malformed prefixes like "[element]: "
+      .replace(/^\[.*?\]:\s*/, '')
+      // Remove quotes around internal text (optional, check if needed)
+      // .replace(/["']([^"']+)["']/g, '$1')
+      // Remove backticks
+      .replace(/`([^`]+)`/g, '$1')
+      // Remove trailing colons or whitespace
       .replace(/:\s*$/, '')
-      .replace(/["']([^"']+)["']/g, '$1') // Remove quotes around any text
-      .replace(/`([^`]+)`/g, '$1')  
-      // Remove "Here is a better X:" prefix if followed by "Example:"
-      .replace(/^Here is a better [^:]+:\s*Example:\s*/i, '')
-      // Remove "Better X:" if followed by "Example:"
-      .replace(/^Better [^:]+:\s*Example:\s*/i, '')
-      // Remove "Example:" prefix if it appears after another introduction
-      .replace(/^([^:]+):\s*Example:\s*/i, '$1: ')
-      // Remove duplicate labels like "Title: Meta Description:"
-      .replace(/^([^:]+):\s*([^:]+):\s*/i, '$1: ')
-      .replace(/^([A-Za-z\s]{1,20}):\s*([A-Za-z\s]{1,20}):\s*/i, '$1: ');
-    
+      .trim(); // Trim final result
+
+    // Return cleaned recommendation (fallback here is less likely needed but safe)
     return cleanedRecommendation || `Add "${keyphrase}" to your ${title.toLowerCase()}`;
+
   } catch (error) {
     console.error("[SEO Analyzer] Error getting AI recommendation:", error);
+    // This fallback is now *only* for actual API errors or unexpected issues
     return `${keyphrase.charAt(0).toUpperCase() + keyphrase.slice(1)} - Your Website`;
   }
 }
@@ -170,8 +151,6 @@ const allowedOrigins: string[] = [
   'http://localhost:1337',  // For local development
   'http://localhost:5173'   // For Vite development server
 ];
-
-export {}; // Ensure this file is treated as a module
 
 // Create a pattern to test domains against
 const createDomainPattern = (domain: string): RegExp => {
@@ -218,10 +197,16 @@ async function fetchOAuthToken(code: string, env: any): Promise<string> {
   const clientSecret = env.WEBFLOW_CLIENT_SECRET;
   const redirectUri = env.WEBFLOW_REDIRECT_URI;
 
-  const response = await fetch('https://api.webflow.com/oauth/access_token', {
+  const tokenUrl = 'https://api.webflow.com/oauth/access_token';
+  const urlWithCacheBust = new URL(tokenUrl);
+  urlWithCacheBust.searchParams.set('_t', Date.now().toString()); // Add cache buster
+
+  const response = await fetch(urlWithCacheBust.toString(), { // Use updated URL
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'Cache-Control': 'no-store', // Prevent caching of this request/response
+      'Pragma': 'no-cache'
     },
     body: JSON.stringify({
       client_id: clientId,
@@ -230,7 +215,9 @@ async function fetchOAuthToken(code: string, env: any): Promise<string> {
       redirect_uri: redirectUri,
       grant_type: 'authorization_code',
     }),
-  });
+    cache: 'no-store', // Standard fetch cache directive
+    cf: { cacheTtl: 0 } // Prevent Cloudflare edge caching
+  } as RequestInit); // Cast to include Cloudflare specific properties
 
   if (!response.ok) {
     throw new Error(`Failed to fetch OAuth token: ${response.statusText}`);
@@ -621,18 +608,24 @@ async function scrapeWebpage(url: string): Promise<any> {
         'User-Agent': 'SEO-Analyzer/2.3.2 (https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow)',
         'Accept': 'text/html,application/xhtml+xml,application/xml',
         'Accept-Language': 'en-US,en;q=0.9',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
+        'Cache-Control': 'no-cache, no-store, must-revalidate', // More explicit request headers
+        'Pragma': 'no-cache', // For older HTTP/1.0 caches
+        'Expires': '0' // For older HTTP/1.0 caches
       },
       redirect: 'follow' as RequestRedirect,
+      cache: 'no-store', // Standard fetch cache directive
       cf: { // Cloudflare-specific options
-        cacheTtl: 0, // Don't cache the response
-        resolveOverride: urlObj.hostname // Ensure DNS resolution uses the correct hostname
+        cacheTtl: 0, // Don't cache the response at Cloudflare edge
       }
-    };
+    } as RequestInit; // Cast to include Cloudflare specific properties
     
     // Try each URL variant with retries
-    for (const variantUrl of uniqueVariants) {
+    for (let variantUrl of uniqueVariants) {
+      // Add cache-busting parameter
+      const urlWithCacheBust = new URL(variantUrl);
+      urlWithCacheBust.searchParams.set('_t', Date.now().toString());
+      variantUrl = urlWithCacheBust.toString();
+
       for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
           console.log(`[SEO Analyzer] Attempt ${attempt + 1}/${maxRetries} for URL: ${variantUrl}`);
@@ -1999,70 +1992,87 @@ addEventListener('fetch', (event: any) => {
 async function handleRequest(request: Request, env: any): Promise<Response> {
   const corsResponse = handleCors(request);
   if (corsResponse) return corsResponse;
-  
+
   const url = new URL(request.url);
   const path = url.pathname;
   const origin = request.headers.get('Origin');
-  const corsHeaders = {
+
+  // Define standard NO-CACHE headers for all responses
+  const noCacheHeaders = {
     'Access-Control-Allow-Origin': origin || '*',
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
+    'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+    'Pragma': 'no-cache', // HTTP 1.0 backward compatibility
+    'Expires': '0' // HTTP 1.0 backward compatibility
   };
-  
-  
+
   try {
+    // HEAD request - OK to use simple headers, no body to cache
     if (path === '/api/analyze' && request.method === 'HEAD') {
-      return new Response(null, { status: 200, headers: corsHeaders });
+      return new Response(null, { status: 200, headers: { 'Access-Control-Allow-Origin': origin || '*' } });
     }
 
+    // OAuth routes - Should not be cached
     if (path === '/api/oauth/callback' && request.method === 'POST') {
-      return handleOAuthTokenExchange(request, env);
+      // Assuming handleOAuthTokenExchange returns a Response
+      const response = await handleOAuthTokenExchange(request, env);
+      // Apply no-cache headers
+      Object.entries(noCacheHeaders).forEach(([key, value]) => response.headers.set(key, value));
+      return response;
     }
-
     if (path === '/api/auth' && request.method === 'GET') {
-      return handleAuthRedirect(request, env);
+      // Assuming handleAuthRedirect returns a Response (likely a redirect)
+      const response = await handleAuthRedirect(request, env);
+      // Apply no-cache headers to the redirect response itself
+      Object.entries(noCacheHeaders).forEach(([key, value]) => response.headers.set(key, value));
+      return response;
+    }
+    if (path === '/api/callback' && request.method === 'GET') {
+      // Assuming handleAuthCallback returns a Response
+      const response = await handleAuthCallback(request, env);
+      // Apply no-cache headers
+      Object.entries(noCacheHeaders).forEach(([key, value]) => response.headers.set(key, value));
+      return response;
     }
 
-    if (path === '/api/callback' && request.method === 'GET') {
-      return handleAuthCallback(request, env);
-    }
-    
-    try {
-      if (path === '/api/analyze' && request.method === 'POST') {
-        const data = await request.json();
-        const { keyphrase, url } = data;
-        if (!keyphrase || !url) {
-          return new Response(JSON.stringify({ message: "Keyphrase and URL are required" }), { status: 400, headers: corsHeaders });
-        }
-        const results = await analyzeSEOElements(url, keyphrase, env);
-        return new Response(JSON.stringify(results), { status: 200, headers: corsHeaders });
-      } else if (path === '/api/register-domains' && request.method === 'POST') {
-        const data = await request.json();
-        const { domains } = data;
-        if (!domains || !Array.isArray(domains)) {
-          return new Response(JSON.stringify({ success: false, message: "Domains array is required" }), { status: 400, headers: corsHeaders });
-        }
-        return new Response(JSON.stringify({ success: true, message: `Successfully registered ${domains.length} domains.` }), { status: 200, headers: corsHeaders });
+    // Analyze route - Should not be cached
+    if (path === '/api/analyze' && request.method === 'POST') {
+      const data = await request.json();
+      const { keyphrase, url: targetUrl } = data; // Renamed url to avoid conflict
+      if (!keyphrase || !targetUrl) {
+        return new Response(JSON.stringify({ message: "Keyphrase and URL are required" }), { status: 400, headers: noCacheHeaders });
       }
-      else if (path === '/api/ping' && (request.method === 'GET' || request.method === 'HEAD')) {
-        const pingResponse = {
-          status: 'ok',
-          message: 'Worker is running',
-          timestamp: new Date().toISOString()
-        }
-        return new Response(JSON.stringify(pingResponse), { 
-          status: 200, 
-          headers: { 
-            ...corsHeaders,
-            'Cache-Control': 'public, max-age=60'  // Cache for 60 seconds 
-          } 
-        });
-      }
-      return new Response(JSON.stringify({ message: "Route not found", path }), { status: 404, headers: corsHeaders });
-    } catch (error: any) {
-      return new Response(JSON.stringify({ message: "Internal server error", error: error.message }), { status: 500, headers: corsHeaders });
+      const results = await analyzeSEOElements(targetUrl, keyphrase, env);
+      return new Response(JSON.stringify(results), { status: 200, headers: noCacheHeaders });
     }
+
+    // Register domains route - Response likely doesn't need caching
+    if (path === '/api/register-domains' && request.method === 'POST') {
+      const data = await request.json();
+      const { domains } = data;
+      if (!domains || !Array.isArray(domains)) {
+        return new Response(JSON.stringify({ success: false, message: "Domains array is required" }), { status: 400, headers: noCacheHeaders });
+      }
+      return new Response(JSON.stringify({ success: true, message: `Successfully registered ${domains.length} domains.` }), { status: 200, headers: noCacheHeaders });
+    }
+
+    // Ping route - Remove caching
+    if (path === '/api/ping' && (request.method === 'GET' || request.method === 'HEAD')) {
+      const pingResponse = {
+        status: 'ok',
+        message: 'Worker is running',
+        timestamp: new Date().toISOString()
+      };
+      // Use noCacheHeaders instead of allowing caching
+      return new Response(JSON.stringify(pingResponse), { status: 200, headers: noCacheHeaders });
+    }
+
+    // Not found
+    return new Response(JSON.stringify({ message: "Route not found", path }), { status: 404, headers: noCacheHeaders });
+
   } catch (error: any) {
-    return new Response(JSON.stringify({ message: "Internal server error", error: error.message }), { status: 500, headers: corsHeaders });
+    // Error response
+    return new Response(JSON.stringify({ message: "Internal server error", error: error.message }), { status: 500, headers: noCacheHeaders });
   }
 }
 
