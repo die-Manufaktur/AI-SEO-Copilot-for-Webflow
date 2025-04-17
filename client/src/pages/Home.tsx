@@ -96,7 +96,7 @@ export const getPriorityIcon = (priority: string, className: string = "h-4 w-4")
 };
 
 // Get priority text based on priority level
-const getPriorityText = (priority: string) => {
+export const getPriorityText = (priority: string) => {
   switch (priority) {
     case 'high':
       return "High Priority";
