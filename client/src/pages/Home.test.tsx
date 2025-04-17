@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
 import { AlertTriangle, CircleAlert, Info } from 'lucide-react';
 import React from 'react';
+import { getPriorityText } from '../pages/Home';
 
 type Priority = 'high' | 'medium' | 'low' | 'unknown';
 
@@ -72,5 +73,34 @@ describe('getPriorityIcon', () => {
         const svgElement = container.querySelector('svg');
         expect(svgElement).not.toBeNull();
         expect(svgElement).toHaveClass('h-4', 'w-4');
+    });
+
+    describe('getPriorityText', () => {
+        it('should return "High Priority" for high priority', () => {
+            expect(getPriorityText('high')).toBe("High Priority");
+        });
+
+        it('should return "Medium Priority" for medium priority', () => {
+            expect(getPriorityText('medium')).toBe("Medium Priority");
+        });
+
+        it('should return "Low Priority" for low priority', () => {
+            expect(getPriorityText('low')).toBe("Low Priority");
+        });
+
+        it('should return an empty string for unknown priority', () => {
+            expect(getPriorityText('unknown')).toBe("");
+        });
+
+        it('should return an empty string for an empty string input', () => {
+            expect(getPriorityText('')).toBe("");
+        });
+
+        it('should return an empty string for a null input (if applicable, depends on type)', () => {
+            // Assuming the type allows null/undefined, though the current signature is string
+            // If the function signature changes, this test might be relevant.
+            // For now, testing with a non-priority string.
+            expect(getPriorityText('some other value')).toBe("");
+        });
     });
 });
