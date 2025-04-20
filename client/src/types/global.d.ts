@@ -21,6 +21,7 @@ interface WebflowPage {
   id: string;
   name: string;
   path: string;
+  isHomepage(): Promise<boolean>;
   getTitle(): Promise<string>;
   getDescription(): Promise<string>;
   getSlug(): Promise<string>;

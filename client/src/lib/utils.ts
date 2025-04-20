@@ -23,6 +23,23 @@ export function extractDomainFromUrl(url: string): string {
 }
 
 /**
+ * Extracts text after the first colon in a string.
+ * Returns the original string if no colon is found.
+ * @param text The input string.
+ * @returns The text after the first colon, trimmed, or the original string.
+ */
+export function extractTextAfterColon(text: string | undefined | null): string {
+  if (!text) {
+    return "";
+  }
+  const colonIndex = text.indexOf(':');
+  if (colonIndex === -1) {
+    return text.trim(); // Return trimmed original if no colon
+  }
+  return text.substring(colonIndex + 1).trim();
+}
+
+/**
  * Log level types
  */
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
