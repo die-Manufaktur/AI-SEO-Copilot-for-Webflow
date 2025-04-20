@@ -27,3 +27,15 @@ export interface AnalyzeRequest {
   url: string;
   keyphrase: string;
 }
+
+// NEW: Data fetched directly from Webflow API
+export interface WebflowPageData {
+  title: string;
+  metaDescription: string;
+  ogTitle: string;
+  ogDescription: string;
+  ogImage: string;
+  usesTitleAsOGTitle: boolean; // Added
+  usesDescriptionAsOGDescription: boolean; // Added
+  // Add other relevant fields if needed, e.g., search title/desc
+}

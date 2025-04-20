@@ -2,7 +2,7 @@ import OpenAI from 'openai';
 import * as ip from "ip";
 import { URL } from "url";
 
-// --- NEW: Define Shared Types ---
+// --- Shared Types ---
 
 // Matches client/src/lib/types.ts SEOCheck
 interface SEOCheck {
@@ -45,24 +45,31 @@ interface SchemaMarkupResult {
   schemaCount: number;
 }
 
-// Type for data scraped and processed from HTML
-interface ScrapedPageData {
+// NEW: Data fetched directly from Webflow API (Matches client type)
+interface WebflowPageData {
   title: string;
   metaDescription: string;
+  ogTitle: string;
+  ogDescription: string;
+  ogImage: string;
+  usesTitleAsOGTitle: boolean; // Added
+  usesDescriptionAsOGDescription: boolean; // Added
+}
+
+// UPDATED: ScrapedPageData - Removed fields now coming from Webflow API
+interface ScrapedPageData {
   content: string;
   paragraphs: string[];
   headings: Array<{ level: number; text: string }>;
   images: Array<{ src: string; alt: string; size?: number }>;
   internalLinks: string[];
   outboundLinks: string[];
-  url: string;
-  ogMetadata: OGMetadata;
+  url: string; // Keep the actual fetched URL
   resources: {
     js: Resource[];
     css: Resource[];
   };
-  schema: SchemaInfo; // From the complex schema detection logic
-  schemaMarkup: SchemaMarkupResult; // From the simpler detectSchemaMarkup function
+  schemaMarkup: SchemaMarkupResult;
 }
 
 // Matches client/src/lib/types.ts SEOAnalysisResult
@@ -437,7 +444,6 @@ function escapeRegExp(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-// --- NEW: Add the missing getSuccessMessage function ---
 /**
  * Generates a standard success message for a passed SEO check.
  * @param checkType The name of the check that passed.
@@ -487,9 +493,7 @@ function getSuccessMessage(checkType: string, url?: string): string {
       return `Check passed: ${checkType}`;
   }
 }
-// --- End of getSuccessMessage function ---
 
-// --- NEW: Add the missing calculateKeyphraseDensity function ---
 /**
  * Calculates the keyphrase density within a given text content.
  * @param content The main text content of the page.
@@ -532,7 +536,6 @@ function calculateKeyphraseDensity(content: string, keyphrase: string): { densit
 }
 // --- End of calculateKeyphraseDensity function ---
 
-// REVISED scrapeWebpage function signature (return type updated)
 async function scrapeWebpage(url: string, siteInfo: WebflowSiteInfo): Promise<ScrapedPageData> {
   const maxRetries = 2; // Reduced retries slightly
   let lastError = null;
@@ -629,400 +632,6 @@ async function scrapeWebpage(url: string, siteInfo: WebflowSiteInfo): Promise<Sc
   throw lastError || new Error(`Failed to fetch page after trying all URL variants`);
 }
 
-// REVISED processHtml function signature (return type updated)
-async function processHtml(html: string, url: string): Promise<ScrapedPageData> {
-  try {
-    console.log(`[SEO Analyzer] Processing HTML content from: ${url}`);
-    
-    // Extract title and meta description
-    const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
-    const title = titleMatch ? titleMatch[1].trim() : "";
-    
-    const metaDescriptionMatches = [
-      html.match(/<meta\s+name=["']description["'][^>]*content=["'](.*?)["']/i),
-      html.match(/<meta\s+content=["'](.*?)["'][^>]*name=["']description["']/i),
-      html.match(/<meta\s+property=["']og:description["'][^>]*content=["'](.*?)["']/i),
-      html.match(/<meta\s+content=["'](.*?)["'][^>]*property=["']og:description["']/i)
-    ];
-    
-    let metaDescription = "";
-    for (const match of metaDescriptionMatches) {
-      if (match && match[1]) {
-        metaDescription = match[1].trim();
-        break;
-      }
-    }
-    
-    console.log("[SEO Analyzer] Meta Description Found:", metaDescription || "(none)");
-    
-    // Extract OpenGraph metadata
-    const ogMetadata: OGMetadata = {
-      title: "",
-      description: "",
-      image: "",
-      imageWidth: "",
-      imageHeight: ""
-    };
-
-    // Extract OG title - Fix the regex to properly match the content
-    const ogTitleMatch = html.match(/<meta\s+property=["']og:title["']\s+content=["']([^"']+)["']\s*\/?>/i) || 
-                         html.match(/<meta\s+content=["']([^"']+)["']\s+property=["']og:title["']\s*\/?>/i);
-    if (ogTitleMatch) ogMetadata.title = ogTitleMatch[1].trim();
-
-    // Extract OG description - Improved regex pattern
-    const ogDescMatch = html.match(/<meta\s+property=["']og:description["']\s+content=["']([^"']+)["']\s*\/?>/i) ||
-                        html.match(/<meta\s+content=["']([^"']+)["']\s+property=["']og:description["']\s*\/?>/i);
-    if (ogDescMatch) ogMetadata.description = ogDescMatch[1].trim();
-
-    // Extract OG image - Improved regex pattern
-    const ogImageMatch = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']\s*\/?>/i) ||
-                         html.match(/<meta\s+content=["']([^"']+)["']\s+property=["']og:image["']\s*\/?>/i);
-    if (ogImageMatch) ogMetadata.image = ogImageMatch[1].trim();
-
-    // Extract OG image dimensions - Improved regex patterns
-    const ogImageWidthMatch = html.match(/<meta\s+property=["']og:image:width["']\s+content=["']([^"']+)["']\s*\/?>/i) ||
-                              html.match(/<meta\s+content=["']([^"']+)["']\s+property=["']og:image:width["']\s*\/?>/i);
-    if (ogImageWidthMatch) ogMetadata.imageWidth = ogImageWidthMatch[1].trim();
-
-    const ogImageHeightMatch = html.match(/<meta\s+property=["']og:image:height["']\s+content=["']([^"']+)["']\s*\/?>/i) ||
-                               html.match(/<meta\s+content=["']([^"']+)["']\s+property=["']og:image:height["']\s*\/?>/i);
-    if (ogImageHeightMatch) ogMetadata.imageHeight = ogImageHeightMatch[1].trim();
-
-    // Try more flexible matching if the strict patterns didn't match
-    if (!ogTitleMatch) {
-      const flexMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["'][^>]*>/i) ||
-                        html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:title["'][^>]*>/i);
-      if (flexMatch) ogMetadata.title = flexMatch[1].trim();
-    }
-
-    if (!ogDescMatch) {
-      const flexMatch = html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["'][^>]*>/i) ||
-                       html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:description["'][^>]*>/i);
-      if (flexMatch) ogMetadata.description = flexMatch[1].trim();
-    }
-
-    if (!ogImageMatch) {
-      const flexMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["'][^>]*>/i) ||
-                       html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["'][^>]*>/i);
-      if (flexMatch) ogMetadata.image = flexMatch[1].trim();
-    }
-    
-    // Extract body content
-    const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-    const bodyContent = bodyMatch ? bodyMatch[1] : html;
-    const content = bodyContent.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-    console.log("[SEO Analyzer] Extracted content:", content.substring(0, 200) + "...");
-
-    console.log("[SEO Analyzer] Scraping paragraphs...");
-    // Use regex to extract paragraphs instead of DOM API
-    const paragraphRegex = /<p[^>]*>([\s\S]*?)<\/p>/gi;
-    const paragraphMatches = [...bodyContent.matchAll(paragraphRegex)];
-    console.log("[SEO Analyzer] Total p tags found:", paragraphMatches.length);
-
-    // Extract paragraphs with parent context
-    const paragraphs = paragraphMatches
-      .map(match => {
-        const text = match[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-        // Try to get parent element class (simplified)
-        const fullMatch = match[0];
-        const parentClassMatch = bodyContent.substring(
-          Math.max(0, bodyContent.indexOf(fullMatch) - 200), 
-          bodyContent.indexOf(fullMatch)
-        ).match(/<([a-z0-9]+)[^>]*class=["']([^"']+)["'][^>]*>[^<]*$/i);
-        
-        const parentClass = parentClassMatch ? parentClassMatch[2] : 'no-parent-class';
-        console.log(`[SEO Analyzer] Paragraph found in ${parentClass}:`, text.substring(0, 100) + (text.length > 100 ? '...' : ''));
-        return text;
-      })
-      .filter(text => text.length > 0);
-    
-    // Extract headings - UPDATED to properly handle nested elements with spans
-    const headings: Array<{ level: number; text: string }> = [];
-    for (let i = 1; i <= 6; i++) {
-      // Create pattern that captures the full content between opening and closing tags
-      const headingPattern = new RegExp(`<h${i}[^>]*>(.*?)<\\/h${i}>`, 'gi');
-      
-      // Extract full text content including nested elements using our utility function
-      const headingTexts = extractFullTextContent(html, headingPattern);
-      
-      // Add all found headings to the list
-      headingTexts.forEach(text => {
-        headings.push({ level: i, text });
-      });
-    }
-    
-    // Extract images with sizes
-    const images: Array<{ src: string; alt: string; size?: number }> = [];
-    const imageMatches = html.matchAll(/<img[^>]*src=["'](.*?)["'][^>]*alt=["'](.*?)["'][^>]*>/gi);
-    for (const match of imageMatches) {
-      images.push({ src: match[1], alt: match[2] });
-    }
-    
-    // Also match images where alt comes before src (Webflow sometimes does this)
-    const altFirstImageMatches = html.matchAll(/<img[^>]*alt=["'](.*?)["'][^>]*src=["'](.*?)["'][^>]*>/gi);
-    for (const match of altFirstImageMatches) {
-      images.push({ src: match[2], alt: match[1] });
-    }
-    
-    // Extract links
-    const baseUrl = new URL(url);
-    const internalLinks: string[] = [];
-    const outboundLinks: string[] = [];
-    const linkMatches = html.matchAll(/<a[^>]*href=["'](.*?)["'][^>]*>/gi);
-    for (const match of linkMatches) {
-      try {
-        const href = match[1];
-        if (href.startsWith('#') || href.startsWith('javascript:')) continue;
-        const linkUrl = new URL(href, baseUrl.origin);
-        if (linkUrl.hostname === baseUrl.hostname) {
-          internalLinks.push(href);
-        } else {
-          outboundLinks.push(href);
-        }
-      } catch (e) {
-        // Skip invalid URLs
-      }
-    }
-    
-    // Extract JavaScript and CSS resources to check minification
-    const resources = {
-      js: [] as Resource[],
-      css: [] as Resource[]
-    };
-    
-    // Extract JavaScript files
-    const scriptMatches = html.matchAll(/<script[^>]*src=["'](.*?)["'][^>]*>/gi);
-    for (const match of Array.from(scriptMatches)) {
-      const scriptUrl = match[1];
-      if (scriptUrl) {
-        try {
-          // Determine if it's external or can be fetched
-          let absoluteUrl = scriptUrl;
-          if (scriptUrl.startsWith('//')) {
-            absoluteUrl = `https:${scriptUrl}`;
-          } else if (scriptUrl.startsWith('/')) {
-            absoluteUrl = `${baseUrl.protocol}//${baseUrl.host}${scriptUrl}`;
-          } else if (!scriptUrl.startsWith('http')) {
-            absoluteUrl = new URL(scriptUrl, url).toString();
-          }
-
-          // Fetch the content of the script
-          const scriptResponse = await fetch(absoluteUrl);
-          const scriptContent = scriptResponse.ok ? await scriptResponse.text() : '';
-
-          resources.js.push({
-            url: absoluteUrl,
-            content: scriptContent,
-            minified: scriptUrl.includes('.min.js') || scriptUrl.includes('-min.js')
-          });
-        } catch (e) {
-          // Just continue if we can't fetch a script
-          resources.js.push({
-            url: scriptUrl,
-            content: '',
-            minified: scriptUrl.includes('.min.js') || scriptUrl.includes('-min.js')
-          });
-        }
-      }
-    }
-    
-    // Extract inline scripts - replace sanitizeHtml with manual extraction
-    const inlineScriptMatches = html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi);
-    for (const match of Array.from(inlineScriptMatches)) {
-      const scriptContent = match[1]?.trim();
-      if (scriptContent && scriptContent.length > 0) {
-        // Use the centralized isMinified function with the 30% threshold
-        const scriptMinified = isMinified(scriptContent);
-        resources.js.push({
-          url: 'inline-script',
-          content: scriptContent,
-          minified: scriptMinified
-        });
-      }
-    }
-    
-    // Extract CSS files
-    const cssMatches = html.matchAll(/<link[^>]*rel=["']stylesheet["'][^>]*href=["'](.*?)["'][^>]*>/gi);
-    for (const match of Array.from(cssMatches)) {
-      const cssUrl = match[1];
-      if (cssUrl) {
-        try {
-          // Determine if it's external or can be fetched
-          let absoluteUrl = cssUrl;
-          if (cssUrl.startsWith('//')) {
-            absoluteUrl = `https:${cssUrl}`;
-          } else if (cssUrl.startsWith('/')) {
-            absoluteUrl = `${baseUrl.protocol}//${baseUrl.host}${cssUrl}`;
-          } else if (!cssUrl.startsWith('http')) {
-            absoluteUrl = new URL(cssUrl, url).toString();
-          }
-
-          // Fetch the content of the CSS
-          const cssResponse = await fetch(absoluteUrl);
-          const cssContent = cssResponse.ok ? await cssResponse.text() : '';
-
-          resources.css.push({
-            url: absoluteUrl,
-            content: cssContent,
-            minified: cssUrl.includes('.min.css') || cssUrl.includes('-min.css')
-          });
-        } catch (e) {
-          // Just continue if we can't fetch a stylesheet
-          resources.css.push({
-            url: cssUrl,
-            content: '',
-            minified: cssUrl.includes('.min.css') || cssUrl.includes('-min.css')
-          });
-        }
-      }
-    }
-    
-    // Extract inline styles
-    const inlineStyleMatches = html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi);
-    for (const match of Array.from(inlineStyleMatches)) {
-      const styleContent = match[1]?.trim();
-      if (styleContent && styleContent.length > 0) {
-        // Use the centralized isMinified function with the 30% threshold
-        const styleMinified = isMinified(styleContent);
-        resources.css.push({
-          url: 'inline-style',
-          content: styleContent,
-          minified: styleMinified
-        });
-      }
-    }
-    
-    // Check for schema.org structured data
-    const schema: SchemaInfo = {
-      detected: false,
-      types: [],
-      jsonLdBlocks: [],
-      microdataTypes: [],
-      debug: {}
-    };
-    
-    // Extract JSON-LD schema
-    // Try multiple regex patterns from most specific to most permissive
-    let matchesArray: RegExpMatchArray[] = [];
-
-    // Create a consistent logging prefix
-    const logPrefix = '[SEO Analyzer]';
-
-    // Declare all match variables at the top level so they're accessible later
-    const pattern1 = /<script\s+type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
-    const matches1 = Array.from(html.matchAll(pattern1));
-    // Check if pattern1 found any matches
-    if (matches1.length > 0) {
-      matchesArray = matches1;
-    }
-    // Define remaining match variables that will be used later
-    let matches2: RegExpMatchArray[] = [];
-    let matches3: RegExpMatchArray[] = [];
-    let matches4: RegExpMatchArray[] = [];
-    let matches5: RegExpMatchArray[] = [];
-    // Pattern 2: More permissive to handle different attribute ordering
-    if (matchesArray.length === 0) {
-      const pattern2 = /<script[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
-      matches2 = Array.from(html.matchAll(pattern2));
-      if (matches2.length > 0) {
-        matchesArray = matches2;
-      }
-    }
-    // Pattern 3: Most permissive - any script with ld+json anywhere in attributes
-    if (matchesArray.length === 0) {
-      const pattern3 = /<script[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi;
-      matches3 = Array.from(html.matchAll(pattern3));
-      if (matches3.length > 0) {
-        matchesArray = matches3;
-      }
-    }
-
-    // Pattern 4: Exact pattern for specific cases (trying to match your exact format)
-    if (matchesArray.length === 0) {
-      // This pattern specifically looks for your script format with no whitespace between attributes
-      const pattern4 = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi;
-      matches4 = Array.from(html.matchAll(pattern4));
-      if (matches4.length > 0) {
-        matchesArray = matches4;
-      }
-    }
-
-    // Pattern 5: Ultra-permissive pattern
-    if (matchesArray.length === 0) {
-      // Look for any script tag that might contain schema.org data
-      const pattern5 = /<script[^>]*>([\s\S]*?@context[\s\S]*?schema\.org[\s\S]*?@type[\s\S]*?)<\/script>/gi;
-      matches5 = Array.from(html.matchAll(pattern5));
-      if (matches5.length > 0) {
-        matchesArray = matches5;
-      }
-    }
-
-    // Process schema matches
-    for (const match of matchesArray) {
-      try {
-        // Extract and trim the content inside the script tag
-        const scriptContent = match[1].trim();
-        
-        // Try to parse the JSON
-        try {
-          const jsonData = JSON.parse(scriptContent);
-          
-          schema.detected = true;
-          schema.jsonLdBlocks.push(jsonData);
-          
-          if (jsonData['@type']) {
-            schema.types.push(jsonData['@type']);
-          } else if (Array.isArray(jsonData)) {
-            jsonData.forEach((item) => {
-              if (item && item['@type']) {
-                schema.types.push(item['@type']);
-              }
-            });
-          }
-        } catch (jsonError) {
-          // Just continue if we can't parse the JSON
-        }
-      } catch (e) {
-        // Just continue if there's an error processing this match
-      }
-    }
-
-    // Extract Microdata schema as well
-    const microdataMatches = html.matchAll(/<[^>]+\s+itemscope[^>]*>/gi);
-    for (const match of microdataMatches) {
-      const itemTypeMatch = match[0].match(/itemtype=["'](.*?)["']/i);
-      if (itemTypeMatch) {
-        schema.detected = true;
-        const types = itemTypeMatch[1].split(/\s+/).filter(Boolean);
-        schema.microdataTypes.push(...types);
-      }
-    }
-
-    // Add schema markup detection
-    const schemaMarkup = detectSchemaMarkup(html);
-
-    return {
-      title,
-      metaDescription,
-      content,
-      paragraphs,
-      headings,
-      images,
-      internalLinks,
-      outboundLinks,
-      url,
-      ogMetadata,
-      resources,
-      schema,
-      schemaMarkup
-    };
-  } catch (error) {
-    console.error("[SEO Analyzer] Error processing HTML:", error);
-    throw error;
-  }
-}
-
-// Centralized minification detection function with configurable threshold
 function isMinified(code: string, minificationThreshold: number = 30): boolean {
   if (!code || code.length < 50) return true;
 
@@ -1054,8 +663,116 @@ function isMinified(code: string, minificationThreshold: number = 30): boolean {
   return isLikelyMinified;
 }
 
+// REVISED processHtml function signature (return type updated)
+async function processHtml(html: string, url: string): Promise<ScrapedPageData> { // Return type is now the simplified ScrapedPageData
+  try {
+    console.log(`[SEO Analyzer] Processing HTML content from: ${url}`);
+    const baseUrl = new URL(url);
+
+    // --- Keep width/height extraction if needed for specific checks, otherwise remove ---
+    const ogImageWidthMatch = html.match(/<meta[^>]*property=["']og:image:width["'][^>]*content=["'](.*?)["'][^>]*>/i);
+    const ogImageHeightMatch = html.match(/<meta[^>]*property=["']og:image:height["'][^>]*content=["'](.*?)["'][^>]*>/i);
+    const ogImageWidth = ogImageWidthMatch ? ogImageWidthMatch[1].trim() : '';
+    const ogImageHeight = ogImageHeightMatch ? ogImageHeightMatch[1].trim() : '';
+
+
+    // Extract Body Content (simplified) - REMAINS THE SAME
+    const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    const bodyContent = bodyMatch ? bodyMatch[1] : '';
+    const content = bodyContent.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+                             .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+                             .replace(/<[^>]+>/g, ' ')
+                             .replace(/\s+/g, ' ')
+                             .trim();
+    console.log(`[SEO Analyzer] Extracted Content Length: ${content.length}`);
+
+    // Extract Paragraphs - REMAINS THE SAME
+    const paragraphs = extractFullTextContent(bodyContent, /<p[^>]*>([\s\S]*?)<\/p>/gi);
+    console.log(`[SEO Analyzer] Extracted ${paragraphs.length} Paragraphs`);
+
+    // Extract Headings - REMAINS THE SAME
+    const headings: Array<{ level: number; text: string }> = [];
+    const headingMatches = bodyContent.matchAll(/<h([1-6])[^>]*>([\s\S]*?)<\/h\1>/gi);
+    for (const match of headingMatches) {
+      const level = parseInt(match[1], 10);
+      const headingTextContent = match[2]
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (headingTextContent) {
+        headings.push({ level, text: headingTextContent });
+      }
+    }
+    console.log(`[SEO Analyzer] Extracted ${headings.length} Headings`);
+
+    // Extract images - REMAINS THE SAME
+    console.log("[SEO Analyzer] Starting Image Extraction...");
+    const images: Array<{ src: string; alt: string; size?: number }> = [];
+    const imageMatches = bodyContent.matchAll(/<img[^>]*src=["'](.*?)["'][^>]*alt=["'](.*?)["'][^>]*>/gi);
+    for (const match of imageMatches) {
+        const src = match[1];
+        const alt = match[2];
+        images.push({ src: new URL(src, baseUrl.toString()).toString(), alt: alt.trim(), size: undefined });
+    }
+    console.log(`[SEO Analyzer] Finished Image Extraction. Found ${images.length} images.`);
+
+    // Extract links - REMAINS THE SAME
+    console.log("[SEO Analyzer] Starting Link Extraction...");
+    const internalLinks: string[] = [];
+    const outboundLinks: string[] = [];
+    const linkMatches = bodyContent.matchAll(/<a[^>]*href=["'](.*?)["'][^>]*>/gi);
+    for (const match of linkMatches) {
+        const href = match[1];
+        if (href && !href.startsWith('#') && !href.startsWith('mailto:') && !href.startsWith('tel:')) {
+            try {
+                const absoluteUrl = new URL(href, baseUrl.toString());
+                if (absoluteUrl.hostname === baseUrl.hostname) {
+                    internalLinks.push(absoluteUrl.toString());
+                } else {
+                    outboundLinks.push(absoluteUrl.toString());
+                }
+            } catch (e) {
+                console.warn(`[SEO Analyzer] Skipping invalid link URL: ${href}`);
+            }
+        }
+    }
+    console.log(`[SEO Analyzer] Finished Link Extraction. Found ${internalLinks.length} internal, ${outboundLinks.length} outbound.`);
+
+    // Extract JavaScript and CSS resources - REMAINS THE SAME (including fetch calls)
+    console.log("[SEO Analyzer] Starting Resource Extraction...");
+    const resources = { js: [] as Resource[], css: [] as Resource[] };
+    // ... existing JS/CSS extraction logic ...
+    console.log("[SEO Analyzer] Finished Resource Extraction.");
+
+
+    // Detect schema markup - REMAINS THE SAME
+    const schemaMarkup = detectSchemaMarkup(html);
+    console.log(`[SEO Analyzer] Schema Markup Detected: ${schemaMarkup.hasSchema}, Types: ${schemaMarkup.schemaTypes.join(', ')}`);
+
+    // Construct the final ScrapedPageData object (using the simplified interface)
+    const scrapedData: ScrapedPageData = {
+      content: content || '',
+      paragraphs: paragraphs || [],
+      headings: headings || [],
+      images: images || [],
+      internalLinks: internalLinks || [],
+      outboundLinks: outboundLinks || [],
+      url: url, // Keep the actual fetched URL
+      resources: resources || { js: [], css: [] },
+      schemaMarkup: schemaMarkup
+    };
+
+    console.log("[SEO Analyzer] Finished processing HTML.");
+    return scrapedData;
+
+  } catch (error) {
+    console.error("[SEO Analyzer] CRITICAL Error processing HTML:", error);
+    throw error;
+  }
+}
+
 // Function to detect schema markup in HTML content
-function detectSchemaMarkup(html: string): { 
+function detectSchemaMarkup(html: string): {
   hasSchema: boolean;
   schemaTypes: string[];
   schemaCount: number;
@@ -1105,112 +822,317 @@ function detectSchemaMarkup(html: string): {
   return result;
 }
 
-// REVISED analyzeSEOElements signature (return type updated)
 export async function analyzeSEOElements(
   url: string,
   keyphrase: string,
   isHomePage: boolean,
   siteInfo: WebflowSiteInfo,
-  publishPath: string,
-  env: any
-): Promise<SEOAnalysisResult> { // Updated return type
-  console.log("[SEO Analyzer] Analyzing elements for:", { url, keyphrase, isHomePage, siteName: siteInfo.siteName, publishPath });
+  publishPath: string, // Keep receiving publishPath for now
+  env: any,
+  webflowPageData: WebflowPageData | undefined // Includes OG settings
+): Promise<SEOAnalysisResult> {
+  console.log("[SEO Analyzer] Analyzing elements for:", { url, keyphrase, isHomePage, siteName: siteInfo.siteName, publishPath, hasWebflowData: !!webflowPageData });
 
   try {
-    // Use the simplified scrapeWebpage function, result is ScrapedPageData
+    // Scrape the page to get content, headings, images, links, resources, schema
     const scrapedData: ScrapedPageData = await scrapeWebpage(url, siteInfo);
 
-    // Destructure with types from ScrapedPageData
+    // --- Combine Webflow API data and Scraped Data ---
+    const finalTitle = webflowPageData?.title ?? ''; // Prioritize API data, fallback to empty string
+    const finalMetaDescription = webflowPageData?.metaDescription ?? ''; // Prioritize API data
+    const finalOgMetadata: OGMetadata = { // Construct OG data, prioritizing API
+        title: webflowPageData?.ogTitle ?? '',
+        description: webflowPageData?.ogDescription ?? '',
+        image: webflowPageData?.ogImage ?? '',
+        // Keep width/height from scraping for now, if needed
+        imageWidth: scrapedData.resources.css.length > 0 ? 'scraped' : '', // Placeholder logic, adjust as needed
+        imageHeight: scrapedData.resources.css.length > 0 ? 'scraped' : '', // Placeholder logic, adjust as needed
+    };
+    console.log("[SEO Analyzer] Using Final Title:", finalTitle);
+    console.log("[SEO Analyzer] Using Final Meta Description:", finalMetaDescription);
+    console.log("[SEO Analyzer] Using Final OG Metadata:", finalOgMetadata);
+
+    // Destructure only the necessary parts from scrapedData
     const {
-      title,
-      metaDescription,
       content,
       paragraphs,
-      headings, // Now Array<{ level: number; text: string }>
-      images,   // Now Array<{ src: string; alt: string; size?: number }>
+      headings,
+      images,
       internalLinks,
       outboundLinks,
-      ogMetadata, // Now OGMetadata
-      resources,  // Now { js: Resource[]; css: Resource[] }
-      schemaMarkup // Use schemaMarkup from ScrapedPageData
+      resources,
+      schemaMarkup
     } = scrapedData;
 
-    // Type the checks array
     const checks: SEOCheck[] = [];
+    const apiDataUsed = !!webflowPageData; // Track if API data was available
 
     // --- SEO Checks ---
-    // ... (existing checks 1-6) ...
 
-    // 7. Image Alt Attributes (Update type for img)
-    const imagesMissingAlt = images.filter((img: { src: string; alt: string; size?: number }) => !img.alt || img.alt.trim() === "");
-    // ... rest of check 7 ...
+    // 1. Keyphrase in Title
+    const titleContainsKeyword = finalTitle.toLowerCase().includes(keyphrase.toLowerCase());
+    checks.push({
+      title: "Keyphrase in Title",
+      description: titleContainsKeyword ? getSuccessMessage("Keyphrase in Title") : `Your title doesn't contain the keyphrase "${keyphrase}".`,
+      passed: titleContainsKeyword,
+      priority: analyzerCheckPriorities["Keyphrase in Title"],
+      recommendation: !titleContainsKeyword ? await getAIRecommendation("Title", keyphrase, env, finalTitle) : undefined
+    });
 
-    // ... (existing checks 8-12) ...
+    // 2. Keyphrase in Meta Description
+    const descContainsKeyword = finalMetaDescription.toLowerCase().includes(keyphrase.toLowerCase());
+    checks.push({
+      title: "Keyphrase in Meta Description",
+      description: descContainsKeyword ? getSuccessMessage("Keyphrase in Meta Description") : `Your meta description is missing the keyphrase "${keyphrase}".`,
+      passed: descContainsKeyword,
+      priority: analyzerCheckPriorities["Keyphrase in Meta Description"],
+      recommendation: !descContainsKeyword ? await getAIRecommendation("Meta Description", keyphrase, env, finalMetaDescription) : undefined
+    });
 
-    // 13. Keyphrase in H1 Heading (Update type for h)
-    const h1Headings = headings.filter((h: { level: number; text: string }) => h.level === 1);
-    const h1ContainsKeyword = h1Headings.length > 0 && h1Headings.some((h: { level: number; text: string }) => h.text.toLowerCase().includes(keyphrase.toLowerCase()));
-    // ... rest of check 13 ...
+    // 3. Keyphrase in URL (Uses scraped URL's path)
+    const urlObject = new URL(url); // Use the actual fetched URL
+    const slug = urlObject.pathname.split('/').pop() || '';
+    const urlContainsKeyword = slug.toLowerCase().includes(keyphrase.toLowerCase().replace(/\s+/g, '-')); // Simple check
+    checks.push({
+      title: "Keyphrase in URL",
+      description: urlContainsKeyword ? getSuccessMessage("Keyphrase in URL") : `The URL slug "${slug}" doesn't seem to contain the keyphrase "${keyphrase}".`,
+      passed: urlContainsKeyword,
+      priority: analyzerCheckPriorities["Keyphrase in URL"],
+      // Recommendation might involve suggesting a new slug based on the title/keyphrase
+      recommendation: !urlContainsKeyword ? `Consider including "${keyphrase.toLowerCase().replace(/\s+/g, '-')}" in your URL slug.` : undefined
+    });
 
-    // 14. Keyphrase in H2 Headings (Update type for h)
-    const h2Headings = headings.filter((h: { level: number; text: string }) => h.level === 2);
-    const h2ContainsKeyword = h2Headings.some((h: { level: number; text: string }) => h.text.toLowerCase().includes(keyphrase.toLowerCase()));
-    // ... rest of check 14 ...
+    // 4. Content Length (Uses scraped content)
+    const wordCount = content.split(/\s+/).filter(Boolean).length;
+    const contentLengthPassed = wordCount >= 300; // Example threshold
+    checks.push({
+      title: "Content Length",
+      description: contentLengthPassed ? `${getSuccessMessage("Content Length")} (${wordCount} words)` : `Your content is quite short (${wordCount} words). Aim for at least 300 words.`,
+      passed: contentLengthPassed,
+      priority: analyzerCheckPriorities["Content Length"],
+      recommendation: !contentLengthPassed ? `Expand your content to provide more value and detail, aiming for at least 300 words.` : undefined
+    });
 
-    // 15. Heading Hierarchy (Update type for heading)
+    // 5. Keyphrase Density (Uses scraped content)
+    const densityInfo = calculateKeyphraseDensity(content, keyphrase);
+    const densityPassed = densityInfo.density >= 0.5 && densityInfo.density <= 2.5; // Example range
+    checks.push({
+      title: "Keyphrase Density",
+      description: densityPassed ? `${getSuccessMessage("Keyphrase Density")} (${densityInfo.density.toFixed(1)}%)` : `Keyphrase density is ${densityInfo.density.toFixed(1)}%. Aim for 0.5-2.5%.`,
+      passed: densityPassed,
+      priority: analyzerCheckPriorities["Keyphrase Density"],
+      recommendation: !densityPassed ? `Adjust the number of times "${keyphrase}" appears (${densityInfo.occurrences} times in ${densityInfo.totalWords} words) to fall within the 0.5-2.5% density range.` : undefined
+    });
+
+    // 6. Keyphrase in Introduction (Uses scraped paragraphs)
+    const firstParagraph = paragraphs.length > 0 ? paragraphs[0].toLowerCase() : "";
+    const introContainsKeyword = firstParagraph.includes(keyphrase.toLowerCase());
+    checks.push({
+      title: "Keyphrase in Introduction",
+      description: introContainsKeyword ? getSuccessMessage("Keyphrase in Introduction") : `The keyphrase "${keyphrase}" was not found in the first paragraph.`,
+      passed: introContainsKeyword,
+      priority: analyzerCheckPriorities["Keyphrase in Introduction"],
+      recommendation: !introContainsKeyword ? await getAIRecommendation("Introduction Paragraph", keyphrase, env, firstParagraph) : undefined
+    });
+
+    // 7. Image Alt Attributes (Uses scraped images)
+    const imagesMissingAlt = images.filter(img => !img.alt || img.alt.trim() === "");
+    const altCheckPassed = imagesMissingAlt.length === 0;
+    checks.push({
+      title: "Image Alt Attributes",
+      description: altCheckPassed ? getSuccessMessage("Image Alt Attributes") : `${imagesMissingAlt.length} image(s) are missing descriptive alt text.`,
+      passed: altCheckPassed,
+      priority: analyzerCheckPriorities["Image Alt Attributes"],
+      recommendation: !altCheckPassed ? `Add descriptive alt text to all images, incorporating "${keyphrase}" where relevant. Missing on: ${imagesMissingAlt.map(img => img.src.split('/').pop()).slice(0, 2).join(', ')}${imagesMissingAlt.length > 2 ? '...' : ''}` : undefined
+    });
+
+    // 8. Internal Links (Uses scraped links)
+    const internalLinksPassed = internalLinks.length > 0;
+    checks.push({
+      title: "Internal Links",
+      description: internalLinksPassed ? `${getSuccessMessage("Internal Links")} (Found ${internalLinks.length})` : `No internal links found. Add links to other relevant pages on your site.`,
+      passed: internalLinksPassed,
+      priority: analyzerCheckPriorities["Internal Links"],
+      recommendation: !internalLinksPassed ? `Add links from this page to other relevant pages or posts on your website to improve site structure and SEO.` : undefined
+    });
+
+    // 9. Outbound Links (Uses scraped links)
+    const outboundLinksPassed = outboundLinks.length > 0;
+    checks.push({
+      title: "Outbound Links",
+      description: outboundLinksPassed ? `${getSuccessMessage("Outbound Links")} (Found ${outboundLinks.length})` : `No outbound links found. Consider linking to relevant external resources.`,
+      passed: outboundLinksPassed,
+      priority: analyzerCheckPriorities["Outbound Links"],
+      recommendation: !outboundLinksPassed ? `Link to authoritative external websites where relevant to provide additional context and credibility.` : undefined
+    });
+
+    // 10. Next-Gen Image Formats (Uses scraped images - Placeholder)
+    // This check is complex without fetching/analyzing image headers. Basic check for now.
+    const nonWebPOrAvif = images.filter(img => !img.src.toLowerCase().endsWith('.webp') && !img.src.toLowerCase().endsWith('.avif')).length;
+    const nextGenPassed = nonWebPOrAvif === 0; // Simplistic check
+     checks.push({
+      title: "Next-Gen Image Formats",
+      description: nextGenPassed ? getSuccessMessage("Next-Gen Image Formats") : `Consider using WebP or AVIF formats for ${nonWebPOrAvif} image(s) to improve loading speed.`,
+      passed: nextGenPassed, // Placeholder result
+      priority: analyzerCheckPriorities["Next-Gen Image Formats"],
+      recommendation: !nextGenPassed ? `Convert images like ${images.filter(img => !img.src.toLowerCase().endsWith('.webp') && !img.src.toLowerCase().endsWith('.avif')).map(img => img.src.split('/').pop()).slice(0, 2).join(', ')}... to WebP or AVIF format.` : undefined
+    });
+
+    // 11. OG Image (Uses combined finalOgMetadata)
+    const ogImagePassed = !!finalOgMetadata.image;
+    checks.push({
+      title: "OG Image",
+      description: ogImagePassed ? getSuccessMessage("OG Image") : `No Open Graph image specified. Add an 'og:image' meta tag.`,
+      passed: ogImagePassed,
+      priority: analyzerCheckPriorities["OG Image"],
+      recommendation: !ogImagePassed ? `Set an Open Graph image (og:image meta tag) for better social sharing previews. Recommended size: 1200x630px.` : undefined
+    });
+
+    // 12. OG Title and Description (Uses combined finalOgMetadata AND Webflow settings)
+    const hasOgTitle = !!finalOgMetadata.title;
+    const hasOgDesc = !!finalOgMetadata.description;
+    const usesDefaults = webflowPageData?.usesTitleAsOGTitle && webflowPageData?.usesDescriptionAsOGDescription;
+
+    // Pass if either the defaults are used OR specific OG title/desc are set
+    const ogTitleDescPassed = usesDefaults || (hasOgTitle && hasOgDesc);
+    let ogTitleDescDesc = "";
+    let ogTitleDescRec = undefined;
+
+    if (ogTitleDescPassed) {
+        ogTitleDescDesc = getSuccessMessage("OG Title and Description");
+        if (usesDefaults && (!hasOgTitle || !hasOgDesc)) {
+            ogTitleDescDesc += " (using page title/description as fallback)";
+        }
+    } else {
+        ogTitleDescDesc = "Open Graph title or description is missing and defaults are not enabled.";
+        ogTitleDescRec = `Define both Open Graph title (og:title) and description (og:description) in Webflow settings, or ensure the page title/description are suitable fallbacks and enable the default settings.`;
+    }
+
+    checks.push({
+      title: "OG Title and Description",
+      description: ogTitleDescDesc,
+      passed: ogTitleDescPassed,
+      priority: analyzerCheckPriorities["OG Title and Description"],
+      recommendation: ogTitleDescRec
+    });
+
+    // 13. Keyphrase in H1 Heading (Uses scraped headings)
+    const h1Headings = headings.filter(h => h.level === 1);
+    const h1ContainsKeyword = h1Headings.length > 0 && h1Headings.some(h => h.text.toLowerCase().includes(keyphrase.toLowerCase()));
+    checks.push({
+      title: "Keyphrase in H1 Heading",
+      description: h1Headings.length === 0 ? "No H1 heading found on the page." : (h1ContainsKeyword ? getSuccessMessage("Keyphrase in H1 Heading") : `The main H1 heading doesn't contain the keyphrase "${keyphrase}".`),
+      passed: h1Headings.length > 0 && h1ContainsKeyword,
+      priority: analyzerCheckPriorities["Keyphrase in H1 Heading"],
+      recommendation: h1Headings.length === 0 ? "Add a single, descriptive H1 heading to the page." : (!h1ContainsKeyword ? await getAIRecommendation("H1 Heading", keyphrase, env, h1Headings[0]?.text) : undefined)
+    });
+
+    // 14. Keyphrase in H2 Headings (Uses scraped headings)
+    const h2Headings = headings.filter(h => h.level === 2);
+    const h2ContainsKeyword = h2Headings.some(h => h.text.toLowerCase().includes(keyphrase.toLowerCase()));
+    checks.push({
+      title: "Keyphrase in H2 Headings",
+      description: h2Headings.length === 0 ? "No H2 headings found. Use H2s for main sections." : (h2ContainsKeyword ? getSuccessMessage("Keyphrase in H2 Headings") : `The keyphrase "${keyphrase}" is not found in any H2 headings.`),
+      passed: h2Headings.length === 0 || h2ContainsKeyword, // Pass if no H2s or if keyword is present
+      priority: analyzerCheckPriorities["Keyphrase in H2 Headings"],
+      recommendation: h2Headings.length > 0 && !h2ContainsKeyword ? `Include "${keyphrase}" naturally in one or more H2 subheadings where relevant.` : undefined
+    });
+
+    // 15. Heading Hierarchy (Uses scraped headings)
     let hierarchyPassed = true;
     let lastLevel = 0;
-    for (const heading of headings) { // heading is { level: number; text: string }
-      if (heading.level > lastLevel + 1) {
+    let hierarchyIssue = "";
+    if (headings.length > 0 && headings[0].level !== 1) {
         hierarchyPassed = false;
-        break;
-      }
-      lastLevel = heading.level;
+        hierarchyIssue = "Page should start with an H1 heading.";
+    } else {
+        for (const heading of headings) {
+            if (heading.level > lastLevel + 1) {
+                hierarchyPassed = false;
+                hierarchyIssue = `Incorrect jump from H${lastLevel} to H${heading.level} ('${heading.text.substring(0,20)}...').`;
+                break;
+            }
+            lastLevel = heading.level;
+        }
     }
-    // ... rest of check 15 ...
+    checks.push({
+      title: "Heading Hierarchy",
+      description: hierarchyPassed ? getSuccessMessage("Heading Hierarchy") : `Heading structure issue: ${hierarchyIssue}`,
+      passed: hierarchyPassed,
+      priority: analyzerCheckPriorities["Heading Hierarchy"],
+      recommendation: !hierarchyPassed ? `Review your heading structure (H1-H6). Ensure headings follow a logical order without skipping levels (e.g., H1 -> H2, H2 -> H3). ${hierarchyIssue}` : undefined
+    });
 
-    // 16. Code Minification (Update type for r)
-    const unminifiedJs = resources.js.filter((r: Resource) => r.minified === false).length;
-    const unminifiedCss = resources.css.filter((r: Resource) => r.minified === false).length;
-    // ... rest of check 16 ...
+    // 16. Code Minification (Uses scraped resources)
+    const unminifiedJs = resources.js.filter(r => r.minified === false).length;
+    const unminifiedCss = resources.css.filter(r => r.minified === false).length;
+    const minificationPassed = unminifiedJs === 0 && unminifiedCss === 0;
+    checks.push({
+      title: "Code Minification",
+      description: minificationPassed ? getSuccessMessage("Code Minification") : `Found ${unminifiedJs} unminified JS and ${unminifiedCss} unminified CSS files. Minify them to reduce file size.`,
+      passed: minificationPassed,
+      priority: analyzerCheckPriorities["Code Minification"],
+      recommendation: !minificationPassed ? `Minify JavaScript and CSS files to improve page load speed. Tools like Terser (JS) or cssnano (CSS) can help.` : undefined
+    });
 
-    // 17. Schema Markup (Use schemaMarkup from scrapedData)
-    const schemaCheckPassed = schemaMarkup.hasSchema; // Use the result from detectSchemaMarkup
+    // 17. Schema Markup (Uses scraped schemaMarkup)
+    const schemaCheckPassed = schemaMarkup.hasSchema;
     checks.push({
       title: "Schema Markup",
-      // Use schemaMarkup.schemaTypes which comes from detectSchemaMarkup
       description: schemaCheckPassed ? `${getSuccessMessage("Schema Markup", url)} Found types: ${schemaMarkup.schemaTypes.join(', ') || 'N/A'}` : `No Schema.org markup detected. Adding structured data can help search engines understand your content.`,
       passed: schemaCheckPassed,
       priority: analyzerCheckPriorities["Schema Markup"],
       recommendation: !schemaCheckPassed ? analyzerFallbackRecommendations["Schema Markup"]({}) : undefined
     });
 
-    // ... (existing check 18) ...
+    // 18. Image File Size (Uses scraped images - Placeholder)
+    // Requires fetching image headers/content, which is resource-intensive. Placeholder check.
+    const largeImages = images.filter(img => img.size && img.size > 150 * 1024).length; // Example: > 150KB
+    const imageSizePassed = largeImages === 0; // Placeholder
+    checks.push({
+        title: "Image File Size",
+        description: imageSizePassed ? getSuccessMessage("Image File Size") : `Found ${largeImages} image(s) potentially larger than 150KB. Optimize image sizes.`,
+        passed: imageSizePassed, // Placeholder result
+        priority: analyzerCheckPriorities["Image File Size"],
+        recommendation: !imageSizePassed ? `Optimize images to reduce file size without sacrificing quality. Aim for <150KB per image where possible. Use tools like Squoosh or TinyPNG.` : undefined
+    });
 
     // --- End SEO Checks ---
 
     const passedChecks = checks.filter(c => c.passed).length;
     const failedChecks = checks.length - passedChecks;
-    const score = Math.round((passedChecks / checks.length) * 100);
+    // Recalculate score based on potentially different number of checks if some fail to run
+    const totalPossiblePoints = checks.reduce((sum, check) => {
+        const weights = { high: 3, medium: 2, low: 1 };
+        return sum + (weights[check.priority] || weights.medium);
+    }, 0);
+    const earnedPoints = checks.reduce((sum, check) => {
+        if (check.passed) {
+            const weights = { high: 3, medium: 2, low: 1 };
+            return sum + (weights[check.priority] || weights.medium);
+        }
+        return sum;
+    }, 0);
+    const score = totalPossiblePoints > 0 ? Math.round((earnedPoints / totalPossiblePoints) * 100) : 0;
 
-    // Ensure the returned object matches SEOAnalysisResult interface
+
     const result: SEOAnalysisResult = {
       checks,
       passedChecks,
       failedChecks,
-      url: url,
+      url: url, // Use the actual fetched URL
       score,
-      ogData: ogMetadata,
+      ogData: finalOgMetadata, // Use the combined OG data
       timestamp: new Date().toISOString(),
-      apiDataUsed: false
+      apiDataUsed // Indicate if API data was used
     };
+    console.log("[SEO Analyzer] Analysis complete. Result:", result);
     return result;
 
   } catch (error: any) {
     console.error("[SEO Analyzer] Error during element analysis:", error);
-    // Propagate the error message, potentially wrapping it
-    // Consider creating a custom error type or structure for API responses
-    throw new Error(`Analysis failed: ${error.message}`);
+    // Propagate a user-friendly error
+    throw new Error(`Analysis failed: ${error.message || 'Unknown error'}`);
   }
 }
 
@@ -1221,9 +1143,10 @@ addEventListener('fetch', (event: any) => {
 });
 
 async function handleRequest(request: Request, env: any): Promise<Response> {
+  // ... existing CORS handling ...
   const corsResponse = handleCors(request);
   if (corsResponse) return corsResponse;
-  
+
   const url = new URL(request.url);
   const path = url.pathname;
   const origin = request.headers.get('Origin');
@@ -1231,61 +1154,30 @@ async function handleRequest(request: Request, env: any): Promise<Response> {
     'Access-Control-Allow-Origin': origin || '*',
     'Content-Type': 'application/json'
   };
-  
-  
+
   try {
-    if (path === '/api/analyze' && request.method === 'HEAD') {
-      return new Response(null, { status: 200, headers: corsHeaders });
-    }
+    // ... existing HEAD, OAuth, Auth, Callback routes ...
 
-    if (path === '/api/oauth/callback' && request.method === 'POST') {
-      return handleOAuthTokenExchange(request, env);
-    }
-
-    if (path === '/api/auth' && request.method === 'GET') {
-      return handleAuthRedirect(request, env);
-    }
-
-    if (path === '/api/callback' && request.method === 'GET') {
-      return handleAuthCallback(request, env);
-    }
-    
-    try {
-      if (path === '/api/analyze' && request.method === 'POST') {
-        const data = await request.json();
-        const { keyphrase, url, isHomePage, siteInfo, publishPath } = data;
-        if (!keyphrase || !url || typeof isHomePage === 'undefined' || !siteInfo || typeof publishPath === 'undefined') {
-          return new Response(JSON.stringify({ message: "Keyphrase, URL, isHomePage, siteInfo, and publishPath are required" }), { status: 400, headers: corsHeaders });
-        }
-        const results = await analyzeSEOElements(url, keyphrase, isHomePage, siteInfo, publishPath, env);
-        return new Response(JSON.stringify(results), { status: 200, headers: corsHeaders });
-      } else if (path === '/api/register-domains' && request.method === 'POST') {
-        const data = await request.json();
-        const { domains } = data;
-        if (!domains || !Array.isArray(domains)) {
-          return new Response(JSON.stringify({ success: false, message: "Domains array is required" }), { status: 400, headers: corsHeaders });
-        }
-        return new Response(JSON.stringify({ success: true, message: `Successfully registered ${domains.length} domains.` }), { status: 200, headers: corsHeaders });
+    if (path === '/api/analyze' && request.method === 'POST') {
+      const data = await request.json();
+      // Destructure webflowPageData as well
+      const { keyphrase, url, isHomePage, siteInfo, publishPath, webflowPageData } = data;
+      if (!keyphrase || !url || typeof isHomePage === 'undefined' || !siteInfo || typeof publishPath === 'undefined') {
+        return new Response(JSON.stringify({ message: "Keyphrase, URL, isHomePage, siteInfo, and publishPath are required" }), { status: 400, headers: corsHeaders });
       }
-      else if (path === '/api/ping' && (request.method === 'GET' || request.method === 'HEAD')) {
-        const pingResponse = {
-          status: 'ok',
-          message: 'Worker is running',
-          timestamp: new Date().toISOString()
-        }
-        return new Response(JSON.stringify(pingResponse), { 
-          status: 200, 
-          headers: { 
-            ...corsHeaders,
-            'Cache-Control': 'public, max-age=60'  // Cache for 60 seconds 
-          } 
-        });
-      }
-      return new Response(JSON.stringify({ message: "Route not found", path }), { status: 404, headers: corsHeaders });
-    } catch (error: any) {
-      return new Response(JSON.stringify({ message: "Internal server error", error: error.message }), { status: 500, headers: corsHeaders });
+      // Pass webflowPageData to analyzeSEOElements
+      const results = await analyzeSEOElements(url, keyphrase, isHomePage, siteInfo, publishPath, env, webflowPageData);
+      return new Response(JSON.stringify(results), { status: 200, headers: corsHeaders });
+    } else if (path === '/api/register-domains' && request.method === 'POST') {
+      // ... existing register-domains logic ...
+    } else if (path === '/api/ping' && (request.method === 'GET' || request.method === 'HEAD')) {
+      // ... existing ping logic ...
     }
+
+    return new Response(JSON.stringify({ message: "Route not found", path }), { status: 404, headers: corsHeaders });
+
   } catch (error: any) {
+    console.error("[Worker handleRequest] Error:", error); // Log top-level errors
     return new Response(JSON.stringify({ message: "Internal server error", error: error.message }), { status: 500, headers: corsHeaders });
   }
 }

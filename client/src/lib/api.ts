@@ -1,4 +1,4 @@
-import type { SEOAnalysisResult } from "../lib/types";
+import type { SEOAnalysisResult, WebflowPageData } from "../lib/types"; // Import WebflowPageData
 interface ImportMetaEnv {
   VITE_API_URL?: string;
   DEV?: boolean;
@@ -38,8 +38,9 @@ export interface AnalyzeSEORequest {
   keyphrase: string;
   url: string;
   isHomePage: boolean;
-  siteInfo: WebflowSiteInfo; // Add siteInfo using the global type
-  publishPath: string;       // Add publishPath
+  siteInfo: WebflowSiteInfo;
+  publishPath: string;
+  webflowPageData?: WebflowPageData; // Add optional Webflow data
   debug?: boolean;
 }
 
@@ -47,12 +48,13 @@ export async function analyzeSEO({
   keyphrase,
   url,
   isHomePage,
-  siteInfo, // Destructure siteInfo
-  publishPath, // Destructure publishPath
+  siteInfo,
+  publishPath,
+  webflowPageData, // Destructure webflowPageData
   debug = true
-}: AnalyzeSEORequest): Promise<SEOAnalysisResult> { // Use the updated request type and ensure return type is correct
+}: AnalyzeSEORequest): Promise<SEOAnalysisResult> {
   const apiBaseUrl = getApiBaseUrl();
-  console.log("[SEO Analyzer] Starting analysis with settings:", { keyphrase, url, isHomePage, siteInfo, publishPath, debug }); // Log siteInfo and publishPath
+  console.log("[SEO Analyzer] Starting analysis with settings:", { keyphrase, url, isHomePage, siteInfo, publishPath, webflowPageData, debug }); // Log webflowPageData
   console.log(`[SEO Analyzer] Using API endpoint: ${apiBaseUrl}/api/analyze`);
 
   try {
@@ -65,8 +67,9 @@ export async function analyzeSEO({
         keyphrase,
         url,
         isHomePage,
-        siteInfo,    // Include siteInfo in the request body
-        publishPath, // Include publishPath in the request body
+        siteInfo,
+        publishPath,
+        webflowPageData, // Include webflowPageData in the request body
         debug
       })
     });

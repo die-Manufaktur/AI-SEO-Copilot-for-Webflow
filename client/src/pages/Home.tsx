@@ -30,12 +30,12 @@ import {
 import { useToast } from "../hooks/use-toast";
 import { getPageSlug } from "../lib/get-page-slug";
 import { analyzeSEO, registerDomains, AnalyzeSEORequest } from "../lib/api";
-import type { SEOAnalysisResult, SEOCheck } from "../lib/types";
+import type { SEOAnalysisResult, SEOCheck, WebflowPageData } from "../lib/types";
 import { ProgressCircle } from "../components/ui/progress-circle";
 import { getLearnMoreUrl } from "../lib/docs-links";
 import styled from 'styled-components';
 import Footer from "../components/Footer";
-import { extractTextAfterColon } from "@/lib/utils";
+import { extractTextAfterColon } from "./../lib/utils";
 import React from 'react';
 
 const formSchema = z.object({
@@ -141,6 +141,33 @@ const groupChecksByCategory = (checks: SEOCheck[]) => {
   return grouped;
 };
 
+// Helper function to fetch page info
+const fetchPageInfo = async (
+  setSlug: React.Dispatch<React.SetStateAction<string | null>>,
+  setIsHomePage: React.Dispatch<React.SetStateAction<boolean>>
+) => {
+  try {
+    if (window.webflow) {
+      const currentPage = await window.webflow.getCurrentPage();
+      const currentSlug = await currentPage.getSlug();
+      const isHome = await currentPage.isHomepage();
+      setSlug(currentSlug);
+      setIsHomePage(isHome);
+    } else {
+      console.warn("Webflow API not available for fetching page info.");
+      // Set default values or handle the absence of Webflow API
+      setSlug(null);
+      setIsHomePage(false);
+    }
+  } catch (error) {
+    console.error("Error fetching page info:", error);
+    // Set default/error state
+    setSlug(null);
+    setIsHomePage(false);
+  }
+};
+
+
 // Get status for a category
 const getCategoryStatus = (checks: SEOCheck[]) => {
   if (!checks || checks.length === 0) return "neutral";
@@ -235,73 +262,22 @@ const CardTitle = styled.h2`
   font-weight: 500;
 `;
 
-// Utility function to sort domains by lastPublished, then default
-function getMostRecentlyPublishedDomain(domains: WebflowDomain[]): WebflowDomain | undefined {
-  return domains
-    .filter(domain => domain.lastPublished)
-    .sort((a, b) => {
-      const aDate = new Date(a.lastPublished || 0).getTime();
-      const bDate = new Date(b.lastPublished || 0).getTime();
-      return bDate - aDate;
-    })[0] || domains.find(domain => domain.default);
-}
-
-// Define fetchPageInfo outside the component
-async function fetchPageInfo(
-  setSlug: React.Dispatch<React.SetStateAction<string | null>>,
-  setIsHomePage: React.Dispatch<React.SetStateAction<boolean>>
-) {
-  try {
-    if (webflow) {
-      const currentPage = await webflow.getCurrentPage();
-      const slug = await currentPage.getSlug();
-      const isHome = await currentPage.isHomepage();
-      setSlug(slug);
-      setIsHomePage(isHome);
-      console.log(`[fetchPageInfo] Fetched: slug=${slug}, isHome=${isHome}`);
-    } else {
-      console.warn("[fetchPageInfo] Webflow API not available.");
-      // Set default/fallback states if needed
-      setSlug(null);
-      setIsHomePage(false);
-    }
-  } catch (error) {
-    console.error("Error fetching page info:", error);
-    // Set error state or default values
-    setSlug(null);
-    setIsHomePage(false);
-    // Optionally show a toast message here
-  }
-}
-
-// Define formatRecommendationForDisplay outside the component
-function formatRecommendationForDisplay(recommendation: string | undefined, checkTitle: string): React.ReactNode {
-  if (!recommendation) {
+// Helper function to find the most recently published domain
+const getMostRecentlyPublishedDomain = (domains: WebflowDomain[]): WebflowDomain | null => {
+  if (!domains || domains.length === 0) {
     return null;
   }
 
-  // Basic example: Split by newline and render paragraphs
-  // You can add more complex logic here based on checkTitle or specific keywords
-  const lines = recommendation.split('\n').filter(line => line.trim() !== '');
+  return domains.reduce((latest, current) => {
+    if (!current.lastPublished) return latest; // Ignore domains never published
+    if (!latest || !latest.lastPublished) return current; // If latest wasn't published, current is newer
 
-  // Example: Special formatting for introduction keyphrase
-  if (checkTitle.toLowerCase().includes("keyphrase in introduction") && lines.length > 1) {
-     // Assume the first line is context and the rest is the suggestion
-     return (
-       <>
-         <p className="font-semibold mb-1">{lines[0]}</p>
-         {lines.slice(1).map((line, index) => (
-           <p key={index} className="mb-1">{line}</p>
-         ))}
-       </>
-     );
-  }
+    const latestDate = new Date(latest.lastPublished);
+    const currentDate = new Date(current.lastPublished);
 
-  // Default: render each line as a paragraph
-  return lines.map((line, index) => (
-    <p key={index} className="mb-1">{line}</p>
-  ));
-}
+    return currentDate > latestDate ? current : latest;
+  }, null as WebflowDomain | null); // Start with null
+};
 
 export default function Home() {
   const { toast } = useToast();
@@ -400,11 +376,12 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (window.webflow) {
-      const unsubscribe = window.webflow.subscribe('currentpage', async () => {
+    if (webflow) {
+      const unsubscribe = webflow.subscribe('currentpage', async () => {
         try {
           await fetchPageInfo(setSlug, setIsHomePage);
         } catch (error) {
+          console.error("Error fetching page info:", error);
         }
       });
       
@@ -538,27 +515,40 @@ export default function Home() {
       }
 
       const mostRecentDomain = getMostRecentlyPublishedDomain(siteInfo.domains);
+
       if (!mostRecentDomain) {
         toast({
           variant: "destructive",
-          title: "Error",
-          description: "Could not determine the most recently published domain"
+          title: "No Published Domain Found",
+          description: "Cannot perform analysis as no domain appears to have been published."
         });
         return;
       }
-      let url = mostRecentDomain.url.startsWith("http")
-        ? mostRecentDomain.url
-        : `https://${mostRecentDomain.url}`;
+
+      const baseUrl = mostRecentDomain.url.startsWith('http') ? mostRecentDomain.url : `https://${mostRecentDomain.url}`;
 
       let publishPath = "";
       let currentPage: WebflowPage | null = null;
+      let pageData: WebflowPageData | undefined = undefined;
+
       try {
         if (!window.webflow) {
           throw new Error("Webflow API not available.");
         }
         currentPage = await window.webflow.getCurrentPage();
-        publishPath = await currentPage.getPublishPath() ?? "";
+        publishPath = (await currentPage.getPublishPath()) ?? "";
         setIsHomePage(await currentPage.isHomepage());
+
+        pageData = {
+          title: await currentPage.getTitle(),
+          metaDescription: await currentPage.getDescription(),
+          ogTitle: await currentPage.getOpenGraphTitle(),
+          ogDescription: await currentPage.getOpenGraphDescription(),
+          ogImage: await currentPage.getOpenGraphImage(),
+          usesTitleAsOGTitle: await currentPage.usesTitleAsOpenGraphTitle(),
+          usesDescriptionAsOGDescription: await currentPage.usesDescriptionAsOpenGraphDescription(),
+        };
+        console.log("[Home onSubmit] Fetched Webflow Page Data:", pageData);
 
       } catch (error) {
         toast({
@@ -569,17 +559,16 @@ export default function Home() {
         return;
       }
 
-      if (publishPath && !(await currentPage.isHomepage())) {
-        url = url.replace(/\/$/, "");
-        url = `${url}${publishPath.startsWith("/") ? "" : "/"}${publishPath}`;
-      }
+      const finalUrlPath = publishPath === '/' ? '' : publishPath;
+      const url = `${baseUrl}${finalUrlPath.startsWith('/') ? '' : '/'}${finalUrlPath}`;
 
       const analysisData: AnalyzeSEORequest = {
         keyphrase: values.keyphrase,
         url,
         isHomePage,
         siteInfo,
-        publishPath
+        publishPath,
+        webflowPageData: pageData
       };
 
       mutation.mutate(analysisData);
@@ -991,6 +980,40 @@ export default function Home() {
     </motion.div>
   );
 }
+
+// Helper function to format recommendation text for display
+const formatRecommendationForDisplay = (recommendation: string | undefined, title: string): string => {
+  if (!recommendation) return "";
+
+  let displayText = recommendation;
+
+  // Handle specific formatting for "Keyphrase in Introduction"
+  if (title.toLowerCase().includes("keyphrase in introduction")) {
+    const newlineIndex = recommendation.indexOf('\n');
+    if (newlineIndex !== -1) {
+      displayText = recommendation.substring(newlineIndex + 1).trim();
+    } else {
+      // Fallback if no newline: try splitting by colon
+      const parts = recommendation.split(':');
+      if (parts.length > 1) {
+        // Join everything after the first colon
+        displayText = parts.slice(1).join(':').trim();
+      }
+      // If only one part or less, keep original (minus title potentially)
+    }
+  } else {
+    // General cleanup: extract text after colon if present and seems appropriate
+    displayText = extractTextAfterColon(recommendation);
+  }
+
+  // Remove potential HTML tags for safer display
+  displayText = displayText.replace(/<[^>]*>/g, '');
+  // Remove surrounding quotes if present
+  displayText = displayText.replace(/^"/, '').replace(/"$/, '');
+
+  return displayText;
+};
+
 
 const copyToClipboard = async (text: string) => {
   try {
