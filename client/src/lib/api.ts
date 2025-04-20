@@ -1,4 +1,4 @@
-// Properly declare Vite's environment variable types once
+import type { SEOAnalysisResult, WebflowPageData } from "../lib/types"; // Import WebflowPageData
 interface ImportMetaEnv {
   VITE_API_URL?: string;
   DEV?: boolean;
@@ -31,122 +31,74 @@ export const getApiBaseUrl = (): string => {
   }
 
   return 'https://seo-copilot-api.paul-130.workers.dev';
-};
+}
 
-export async function analyzeSEO({ 
-  keyphrase, 
-  url, 
-  isHomePage, 
-  debug = true 
-}: { 
-  keyphrase: string; 
-  url: string; 
+// Define the request structure including siteInfo and publishPath
+export interface AnalyzeSEORequest {
+  keyphrase: string;
+  url: string;
   isHomePage: boolean;
+  siteInfo: WebflowSiteInfo;
+  publishPath: string;
+  webflowPageData?: WebflowPageData; // Add optional Webflow data
   debug?: boolean;
-}) {
+}
+
+export async function analyzeSEO({
+  keyphrase,
+  url,
+  isHomePage,
+  siteInfo,
+  publishPath,
+  webflowPageData, // Destructure webflowPageData
+  debug = true
+}: AnalyzeSEORequest): Promise<SEOAnalysisResult> {
   const apiBaseUrl = getApiBaseUrl();
-  console.log("[SEO Analyzer] Starting analysis with settings:", { keyphrase, url, isHomePage, debug });
+  console.log("[SEO Analyzer] Starting analysis with settings:", { keyphrase, url, isHomePage, siteInfo, publishPath, webflowPageData, debug }); // Log webflowPageData
   console.log(`[SEO Analyzer] Using API endpoint: ${apiBaseUrl}/api/analyze`);
-  
+
   try {
     const response = await fetch(`${apiBaseUrl}/api/analyze`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ keyphrase, url, debug }),
+      body: JSON.stringify({
+        keyphrase,
+        url,
+        isHomePage,
+        siteInfo,
+        publishPath,
+        webflowPageData, // Include webflowPageData in the request body
+        debug
+      })
     });
-    
+
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("[SEO Analyzer] API error response:", errorText);
-      throw new Error(`API request failed with status ${response.status}: ${errorText}`);
-    }
-    
-    const result = await response.json();
-    console.log("[SEO Analyzer] Analysis results received:", result);
-    
-    // Extract and log OpenGraph specific data to help debug
-    if (result && result.checks) {
-      const ogCheck = result.checks.find((check: any) => 
-        check.title === "Open Graph Title and Description" || 
-        check.title === "OpenGraph Title and Description"
-      );
-      
-      if (ogCheck) {
-        console.log("[SEO Analyzer] OpenGraph check details:", ogCheck);
-        try {
-          // Try to parse context data if it's a JSON string
-          const contextData = typeof ogCheck.context === 'string' ? 
-            JSON.parse(ogCheck.context) : ogCheck.context;
-          console.log("[SEO Analyzer] OpenGraph data:", contextData);
-        } catch (e) {
-          console.log("[SEO Analyzer] OpenGraph check context (raw):", ogCheck.context);
-        }
-      } else {
-        console.log("[SEO Analyzer] No OpenGraph check found in results");
+      const errorBody = await response.text();
+      console.error(`[SEO Analyzer] API Error (${response.status}):`, errorBody);
+      // Try to parse JSON error for more details
+      try {
+        const errorJson = JSON.parse(errorBody);
+        throw new Error(errorJson.message || `API Error: ${response.status} ${response.statusText}`);
+      } catch (e) {
+        // If parsing fails, throw the plain text error
+        throw new Error(errorBody || `API Error: ${response.status} ${response.statusText}`);
       }
     }
-    
-    return result;
-  } catch (error) {
-    console.error("[SEO Analyzer] Analysis failed:", error);
-    throw error; // Re-throw to allow handling by the caller
-  }
-}
 
-export async function analyzePage(keyphrase: string, url: string) {
-  const apiUrl = getApiBaseUrl();
-  
-  // Get Webflow data if available
-  let webflowData = null;
-  if (window.webflow) {
-    try {
-      const allElements = await window.webflow.getAllElements();
-      const paragraphs = [];
-      
-      // Process elements to find paragraphs
-      for (const element of allElements) {
-        if (!element) continue;
-        
-        const isParagraph = element.tagName?.toLowerCase() === 'p' || 
-          (element.customAttributes?.some(attr => 
-            attr.name === 'data-element-type' && attr.value === 'paragraph'
-          ));
+    const data: SEOAnalysisResult = await response.json();
+    console.log("[SEO Analyzer] Analysis successful:", data);
+    return data;
 
-        if (isParagraph && element.textContent) {
-          const text = element.textContent.trim();
-          if (text.length >= 30) {
-            paragraphs.push(text);
-          }
-        }
-      }
-      
-      webflowData = {
-        paragraphs
-      };
-    } catch (error) {
-      console.error('Error getting Webflow data:', error);
+  } catch (error: unknown) {
+    console.error("[SEO Analyzer] Fetch error:", error);
+    if (error instanceof Error) {
+      // Rethrow specific errors or a generic one
+      throw new Error(`Failed to analyze SEO: ${error.message}`);
     }
+    throw new Error("An unknown error occurred during SEO analysis.");
   }
-  
-  const response = await fetch(`${apiUrl}/api/analyze`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      keyphrase,
-      url,
-      webflowData // Include Webflow data in the request
-    })
-  });
-
-  if (!response.ok) {
-    throw new Error('API request failed');
-  }
-
-  return response.json();
 }
 
 export async function fetchOAuthToken(authCode: string): Promise<string> {

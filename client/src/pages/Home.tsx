@@ -29,12 +29,14 @@ import {
 } from "../components/ui/tooltip";
 import { useToast } from "../hooks/use-toast";
 import { getPageSlug } from "../lib/get-page-slug";
-import { analyzeSEO, registerDomains, getApiBaseUrl } from "../lib/api";
-import type { SEOAnalysisResult, SEOCheck } from "../lib/types";
+import { analyzeSEO, registerDomains, AnalyzeSEORequest } from "../lib/api";
+import type { SEOAnalysisResult, SEOCheck, WebflowPageData } from "../lib/types";
 import { ProgressCircle } from "../components/ui/progress-circle";
 import { getLearnMoreUrl } from "../lib/docs-links";
 import styled from 'styled-components';
 import Footer from "../components/Footer";
+import { extractTextAfterColon } from "./../lib/utils";
+import React from 'react';
 
 const formSchema = z.object({
   keyphrase: z.string().min(2, "Keyphrase must be at least 2 characters")
@@ -139,6 +141,33 @@ const groupChecksByCategory = (checks: SEOCheck[]) => {
   return grouped;
 };
 
+// Helper function to fetch page info
+const fetchPageInfo = async (
+  setSlug: React.Dispatch<React.SetStateAction<string | null>>,
+  setIsHomePage: React.Dispatch<React.SetStateAction<boolean>>
+) => {
+  try {
+    if (window.webflow) {
+      const currentPage = await window.webflow.getCurrentPage();
+      const currentSlug = await currentPage.getSlug();
+      const isHome = await currentPage.isHomepage();
+      setSlug(currentSlug);
+      setIsHomePage(isHome);
+    } else {
+      console.warn("Webflow API not available for fetching page info.");
+      // Set default values or handle the absence of Webflow API
+      setSlug(null);
+      setIsHomePage(false);
+    }
+  } catch (error) {
+    console.error("Error fetching page info:", error);
+    // Set default/error state
+    setSlug(null);
+    setIsHomePage(false);
+  }
+};
+
+
 // Get status for a category
 const getCategoryStatus = (checks: SEOCheck[]) => {
   if (!checks || checks.length === 0) return "neutral";
@@ -233,77 +262,22 @@ const CardTitle = styled.h2`
   font-weight: 500;
 `;
 
-// Add this function before the Home component
-const fetchPageInfo = async (setSlug: (slug: string | null) => void, setIsHomePage: (isHome: boolean) => void) => {
-  const currentSlug = await getPageSlug();
-  setSlug(currentSlug);
-  
-  try {
-    if (window.webflow) {
-      const currentPage = await webflow.getCurrentPage();
-      const isHome = await currentPage.isHomepage();
-      setIsHomePage(isHome);
-    }
-  } catch (error) {
-    setIsHomePage(false);
+// Helper function to find the most recently published domain
+const getMostRecentlyPublishedDomain = (domains: WebflowDomain[]): WebflowDomain | null => {
+  if (!domains || domains.length === 0) {
+    return null;
   }
+
+  return domains.reduce((latest, current) => {
+    if (!current.lastPublished) return latest; // Ignore domains never published
+    if (!latest || !latest.lastPublished) return current; // If latest wasn't published, current is newer
+
+    const latestDate = new Date(latest.lastPublished);
+    const currentDate = new Date(current.lastPublished);
+
+    return currentDate > latestDate ? current : latest;
+  }, null as WebflowDomain | null); // Start with null
 };
-
-// Add this function near the copyCleanToClipboard function
-const formatRecommendationForDisplay = (text: string | undefined, checkTitle: string): string => {
-  if (!text) return '';
-
-  // Special handling for OG Title and Description recommendations
-  if (checkTitle.toLowerCase().includes('og title') || 
-      checkTitle.toLowerCase().includes('og description') ||
-      checkTitle.toLowerCase().includes('open graph')) {
-    return "Recommendation: Configure your Open Graph settings in Webflow to use your existing page title and description. This ensures your content displays correctly when shared on social media.";
-  }
-
-  // Handle Recommendation: prefix consistently
-  let formattedText = text.replace(/^Recommendation:\s*/i, '');
-  
-  // Remove all double quotes
-  formattedText = formattedText.replace(/"/g, '');
-  
-  // Special handling for Image Alt Attributes - simplify to one suggestion
-  if (text.includes('Image Alt Attributes') || formattedText.toLowerCase().includes('alt tag') || formattedText.toLowerCase().includes('alt text')) {
-    // Try to find the first specific suggestion
-    const suggestionMatches = formattedText.match(/['']([^'']*)['']|Consider using ['']([^'']*)['']|add alt text ['']([^'']*)['']|could be ['']([^'']*)['']|such as ['']([^'']*)['']|like ['']([^'']*)['']/i);
-    
-    if (suggestionMatches) {
-      // Find the first non-undefined capture group (the actual suggestion)
-      const suggestion = suggestionMatches.slice(1).find(match => match !== undefined);
-      if (suggestion) {
-        // Format as a clean, single suggestion
-        return `Recommendation: Use alt text that describes the image content and includes your keyphrase when relevant: ${suggestion}`;
-      }
-    }
-  }
-  
-  // Remove any surrounding quotes (both single and double)
-  formattedText = formattedText.replace(/^['"]/, ''); // Remove quote at beginning if present
-  formattedText = formattedText.replace(/['"]$/, ''); // Remove quote at end if present
-  
-  // Check for abrupt truncation (ends with comma, colon, or starts a list without finishing)
-  if (formattedText.endsWith(',') || formattedText.endsWith(':') || 
-      formattedText.match(/[0-9]\.\s*$/)) {
-    formattedText += '...';
-  }
-  
-  return formattedText;
-};
-
-// Add this function to the file that manages your UI components
-function extractTextAfterColon(text: string): string {
-  const colonIndex = text.indexOf(':');
-  if (colonIndex !== -1) {
-    // Extract everything after the first colon, and trim any leading/trailing whitespace
-    return text.substring(colonIndex + 1).trim();
-  }
-  // Return the original text if no colon is found
-  return text;
-}
 
 export default function Home() {
   const { toast } = useToast();
@@ -314,10 +288,8 @@ export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [stagingName, setStagingName] = useState<string>('');
   const [urls, setUrls] = useState<string[]>([]);
-  // Add state for perfect score celebration
   const [showedPerfectScoreMessage, setShowedPerfectScoreMessage] = useState<boolean>(false);
   
-  // Calculate overall SEO score - moved up to avoid reference before declaration
   const seoScore = results ? calculateSEOScore(results.checks) : 0;
   const scoreRating = getScoreRatingText(seoScore);
 
@@ -326,7 +298,6 @@ export default function Home() {
       const currentSlug = await getPageSlug();
       setSlug(currentSlug);
       
-      // Also check if the current page is the homepage
       try {
         if (window.webflow) {
           const currentPage = await webflow.getCurrentPage();
@@ -340,10 +311,8 @@ export default function Home() {
     fetchSlug();
   }, []);
 
-  // Move the event listener inside useEffect
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      // Ensure the message is coming from a trusted origin
       if (event.origin !== 'http://localhost:1337' && event.origin !== `https://${stagingName}.webflow.io`) {
         return;
       }
@@ -360,9 +329,7 @@ export default function Home() {
     return () => window.removeEventListener('message', handleMessage);
   }, [stagingName]);
 
-  // Add direct DOM manipulation on first render to ensure visibility
   useEffect(() => {
-    // Try to show a toast message to verify the component is working
     toast({
       title: "SEO Analyzer Ready",
       description: "Enter your target keyphrase to begin analysis",
@@ -370,13 +337,10 @@ export default function Home() {
     });
   }, []);
 
-  // Add this effect near the other useEffect hooks
   useEffect(() => {
-    // Subscribe to page changes in Webflow Designer
     if (window.webflow) {
       let currentPageId: string | null = null;
       
-      // Get initial page ID
       const getCurrentPageId = async () => {
         try {
           const currentPage = await webflow.getCurrentPage();
@@ -391,16 +355,12 @@ export default function Home() {
       
       const unsubscribe = window.webflow.subscribe('currentpage', async (event) => {
         try {
-          // Get updated page info
           const currentPage = await webflow.getCurrentPage();
-          // getCurrentPage returns the current page directly, no need to find it
           const newCurrentPage = currentPage;
           
           if (newCurrentPage && newCurrentPage.id !== currentPageId) {
-            // Page has actually changed, update currentPageId and reload
             currentPageId = newCurrentPage.id;
             
-            // Use a small timeout to prevent potential race conditions
             setTimeout(() => {
               window.location.reload();
             }, 100);
@@ -409,44 +369,36 @@ export default function Home() {
         }
       });
       
-      // Clean up subscription when component unmounts
       return () => {
         unsubscribe();
       };
     }
   }, []);
 
-  // Update the page change subscription
   useEffect(() => {
-    if (window.webflow) {
-      // Subscribe to page changes in Webflow Designer
-      const unsubscribe = window.webflow.subscribe('currentpage', async () => {
+    if (webflow) {
+      const unsubscribe = webflow.subscribe('currentpage', async () => {
         try {
-          // When page changes, fetch new page info
           await fetchPageInfo(setSlug, setIsHomePage);
         } catch (error) {
+          console.error("Error fetching page info:", error);
         }
       });
       
-      // Clean up subscription when component unmounts
       return () => {
         unsubscribe();
       };
     }
   }, []);
 
-  // Add effect for perfect score celebration
   useEffect(() => {
-    // Only run when we have results and the score is 100
     if (results && seoScore === 100 && !showedPerfectScoreMessage) {
-      // Trigger confetti animation
       confetti({
         particleCount: 200,
         spread: 100,
         origin: { y: 0.6 }
       });
 
-      // Mark as shown so we don't show it again
       setShowedPerfectScoreMessage(true);
     }
   }, [results, seoScore, showedPerfectScoreMessage, toast]);
@@ -458,7 +410,7 @@ export default function Home() {
     }
   });
 
-  const mutation = useMutation({
+  const mutation = useMutation<SEOAnalysisResult, Error, AnalyzeSEORequest>({
     mutationFn: analyzeSEO,
     onMutate: () => {
       setIsLoading(true);
@@ -471,22 +423,18 @@ export default function Home() {
     onError: (error: Error) => {
       setIsLoading(false);
       
-      // Check if the error message indicates an empty/unpublished page
       if (error.message.includes('Failed to fetch page') || error.message.includes('500')) {
         toast({
           variant: "destructive",
           title: "Unpublished Page",
           description: "It seems the page you are trying to analyze is empty. Can you make sure you published the page (top right corner button) and try again.",
-          // Increase duration so user has time to read
           duration: 6000,
-          // Add custom styling
           className: "bg-amber-50 dark:bg-amber-900 border-amber-200 dark:border-amber-800",
           style: {
             fontWeight: 500
           }
         });
       } else {
-        // Default error toast for other errors
         toast({
           variant: "destructive", 
           title: "Analysis Failed",
@@ -499,19 +447,13 @@ export default function Home() {
   const copyCleanToClipboard = async (text: string | undefined) => {
     if (!text) return;
 
-    // Extract text after the colon, with special handling for multiple colons
     let cleanText = text;
     
-    // Special handling for "Keyphrase in Introduction" which has a unique format
     if (text.toLowerCase().includes("keyphrase in introduction")) {
-      // Check if there's a newline character indicating the format "Title\nRecommendation"
       const newlineIndex = text.indexOf('\n');
       if (newlineIndex !== -1) {
-        // Extract everything after the newline
         cleanText = text.substring(newlineIndex + 1).trim();
-      } 
-      // If there's no newline but there are colons, use the existing logic
-      else {
+      } else {
         const parts = text.split(':');
         if (parts.length > 2) {
           cleanText = parts.slice(2).join(':').trim();
@@ -519,19 +461,13 @@ export default function Home() {
           cleanText = parts[1].trim();
         }
       }
-    }
-    // All other cases including H1 and H2 Headings use simple extraction
-    else {
-      // Normal case - use existing function
+    } else {
       cleanText = extractTextAfterColon(text);
     }
     
-    // Remove any HTML tags that might be present
     cleanText = cleanText.replace(/<[^>]*>/g, '');
-    
-    // Remove surrounding double quotes if present
-    cleanText = cleanText.replace(/^"/, ''); // Remove quote at beginning if present
-    cleanText = cleanText.replace(/"$/, ''); // Remove quote at end if present
+    cleanText = cleanText.replace(/^"/, '');
+    cleanText = cleanText.replace(/"$/, '');
     
     const success = await copyToClipboard(cleanText);
     if (success) {
@@ -549,29 +485,26 @@ export default function Home() {
     }
   };
   
-  const getSiteInfo = async (): Promise<WebflowSiteInfo | null> => {
-    try {
-      const siteInfo = await webflow.getSiteInfo();
-      if (siteInfo?.shortName) {
-        setStagingName(siteInfo.shortName);
-      }
-      return siteInfo as WebflowSiteInfo;
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Error getting site info"
-      });
-      return null;
-    }
-  };
-
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
-      // Force a double-check of the API URL
-      const apiBaseUrl = getApiBaseUrl();
+      let siteInfo: WebflowSiteInfo;
+      try {
+        if (!window.webflow) {
+          throw new Error("Webflow API not available.");
+        }
+        siteInfo = await window.webflow.getSiteInfo();
+        if (siteInfo?.shortName) {
+          setStagingName(siteInfo.shortName);
+        }
+      } catch (error) {
+        toast({
+          variant: "destructive",
+          title: "Error Fetching Site Info",
+          description: error instanceof Error ? error.message : "Could not get site info from Webflow."
+        });
+        return;
+      }
 
-      const siteInfo = await getSiteInfo();
       if (!siteInfo || !siteInfo.domains || siteInfo.domains.length === 0) {
         toast({
           variant: "destructive",
@@ -580,95 +513,90 @@ export default function Home() {
         });
         return;
       }
-  
-      let url = "";
-      if (siteInfo.domains.length === 1) {
-        url = siteInfo.domains[0].url;
-      } else {
-        const defaultDomain = siteInfo.domains.find(domain => domain.default);
-        if (defaultDomain) {
-          url = defaultDomain.url;
-        } else {
-          toast({
-            variant: "destructive",
-            title: "Error",
-            description: "No default domain found in site info"
-          });
-          return;
-        }
-      }
-  
-      if (url) {
-        // Make sure URLs start with https:// for production compatibility
-        if (!url.startsWith('http://') && !url.startsWith('https://')) {
-          url = 'https://' + url;
-        } else if (url.startsWith('http://')) {
-          url = url.replace(/^http:/, 'https:');
-        }
-        
-        // Append the slug to the URL if it exists
-        if (slug) {
-          // Remove trailing slash from URL if present
-          url = url.replace(/\/$/, '');
-          
-          // Add the slug with leading slash
-          url = `${url}/${slug}`;
-        } else {
-        }
-        
-        // Wrap in try-catch and provide useful error message
-        try {
-          // Force a direct request to the Worker to test connectivity
-          const testConnection = await fetch(`${apiBaseUrl}/api/analyze`, {
-            method: "HEAD"
-          }).catch(err => {
-            return null;
-          });
-          
-          // Pass isHomePage to the SEO analysis
-          mutation.mutate({ keyphrase: values.keyphrase, url, isHomePage });
-        } catch (apiError) {
-          toast({
-            variant: "destructive",
-            title: "Connection Error",
-            description: "Make sure the Cloudflare Worker is running with 'yarn dev:worker'"
-          });
-        }
-      } else {
+
+      const mostRecentDomain = getMostRecentlyPublishedDomain(siteInfo.domains);
+
+      if (!mostRecentDomain) {
         toast({
           variant: "destructive",
-          title: "Error",
-          description: "Unable to determine the URL"
+          title: "No Published Domain Found",
+          description: "Cannot perform analysis as no domain appears to have been published."
         });
+        return;
       }
+
+      const baseUrl = mostRecentDomain.url.startsWith('http') ? mostRecentDomain.url : `https://${mostRecentDomain.url}`;
+
+      let publishPath = "";
+      let currentPage: WebflowPage | null = null;
+      let pageData: WebflowPageData | undefined = undefined;
+
+      try {
+        if (!window.webflow) {
+          throw new Error("Webflow API not available.");
+        }
+        currentPage = await window.webflow.getCurrentPage();
+        publishPath = (await currentPage.getPublishPath()) ?? "";
+        setIsHomePage(await currentPage.isHomepage());
+
+        pageData = {
+          title: await currentPage.getTitle(),
+          metaDescription: await currentPage.getDescription(),
+          ogTitle: await currentPage.getOpenGraphTitle(),
+          ogDescription: await currentPage.getOpenGraphDescription(),
+          ogImage: await currentPage.getOpenGraphImage(),
+          usesTitleAsOGTitle: await currentPage.usesTitleAsOpenGraphTitle(),
+          usesDescriptionAsOGDescription: await currentPage.usesDescriptionAsOpenGraphDescription(),
+        };
+        console.log("[Home onSubmit] Fetched Webflow Page Data:", pageData);
+
+      } catch (error) {
+        toast({
+          variant: "destructive",
+          title: "Error Fetching Page Info",
+          description: error instanceof Error ? error.message : "Failed to get page info from Webflow"
+        });
+        return;
+      }
+
+      const finalUrlPath = publishPath === '/' ? '' : publishPath;
+      const url = `${baseUrl}${finalUrlPath.startsWith('/') ? '' : '/'}${finalUrlPath}`;
+
+      const analysisData: AnalyzeSEORequest = {
+        keyphrase: values.keyphrase,
+        url,
+        isHomePage,
+        siteInfo,
+        publishPath,
+        webflowPageData: pageData
+      };
+
+      mutation.mutate(analysisData);
+
     } catch (error) {
       toast({
-        variant: "destructive", 
-        title: "Error",
-        description: "Failed to analyze SEO. Please try again."
+        variant: "destructive",
+        title: "Error Preparing Analysis",
+        description: error instanceof Error ? error.message : "Failed to analyze SEO. Please try again."
       });
     }
   };
 
-  // Group checks for the overview
   const groupedChecks = results ? groupChecksByCategory(results.checks) : null;
 
-  // Function to extract domains from URLs and register them
   const registerDetectedDomains = async (detectedUrls: string[]) => {
     if (!detectedUrls || detectedUrls.length === 0) return;
 
     try {
-      // Extract unique domains from the URLs
       const domains = detectedUrls
         .filter(Boolean)
         .map(url => {
           try {
-            // Handle URLs with or without protocol
             const urlWithProtocol = url.startsWith('http') ? url : `https://${url}`;
             const urlObj = new URL(urlWithProtocol);
             return urlObj.hostname;
           } catch (e) {
-            return url; // Return original if parsing fails
+            return url;
           }
         })
         .filter(Boolean);
@@ -682,7 +610,6 @@ export default function Home() {
           } else {
           }
         } catch (err) {
-          // Don't block the app if domain registration fails (it will just use the API's default allowed domains)
         }
       }
     } catch (error) {
@@ -690,15 +617,12 @@ export default function Home() {
   };
 
   useEffect(() => {
-    // Get URLs from Webflow context
     const getUrls = async () => {
       try {
-        // Initialize detectedUrls as an empty array
         const detectedUrls: string[] = [];
         
-        // Try to get URL from Webflow context if available
-        if (webflow && typeof webflow.getSiteInfo === 'function') {
-          const siteInfo = await getSiteInfo();
+        if (webflow) {
+          const siteInfo = await webflow.getSiteInfo();
           if (siteInfo?.domains && siteInfo.domains.length > 0) {
             siteInfo.domains.forEach(domain => {
               if (domain.url) {
@@ -708,7 +632,6 @@ export default function Home() {
           }
         }
         
-        // After setting the URLs, register their domains
         if (detectedUrls && detectedUrls.length > 0) {
           setUrls(detectedUrls);
           await registerDetectedDomains(detectedUrls);
@@ -720,7 +643,6 @@ export default function Home() {
     getUrls();
   }, []);
 
-  // Get checks for the selected category
   const selectedCategoryChecks = selectedCategory && results ? 
     results.checks.filter(check => {
       const categories = groupChecksByCategory(results.checks);
@@ -732,7 +654,7 @@ export default function Home() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className="min-h-screen bg-background p-4 md:p-6 flex flex-col"
-      style={{ color: "#FFFFFF" }} // Force white text for visibility
+      style={{ color: "#FFFFFF" }}
     >
       <div className="mx-auto w-full max-w-3xl space-y-6 flex-grow">
         <motion.div
@@ -784,7 +706,6 @@ export default function Home() {
                       Start optimizing your SEO
                     </Button>
                   </motion.div>
-                  {/* Only show test button in development environments */}
                   {process.env.NODE_ENV !== 'production' && (
                     <Button
                       type="button"
@@ -792,7 +713,6 @@ export default function Home() {
                       size="sm"
                       className="mt-2"
                       onClick={() => {
-                        // Mock a perfect score result
                         const mockPerfectResult = results ? {
                           ...results,
                           checks: results.checks.map(check => ({
@@ -806,21 +726,18 @@ export default function Home() {
                         if (mockPerfectResult) {
                           setResults(mockPerfectResult);
                           
-                          // Trigger the confetti directly for immediate feedback
                           confetti({
                             particleCount: 200,
                             spread: 100,
                             origin: { y: 0.6 }
                           });
                           
-                          // Keep toast for test button only to provide feedback about test mode
                           toast({
                             title: "Test Mode Activated",
                             description: "Perfect score simulation is now active.",
                             duration: 3000,
                           });
                           
-                          // Set the state to prevent repeated toasts
                           setShowedPerfectScoreMessage(true);
                         } else {
                           toast({
@@ -876,7 +793,6 @@ export default function Home() {
                           {results.passedChecks} passed <CheckCircle className="inline-block h-4 w-4 text-greenText" style={{color: 'var(--greenText)', stroke: 'var(--greenText)'}} /> • {results.failedChecks} to improve <XCircle className="inline-block h-4 w-4 text-redText" style={{color: 'var(--redText)', stroke: 'var(--redText)'}} />
                         </p>
                         
-                        {/* Perfect score celebration message */}
                         {seoScore === 100 && (
                           <motion.div
                             initial={{ opacity: 0, scale: 0.8 }}
@@ -904,7 +820,6 @@ export default function Home() {
                 </CardHeader>
                 <CardContent>
                   {selectedCategory ? (
-                    // Show checks for the selected category
                     <ScrollArea className="h-[600px] pr-4 w-full">
                       <motion.div
                         variants={container}
@@ -940,7 +855,6 @@ export default function Home() {
                                   </motion.div>
                                   {check.title}
 
-                                  {/* Priority Icon */}
                                   <TooltipProvider>
                                     <Tooltip>
                                       <TooltipTrigger asChild>
@@ -1019,7 +933,6 @@ export default function Home() {
                       </motion.div>
                     </ScrollArea>
                   ) : (
-                    // Show overview categories
                     <div className="space-y-6">
                       {groupedChecks && Object.entries(groupedChecks).map(([category, checks]) => {
                         const status = getCategoryStatus(checks);
@@ -1068,18 +981,47 @@ export default function Home() {
   );
 }
 
-// Move copyToClipboard function inside the component as well
+// Helper function to format recommendation text for display
+const formatRecommendationForDisplay = (recommendation: string | undefined, title: string): string => {
+  if (!recommendation) return "";
 
-// Use the existing WebflowExtension type defined in global.d.ts
+  let displayText = recommendation;
+
+  // Handle specific formatting for "Keyphrase in Introduction"
+  if (title.toLowerCase().includes("keyphrase in introduction")) {
+    const newlineIndex = recommendation.indexOf('\n');
+    if (newlineIndex !== -1) {
+      displayText = recommendation.substring(newlineIndex + 1).trim();
+    } else {
+      // Fallback if no newline: try splitting by colon
+      const parts = recommendation.split(':');
+      if (parts.length > 1) {
+        // Join everything after the first colon
+        displayText = parts.slice(1).join(':').trim();
+      }
+      // If only one part or less, keep original (minus title potentially)
+    }
+  } else {
+    // General cleanup: extract text after colon if present and seems appropriate
+    displayText = extractTextAfterColon(recommendation);
+  }
+
+  // Remove potential HTML tags for safer display
+  displayText = displayText.replace(/<[^>]*>/g, '');
+  // Remove surrounding quotes if present
+  displayText = displayText.replace(/^"/, '').replace(/"$/, '');
+
+  return displayText;
+};
+
+
 const copyToClipboard = async (text: string) => {
   try {
-    // Try using Webflow's built-in clipboard method
     if (window.webflow?.clipboard) {
       await window.webflow.clipboard.writeText(text);
       return true;
     }
     
-    // If Webflow's clipboard API is not available, try using the DOM method
     const textArea = document.createElement('textarea');
     textArea.value = text;
     textArea.style.position = 'fixed';
