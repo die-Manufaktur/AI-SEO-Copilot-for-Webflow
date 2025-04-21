@@ -3,7 +3,7 @@ import { Slot } from "@radix-ui/react-slot"
 import { VariantProps, cva } from "class-variance-authority"
 import { PanelLeft } from "lucide-react"
 
-import { useIsMobile } from "../../hooks/use-mobile"
+import { useMobile } from "../../hooks/use-mobile"
 import { cn } from "../../lib/utils";
 import { Button } from "../../components/ui/button"
 import { Input } from "../../components/ui/input"
@@ -56,7 +56,7 @@ const SidebarProvider = React.forwardRef<
   (
     {
       defaultOpen = true,
-      open: openProp,
+      open: openProp, // Explicitly typed in the props definition above
       onOpenChange: setOpenProp,
       className,
       style,
@@ -65,7 +65,7 @@ const SidebarProvider = React.forwardRef<
     },
     ref
   ) => {
-    const isMobile = useIsMobile()
+    const isMobile = useMobile()
     const [openMobile, setOpenMobile] = React.useState(false)
 
     // This is the internal state of the sidebar.
