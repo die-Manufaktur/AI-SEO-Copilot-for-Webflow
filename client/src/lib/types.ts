@@ -1,13 +1,8 @@
-export interface SEOCheck {
-  title: string;
-  description: string;
-  passed: boolean;
-  recommendation?: string;
-  priority: 'high' | 'medium' | 'low'; // Added priority field
-}
+// Import the shared SEOCheck type
+import type { SEOCheck } from '../../../shared/types';
 
 export interface SEOAnalysisResult {
-  checks: SEOCheck[];
+  checks: SEOCheck[]; // Uses the imported SEOCheck
   passedChecks: number;
   failedChecks: number;
   url: string;
