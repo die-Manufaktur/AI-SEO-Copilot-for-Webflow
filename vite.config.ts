@@ -10,26 +10,31 @@ export default defineConfig({
   plugins: [
     react(),
   ],
-  base: './', // Keep base relative if index.html is served from root
+  // Set the root directory to 'client' for build and dev server context
+  root: path.resolve(__dirname, 'client'),
+  // Base path relative to the output directory root
+  base: './',
   optimizeDeps: {
     exclude: ['whatwg-url', 'jsdom']
   },
   build: {
-    // Ensure outDir matches where the webflow bundler expects files
-    outDir: 'public', // Changed from 'dist/client'
-    emptyOutDir: true,
-    sourcemap: false, // Keep sourcemaps off for production build if desired
-    assetsDir: 'assets', // Assets relative to outDir
+    // Output directory relative to the project root (one level up from 'client')
+    // Use path.resolve to ensure it points correctly outside the 'root' dir
+    outDir: path.resolve(__dirname, 'public'),
+    emptyOutDir: true, // Clean the 'public' directory before build
+    sourcemap: false,
+    assetsDir: 'assets', // Assets relative to outDir ('public/assets')
     rollupOptions: {
-      input: {
-        // Explicitly point to your index.html within the client folder
-        main: path.resolve(__dirname, 'client/index.html')
-      },
+      // Input is now relative to the 'root' directory ('client')
+      // Vite automatically picks up index.html from the root directory
+      // input: { main: 'index.html' }, // Usually not needed if index.html is at root
       output: {
+        // Output paths remain relative to outDir ('public')
         entryFileNames: 'assets/[name].[hash].js',
         chunkFileNames: 'assets/[name].[hash].js',
         assetFileNames: 'assets/[name].[hash].[ext]',
         manualChunks: (id) => {
+          // Ensure paths in manualChunks are handled correctly relative to project root
           if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
             return 'vendor';
           }
@@ -39,7 +44,7 @@ export default defineConfig({
         }
       }
     },
-    manifest: true, // Make sure manifest generation is enabled if needed by the bundler
+    manifest: true, // Generate manifest.json in outDir/.vite/
   },
   css: {
     // Path relative to project root
@@ -47,16 +52,19 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      // Path relative to project root
+      // Alias relative to project root, pointing inside the 'client/src' directory
+      // Vite automatically resolves '@' relative to 'root' if not absolute
       '@': path.resolve(__dirname, './client/src'),
     },
   },
   server: {
-    // Serve from the client directory during development
+    // Server settings might need adjustment if 'root' changes behavior significantly
+    // The 'root' option sets the server's root directory
     fs: {
-      strict: false, // Allow serving files from outside the workspace root (needed for client dir)
+      // Allow serving files needed for development, potentially from project root
+      allow: [path.resolve(__dirname)], // Allow serving from the project root
     },
-    origin: 'http://127.0.0.1:5173', // Explicitly set origin if needed
+    origin: 'http://127.0.0.1:5173',
     watch: {
       usePolling: true,
       interval: 300,
@@ -64,7 +72,7 @@ export default defineConfig({
     hmr: {
       overlay: true,
       protocol: 'ws',
-      port: 24678, // Ensure this port is free
+      port: 24678,
       timeout: 5000,
     },
     proxy: {
@@ -75,26 +83,30 @@ export default defineConfig({
       }
     },
   },
-  // Consolidated Vitest Configuration
+  // Vitest Configuration - Paths need to be relative to project root
   test: {
+    // Set root for tests to project root explicitly if needed, otherwise defaults to vite config root ('client')
+    // root: __dirname, // Uncomment if tests need project root context
     globals: true,
     environment: 'jsdom',
-    // Path relative to project root
-    setupFiles: './client/src/setupTests.ts',
-    // Use relative paths from project root for include patterns
+    // Setup file relative to project root
+    setupFiles: path.resolve(__dirname, './client/src/setupTests.ts'),
+    // Include patterns relative to project root
     include: [
+        // Adjust paths relative to project root if test.root is changed
         'client/**/*.{test,spec}.?(c|m)[jt]s?(x)',
         'workers/**/*.{test,spec}.?(c|m)[jt]s?(x)'
     ],
     // Exclude patterns relative to project root
     exclude: [
         '**/node_modules/**',
-        '**/dist/**',
+        '**/dist/**', // Exclude default vite dist
+        '**/public/**', // Exclude build output dir
         '**/cypress/**',
         '**/.{idea,git,cache,output,temp}/**',
         '**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build,eslint,prettier}.config.*',
     ],
-    // Alias relative to project root - Correct
+    // Alias relative to project root
     alias: {
        '@': path.resolve(__dirname, './client/src'),
     }
