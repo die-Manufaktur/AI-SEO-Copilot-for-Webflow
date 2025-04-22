@@ -16,7 +16,7 @@ export default defineConfig({
   },
   build: {
     // Ensure outDir matches where the webflow bundler expects files
-    outDir: 'dist/client',
+    outDir: 'public', // Changed from 'dist/client'
     emptyOutDir: true,
     sourcemap: false, // Keep sourcemaps off for production build if desired
     assetsDir: 'assets', // Assets relative to outDir
