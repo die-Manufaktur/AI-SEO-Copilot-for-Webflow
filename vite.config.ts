@@ -1,5 +1,5 @@
 /// <reference types="vitest" />
-import { defineConfig } from 'vitest/config';
+import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react-swc';
 import path from 'path';
 
@@ -15,14 +15,16 @@ export default defineConfig({
     exclude: ['whatwg-url', 'jsdom']
   },
   build: {
-    // Output relative to project root
-    outDir: path.resolve(__dirname, './dist/client'), // Changed output dir to avoid conflicts, place client build in dist/client
+    // Ensure outDir matches where the webflow bundler expects files
+    outDir: 'dist/client',
     emptyOutDir: true,
     sourcemap: false, // Keep sourcemaps off for production build if desired
     assetsDir: 'assets', // Assets relative to outDir
     rollupOptions: {
-      // Input path relative to project root
-      input: path.resolve(__dirname, 'client/index.html'),
+      input: {
+        // Explicitly point to your index.html within the client folder
+        main: path.resolve(__dirname, 'client/index.html')
+      },
       output: {
         entryFileNames: 'assets/[name].[hash].js',
         chunkFileNames: 'assets/[name].[hash].js',
@@ -37,6 +39,7 @@ export default defineConfig({
         }
       }
     },
+    manifest: true, // Make sure manifest generation is enabled if needed by the bundler
   },
   css: {
     // Path relative to project root
