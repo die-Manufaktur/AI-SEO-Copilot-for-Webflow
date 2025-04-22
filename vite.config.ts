@@ -86,7 +86,7 @@ export default defineConfig({
   // Vitest Configuration - Paths need to be relative to project root
   test: {
     // Set root for tests to project root explicitly if needed, otherwise defaults to vite config root ('client')
-    // root: __dirname, // Uncomment if tests need project root context
+    root: __dirname, // Uncomment if tests need project root context
     globals: true,
     environment: 'jsdom',
     // Setup file relative to project root
