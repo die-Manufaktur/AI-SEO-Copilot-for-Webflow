@@ -1,4 +1,5 @@
-import { defineConfig } from 'vite';
+/// <reference types="vitest" />
+import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react-swc';
 import path from 'path';
 
@@ -6,70 +7,93 @@ const __dirname = process.cwd();
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  root: path.resolve(__dirname, 'client'),
   plugins: [
     react(),
   ],
-  base: './',
+  base: './', // Keep base relative if index.html is served from root
   optimizeDeps: {
     exclude: ['whatwg-url', 'jsdom']
   },
   build: {
-    outDir: path.resolve(__dirname, './public'), // Output to the project root's public directory
+    // Output relative to project root
+    outDir: path.resolve(__dirname, './dist/client'), // Changed output dir to avoid conflicts, place client build in dist/client
     emptyOutDir: true,
-    sourcemap: false, // disable source maps for production
-    assetsDir: 'assets',
+    sourcemap: false, // Keep sourcemaps off for production build if desired
+    assetsDir: 'assets', // Assets relative to outDir
     rollupOptions: {
+      // Input path relative to project root
       input: path.resolve(__dirname, 'client/index.html'),
       output: {
         entryFileNames: 'assets/[name].[hash].js',
         chunkFileNames: 'assets/[name].[hash].js',
         assetFileNames: 'assets/[name].[hash].[ext]',
-        // Use a function-based approach for manualChunks
         manualChunks: (id) => {
-          // Vendor chunk for React
           if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
             return 'vendor';
           }
-          
-          // UI libraries chunk
           if (id.includes('node_modules/react-icons') || id.includes('node_modules/tailwindcss')) {
             return 'ui';
           }
-          
-          // You can add more chunk definitions as needed
         }
       }
     },
   },
   css: {
+    // Path relative to project root
     postcss: path.resolve(__dirname, 'postcss.config.mjs'),
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      // Path relative to project root
+      '@': path.resolve(__dirname, './client/src'),
     },
   },
   server: {
+    // Serve from the client directory during development
+    fs: {
+      strict: false, // Allow serving files from outside the workspace root (needed for client dir)
+    },
+    origin: 'http://127.0.0.1:5173', // Explicitly set origin if needed
     watch: {
       usePolling: true,
-      // Watch for changes more aggressively
       interval: 300,
     },
     hmr: {
       overlay: true,
-      // Force full page reload if needed for Webflow integration
       protocol: 'ws',
-      port: 24678,
-      // Increase timeout to ensure connections are maintained
+      port: 24678, // Ensure this port is free
       timeout: 5000,
     },
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8787',
+        target: 'http://127.0.0.1:8787', // Your worker backend
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '')
       }
+    },
+  },
+  // Consolidated Vitest Configuration
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    // Path relative to project root
+    setupFiles: './client/src/setupTests.ts',
+    // Use relative paths from project root for include patterns
+    include: [
+        'client/**/*.{test,spec}.?(c|m)[jt]s?(x)',
+        'workers/**/*.{test,spec}.?(c|m)[jt]s?(x)'
+    ],
+    // Exclude patterns relative to project root
+    exclude: [
+        '**/node_modules/**',
+        '**/dist/**',
+        '**/cypress/**',
+        '**/.{idea,git,cache,output,temp}/**',
+        '**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build,eslint,prettier}.config.*',
+    ],
+    // Alias relative to project root - Correct
+    alias: {
+       '@': path.resolve(__dirname, './client/src'),
     }
   },
 });

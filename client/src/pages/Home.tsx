@@ -387,11 +387,59 @@ export default function Home() {
     mutationFn: analyzeSEO,
     onMutate: () => {
       setIsLoading(true);
+      setResults(null); // Clear previous results
     },
     onSuccess: (data) => {
-      setResults(data);
-      setSelectedCategory(null); 
+      let modifiedData = { ...data }; // Clone the data to avoid direct mutation
+
+      // --- MODIFICATION START ---
+      // Check if it's the homepage and modify the URL check result accordingly
+      if (isHomePage) {
+        const urlCheckIndex = modifiedData.checks.findIndex(check => check.title === "Keyphrase in URL");
+
+        if (urlCheckIndex !== -1) {
+          // Create a mutable copy of the checks array
+          const newChecks = [...modifiedData.checks];
+          const originalCheck = newChecks[urlCheckIndex];
+
+          // Check if the status is changing from failed to passed
+          const wasFailed = !originalCheck.passed;
+
+          // Update the specific check
+          newChecks[urlCheckIndex] = {
+            ...originalCheck,
+            passed: true,
+            description: "This is the homepage URL, so the keyphrase is not required in the URL ✨",
+            // Keep original priority, recommendation might become irrelevant but leave it for now
+          };
+
+          // Update the overall counts if the status changed
+          if (wasFailed) {
+            modifiedData.passedChecks = (modifiedData.passedChecks ?? 0) + 1;
+            modifiedData.failedChecks = Math.max(0, (modifiedData.failedChecks ?? 0) - 1);
+            // Recalculate score based on the modified checks
+            modifiedData.score = calculateSEOScore(newChecks);
+          }
+
+          // Assign the modified checks array back to the data
+          modifiedData.checks = newChecks;
+        }
+      }
+      // --- MODIFICATION END ---
+
+      setResults(modifiedData); // Set state with potentially modified data
+      setSelectedCategory(null);
       setIsLoading(false);
+
+      // Trigger confetti only if the *final* score is 100
+      if (modifiedData.score === 100 && !showedPerfectScoreMessage) {
+         confetti({
+           particleCount: 200,
+           spread: 100,
+           origin: { y: 0.6 }
+         });
+         setShowedPerfectScoreMessage(true); // Ensure flag is set here too
+      }
     },
     onError: (error: Error) => {
       setIsLoading(false);
