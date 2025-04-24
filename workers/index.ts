@@ -1,17 +1,10 @@
 import OpenAI from 'openai';
 import * as ip from "ip";
 import { URL } from "url";
+import type { SEOCheck } from './../shared/types/index';
+import { calculateSEOScore } from './../shared/utils/seoUtils'; // Import shared function
 
 // --- Shared Types ---
-
-// Matches client/src/lib/types.ts SEOCheck
-interface SEOCheck {
-  title: string;
-  description: string;
-  passed: boolean;
-  priority: 'high' | 'medium' | 'low';
-  recommendation?: string;
-}
 
 // Type for Open Graph metadata
 interface OGMetadata {
@@ -56,8 +49,10 @@ interface WebflowPageData {
   usesDescriptionAsOGDescription: boolean; // Added
 }
 
-// UPDATED: ScrapedPageData - Removed fields now coming from Webflow API
+// UPDATED: ScrapedPageData - Add title and metaDescription from scrape
 interface ScrapedPageData {
+  title: string; // Added: To store scraped <title>
+  metaDescription: string; // Added: To store scraped <meta name="description">
   content: string;
   paragraphs: string[];
   headings: Array<{ level: number; text: string }>;
@@ -74,7 +69,7 @@ interface ScrapedPageData {
 
 // Matches client/src/lib/types.ts SEOAnalysisResult
 interface SEOAnalysisResult {
-  checks: SEOCheck[];
+  checks: SEOCheck[]; // Uses imported SEOCheck
   passedChecks: number;
   failedChecks: number;
   url: string;
@@ -100,12 +95,6 @@ interface WebflowSiteInfo {
   isPasswordProtected: boolean;
   isPrivateStaging: boolean;
   domains: WebflowDomain[];
-}
-
-interface WebflowPage {
-  id: string;
-  name: string;
-  path: string;
 }
 
 // Add utility function for extracting full text content from HTML elements with nested children
@@ -156,10 +145,6 @@ function extractFullTextContent(html: string, tagPattern: RegExp): string[] {
 // ===== Constants =====
 const ALLOWED_DOMAINS = [
   "example.com",
-  "pull-list.net",
-  "*.pull-list.net",
-  "www.pmds.pull-list.net",
-  "pmds.pull-list.net"
 ];
 
 // Define a cache object at the module level
@@ -341,65 +326,6 @@ async function fetchOAuthToken(code: string, env: any): Promise<string> {
 
   const data = await response.json();
   return data.access_token;
-}
-
-// Endpoint to handle OAuth token exchange
-async function handleOAuthTokenExchange(request: Request, env: any): Promise<Response> {
-  try {
-    const { code } = await request.json();
-    if (!code) {
-      return new Response(JSON.stringify({ error: 'Missing authorization code' }), { status: 400 });
-    }
-
-    const token = await fetchOAuthToken(code, env);
-    return new Response(JSON.stringify({ token }), { status: 200 });
-  } catch (error) {
-    return new Response(JSON.stringify({ error: 'Failed to exchange OAuth token' }), { status: 500 });
-  }
-}
-
-// Endpoint to create and redirect to the authorization link
-async function handleAuthRedirect(request: Request, env: any): Promise<Response> {
-  try {
-    // Manually construct the Webflow OAuth URL
-    const authorizeUrl = new URL('https://webflow.com/oauth/authorize');
-    authorizeUrl.searchParams.append('response_type', 'code');
-    authorizeUrl.searchParams.append('client_id', env.WEBFLOW_CLIENT_ID);
-    authorizeUrl.searchParams.append('redirect_uri', env.WEBFLOW_REDIRECT_URI);
-    authorizeUrl.searchParams.append('scope', 'sites:read');
-    authorizeUrl.searchParams.append('state', env.STATE);
-    
-    return Response.redirect(authorizeUrl.toString(), 302);
-  } catch (error) {
-    return new Response(JSON.stringify({ error: 'Failed to create authorization link' }), { status: 500 });
-  }
-}
-
-// Endpoint to handle the callback from Webflow
-async function handleAuthCallback(request: Request, env: any): Promise<Response> {
-  try {
-    const url = new URL(request.url);
-    const code = url.searchParams.get('code');
-    const state = url.searchParams.get('state');
-
-    if (!code) {
-      return new Response(JSON.stringify({ error: 'Missing authorization code' }), { status: 400 });
-    }
-
-    if (state !== env.STATE) {
-      return new Response(JSON.stringify({ error: 'State does not match' }), { status: 400 });
-    }
-
-    // Exchange the authorization code for an access token
-    const token = await fetchOAuthToken(code, env);
-
-    // Cache the access token securely (e.g., using KV storage)
-    await env.TOKENS.put('user-access-token', token);
-
-    return new Response(JSON.stringify({ message: 'Authorization code received', token }), { status: 200 });
-  } catch (error) {
-    return new Response(JSON.stringify({ error: 'Failed to handle auth callback' }), { status: 500 });
-  }
 }
 
 // =======================================
@@ -663,11 +589,27 @@ function isMinified(code: string, minificationThreshold: number = 30): boolean {
   return isLikelyMinified;
 }
 
-// REVISED processHtml function signature (return type updated)
-async function processHtml(html: string, url: string): Promise<ScrapedPageData> { // Return type is now the simplified ScrapedPageData
+// processHtml function signature (return type updated)
+async function processHtml(html: string, url: string): Promise<ScrapedPageData> {
   try {
     console.log(`[SEO Analyzer] Processing HTML content from: ${url}`);
     const baseUrl = new URL(url);
+
+    // --- Extract Title ---
+    const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+    // Decode HTML entities in the title
+    const pageTitle = titleMatch ? titleMatch[1].replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim() : '';
+    console.log(`[SEO Analyzer] Extracted Page Title: ${pageTitle}`);
+
+    // --- Extract Meta Description ---
+    const metaDescriptionRegex = /<meta\s+(?:[^>]*?\s+)?(?:name=["']description["']|content=["']([^"']*)["'])\s+(?:[^>]*?\s+)?(?:name=["']description["']|content=["']([^"']*)["'])\s*[^>]*>/i;
+    const metaDescriptionMatch = html.match(metaDescriptionRegex);
+    const rawMetaDescription = metaDescriptionMatch ? (metaDescriptionMatch[1] || metaDescriptionMatch[2]) : '';
+    const metaDescription = rawMetaDescription
+      ? rawMetaDescription.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim()
+      : '';
+    console.log(`[SEO Analyzer] Extracted Meta Description: ${metaDescription}`);
+
 
     // --- Keep width/height extraction if needed for specific checks, otherwise remove ---
     const ogImageWidthMatch = html.match(/<meta[^>]*property=["']og:image:width["'][^>]*content=["'](.*?)["'][^>]*>/i);
@@ -742,6 +684,58 @@ async function processHtml(html: string, url: string): Promise<ScrapedPageData> 
     console.log("[SEO Analyzer] Starting Resource Extraction...");
     const resources = { js: [] as Resource[], css: [] as Resource[] };
     // ... existing JS/CSS extraction logic ...
+    // --- Fetch JS resources ---
+    const jsMatches = html.matchAll(/<script[^>]*src=["'](.*?)["'][^>]*>/gi);
+    const jsFetchPromises = [];
+    for (const match of jsMatches) {
+      const src = match[1];
+      if (src) {
+        try {
+          const absoluteUrl = new URL(src, baseUrl.toString()).toString();
+          jsFetchPromises.push(
+            fetch(absoluteUrl)
+              .then(res => res.ok ? res.text() : Promise.resolve(undefined)) // Fetch content only if successful
+              .then(content => ({ url: absoluteUrl, content }))
+              .catch(() => ({ url: absoluteUrl, content: undefined })) // Handle fetch errors
+          );
+        } catch (e) {
+          console.warn(`[SEO Analyzer] Skipping invalid JS URL: ${src}`);
+        }
+      }
+    }
+    const jsResults = await Promise.all(jsFetchPromises);
+    resources.js = jsResults.map(res => ({
+        ...res,
+        minified: res.content ? isMinified(res.content) : undefined
+    }));
+    console.log(`[SEO Analyzer] Processed ${resources.js.length} JS resources.`);
+
+
+    // --- Fetch CSS resources ---
+    const cssMatches = html.matchAll(/<link[^>]*rel=["']stylesheet["'][^>]*href=["'](.*?)["'][^>]*>/gi);
+    const cssFetchPromises = [];
+    for (const match of cssMatches) {
+      const href = match[1];
+      if (href) {
+        try {
+          const absoluteUrl = new URL(href, baseUrl.toString()).toString();
+          cssFetchPromises.push(
+            fetch(absoluteUrl)
+              .then(res => res.ok ? res.text() : Promise.resolve(undefined))
+              .then(content => ({ url: absoluteUrl, content }))
+              .catch(() => ({ url: absoluteUrl, content: undefined }))
+          );
+        } catch (e) {
+          console.warn(`[SEO Analyzer] Skipping invalid CSS URL: ${href}`);
+        }
+      }
+    }
+    const cssResults = await Promise.all(cssFetchPromises);
+     resources.css = cssResults.map(res => ({
+        ...res,
+        minified: res.content ? isMinified(res.content) : undefined
+    }));
+    console.log(`[SEO Analyzer] Processed ${resources.css.length} CSS resources.`);
     console.log("[SEO Analyzer] Finished Resource Extraction.");
 
 
@@ -751,6 +745,8 @@ async function processHtml(html: string, url: string): Promise<ScrapedPageData> 
 
     // Construct the final ScrapedPageData object (using the simplified interface)
     const scrapedData: ScrapedPageData = {
+      title: pageTitle, // Add scraped title
+      metaDescription: metaDescription, // Add scraped description
       content: content || '',
       paragraphs: paragraphs || [],
       headings: headings || [],
@@ -767,7 +763,21 @@ async function processHtml(html: string, url: string): Promise<ScrapedPageData> 
 
   } catch (error) {
     console.error("[SEO Analyzer] CRITICAL Error processing HTML:", error);
-    throw error;
+    // Ensure a valid ScrapedPageData structure is returned even on error,
+    // potentially with empty fields, so the calling function doesn't break.
+     return {
+        title: '',
+        metaDescription: '',
+        content: '',
+        paragraphs: [],
+        headings: [],
+        images: [],
+        internalLinks: [],
+        outboundLinks: [],
+        url: url,
+        resources: { js: [], css: [] },
+        schemaMarkup: { hasSchema: false, schemaTypes: [], schemaCount: 0 }
+     };
   }
 }
 
@@ -833,307 +843,561 @@ export async function analyzeSEOElements(
 ): Promise<SEOAnalysisResult> {
   console.log("[SEO Analyzer] Analyzing elements for:", { url, keyphrase, isHomePage, siteName: siteInfo.siteName, publishPath, hasWebflowData: !!webflowPageData });
 
+  // Define the pattern for Webflow dynamic variables
+  const webflowVariablePattern = /\{\{wf\s+\{&quot;.*?&quot;\\\}\s*\}\}/;
+  let apiDataUsedForTitle = false;
+  let apiDataUsedForDescription = false;
+
+  let scrapedData: ScrapedPageData | null = null;
+  let titleToCheck: string = '';
+  let descriptionToCheck: string = '';
+  let ogTitleToCheck: string = webflowPageData?.ogTitle || '';
+  let ogDescriptionToCheck: string = webflowPageData?.ogDescription || '';
+  let ogImageToCheck: string = webflowPageData?.ogImage || '';
+
   try {
-    // Scrape the page to get content, headings, images, links, resources, schema
-    const scrapedData: ScrapedPageData = await scrapeWebpage(url, siteInfo);
+    // Always scrape the page
+    scrapedData = await scrapeWebpage(url, siteInfo);
+    console.log("[SEO Analyzer] Page scraped successfully by worker.");
+    // ADD LOG: Log the scraped title/desc immediately
+    console.log(`[SEO Analyzer] SCRAPED Title: "${scrapedData.title}"`);
+    console.log(`[SEO Analyzer] SCRAPED Meta Description: "${scrapedData.metaDescription}"`);
 
-    // --- Combine Webflow API data and Scraped Data ---
-    const finalTitle = webflowPageData?.title ?? ''; // Prioritize API data, fallback to empty string
-    const finalMetaDescription = webflowPageData?.metaDescription ?? ''; // Prioritize API data
-    const finalOgMetadata: OGMetadata = { // Construct OG data, prioritizing API
-        title: webflowPageData?.ogTitle ?? '',
-        description: webflowPageData?.ogDescription ?? '',
-        image: webflowPageData?.ogImage ?? '',
-        // Keep width/height from scraping for now, if needed
-        imageWidth: scrapedData.resources.css.length > 0 ? 'scraped' : '', // Placeholder logic, adjust as needed
-        imageHeight: scrapedData.resources.css.length > 0 ? 'scraped' : '', // Placeholder logic, adjust as needed
-    };
-    console.log("[SEO Analyzer] Using Final Title:", finalTitle);
-    console.log("[SEO Analyzer] Using Final Meta Description:", finalMetaDescription);
-    console.log("[SEO Analyzer] Using Final OG Metadata:", finalOgMetadata);
-
-    // Destructure only the necessary parts from scrapedData
-    const {
-      content,
-      paragraphs,
-      headings,
-      images,
-      internalLinks,
-      outboundLinks,
-      resources,
-      schemaMarkup
-    } = scrapedData;
-
-    const checks: SEOCheck[] = [];
-    const apiDataUsed = !!webflowPageData; // Track if API data was available
-
-    // --- SEO Checks ---
-
-    // 1. Keyphrase in Title
-    const titleContainsKeyword = finalTitle.toLowerCase().includes(keyphrase.toLowerCase());
-    checks.push({
-      title: "Keyphrase in Title",
-      description: titleContainsKeyword ? getSuccessMessage("Keyphrase in Title") : `Your title doesn't contain the keyphrase "${keyphrase}".`,
-      passed: titleContainsKeyword,
-      priority: analyzerCheckPriorities["Keyphrase in Title"],
-      recommendation: !titleContainsKeyword ? await getAIRecommendation("Title", keyphrase, env, finalTitle) : undefined
-    });
-
-    // 2. Keyphrase in Meta Description
-    const descContainsKeyword = finalMetaDescription.toLowerCase().includes(keyphrase.toLowerCase());
-    checks.push({
-      title: "Keyphrase in Meta Description",
-      description: descContainsKeyword ? getSuccessMessage("Keyphrase in Meta Description") : `Your meta description is missing the keyphrase "${keyphrase}".`,
-      passed: descContainsKeyword,
-      priority: analyzerCheckPriorities["Keyphrase in Meta Description"],
-      recommendation: !descContainsKeyword ? await getAIRecommendation("Meta Description", keyphrase, env, finalMetaDescription) : undefined
-    });
-
-    // 3. Keyphrase in URL (Uses scraped URL's path)
-    const urlObject = new URL(url); // Use the actual fetched URL
-    const slug = urlObject.pathname.split('/').pop() || '';
-    const urlContainsKeyword = slug.toLowerCase().includes(keyphrase.toLowerCase().replace(/\s+/g, '-')); // Simple check
-    checks.push({
-      title: "Keyphrase in URL",
-      description: urlContainsKeyword ? getSuccessMessage("Keyphrase in URL") : `The URL slug "${slug}" doesn't seem to contain the keyphrase "${keyphrase}".`,
-      passed: urlContainsKeyword,
-      priority: analyzerCheckPriorities["Keyphrase in URL"],
-      // Recommendation might involve suggesting a new slug based on the title/keyphrase
-      recommendation: !urlContainsKeyword ? `Consider including "${keyphrase.toLowerCase().replace(/\s+/g, '-')}" in your URL slug.` : undefined
-    });
-
-    // 4. Content Length (Uses scraped content)
-    const wordCount = content.split(/\s+/).filter(Boolean).length;
-    const contentLengthPassed = wordCount >= 300; // Example threshold
-    checks.push({
-      title: "Content Length",
-      description: contentLengthPassed ? `${getSuccessMessage("Content Length")} (${wordCount} words)` : `Your content is quite short (${wordCount} words). Aim for at least 300 words.`,
-      passed: contentLengthPassed,
-      priority: analyzerCheckPriorities["Content Length"],
-      recommendation: !contentLengthPassed ? `Expand your content to provide more value and detail, aiming for at least 300 words.` : undefined
-    });
-
-    // 5. Keyphrase Density (Uses scraped content)
-    const densityInfo = calculateKeyphraseDensity(content, keyphrase);
-    const densityPassed = densityInfo.density >= 0.5 && densityInfo.density <= 2.5; // Example range
-    checks.push({
-      title: "Keyphrase Density",
-      description: densityPassed ? `${getSuccessMessage("Keyphrase Density")} (${densityInfo.density.toFixed(1)}%)` : `Keyphrase density is ${densityInfo.density.toFixed(1)}%. Aim for 0.5-2.5%.`,
-      passed: densityPassed,
-      priority: analyzerCheckPriorities["Keyphrase Density"],
-      recommendation: !densityPassed ? `Adjust the number of times "${keyphrase}" appears (${densityInfo.occurrences} times in ${densityInfo.totalWords} words) to fall within the 0.5-2.5% density range.` : undefined
-    });
-
-    // 6. Keyphrase in Introduction (Uses scraped paragraphs)
-    const firstParagraph = paragraphs.length > 0 ? paragraphs[0].toLowerCase() : "";
-    const introContainsKeyword = firstParagraph.includes(keyphrase.toLowerCase());
-    checks.push({
-      title: "Keyphrase in Introduction",
-      description: introContainsKeyword ? getSuccessMessage("Keyphrase in Introduction") : `The keyphrase "${keyphrase}" was not found in the first paragraph.`,
-      passed: introContainsKeyword,
-      priority: analyzerCheckPriorities["Keyphrase in Introduction"],
-      recommendation: !introContainsKeyword ? await getAIRecommendation("Introduction Paragraph", keyphrase, env, firstParagraph) : undefined
-    });
-
-    // 7. Image Alt Attributes (Uses scraped images)
-    const imagesMissingAlt = images.filter(img => !img.alt || img.alt.trim() === "");
-    const altCheckPassed = imagesMissingAlt.length === 0;
-    checks.push({
-      title: "Image Alt Attributes",
-      description: altCheckPassed ? getSuccessMessage("Image Alt Attributes") : `${imagesMissingAlt.length} image(s) are missing descriptive alt text.`,
-      passed: altCheckPassed,
-      priority: analyzerCheckPriorities["Image Alt Attributes"],
-      recommendation: !altCheckPassed ? `Add descriptive alt text to all images, incorporating "${keyphrase}" where relevant. Missing on: ${imagesMissingAlt.map(img => img.src.split('/').pop()).slice(0, 2).join(', ')}${imagesMissingAlt.length > 2 ? '...' : ''}` : undefined
-    });
-
-    // 8. Internal Links (Uses scraped links)
-    const internalLinksPassed = internalLinks.length > 0;
-    checks.push({
-      title: "Internal Links",
-      description: internalLinksPassed ? `${getSuccessMessage("Internal Links")} (Found ${internalLinks.length})` : `No internal links found. Add links to other relevant pages on your site.`,
-      passed: internalLinksPassed,
-      priority: analyzerCheckPriorities["Internal Links"],
-      recommendation: !internalLinksPassed ? `Add links from this page to other relevant pages or posts on your website to improve site structure and SEO.` : undefined
-    });
-
-    // 9. Outbound Links (Uses scraped links)
-    const outboundLinksPassed = outboundLinks.length > 0;
-    checks.push({
-      title: "Outbound Links",
-      description: outboundLinksPassed ? `${getSuccessMessage("Outbound Links")} (Found ${outboundLinks.length})` : `No outbound links found. Consider linking to relevant external resources.`,
-      passed: outboundLinksPassed,
-      priority: analyzerCheckPriorities["Outbound Links"],
-      recommendation: !outboundLinksPassed ? `Link to authoritative external websites where relevant to provide additional context and credibility.` : undefined
-    });
-
-    // 10. Next-Gen Image Formats (Uses scraped images - Placeholder)
-    // This check is complex without fetching/analyzing image headers. Basic check for now.
-    const nonWebPOrAvif = images.filter(img => !img.src.toLowerCase().endsWith('.webp') && !img.src.toLowerCase().endsWith('.avif')).length;
-    const nextGenPassed = nonWebPOrAvif === 0; // Simplistic check
-     checks.push({
-      title: "Next-Gen Image Formats",
-      description: nextGenPassed ? getSuccessMessage("Next-Gen Image Formats") : `Consider using WebP or AVIF formats for ${nonWebPOrAvif} image(s) to improve loading speed.`,
-      passed: nextGenPassed, // Placeholder result
-      priority: analyzerCheckPriorities["Next-Gen Image Formats"],
-      recommendation: !nextGenPassed ? `Convert images like ${images.filter(img => !img.src.toLowerCase().endsWith('.webp') && !img.src.toLowerCase().endsWith('.avif')).map(img => img.src.split('/').pop()).slice(0, 2).join(', ')}... to WebP or AVIF format.` : undefined
-    });
-
-    // 11. OG Image (Uses combined finalOgMetadata)
-    const ogImagePassed = !!finalOgMetadata.image;
-    checks.push({
-      title: "OG Image",
-      description: ogImagePassed ? getSuccessMessage("OG Image") : `No Open Graph image specified. Add an 'og:image' meta tag.`,
-      passed: ogImagePassed,
-      priority: analyzerCheckPriorities["OG Image"],
-      recommendation: !ogImagePassed ? `Set an Open Graph image (og:image meta tag) for better social sharing previews. Recommended size: 1200x630px.` : undefined
-    });
-
-    // 12. OG Title and Description (Uses combined finalOgMetadata AND Webflow settings)
-    const hasOgTitle = !!finalOgMetadata.title;
-    const hasOgDesc = !!finalOgMetadata.description;
-    const usesDefaults = webflowPageData?.usesTitleAsOGTitle && webflowPageData?.usesDescriptionAsOGDescription;
-
-    // Pass if either the defaults are used OR specific OG title/desc are set
-    const ogTitleDescPassed = usesDefaults || (hasOgTitle && hasOgDesc);
-    let ogTitleDescDesc = "";
-    let ogTitleDescRec = undefined;
-
-    if (ogTitleDescPassed) {
-        ogTitleDescDesc = getSuccessMessage("OG Title and Description");
-        if (usesDefaults && (!hasOgTitle || !hasOgDesc)) {
-            ogTitleDescDesc += " (using page title/description as fallback)";
-        }
+    // --- Determine Title ---
+    if (webflowPageData?.title && !webflowVariablePattern.test(webflowPageData.title)) {
+      titleToCheck = webflowPageData.title;
+      apiDataUsedForTitle = true;
+      console.log("[SEO Analyzer] Using Title from Webflow API:", titleToCheck);
     } else {
-        ogTitleDescDesc = "Open Graph title or description is missing and defaults are not enabled.";
-        ogTitleDescRec = `Define both Open Graph title (og:title) and description (og:description) in Webflow settings, or ensure the page title/description are suitable fallbacks and enable the default settings.`;
+      titleToCheck = scrapedData.title;
+      apiDataUsedForTitle = false;
+      // ADD LOG: Confirm fallback happened
+      console.log("[SEO Analyzer] Using SCRAPED Title:", titleToCheck);
     }
 
-    checks.push({
-      title: "OG Title and Description",
-      description: ogTitleDescDesc,
-      passed: ogTitleDescPassed,
-      priority: analyzerCheckPriorities["OG Title and Description"],
-      recommendation: ogTitleDescRec
-    });
-
-    // 13. Keyphrase in H1 Heading (Uses scraped headings)
-    const h1Headings = headings.filter(h => h.level === 1);
-    const h1ContainsKeyword = h1Headings.length > 0 && h1Headings.some(h => h.text.toLowerCase().includes(keyphrase.toLowerCase()));
-    checks.push({
-      title: "Keyphrase in H1 Heading",
-      description: h1Headings.length === 0 ? "No H1 heading found on the page." : (h1ContainsKeyword ? getSuccessMessage("Keyphrase in H1 Heading") : `The main H1 heading doesn't contain the keyphrase "${keyphrase}".`),
-      passed: h1Headings.length > 0 && h1ContainsKeyword,
-      priority: analyzerCheckPriorities["Keyphrase in H1 Heading"],
-      recommendation: h1Headings.length === 0 ? "Add a single, descriptive H1 heading to the page." : (!h1ContainsKeyword ? await getAIRecommendation("H1 Heading", keyphrase, env, h1Headings[0]?.text) : undefined)
-    });
-
-    // 14. Keyphrase in H2 Headings (Uses scraped headings)
-    const h2Headings = headings.filter(h => h.level === 2);
-    const h2ContainsKeyword = h2Headings.some(h => h.text.toLowerCase().includes(keyphrase.toLowerCase()));
-    checks.push({
-      title: "Keyphrase in H2 Headings",
-      description: h2Headings.length === 0 ? "No H2 headings found. Use H2s for main sections." : (h2ContainsKeyword ? getSuccessMessage("Keyphrase in H2 Headings") : `The keyphrase "${keyphrase}" is not found in any H2 headings.`),
-      passed: h2Headings.length === 0 || h2ContainsKeyword, // Pass if no H2s or if keyword is present
-      priority: analyzerCheckPriorities["Keyphrase in H2 Headings"],
-      recommendation: h2Headings.length > 0 && !h2ContainsKeyword ? `Include "${keyphrase}" naturally in one or more H2 subheadings where relevant.` : undefined
-    });
-
-    // 15. Heading Hierarchy (Uses scraped headings)
-    let hierarchyPassed = true;
-    let lastLevel = 0;
-    let hierarchyIssue = "";
-    if (headings.length > 0 && headings[0].level !== 1) {
-        hierarchyPassed = false;
-        hierarchyIssue = "Page should start with an H1 heading.";
+    // --- Determine Meta Description ---
+    if (webflowPageData?.metaDescription && !webflowVariablePattern.test(webflowPageData.metaDescription)) {
+      // Use API data if available and static
+      descriptionToCheck = webflowPageData.metaDescription;
+      apiDataUsedForDescription = true;
+      console.log("[SEO Analyzer] Using Meta Description from Webflow API:", descriptionToCheck);
     } else {
-        for (const heading of headings) {
-            if (heading.level > lastLevel + 1) {
-                hierarchyPassed = false;
-                hierarchyIssue = `Incorrect jump from H${lastLevel} to H${heading.level} ('${heading.text.substring(0,20)}...').`;
-                break;
-            }
-            lastLevel = heading.level;
-        }
+      // Fallback to scraped data if API data is missing or dynamic
+      descriptionToCheck = scrapedData.metaDescription;
+      apiDataUsedForDescription = false;
+      console.log("[SEO Analyzer] Using SCRAPED Meta Description:", descriptionToCheck); // Log fallback
     }
-    checks.push({
-      title: "Heading Hierarchy",
-      description: hierarchyPassed ? getSuccessMessage("Heading Hierarchy") : `Heading structure issue: ${hierarchyIssue}`,
-      passed: hierarchyPassed,
-      priority: analyzerCheckPriorities["Heading Hierarchy"],
-      recommendation: !hierarchyPassed ? `Review your heading structure (H1-H6). Ensure headings follow a logical order without skipping levels (e.g., H1 -> H2, H2 -> H3). ${hierarchyIssue}` : undefined
-    });
 
-    // 16. Code Minification (Uses scraped resources)
-    const unminifiedJs = resources.js.filter(r => r.minified === false).length;
-    const unminifiedCss = resources.css.filter(r => r.minified === false).length;
-    const minificationPassed = unminifiedJs === 0 && unminifiedCss === 0;
-    checks.push({
-      title: "Code Minification",
-      description: minificationPassed ? getSuccessMessage("Code Minification") : `Found ${unminifiedJs} unminified JS and ${unminifiedCss} unminified CSS files. Minify them to reduce file size.`,
-      passed: minificationPassed,
-      priority: analyzerCheckPriorities["Code Minification"],
-      recommendation: !minificationPassed ? `Minify JavaScript and CSS files to improve page load speed. Tools like Terser (JS) or cssnano (CSS) can help.` : undefined
-    });
+    // --- Determine OG Title ---
+    // If Webflow says use main title, and main title ended up being scraped, use scraped title for OG too.
+    if (webflowPageData?.usesTitleAsOGTitle && !apiDataUsedForTitle) {
+      ogTitleToCheck = titleToCheck;
+      console.log("[SEO Analyzer] Using scraped title as OG Title because usesTitleAsOGTitle is true.");
+    } else if (webflowPageData?.ogTitle && !webflowVariablePattern.test(webflowPageData.ogTitle)) {
+      ogTitleToCheck = webflowPageData.ogTitle; // Use specific OG title if set and static
+      console.log("[SEO Analyzer] Using specific OG Title from Webflow API:", ogTitleToCheck);
+    } else if (webflowPageData?.ogTitle && webflowVariablePattern.test(webflowPageData.ogTitle)) {
+      // If OG title is dynamic, maybe fall back to main title? Or leave blank? Let's use main title.
+      ogTitleToCheck = titleToCheck;
+      console.log("[SEO Analyzer] Webflow API OG Title was dynamic, falling back to main title:", ogTitleToCheck);
+    } else {
+      // Default case if no specific OG title and not using main title (or main title wasn't set)
+      ogTitleToCheck = titleToCheck; // Fallback to main title
+      console.log("[SEO Analyzer] No specific OG Title, falling back to main title:", ogTitleToCheck);
+    }
 
-    // 17. Schema Markup (Uses scraped schemaMarkup)
-    const schemaCheckPassed = schemaMarkup.hasSchema;
-    checks.push({
-      title: "Schema Markup",
-      description: schemaCheckPassed ? `${getSuccessMessage("Schema Markup", url)} Found types: ${schemaMarkup.schemaTypes.join(', ') || 'N/A'}` : `No Schema.org markup detected. Adding structured data can help search engines understand your content.`,
-      passed: schemaCheckPassed,
-      priority: analyzerCheckPriorities["Schema Markup"],
-      recommendation: !schemaCheckPassed ? analyzerFallbackRecommendations["Schema Markup"]({}) : undefined
-    });
+    // --- Determine OG Description ---
+    // If Webflow says use main description, and main description ended up being scraped, use scraped description for OG too.
+    if (webflowPageData?.usesDescriptionAsOGDescription && !apiDataUsedForDescription) {
+      ogDescriptionToCheck = descriptionToCheck;
+      console.log("[SEO Analyzer] Using scraped description as OG Description because usesDescriptionAsOGDescription is true.");
+    } else if (webflowPageData?.ogDescription && !webflowVariablePattern.test(webflowPageData.ogDescription)) {
+      ogDescriptionToCheck = webflowPageData.ogDescription; // Use specific OG description if set and static
+      console.log("[SEO Analyzer] Using specific OG Description from Webflow API:", ogDescriptionToCheck);
+    } else if (webflowPageData?.ogDescription && webflowVariablePattern.test(webflowPageData.ogDescription)) {
+      // If OG description is dynamic, fall back to main description.
+      ogDescriptionToCheck = descriptionToCheck;
+      console.log("[SEO Analyzer] Webflow API OG Description was dynamic, falling back to main description:", ogDescriptionToCheck);
+    } else {
+      // Default case
+      ogDescriptionToCheck = descriptionToCheck; // Fallback to main description
+      console.log("[SEO Analyzer] No specific OG Description, falling back to main description:", ogDescriptionToCheck);
+    }
 
-    // 18. Image File Size (Uses scraped images - Placeholder)
-    // Requires fetching image headers/content, which is resource-intensive. Placeholder check.
-    const largeImages = images.filter(img => img.size && img.size > 150 * 1024).length; // Example: > 150KB
-    const imageSizePassed = largeImages === 0; // Placeholder
-    checks.push({
-        title: "Image File Size",
-        description: imageSizePassed ? getSuccessMessage("Image File Size") : `Found ${largeImages} image(s) potentially larger than 150KB. Optimize image sizes.`,
-        passed: imageSizePassed, // Placeholder result
-        priority: analyzerCheckPriorities["Image File Size"],
-        recommendation: !imageSizePassed ? `Optimize images to reduce file size without sacrificing quality. Aim for <150KB per image where possible. Use tools like Squoosh or TinyPNG.` : undefined
-    });
+    // --- OG Image ---
+    // If OG image looks dynamic, we can't easily scrape it. Log a warning.
+    if (webflowPageData?.ogImage && webflowVariablePattern.test(webflowPageData.ogImage)) {
+      console.warn("[SEO Analyzer] OG Image uses a dynamic variable. Cannot verify its existence via scraping.");
+      ogImageToCheck = ''; // Set to empty as we can't confirm it
+    } else {
+      ogImageToCheck = webflowPageData?.ogImage || ''; // Use static value or empty
+      console.log("[SEO Analyzer] Using OG Image from Webflow API (or empty):", ogImageToCheck || 'Not Set');
+    }
 
-    // --- End SEO Checks ---
+  } catch (scrapeError: any) {
+    console.error(`[SEO Analyzer] Worker failed to scrape page: ${url}`, scrapeError);
+    // If scraping fails, we MUST rely on webflowPageData, even if dynamic/incomplete
+    titleToCheck = webflowPageData?.title || '';
+    descriptionToCheck = webflowPageData?.metaDescription || '';
+    ogTitleToCheck = webflowPageData?.ogTitle || titleToCheck; // Fallback OG title
+    ogDescriptionToCheck = webflowPageData?.ogDescription || descriptionToCheck; // Fallback OG desc
+    ogImageToCheck = webflowPageData?.ogImage || ''; // Fallback OG image
 
-    const passedChecks = checks.filter(c => c.passed).length;
-    const failedChecks = checks.length - passedChecks;
-    // Recalculate score based on potentially different number of checks if some fail to run
-    const totalPossiblePoints = checks.reduce((sum, check) => {
-        const weights = { high: 3, medium: 2, low: 1 };
-        return sum + (weights[check.priority] || weights.medium);
-    }, 0);
-    const earnedPoints = checks.reduce((sum, check) => {
-        if (check.passed) {
-            const weights = { high: 3, medium: 2, low: 1 };
-            return sum + (weights[check.priority] || weights.medium);
-        }
-        return sum;
-    }, 0);
-    const score = totalPossiblePoints > 0 ? Math.round((earnedPoints / totalPossiblePoints) * 100) : 0;
+    // Check for dynamic patterns even in fallback data
+    if (webflowVariablePattern.test(titleToCheck)) titleToCheck = ''; // If dynamic and scrape failed, we have nothing
+    if (webflowVariablePattern.test(descriptionToCheck)) descriptionToCheck = '';
+    if (webflowVariablePattern.test(ogTitleToCheck)) ogTitleToCheck = titleToCheck; // Fallback again
+    if (webflowVariablePattern.test(ogDescriptionToCheck)) ogDescriptionToCheck = descriptionToCheck; // Fallback again
+    if (webflowVariablePattern.test(ogImageToCheck)) ogImageToCheck = '';
 
+    apiDataUsedForTitle = true; // Mark as true because we are falling back to it
+    apiDataUsedForDescription = true;
 
-    const result: SEOAnalysisResult = {
-      checks,
-      passedChecks,
-      failedChecks,
-      url: url, // Use the actual fetched URL
-      score,
-      ogData: finalOgMetadata, // Use the combined OG data
-      timestamp: new Date().toISOString(),
-      apiDataUsed // Indicate if API data was used
-    };
-    console.log("[SEO Analyzer] Analysis complete. Result:", result);
-    return result;
-
-  } catch (error: any) {
-    console.error("[SEO Analyzer] Error during element analysis:", error);
-    // Propagate a user-friendly error
-    throw new Error(`Analysis failed: ${error.message || 'Unknown error'}`);
+    if (!titleToCheck && !descriptionToCheck) {
+      // If scrape failed AND API data was dynamic/missing, we can't proceed
+      throw new Error(`Failed to fetch or scrape page content for ${url}. Cannot perform analysis.`);
+    }
+    console.warn("[SEO Analyzer] Proceeding with potentially incomplete data from Webflow API due to scraping failure.");
   }
+
+  // Ensure scrapedData is not null for subsequent checks that need it
+  if (!scrapedData) {
+    console.error("[SEO Analyzer] CRITICAL: scrapedData is null after scrape attempt. Using empty fallback.");
+    // Create a minimal fallback structure to prevent crashes
+    scrapedData = {
+      title: titleToCheck, // Use the determined title/desc
+      metaDescription: descriptionToCheck,
+      content: '', paragraphs: [], headings: [], images: [],
+      internalLinks: [], outboundLinks: [], url: url,
+      resources: { js: [], css: [] },
+      schemaMarkup: { hasSchema: false, schemaTypes: [], schemaCount: 0 }
+    };
+    // Potentially throw an error here if scraping is absolutely critical
+    // throw new Error("Scraping failed critically, cannot continue analysis.");
+  }
+
+  const checks: SEOCheck[] = [];
+  const keyphraseLower = keyphrase.toLowerCase();
+
+  // --- Run Checks using determined values ---
+
+  // 1. Keyphrase in Title
+  // ADD LOG: Log the title being checked JUST BEFORE the check
+  console.log(`[SEO Analyzer] CHECKING Title: "${titleToCheck}" for keyphrase "${keyphraseLower}"`);
+  const titleCheck: SEOCheck = {
+    title: "Keyphrase in Title",
+    description: "",
+    passed: false,
+    priority: analyzerCheckPriorities["Keyphrase in Title"]
+  };
+  const titleLower = titleToCheck.toLowerCase();
+  titleCheck.passed = titleLower.includes(keyphraseLower);
+  titleCheck.description = titleCheck.passed
+    ? getSuccessMessage(titleCheck.title)
+    : `The keyphrase "${keyphrase}" was not found in the page title. The current title is "${titleToCheck || 'Not Found'}".`;
+  if (!titleCheck.passed && titleToCheck) { // Only get recommendation if title exists
+    titleCheck.recommendation = await getAIRecommendation(titleCheck.title, keyphrase, env, titleToCheck);
+  } else if (!titleCheck.passed && !titleToCheck) {
+    titleCheck.recommendation = `The page title is missing. Add a title including the keyphrase "${keyphrase}".`;
+  }
+  checks.push(titleCheck);
+
+  // 2. Keyphrase in Meta Description
+  console.log(`[SEO Analyzer] CHECKING Meta Description: "${descriptionToCheck}" for keyphrase "${keyphraseLower}"`); // Log value being checked
+  const descriptionCheck: SEOCheck = {
+    title: "Keyphrase in Meta Description",
+    description: "",
+    passed: false,
+    priority: analyzerCheckPriorities["Keyphrase in Meta Description"]
+  };
+  const metaDescriptionLower = descriptionToCheck.toLowerCase(); // Uses the determined value
+  descriptionCheck.passed = metaDescriptionLower.includes(keyphraseLower);
+  descriptionCheck.description = descriptionCheck.passed
+    ? getSuccessMessage(descriptionCheck.title)
+    : `The keyphrase "${keyphrase}" was not found in the meta description. The current description is "${descriptionToCheck || 'Not Found'}".`;
+  if (!descriptionCheck.passed && descriptionToCheck) { // Only get recommendation if description exists
+    descriptionCheck.recommendation = await getAIRecommendation(descriptionCheck.title, keyphrase, env, descriptionToCheck);
+  } else if (!descriptionCheck.passed && !descriptionToCheck) {
+    descriptionCheck.recommendation = `The meta description is missing. Add a description including the keyphrase "${keyphrase}".`;
+  }
+  checks.push(descriptionCheck);
+
+  // 3. Keyphrase in URL
+  const urlCheck: SEOCheck = {
+    title: "Keyphrase in URL",
+    description: "",
+    passed: false,
+    priority: analyzerCheckPriorities["Keyphrase in URL"]
+  };
+  try {
+    const urlPath = new URL(url).pathname;
+    // Use publishPath if not homepage, otherwise check the full URL path
+    const slugToCheck = !isHomePage && publishPath ? publishPath : urlPath;
+    const slugLower = slugToCheck.toLowerCase();
+    // Check if keyphrase words are in the slug
+    const keyphraseWords = keyphraseLower.split(/[\s-]+/); // Split by space or hyphen
+    urlCheck.passed = keyphraseWords.every(word => slugLower.includes(word));
+    urlCheck.description = urlCheck.passed
+      ? getSuccessMessage(urlCheck.title)
+      : `The keyphrase "${keyphrase}" (or parts of it) was not found in the URL slug "${slugToCheck}".`;
+    if (!urlCheck.passed) {
+      // Simple recommendation, AI might not be best here
+      urlCheck.recommendation = `Consider including your keyphrase "${keyphrase}" in the page's URL slug for better SEO. Current slug: ${slugToCheck}`;
+    }
+  } catch (e) {
+    urlCheck.description = "Could not parse URL to check the slug.";
+    urlCheck.passed = false; // Mark as failed if URL is invalid
+  }
+  checks.push(urlCheck);
+
+  // 4. Content Length
+  const contentLengthCheck: SEOCheck = {
+    title: "Content Length",
+    description: "",
+    passed: false,
+    priority: analyzerCheckPriorities["Content Length"]
+  };
+  const wordCount = scrapedData.content.split(/\s+/).filter(Boolean).length;
+  const minWordCount = 300; // Example minimum
+  contentLengthCheck.passed = wordCount >= minWordCount;
+  contentLengthCheck.description = contentLengthCheck.passed
+    ? `Content length is ${wordCount} words. ${getSuccessMessage(contentLengthCheck.title)}`
+    : `Content length is ${wordCount} words, which is below the recommended minimum of ${minWordCount} words for comprehensive content.`;
+  if (!contentLengthCheck.passed) {
+    contentLengthCheck.recommendation = `Your page content has ${wordCount} words. Aim for at least ${minWordCount} words by expanding on topics, adding details, or including relevant examples to provide more value and improve SEO.`;
+  }
+  checks.push(contentLengthCheck);
+
+  // 5. Keyphrase Density
+  const densityCheck: SEOCheck = {
+    title: "Keyphrase Density",
+    description: "",
+    passed: false,
+    priority: analyzerCheckPriorities["Keyphrase Density"]
+  };
+  const { density, occurrences, totalWords } = calculateKeyphraseDensity(scrapedData.content, keyphrase);
+  const minDensity = 0.5; // 0.5%
+  const maxDensity = 2.5; // 2.5%
+  densityCheck.passed = density >= minDensity && density <= maxDensity;
+  densityCheck.description = `Keyphrase "${keyphrase}" appears ${occurrences} times in ${totalWords} words. Density: ${density.toFixed(2)}%. `;
+  if (densityCheck.passed) {
+    densityCheck.description += getSuccessMessage(densityCheck.title);
+  } else if (density < minDensity) {
+    densityCheck.description += `This is below the recommended range (${minDensity}-${maxDensity}%). Try to include the keyphrase naturally a few more times.`;
+    densityCheck.recommendation = `Keyphrase density is low (${density.toFixed(2)}%). Include "${keyphrase}" naturally a few more times within your headings and body text where relevant.`;
+  } else { // density > maxDensity
+    densityCheck.description += `This is above the recommended range (${minDensity}-${maxDensity}%). This could be seen as keyword stuffing. Try reducing the number of times the keyphrase appears.`;
+    densityCheck.recommendation = `Keyphrase density is high (${density.toFixed(2)}%). Reduce the usage of "${keyphrase}" to avoid keyword stuffing. Replace some instances with synonyms or rephrase sentences.`;
+  }
+  checks.push(densityCheck);
+
+  // 6. Keyphrase in Introduction
+  const introCheck: SEOCheck = {
+    title: "Keyphrase in Introduction",
+    description: "",
+    passed: false,
+    priority: analyzerCheckPriorities["Keyphrase in Introduction"]
+  };
+  const firstParagraph = scrapedData.paragraphs.length > 0 ? scrapedData.paragraphs[0].toLowerCase() : "";
+  introCheck.passed = firstParagraph.includes(keyphraseLower);
+  introCheck.description = introCheck.passed
+    ? getSuccessMessage(introCheck.title)
+    : `The keyphrase "${keyphrase}" was not found in the first paragraph of your content.`;
+  if (!introCheck.passed && scrapedData.paragraphs.length > 0) {
+    introCheck.recommendation = await getAIRecommendation(introCheck.title, keyphrase, env, scrapedData.paragraphs[0]);
+  } else if (!introCheck.passed) {
+    introCheck.recommendation = `Include the keyphrase "${keyphrase}" naturally within the first paragraph of your page content.`;
+  }
+  checks.push(introCheck);
+
+  // 7. Image Alt Attributes
+  const altTextCheck: SEOCheck = {
+    title: "Image Alt Attributes",
+    description: "",
+    passed: false, // Default to false, set true if all relevant images pass
+    priority: analyzerCheckPriorities["Image Alt Attributes"]
+  };
+  const imagesWithoutAlt = scrapedData.images.filter(img => !img.alt || img.alt.trim() === '');
+  // Consider filtering out decorative images if possible (e.g., based on filename or context)
+  altTextCheck.passed = imagesWithoutAlt.length === 0 && scrapedData.images.length > 0; // Pass if no images missing alt OR if there are no images
+  if (scrapedData.images.length === 0) {
+    altTextCheck.description = "No images found on the page to check for alt text.";
+    altTextCheck.passed = true; // Pass if no images
+  } else if (altTextCheck.passed) {
+    altTextCheck.description = getSuccessMessage(altTextCheck.title);
+  } else {
+    altTextCheck.description = `${imagesWithoutAlt.length} image(s) are missing descriptive alt text.`;
+    altTextCheck.recommendation = `Add descriptive alt text to all meaningful images. For example, for an image of a "red cat playing", use alt="Red cat playing with a ball of yarn". Missing alt text on: ${imagesWithoutAlt.map(img => img.src.split('/').pop()).slice(0, 3).join(', ')}${imagesWithoutAlt.length > 3 ? '...' : ''}`;
+  }
+  checks.push(altTextCheck);
+
+  // 8. Internal Links
+  const internalLinksCheck: SEOCheck = {
+    title: "Internal Links",
+    description: "",
+    passed: false,
+    priority: analyzerCheckPriorities["Internal Links"]
+  };
+  internalLinksCheck.passed = scrapedData.internalLinks.length > 0;
+  internalLinksCheck.description = internalLinksCheck.passed
+    ? `Found ${scrapedData.internalLinks.length} internal links. ${getSuccessMessage(internalLinksCheck.title)}`
+    : "No internal links found. Linking to other relevant pages on your site helps SEO.";
+  if (!internalLinksCheck.passed) {
+    internalLinksCheck.recommendation = "Add links from this page to other relevant pages or posts on your website. This helps distribute link equity and improves site navigation.";
+  }
+  checks.push(internalLinksCheck);
+
+  // 9. Outbound Links
+  const outboundLinksCheck: SEOCheck = {
+    title: "Outbound Links",
+    description: "",
+    passed: false,
+    priority: analyzerCheckPriorities["Outbound Links"]
+  };
+  outboundLinksCheck.passed = scrapedData.outboundLinks.length > 0;
+  outboundLinksCheck.description = outboundLinksCheck.passed
+    ? `Found ${scrapedData.outboundLinks.length} outbound links. ${getSuccessMessage(outboundLinksCheck.title)}`
+    : "No outbound links found. Linking to relevant external resources can add value.";
+  if (!outboundLinksCheck.passed) {
+    outboundLinksCheck.recommendation = "Consider adding 1-2 links to high-quality, relevant external websites or resources where appropriate. This can provide additional context and value to your readers.";
+  }
+  checks.push(outboundLinksCheck);
+
+  // 10. Next-Gen Image Formats
+  const imageFormatCheck: SEOCheck = {
+    title: "Next-Gen Image Formats",
+    description: "Checks if images use modern formats like WebP or AVIF. (Basic check, manual verification recommended)",
+    passed: true,
+    priority: analyzerCheckPriorities["Next-Gen Image Formats"]
+  };
+  const nonNextGenImages = scrapedData.images.filter(img =>
+    !img.src.toLowerCase().endsWith('.webp') &&
+    !img.src.toLowerCase().endsWith('.avif') &&
+    !img.src.toLowerCase().endsWith('.svg') &&
+    !img.src.toLowerCase().includes('data:image/')
+  );
+  if (nonNextGenImages.length > 0 && scrapedData.images.length > 0) {
+    imageFormatCheck.passed = false;
+    imageFormatCheck.description = `${nonNextGenImages.length} image(s) are not using next-gen formats (like WebP or AVIF). Consider converting formats like JPG or PNG.`;
+    imageFormatCheck.recommendation = `Convert images like ${nonNextGenImages.map(img => img.src.split('/').pop()).slice(0, 3).join(', ')}${nonNextGenImages.length > 3 ? '...' : ''} to WebP or AVIF format using online tools or image editors to improve loading speed.`;
+  } else if (scrapedData.images.length > 0) {
+    imageFormatCheck.description = getSuccessMessage(imageFormatCheck.title);
+  } else {
+    imageFormatCheck.description = "No images found to check format.";
+    imageFormatCheck.passed = true;
+  }
+  checks.push(imageFormatCheck);
+
+  // 11. OG Image
+  const ogImageCheck: SEOCheck = {
+    title: "OG Image",
+    description: "",
+    passed: false,
+    priority: analyzerCheckPriorities["OG Image"]
+  };
+  // Use the finally determined ogImageToCheck
+  ogImageCheck.passed = !!ogImageToCheck;
+  ogImageCheck.description = ogImageCheck.passed
+    ? `Open Graph image is set: ${ogImageToCheck}. ${getSuccessMessage(ogImageCheck.title)}`
+    : "Open Graph image is not set. This image is shown when the page is shared on social media.";
+  if (!ogImageCheck.passed) {
+    ogImageCheck.recommendation = "Set an Open Graph image in your page settings (under Social Image). Recommended size is 1200x630 pixels.";
+  }
+  checks.push(ogImageCheck);
+
+  // 12. OG Title and Description
+  const ogMetaCheck: SEOCheck = {
+    title: "OG Title and Description",
+    description: "",
+    passed: false,
+    priority: analyzerCheckPriorities["OG Title and Description"]
+  };
+  // Use the finally determined ogTitleToCheck and ogDescriptionToCheck
+  const hasOgTitle = !!ogTitleToCheck;
+  const hasOgDescription = !!ogDescriptionToCheck;
+  ogMetaCheck.passed = hasOgTitle && hasOgDescription;
+  let ogMetaDescText = "";
+  if (ogMetaCheck.passed) {
+      ogMetaDescText = `Open Graph title and description are set. ${getSuccessMessage(ogMetaCheck.title)}`;
+  } else if (!hasOgTitle && !hasOgDescription) {
+      ogMetaDescText = "Open Graph title and description are missing.";
+  } else if (!hasOgTitle) {
+      ogMetaDescText = "Open Graph title is missing.";
+  } else { // !hasOgDescription
+      ogMetaDescText = "Open Graph description is missing.";
+  }
+   ogMetaCheck.description = ogMetaDescText;
+   if (!ogMetaCheck.passed) {
+       let recommendation = "Set the Open Graph ";
+       if (!hasOgTitle && !hasOgDescription) recommendation += "title and description";
+       else if (!hasOgTitle) recommendation += "title";
+       else recommendation += "description";
+       recommendation += " in your page settings (under Social Title/Description) for better social media sharing previews.";
+       if (!hasOgTitle) recommendation += `\nOG Title Suggestion: ${titleToCheck || keyphrase}`; // Suggest main title or keyphrase
+       if (!hasOgDescription) recommendation += `\nOG Description Suggestion: ${descriptionToCheck || 'Brief summary of the page content.'}`; // Suggest main description or placeholder
+       ogMetaCheck.recommendation = recommendation;
+   }
+  checks.push(ogMetaCheck);
+
+
+  // 13. Keyphrase in H1 Heading
+  const h1Check: SEOCheck = {
+    title: "Keyphrase in H1 Heading",
+    description: "",
+    passed: false,
+    priority: analyzerCheckPriorities["Keyphrase in H1 Heading"]
+  };
+  const h1Headings = scrapedData.headings.filter(h => h.level === 1);
+  if (h1Headings.length === 1) {
+      const h1TextLower = h1Headings[0].text.toLowerCase();
+      h1Check.passed = h1TextLower.includes(keyphraseLower);
+      h1Check.description = h1Check.passed
+          ? `The H1 heading "${h1Headings[0].text}" includes the keyphrase. ${getSuccessMessage(h1Check.title)}`
+          : `The keyphrase "${keyphrase}" was not found in the main H1 heading: "${h1Headings[0].text}".`;
+      if (!h1Check.passed) {
+          h1Check.recommendation = await getAIRecommendation(h1Check.title, keyphrase, env, h1Headings[0].text);
+      }
+  } else if (h1Headings.length === 0) {
+      h1Check.description = "No H1 heading found on the page. Every page should have exactly one H1.";
+      h1Check.recommendation = `Add an H1 heading to the page that includes your target keyphrase "${keyphrase}".`;
+  } else { // More than one H1
+      h1Check.description = `Multiple H1 headings (${h1Headings.length}) found. A page should ideally have only one H1.`;
+      h1Check.recommendation = `Review your page structure. Ensure there is only one H1 heading, and include the keyphrase "${keyphrase}" within it.`;
+  }
+  checks.push(h1Check);
+
+
+  // 14. Keyphrase in H2 Headings
+  const h2Check: SEOCheck = {
+    title: "Keyphrase in H2 Headings",
+    description: "",
+    passed: false,
+    priority: analyzerCheckPriorities["Keyphrase in H2 Headings"]
+  };
+  const h2Headings = scrapedData.headings.filter(h => h.level === 2);
+  const h2WithKeyphrase = h2Headings.filter(h => h.text.toLowerCase().includes(keyphraseLower));
+  h2Check.passed = h2WithKeyphrase.length > 0;
+  if (h2Headings.length === 0) {
+       h2Check.description = "No H2 headings found. Using H2s helps structure content.";
+       h2Check.passed = false; // Explicitly fail if no H2s exist
+       h2Check.recommendation = `Add H2 headings to break up your content into logical sections. Include the keyphrase "${keyphrase}" in one or more H2s where relevant.`;
+  } else {
+      h2Check.description = h2Check.passed
+          ? `${h2WithKeyphrase.length} out of ${h2Headings.length} H2 heading(s) include the keyphrase. ${getSuccessMessage(h2Check.title)}`
+          : `The keyphrase "${keyphrase}" was not found in any H2 headings.`;
+      if (!h2Check.passed) {
+          h2Check.recommendation = `Include the keyphrase "${keyphrase}" in at least one relevant H2 heading to improve content structure and SEO.`;
+      }
+  }
+  checks.push(h2Check);
+
+
+  // 15. Heading Hierarchy
+  const hierarchyCheck: SEOCheck = {
+    title: "Heading Hierarchy",
+    description: "",
+    passed: true, // Assume true unless an issue is found
+    priority: analyzerCheckPriorities["Heading Hierarchy"]
+  };
+  let lastLevel = 0;
+  let hierarchyIssue = "";
+  for (const heading of scrapedData.headings) {
+      if (heading.level > lastLevel + 1) {
+          hierarchyIssue = `Heading level skipped: Found H${heading.level} after H${lastLevel}. ("${heading.text.substring(0,30)}...")`;
+          hierarchyCheck.passed = false;
+          break;
+      }
+      lastLevel = heading.level;
+  }
+   if (scrapedData.headings.length > 0 && scrapedData.headings[0].level !== 1 && !hierarchyIssue) {
+       // Check if first heading is not H1 (but allow if no H1 exists at all, covered by H1 check)
+       const hasH1 = scrapedData.headings.some(h => h.level === 1);
+       if (hasH1) {
+           hierarchyIssue = `First heading is H${scrapedData.headings[0].level}, not H1.`;
+           hierarchyCheck.passed = false;
+       }
+   }
+
+  if (hierarchyCheck.passed) {
+      hierarchyCheck.description = getSuccessMessage(hierarchyCheck.title);
+  } else {
+      hierarchyCheck.description = `Heading hierarchy issue detected: ${hierarchyIssue}`;
+      hierarchyCheck.recommendation = `Review your heading structure (H1, H2, H3, etc.). Ensure headings follow a logical order without skipping levels (e.g., don't jump from H2 to H4). Start with an H1. Fix: ${hierarchyIssue}`;
+  }
+  checks.push(hierarchyCheck);
+
+
+  // 16. Code Minification
+  const minificationCheck: SEOCheck = {
+      title: "Code Minification",
+      description: "",
+      passed: true, // Assume true unless unminified files found
+      priority: analyzerCheckPriorities["Code Minification"]
+  };
+  const unminifiedJs = scrapedData.resources.js.filter(r => r.content && !r.minified);
+  const unminifiedCss = scrapedData.resources.css.filter(r => r.content && !r.minified);
+  if (unminifiedJs.length > 0 || unminifiedCss.length > 0) {
+      minificationCheck.passed = false;
+      const jsFiles = unminifiedJs.map(r => r.url.split('/').pop()).slice(0,2).join(', ');
+      const cssFiles = unminifiedCss.map(r => r.url.split('/').pop()).slice(0,2).join(', ');
+      minificationCheck.description = `Found potentially unminified code: ${unminifiedJs.length} JS file(s) ${jsFiles ? '('+jsFiles+'...)' : ''}, ${unminifiedCss.length} CSS file(s) ${cssFiles ? '('+cssFiles+'...)' : ''}.`;
+      minificationCheck.recommendation = `Minify JavaScript and CSS files to reduce file size and improve page load speed. Webflow typically handles this, but check custom code or third-party scripts.`;
+  } else {
+       minificationCheck.description = getSuccessMessage(minificationCheck.title);
+  }
+  checks.push(minificationCheck);
+
+
+  // 17. Schema Markup
+  const schemaCheck: SEOCheck = {
+    title: "Schema Markup",
+    description: "",
+    passed: false,
+    priority: analyzerCheckPriorities["Schema Markup"]
+  };
+  schemaCheck.passed = scrapedData.schemaMarkup.hasSchema;
+  if (schemaCheck.passed) {
+      schemaCheck.description = `Schema.org markup detected (${scrapedData.schemaMarkup.schemaCount} block(s)). Types: ${scrapedData.schemaMarkup.schemaTypes.join(', ') || 'Unknown'}. ${getSuccessMessage(schemaCheck.title)}`;
+  } else {
+      schemaCheck.description = "No Schema.org structured data markup found. Adding schema can help search engines understand your content better.";
+      schemaCheck.recommendation = analyzerFallbackRecommendations["Schema Markup"]({}); // Use fallback
+  }
+  checks.push(schemaCheck);
+
+  // 18. Image File Size (Placeholder/Basic)
+  const imageSizeCheck: SEOCheck = {
+      title: "Image File Size",
+      description: "Checks if images have potentially large file sizes. (Basic check, manual verification recommended)",
+      passed: true, // Assume true, needs actual size data
+      priority: analyzerCheckPriorities["Image File Size"]
+  };
+  // This check requires fetching image headers or the images themselves to get size,
+  // which is too intensive for this basic analysis. Mark as passed with a note.
+  imageSizeCheck.description = "Image file size check requires manual verification or advanced tools. Ensure images are compressed appropriately.";
+  checks.push(imageSizeCheck);
+
+
+  // --- Final Calculation ---
+  const passedChecks = checks.filter(check => check.passed).length;
+  const failedChecks = checks.length - passedChecks;
+  const score = calculateSEOScore(checks); // Now uses the imported function
+
+  // ADD LOG: Log the flags before constructing the result
+  console.log(`[SEO Analyzer] Final Flags: apiDataUsedForTitle=${apiDataUsedForTitle}, apiDataUsedForDescription=${apiDataUsedForDescription}`);
+
+  const result: SEOAnalysisResult = {
+    checks,
+    passedChecks,
+    failedChecks,
+    url,
+    score,
+    timestamp: new Date().toISOString(),
+    apiDataUsed: apiDataUsedForTitle || apiDataUsedForDescription
+  };
+
+  console.log("[SEO Analyzer] Analysis complete. Score:", score);
+  return result;
+
 }
 
 // Worker event handler

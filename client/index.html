@@ -4,8 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="Permissions-Policy" content="clipboard-write=*, clipboard-read=*">
-    <title>SEO Copilot</title>
+    <title>Vite + React + TS</title>
     <link rel="manifest" href="./manifest.json" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="description" content="Advanced SEO analysis tool performing 11 comprehensive checks including title optimization, meta description analysis, content verification, keyword density, and image optimization. Get AI-powered recommendations for better rankings." />
     <meta name="keywords" content="seo analysis, website optimization, keyword density, meta description analyzer, content optimization, image optimization, seo tools" />
     <meta property="og:title" content="SEO Copilot - Website Optimization & Analysis" />
@@ -28,6 +29,6 @@
         console.error('Global error caught:', e.message, e.filename, e.lineno);
       });
     </script>
-    <script type="module" src="/src/main.tsx?t=<%= Date.now() %>"></script>
+    <script type="module" src="./src/main.tsx"></script>
   </body>
 </html>

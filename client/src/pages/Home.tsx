@@ -29,14 +29,16 @@ import {
 } from "../components/ui/tooltip";
 import { useToast } from "../hooks/use-toast";
 import { getPageSlug } from "../lib/get-page-slug";
+import { SEOCheck } from "shared/types";
 import { analyzeSEO, registerDomains, AnalyzeSEORequest } from "../lib/api";
-import type { SEOAnalysisResult, SEOCheck, WebflowPageData } from "../lib/types";
+import type { SEOAnalysisResult, WebflowPageData } from "../lib/types";
 import { ProgressCircle } from "../components/ui/progress-circle";
 import { getLearnMoreUrl } from "../lib/docs-links";
 import styled from 'styled-components';
 import Footer from "../components/Footer";
 import { extractTextAfterColon } from "./../lib/utils";
 import React from 'react';
+import { calculateSEOScore } from '../../../shared/utils/seoUtils'; // Import from shared utils
 
 const formSchema = z.object({
   keyphrase: z.string().min(2, "Keyphrase must be at least 2 characters")
@@ -80,7 +82,8 @@ const shouldShowCopyButton = (checkTitle: string) => {
          !checkTitle.toLowerCase().includes("image file size") &&
          !checkTitle.toLowerCase().includes("image alt attributes") &&
          !checkTitle.toLowerCase().includes("og title") &&
-         !checkTitle.toLowerCase().includes("og description");
+         !checkTitle.toLowerCase().includes("og description") &&
+         !checkTitle.toLowerCase().includes("h2");
 };
 
 // Get priority icon based on priority level
@@ -147,8 +150,8 @@ const fetchPageInfo = async (
   setIsHomePage: React.Dispatch<React.SetStateAction<boolean>>
 ) => {
   try {
-    if (window.webflow) {
-      const currentPage = await window.webflow.getCurrentPage();
+    if (webflow) {
+      const currentPage = await webflow.getCurrentPage();
       const currentSlug = await currentPage.getSlug();
       const isHome = await currentPage.isHomepage();
       setSlug(currentSlug);
@@ -191,45 +194,6 @@ const getCategoryStatusIcon = (status: string) => {
     default:
       return <Info className="h-6 w-6 text-blueText" style={{color: 'var(--blueText)', stroke: 'var(--blueText)'}} />;
   }
-};
-
-// Calculate the overall SEO score based on check priorities
-const calculateSEOScore = (checks: SEOCheck[]): number => {
-  if (!checks || checks.length === 0) return 0;
-
-  // Define weights for different priority levels
-  const weights = {
-    high: 3,
-    medium: 2,
-    low: 1
-  };
-
-  // Calculate total possible points
-  let totalPossiblePoints = 0;
-  checks.forEach(check => {
-    totalPossiblePoints += weights[check.priority] || weights.medium;
-  });
-
-  // Calculate earned points
-  let earnedPoints = 0;
-  checks.forEach(check => {
-    if (check.passed) {
-      earnedPoints += weights[check.priority] || weights.medium;
-    }
-  });
-
-  // Calculate percentage score (0-100)
-  return Math.round((earnedPoints / totalPossiblePoints) * 100);
-};
-
-// Get score rating text
-const getScoreRatingText = (score: number): string => {
-  if (score >= 91) return "Excellent - Your site is highly optimized! Keep up the great work.";
-  if (score >= 76) return "Very Good - Your SEO is strong! Just a few tweaks can make it even better.";
-  if (score >= 61) return "Good - You're on the right track! Focus on key refinements to improve further.";
-  if (score >= 41) return "Fair - A solid start! Addressing key SEO areas will boost your rankings.";
-  if (score >= 21) return "Needs Work - There’s potential! Improving key areas will make a big impact.";
-  return "Poor - No worries! Focus on essential fixes to see quick improvements.";
 };
 
 const CategoryHeader = styled.div`
@@ -279,6 +243,16 @@ const getMostRecentlyPublishedDomain = (domains: WebflowDomain[]): WebflowDomain
   }, null as WebflowDomain | null); // Start with null
 };
 
+// Helper function to get text rating based on score
+const getScoreRatingText = (score: number): string => {
+  if (score >= 91) return "Excellent - Your site is highly optimized! Keep up the great work.";
+  if (score >= 76) return "Very Good - Your SEO is strong! Just a few tweaks can make it even better.";
+  if (score >= 61) return "Good - You're on the right track! Focus on key refinements to improve further.";
+  if (score >= 41) return "Fair - A solid start! Addressing key SEO areas will boost your rankings.";
+  if (score >= 21) return "Needs Work - There’s potential! Improving key areas will make a big impact.";
+  return "Poor - No worries! Focus on essential fixes to see quick improvements.";
+};
+
 export default function Home() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -290,7 +264,7 @@ export default function Home() {
   const [urls, setUrls] = useState<string[]>([]);
   const [showedPerfectScoreMessage, setShowedPerfectScoreMessage] = useState<boolean>(false);
   
-  const seoScore = results ? calculateSEOScore(results.checks) : 0;
+  const seoScore = results ? calculateSEOScore(results.checks) : 0; // Uses the imported function
   const scoreRating = getScoreRatingText(seoScore);
 
   useEffect(() => {
@@ -299,7 +273,7 @@ export default function Home() {
       setSlug(currentSlug);
       
       try {
-        if (window.webflow) {
+        if (webflow) {
           const currentPage = await webflow.getCurrentPage();
           const isHome = await currentPage.isHomepage();
           setIsHomePage(isHome);
@@ -338,7 +312,7 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (window.webflow) {
+    if (webflow) {
       let currentPageId: string | null = null;
       
       const getCurrentPageId = async () => {
@@ -353,7 +327,7 @@ export default function Home() {
       
       getCurrentPageId();
       
-      const unsubscribe = window.webflow.subscribe('currentpage', async (event) => {
+      const unsubscribe = webflow.subscribe('currentpage', async (event) => {
         try {
           const currentPage = await webflow.getCurrentPage();
           const newCurrentPage = currentPage;
@@ -414,11 +388,59 @@ export default function Home() {
     mutationFn: analyzeSEO,
     onMutate: () => {
       setIsLoading(true);
+      setResults(null); // Clear previous results
     },
     onSuccess: (data) => {
-      setResults(data);
-      setSelectedCategory(null); 
+      let modifiedData = { ...data }; // Clone the data to avoid direct mutation
+
+      // --- MODIFICATION START ---
+      // Check if it's the homepage and modify the URL check result accordingly
+      if (isHomePage) {
+        const urlCheckIndex = modifiedData.checks.findIndex(check => check.title === "Keyphrase in URL");
+
+        if (urlCheckIndex !== -1) {
+          // Create a mutable copy of the checks array
+          const newChecks = [...modifiedData.checks];
+          const originalCheck = newChecks[urlCheckIndex];
+
+          // Check if the status is changing from failed to passed
+          const wasFailed = !originalCheck.passed;
+
+          // Update the specific check
+          newChecks[urlCheckIndex] = {
+            ...originalCheck,
+            passed: true,
+            description: "This is the homepage URL, so the keyphrase is not required in the URL ✨",
+            // Keep original priority, recommendation might become irrelevant but leave it for now
+          };
+
+          // Update the overall counts if the status changed
+          if (wasFailed) {
+            modifiedData.passedChecks = (modifiedData.passedChecks ?? 0) + 1;
+            modifiedData.failedChecks = Math.max(0, (modifiedData.failedChecks ?? 0) - 1);
+            // Recalculate score based on the modified checks
+            modifiedData.score = calculateSEOScore(newChecks);
+          }
+
+          // Assign the modified checks array back to the data
+          modifiedData.checks = newChecks;
+        }
+      }
+      // --- MODIFICATION END ---
+
+      setResults(modifiedData); // Set state with potentially modified data
+      setSelectedCategory(null);
       setIsLoading(false);
+
+      // Trigger confetti only if the *final* score is 100
+      if (modifiedData.score === 100 && !showedPerfectScoreMessage) {
+         confetti({
+           particleCount: 200,
+           spread: 100,
+           origin: { y: 0.6 }
+         });
+         setShowedPerfectScoreMessage(true); // Ensure flag is set here too
+      }
     },
     onError: (error: Error) => {
       setIsLoading(false);
@@ -489,10 +511,10 @@ export default function Home() {
     try {
       let siteInfo: WebflowSiteInfo;
       try {
-        if (!window.webflow) {
+        if (!webflow) {
           throw new Error("Webflow API not available.");
         }
-        siteInfo = await window.webflow.getSiteInfo();
+        siteInfo = await webflow.getSiteInfo();
         if (siteInfo?.shortName) {
           setStagingName(siteInfo.shortName);
         }
@@ -528,27 +550,28 @@ export default function Home() {
       const baseUrl = mostRecentDomain.url.startsWith('http') ? mostRecentDomain.url : `https://${mostRecentDomain.url}`;
 
       let publishPath = "";
-      let currentPage: WebflowPage | null = null;
-      let pageData: WebflowPageData | undefined = undefined;
+      let currentPage; // Let TypeScript infer the type
+      let rawPageData: WebflowPageData; // Store the raw data from API
 
       try {
-        if (!window.webflow) {
+        if (!webflow) {
           throw new Error("Webflow API not available.");
         }
-        currentPage = await window.webflow.getCurrentPage();
+        currentPage = await webflow.getCurrentPage();
         publishPath = (await currentPage.getPublishPath()) ?? "";
         setIsHomePage(await currentPage.isHomepage());
 
-        pageData = {
+        // Fetch raw data from Webflow API
+        rawPageData = {
           title: await currentPage.getTitle(),
           metaDescription: await currentPage.getDescription(),
           ogTitle: await currentPage.getOpenGraphTitle(),
           ogDescription: await currentPage.getOpenGraphDescription(),
-          ogImage: await currentPage.getOpenGraphImage(),
+          ogImage: (await currentPage.getOpenGraphImage()) ?? '', // Provide default empty string if null
           usesTitleAsOGTitle: await currentPage.usesTitleAsOpenGraphTitle(),
           usesDescriptionAsOGDescription: await currentPage.usesDescriptionAsOpenGraphDescription(),
         };
-        console.log("[Home onSubmit] Fetched Webflow Page Data:", pageData);
+        console.log("[Home onSubmit] Fetched Raw Webflow Page Data:", rawPageData);
 
       } catch (error) {
         toast({
@@ -562,18 +585,50 @@ export default function Home() {
       const finalUrlPath = publishPath === '/' ? '' : publishPath;
       const url = `${baseUrl}${finalUrlPath.startsWith('/') ? '' : '/'}${finalUrlPath}`;
 
+      // --- Logic to handle dynamic fields ---
+      const webflowVariablePattern = /\{\{wf\s+\{&quot;.*?&quot;\\\}\s*\}\}/;
+      const pageDataForApi: Partial<WebflowPageData> = { ...rawPageData }; // Start with all data
+
+      if (webflowVariablePattern.test(rawPageData.title)) {
+        console.log("[Home onSubmit] Dynamic pattern detected in title. Omitting from API call.");
+        delete pageDataForApi.title; // Omit title if dynamic
+      }
+      if (webflowVariablePattern.test(rawPageData.metaDescription)) {
+        console.log("[Home onSubmit] Dynamic pattern detected in meta description. Omitting from API call.");
+        delete pageDataForApi.metaDescription; // Omit description if dynamic
+      }
+       // Also check OG fields if they might be dynamic and need scraping verification (though worker handles fallback)
+       if (rawPageData.ogTitle && webflowVariablePattern.test(rawPageData.ogTitle)) {
+           console.log("[Home onSubmit] Dynamic pattern detected in OG title. Worker will verify/fallback.");
+           // Keep it for now, worker logic decides based on usesTitleAsOGTitle and scraping
+       }
+       if (rawPageData.ogDescription && webflowVariablePattern.test(rawPageData.ogDescription)) {
+           console.log("[Home onSubmit] Dynamic pattern detected in OG description. Worker will verify/fallback.");
+           // Keep it for now, worker logic decides based on usesDescriptionAsOGDescription and scraping
+       }
+        if (rawPageData.ogImage && webflowVariablePattern.test(rawPageData.ogImage)) {
+           console.log("[Home onSubmit] Dynamic pattern detected in OG image. Worker will warn/ignore.");
+           // Keep it for now, worker logic handles this case
+       }
+
+
+      // --- Prepare final analysis request ---
       const analysisData: AnalyzeSEORequest = {
         keyphrase: values.keyphrase,
         url,
         isHomePage,
         siteInfo,
         publishPath,
-        webflowPageData: pageData
+        // Assert type as backend handles potentially partial data
+        webflowPageData: pageDataForApi as WebflowPageData 
       };
 
+      console.log("[Home onSubmit] Sending data to API:", analysisData);
       mutation.mutate(analysisData);
 
     } catch (error) {
+      // Ensure isLoading is reset even if errors occur before mutation starts
+      setIsLoading(false);
       toast({
         variant: "destructive",
         title: "Error Preparing Analysis",
@@ -1015,29 +1070,32 @@ const formatRecommendationForDisplay = (recommendation: string | undefined, titl
 };
 
 
-const copyToClipboard = async (text: string) => {
+const copyToClipboard = async (text: string): Promise<boolean> => {
   try {
-    if (window.webflow?.clipboard) {
-      await window.webflow.clipboard.writeText(text);
-      return true;
-    }
-    
+    // Use the standard browser approach
     const textArea = document.createElement('textarea');
     textArea.value = text;
-    textArea.style.position = 'fixed';
-    textArea.style.opacity = '0';
+    textArea.style.position = 'fixed'; // Prevent scrolling to bottom of page in MS Edge.
+    textArea.style.top = '0';
+    textArea.style.left = '0';
+    textArea.style.opacity = '0'; // Make it invisible
+
     document.body.appendChild(textArea);
-    
+    textArea.focus();
+    textArea.select();
+
+    let success = false;
     try {
-      textArea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textArea);
-      return true;
+      success = document.execCommand('copy');
     } catch (err) {
-      document.body.removeChild(textArea);
-      return false;
+      console.error('Fallback: Oops, unable to copy using execCommand', err);
+      success = false;
     }
+
+    document.body.removeChild(textArea);
+    return success;
   } catch (error) {
+    console.error('Failed to copy text to clipboard:', error);
     return false;
   }
 };
