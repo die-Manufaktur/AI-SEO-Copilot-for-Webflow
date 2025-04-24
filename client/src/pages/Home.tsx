@@ -82,7 +82,8 @@ const shouldShowCopyButton = (checkTitle: string) => {
          !checkTitle.toLowerCase().includes("image file size") &&
          !checkTitle.toLowerCase().includes("image alt attributes") &&
          !checkTitle.toLowerCase().includes("og title") &&
-         !checkTitle.toLowerCase().includes("og description");
+         !checkTitle.toLowerCase().includes("og description") &&
+         !checkTitle.toLowerCase().includes("h2");
 };
 
 // Get priority icon based on priority level
