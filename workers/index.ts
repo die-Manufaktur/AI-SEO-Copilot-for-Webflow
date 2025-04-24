@@ -97,12 +97,6 @@ interface WebflowSiteInfo {
   domains: WebflowDomain[];
 }
 
-interface WebflowPage {
-  id: string;
-  name: string;
-  path: string;
-}
-
 // Add utility function for extracting full text content from HTML elements with nested children
 /**
  * Extracts the complete text content from HTML elements, including text within nested elements
@@ -151,10 +145,6 @@ function extractFullTextContent(html: string, tagPattern: RegExp): string[] {
 // ===== Constants =====
 const ALLOWED_DOMAINS = [
   "example.com",
-  "pull-list.net",
-  "*.pull-list.net",
-  "www.pmds.pull-list.net",
-  "pmds.pull-list.net"
 ];
 
 // Define a cache object at the module level
@@ -336,65 +326,6 @@ async function fetchOAuthToken(code: string, env: any): Promise<string> {
 
   const data = await response.json();
   return data.access_token;
-}
-
-// Endpoint to handle OAuth token exchange
-async function handleOAuthTokenExchange(request: Request, env: any): Promise<Response> {
-  try {
-    const { code } = await request.json();
-    if (!code) {
-      return new Response(JSON.stringify({ error: 'Missing authorization code' }), { status: 400 });
-    }
-
-    const token = await fetchOAuthToken(code, env);
-    return new Response(JSON.stringify({ token }), { status: 200 });
-  } catch (error) {
-    return new Response(JSON.stringify({ error: 'Failed to exchange OAuth token' }), { status: 500 });
-  }
-}
-
-// Endpoint to create and redirect to the authorization link
-async function handleAuthRedirect(request: Request, env: any): Promise<Response> {
-  try {
-    // Manually construct the Webflow OAuth URL
-    const authorizeUrl = new URL('https://webflow.com/oauth/authorize');
-    authorizeUrl.searchParams.append('response_type', 'code');
-    authorizeUrl.searchParams.append('client_id', env.WEBFLOW_CLIENT_ID);
-    authorizeUrl.searchParams.append('redirect_uri', env.WEBFLOW_REDIRECT_URI);
-    authorizeUrl.searchParams.append('scope', 'sites:read');
-    authorizeUrl.searchParams.append('state', env.STATE);
-    
-    return Response.redirect(authorizeUrl.toString(), 302);
-  } catch (error) {
-    return new Response(JSON.stringify({ error: 'Failed to create authorization link' }), { status: 500 });
-  }
-}
-
-// Endpoint to handle the callback from Webflow
-async function handleAuthCallback(request: Request, env: any): Promise<Response> {
-  try {
-    const url = new URL(request.url);
-    const code = url.searchParams.get('code');
-    const state = url.searchParams.get('state');
-
-    if (!code) {
-      return new Response(JSON.stringify({ error: 'Missing authorization code' }), { status: 400 });
-    }
-
-    if (state !== env.STATE) {
-      return new Response(JSON.stringify({ error: 'State does not match' }), { status: 400 });
-    }
-
-    // Exchange the authorization code for an access token
-    const token = await fetchOAuthToken(code, env);
-
-    // Cache the access token securely (e.g., using KV storage)
-    await env.TOKENS.put('user-access-token', token);
-
-    return new Response(JSON.stringify({ message: 'Authorization code received', token }), { status: 200 });
-  } catch (error) {
-    return new Response(JSON.stringify({ error: 'Failed to handle auth callback' }), { status: 500 });
-  }
 }
 
 // =======================================
@@ -658,8 +589,8 @@ function isMinified(code: string, minificationThreshold: number = 30): boolean {
   return isLikelyMinified;
 }
 
-// REVISED processHtml function signature (return type updated)
-async function processHtml(html: string, url: string): Promise<ScrapedPageData> { // Return type is now the simplified ScrapedPageData
+// processHtml function signature (return type updated)
+async function processHtml(html: string, url: string): Promise<ScrapedPageData> {
   try {
     console.log(`[SEO Analyzer] Processing HTML content from: ${url}`);
     const baseUrl = new URL(url);
@@ -847,7 +778,6 @@ async function processHtml(html: string, url: string): Promise<ScrapedPageData> 
         resources: { js: [], css: [] },
         schemaMarkup: { hasSchema: false, schemaTypes: [], schemaCount: 0 }
      };
-    // Or rethrow if preferred: throw error;
   }
 }
 
@@ -1233,17 +1163,18 @@ export async function analyzeSEOElements(
   }
   checks.push(outboundLinksCheck);
 
-  // 10. Next-Gen Image Formats (Basic Check - Placeholder)
+  // 10. Next-Gen Image Formats
   const imageFormatCheck: SEOCheck = {
     title: "Next-Gen Image Formats",
     description: "Checks if images use modern formats like WebP or AVIF. (Basic check, manual verification recommended)",
-    passed: true, // Assume true, potentially refine later
+    passed: true,
     priority: analyzerCheckPriorities["Next-Gen Image Formats"]
   };
   const nonNextGenImages = scrapedData.images.filter(img =>
     !img.src.toLowerCase().endsWith('.webp') &&
     !img.src.toLowerCase().endsWith('.avif') &&
-    !img.src.toLowerCase().includes('data:image/') // Ignore data URIs
+    !img.src.toLowerCase().endsWith('.svg') &&
+    !img.src.toLowerCase().includes('data:image/')
   );
   if (nonNextGenImages.length > 0 && scrapedData.images.length > 0) {
     imageFormatCheck.passed = false;
