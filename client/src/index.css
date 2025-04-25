@@ -150,3 +150,8 @@ input[name="keyphrase"] {
   display: block !important;
   min-width: auto !important;
 }
+
+/* Fix for copy button tooltips */
+.copy-button-tooltip {
+  transform: translateX(-54px) !important;
+}

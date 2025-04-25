@@ -39,6 +39,7 @@ import Footer from "../components/Footer";
 import { extractTextAfterColon } from "./../lib/utils";
 import React from 'react';
 import { calculateSEOScore } from '../../../shared/utils/seoUtils'; // Import from shared utils
+import { CopyTooltip } from "../components/ui/copy-tooltip";
 
 const formSchema = z.object({
   keyphrase: z.string().min(2, "Keyphrase must be at least 2 characters")
@@ -948,32 +949,25 @@ export default function Home() {
                                 </div>
                               </div>
                               {!check.passed && check.recommendation && shouldShowCopyButton(check.title) && (
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <motion.div
-                                        whileHover={{ scale: 1.1 }}
-                                        whileTap={{ scale: 0.9 }}
-                                        className="ml-4"
-                                      >
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          className="flex items-center gap-2"
-                                          onClick={async () => {
-                                            await copyCleanToClipboard(check.recommendation || '');
-                                          }}
-                                        >
-                                          <Copy className="h-4 w-4" />
-                                          Copy
-                                        </Button>
-                                      </motion.div>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>Copy recommendation to clipboard</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
+                                <CopyTooltip content={<p>Copy recommendation to clipboard</p>}>
+                                  <motion.div
+                                    whileHover={{ scale: 1.1 }}
+                                    whileTap={{ scale: 0.9 }}
+                                    className="ml-4"
+                                  >
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="flex items-center gap-2"
+                                      onClick={async () => {
+                                        await copyCleanToClipboard(check.recommendation || '');
+                                      }}
+                                    >
+                                      <Copy className="h-4 w-4" />
+                                      Copy
+                                    </Button>
+                                  </motion.div>
+                                </CopyTooltip>
                               )}
                             </div>
                             {!check.passed && check.recommendation && (
