@@ -879,7 +879,7 @@ export default function Home() {
                 </CardHeader>
                 <CardContent>
                   {selectedCategory ? (
-                    <ScrollArea className="h-[600px] pr-4 w-full">
+                    <ScrollArea className="h-[600px] w-full scrollarea-fix">
                       <motion.div
                         variants={container}
                         initial="hidden"
@@ -932,7 +932,7 @@ export default function Home() {
                                     </Tooltip>
                                   </TooltipProvider>
                                 </motion.div>
-                                <div className="text-sm text-muted-foreground">
+                                <div className="text-sm text-muted-foreground text-break">
                                   <p className="inline">{check.description}</p>
                                   {!check.passed && (
                                     <a 
