@@ -40,7 +40,8 @@ export interface AnalyzeSEORequest {
   isHomePage: boolean;
   siteInfo: WebflowSiteInfo;
   publishPath: string;
-  webflowPageData?: WebflowPageData; // Add optional Webflow data
+  webflowPageData?: WebflowPageData;
+  pageAssets?: Array<{ url: string, alt: string, type: string }>;
   debug?: boolean;
 }
 

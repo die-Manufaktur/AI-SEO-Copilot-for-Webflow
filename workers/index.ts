@@ -650,11 +650,31 @@ async function processHtml(html: string, url: string): Promise<ScrapedPageData> 
     // Extract images - REMAINS THE SAME
     console.log("[SEO Analyzer] Starting Image Extraction...");
     const images: Array<{ src: string; alt: string; size?: number }> = [];
-    const imageMatches = bodyContent.matchAll(/<img[^>]*src=["'](.*?)["'][^>]*alt=["'](.*?)["'][^>]*>/gi);
+    const imageMatches = bodyContent.matchAll(/<img\s+[^>]*?src=["']([^"']+)["'][^>]*?>/gi);
+
     for (const match of imageMatches) {
+      try {
         const src = match[1];
-        const alt = match[2];
-        images.push({ src: new URL(src, baseUrl.toString()).toString(), alt: alt.trim(), size: undefined });
+        if (src) {
+          // Extract alt text if available
+          const fullTag = match[0];
+          const altMatch = fullTag.match(/alt=["']([^"']*)["']/i);
+          const alt = altMatch ? altMatch[1] : '';
+          
+          // Make sure the URL is valid and not HTML markup
+          if (!src.includes('<') && !src.includes('>')) {
+            const fullUrl = new URL(src, baseUrl.toString()).toString();
+            images.push({ 
+              src: fullUrl, 
+              alt: alt.trim(), 
+              size: undefined 
+            });
+            console.log(`[SEO Analyzer] Found image: ${fullUrl}`);
+          }
+        }
+      } catch (error) {
+        console.error(`[SEO Analyzer] Error processing image URL: ${error}`);
+      }
     }
     console.log(`[SEO Analyzer] Finished Image Extraction. Found ${images.length} images.`);
 
@@ -837,9 +857,10 @@ export async function analyzeSEOElements(
   keyphrase: string,
   isHomePage: boolean,
   siteInfo: WebflowSiteInfo,
-  publishPath: string, // Keep receiving publishPath for now
+  publishPath: string,
   env: any,
-  webflowPageData: WebflowPageData | undefined // Includes OG settings
+  webflowPageData: WebflowPageData | undefined,
+  pageAssets?: Array<{ url: string, alt: string, type: string }>
 ): Promise<SEOAnalysisResult> {
   console.log("[SEO Analyzer] Analyzing elements for:", { url, keyphrase, isHomePage, siteName: siteInfo.siteName, publishPath, hasWebflowData: !!webflowPageData });
 
@@ -1531,7 +1552,7 @@ export function validateIPAddress(address: string): boolean {
   if (
     normalizedAddr === '127.0.0.1' || 
     normalizedAddr.startsWith('127.') || 
-    normalizedAddr === '::1' ||
+   normalizedAddr === '::1' ||
     normalizedAddr.toLowerCase().includes('127.0.0.1') ||
     normalizedAddr.toLowerCase().includes('::1')
   ) {
@@ -1552,7 +1573,7 @@ export function validateUrl(url: string): boolean {
     if (protocol !== 'https:') {
       return false;
     }
-    return true; // Valid HTTPS URL
+    return true; // Valid HTTPS URL  
   } catch (error) {
     return false; // Invalid URL
   }
