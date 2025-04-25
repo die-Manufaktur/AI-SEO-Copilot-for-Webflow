@@ -255,13 +255,14 @@ const getScoreRatingText = (score: number): string => {
 
 export default function Home() {
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
-  const [slug, setSlug] = useState<string | null>(null);
+  // Using underscore prefix for state variables that are set but not directly read
+  const [_isLoading, setIsLoading] = useState(false);
+  const [_slug, setSlug] = useState<string | null>(null);
   const [isHomePage, setIsHomePage] = useState<boolean>(false);
   const [results, setResults] = useState<SEOAnalysisResult | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [stagingName, setStagingName] = useState<string>('');
-  const [urls, setUrls] = useState<string[]>([]);
+  const [_urls, setUrls] = useState<string[]>([]);
   const [showedPerfectScoreMessage, setShowedPerfectScoreMessage] = useState<boolean>(false);
   
   const seoScore = results ? calculateSEOScore(results.checks) : 0; // Uses the imported function
@@ -294,7 +295,7 @@ export default function Home() {
       if (event.data.name === 'copyToClipboard') {
         const text = event.data.data;
         navigator.clipboard.writeText(text).then(() => {
-        }).catch(err => {
+        }).catch(() => {
         });
       }
     };
@@ -327,7 +328,7 @@ export default function Home() {
       
       getCurrentPageId();
       
-      const unsubscribe = webflow.subscribe('currentpage', async (event) => {
+      const unsubscribe = webflow.subscribe('currentpage', async () => {
         try {
           const currentPage = await webflow.getCurrentPage();
           const newCurrentPage = currentPage;
@@ -612,6 +613,9 @@ export default function Home() {
        }
 
 
+      // --- Fetch page assets ---
+      const pageAssets = await getPageAssets();
+      
       // --- Prepare final analysis request ---
       const analysisData: AnalyzeSEORequest = {
         keyphrase: values.keyphrase,
@@ -619,8 +623,8 @@ export default function Home() {
         isHomePage,
         siteInfo,
         publishPath,
-        // Assert type as backend handles potentially partial data
-        webflowPageData: pageDataForApi as WebflowPageData 
+        webflowPageData: pageDataForApi as WebflowPageData,
+        pageAssets
       };
 
       console.log("[Home onSubmit] Sending data to API:", analysisData);
@@ -1069,7 +1073,6 @@ const formatRecommendationForDisplay = (recommendation: string | undefined, titl
   return displayText;
 };
 
-
 const copyToClipboard = async (text: string): Promise<boolean> => {
   try {
     // Use the standard browser approach
@@ -1086,16 +1089,90 @@ const copyToClipboard = async (text: string): Promise<boolean> => {
 
     let success = false;
     try {
-      success = document.execCommand('copy');
-    } catch (err) {
-      console.error('Fallback: Oops, unable to copy using execCommand', err);
+      // Prefer navigator.clipboard if available
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        success = true;
+      } else {
+        // Fallback for older browsers
+        // Using execCommand despite deprecation for backward compatibility
+        success = document.execCommand('copy') as boolean;
+      }
+    } catch (copyError) {
+      console.error('Fallback: Oops, unable to copy using execCommand', copyError);
       success = false;
     }
 
     document.body.removeChild(textArea);
     return success;
   } catch (error) {
-    console.error('Failed to copy text to clipboard:', error);
+    console.error('Failed to copy text: ', error);
     return false;
+  }
+};
+/**
+ * Fetches image assets from the current Webflow page.
+ * Handles Webflow Designer API element types properly.
+ */
+const getPageAssets = async (): Promise<Array<{ url: string, alt: string, type: string }>> => {
+  if (!webflow) {
+    console.warn("Webflow API not available");
+    return [];
+  }
+
+  try {
+    // Get all elements on the page
+    const elements = await webflow.getAllElements();
+    
+    // Extract image elements
+    const images: Array<{ url: string, alt: string, type: string }> = [];
+    
+    for (const element of elements) {
+      // Use type assertions to access potentially undefined properties
+      const anyElement = element as any;
+      
+      // Check if this element has properties that suggest it's an image
+      const elementType = anyElement.type || (anyElement.component && anyElement.component.type);
+      const isImageElement = 
+        (typeof anyElement.tag === 'string' && anyElement.tag.toLowerCase() === 'img') || 
+        (typeof elementType === 'string' && elementType.toLowerCase().includes('image'));
+      
+      if (isImageElement) {
+        // Handle different ways attributes might be stored in Webflow elements
+        let src = '';
+        let alt = '';
+        
+        // Try to get src and alt attributes from different possible locations
+        if (Array.isArray(anyElement.customAttributes)) {
+          // If it's an array of attribute objects
+          const srcAttr = anyElement.customAttributes.find((attr: { name: string; value: string }) => attr.name === 'src');
+          const altAttr = anyElement.customAttributes.find((attr: { name: string; value: string }) => attr.name === 'alt');
+          src = srcAttr?.value || '';
+          alt = altAttr?.value || '';
+        } else if (typeof anyElement.attributes === 'object' && anyElement.attributes) {
+          // If it's an object with key-value pairs
+          const attributes = anyElement.attributes as Record<string, string>;
+          src = attributes.src || '';
+          alt = attributes.alt || '';
+        } else if (typeof anyElement.src === 'string') {
+          // Direct property access
+          src = anyElement.src;
+          alt = typeof anyElement.alt === 'string' ? anyElement.alt : '';
+        }
+        
+        if (src) {
+          images.push({
+            url: src,
+            alt: alt,
+            type: 'image'
+          });
+        }
+      }
+    }
+    
+    return images;
+  } catch (error) {
+    console.error("Error fetching page assets:", error);
+    return [];
   }
 };
