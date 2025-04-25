@@ -121,6 +121,10 @@ p, span {
   margin-bottom: 1rem;
 }
 
+.text-break {
+  word-break: break-word;
+}
+
 /* Custom focus states */
 input[name="keyphrase"]:focus {
   outline-color: var(--text3) !important;
@@ -140,4 +144,9 @@ input[name="keyphrase"]:focus-visible {
 input[name="keyphrase"] {
   --tw-ring-color: var(--text3) !important;
   --tw-ring-offset-color: var(--background1) !important;
+}
+
+.scrollarea-fix [data-radix-scroll-area-viewport] > div {
+  display: block !important;
+  min-width: auto !important;
 }
