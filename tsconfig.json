@@ -9,7 +9,7 @@
     "strict": true,
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
-    "typeRoots": ["./node_modules/@types", "./node_modules/@webflow"],
+    "typeRoots": ["./node_modules/@types", "./node_modules/@webflow", "./client/src/types"],
     "module": "esnext",
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
@@ -22,5 +22,5 @@
     },
     "sourceMap": true
   },
-  "include": ["client/src", "client/src/types/*.d.ts", "workers"]
+  "include": ["client/src", "client/src/types/**/*.d.ts", "workers"]
 }

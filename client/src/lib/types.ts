@@ -1,7 +1,7 @@
 // Import the shared SEOCheck type
 import type { SEOCheck } from '../../../shared/types';
 
-export interface SEOAnalysisResult {
+interface SEOAnalysisResult {
   checks: SEOCheck[]; // Uses the imported SEOCheck
   passedChecks: number;
   failedChecks: number;
@@ -18,13 +18,8 @@ export interface SEOAnalysisResult {
   apiDataUsed: boolean;
 }
 
-export interface AnalyzeRequest {
-  url: string;
-  keyphrase: string;
-}
-
 // NEW: Data fetched directly from Webflow API
-export interface WebflowPageData {
+interface WebflowPageData {
   title: string;
   metaDescription: string;
   ogTitle: string;
@@ -33,4 +28,19 @@ export interface WebflowPageData {
   usesTitleAsOGTitle: boolean; // Added
   usesDescriptionAsOGDescription: boolean; // Added
   // Add other relevant fields if needed, e.g., search title/desc
+}
+
+// Re-export shared types for convenience in the client code
+export type { 
+  SEOCheck,
+  OGMetadata, 
+  SEOAnalysisResult,
+  WebflowPageData,
+  AnalyzeSEORequest 
+} from '../../../shared/types';
+
+// Add any client-specific types here that don't make sense in the shared types
+export interface AnalyzeRequest {
+  url: string;
+  keyphrase: string;
 }

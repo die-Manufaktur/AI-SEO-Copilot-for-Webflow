@@ -30,8 +30,8 @@ import {
 import { useToast } from "../hooks/use-toast";
 import { getPageSlug } from "../lib/get-page-slug";
 import { SEOCheck } from "shared/types";
-import { analyzeSEO, registerDomains, AnalyzeSEORequest } from "../lib/api";
-import type { SEOAnalysisResult, WebflowPageData } from "../lib/types";
+import { analyzeSEO, registerDomains } from "../lib/api";
+import type { SEOAnalysisResult, WebflowPageData, AnalyzeSEORequest } from "../lib/types";
 import { ProgressCircle } from "../components/ui/progress-circle";
 import { getLearnMoreUrl } from "../lib/docs-links";
 import styled from 'styled-components';
@@ -40,6 +40,7 @@ import { extractTextAfterColon } from "./../lib/utils";
 import React from 'react';
 import { calculateSEOScore } from '../../../shared/utils/seoUtils'; // Import from shared utils
 import { CopyTooltip } from "../components/ui/copy-tooltip";
+import { ImageSizeDisplay } from "../components/ImageSizeDisplay";
 
 const formSchema = z.object({
   keyphrase: z.string().min(2, "Keyphrase must be at least 2 characters")
@@ -618,11 +619,25 @@ export default function Home() {
       const pageAssets = await getPageAssets();
       
       // --- Prepare final analysis request ---
+      // Map the Webflow API siteInfo to match the expected format in shared types
+      const mappedSiteInfo = {
+        ...siteInfo,
+        domains: siteInfo.domains.map(domain => ({
+          ...domain,
+          // Add required properties from shared types that are missing in Webflow API response
+          id: domain.url,
+          name: domain.url.split('://').pop() || '',
+          host: domain.url.replace(/^https?:\/\//i, ''),
+          publicUrl: domain.url,
+          publishedOn: domain.lastPublished || '' // Use empty string instead of null to satisfy type constraint
+        }))
+      };
+
       const analysisData: AnalyzeSEORequest = {
         keyphrase: values.keyphrase,
         url,
         isHomePage,
-        siteInfo,
+        siteInfo: mappedSiteInfo,
         publishPath,
         webflowPageData: pageDataForApi as WebflowPageData,
         pageAssets
@@ -978,7 +993,7 @@ export default function Home() {
                                 className="mt-4 text-sm p-4 bg-background3 rounded-md w-full"
                                 style={{ backgroundColor: 'var(--background3)' }}
                               >
-                                {formatRecommendationForDisplay(check.recommendation, check.title)}
+                                {renderRecommendation(check)}
                               </motion.div>
                             )}
                           </motion.div>
@@ -1169,4 +1184,42 @@ const getPageAssets = async (): Promise<Array<{ url: string, alt: string, type: 
     console.error("Error fetching page assets:", error);
     return [];
   }
+};
+
+const renderRecommendation = (check: SEOCheck) => {
+  // List of image-related check titles
+  const imageRelatedChecks = [
+    "Image File Size",
+    "Image Alt Attributes",
+    "Next-Gen Image Formats",
+    "OG Image"
+  ];
+  
+  // Special handling for image-related checks
+  if (imageRelatedChecks.includes(check.title) && check.imageData && check.imageData.length > 0) {
+    return (
+      <>
+        {/* Display AI recommendation if available */}
+        {check.recommendation && (
+          <p className="text-sm text-text2 whitespace-pre-wrap break-words mb-4">
+            {check.recommendation}
+          </p>
+        )}
+        
+        {/* Display image thumbnails */}
+        <ImageSizeDisplay 
+          images={check.imageData}
+          showMimeType={check.title !== "Image Alt Attributes"}
+          className="mt-2"
+        />
+      </>
+    );
+  }
+  
+  // Default rendering for other checks
+  return (
+    <p className="text-sm text-text2 whitespace-pre-wrap break-words">
+      {check.recommendation}
+    </p>
+  );
 };
