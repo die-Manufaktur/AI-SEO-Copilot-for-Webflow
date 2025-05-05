@@ -100,7 +100,7 @@
     "framer-motion": "^12.9.2",
     "input-otp": "^1.4.2",
     "net": "^1.0.2",
-    "openai": "^4.96.2",
+    "openai": "^4.97.0",
     "react": "^19.1.0",
     "react-day-picker": "^9.6.7",
     "react-dom": "^19.1.0",

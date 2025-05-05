@@ -135,8 +135,8 @@ importers:
         specifier: ^1.0.2
         version: 1.0.2
       openai:
-        specifier: ^4.96.2
-        version: 4.96.2(ws@8.18.1)(zod@3.24.3)
+        specifier: ^4.97.0
+        version: 4.97.0(ws@8.18.1)(zod@3.24.3)
       react:
         specifier: ^19.1.0
         version: 19.1.0
@@ -3290,8 +3290,8 @@ packages:
   ohash@2.0.11:
     resolution: {integrity: sha512-RdR9FQrFwNBNXAr4GixM8YaRZRJ5PUWbKYbE5eOsrwAjJW0q2REGcf79oYPsLyskQCZG1PLN+S/K1V00joZAoQ==}
 
-  openai@4.96.2:
-    resolution: {integrity: sha512-R2XnxvMsizkROr7BV3uNp1q/3skwPZ7fmPjO1bXLnfB4Tu5xKxrT1EVwzjhxn0MZKBKAvOaGWS63jTMN6KrIXA==}
+  openai@4.97.0:
+    resolution: {integrity: sha512-LRoiy0zvEf819ZUEJhgfV8PfsE8G5WpQi4AwA1uCV8SKvvtXQkoWUFkepD6plqyJQRghy2+AEPQ07FrJFKHZ9Q==}
     hasBin: true
     peerDependencies:
       ws: ^8.18.0
@@ -3983,6 +3983,7 @@ packages:
   wrangler@4.14.0:
     resolution: {integrity: sha512-WhypgOBEYuUMo/ZFw8MgZ0wtyE7EmDanytjD8Me+OMm62raKU9V9DZTlF1UVLkNfilfQNlRbMnFRdzSBji/MEA==}
     engines: {node: '>=18.0.0'}
+    deprecated: Workers with configured tail consumers would sometimes prevent wrangler dev from running. Downgrade to 4.13.2 to workaround this issue
     hasBin: true
     peerDependencies:
       '@cloudflare/workers-types': ^4.20250428.0
@@ -6898,7 +6899,7 @@ snapshots:
 
   ohash@2.0.11: {}
 
-  openai@4.96.2(ws@8.18.1)(zod@3.24.3):
+  openai@4.97.0(ws@8.18.1)(zod@3.24.3):
     dependencies:
       '@types/node': 18.19.87
       '@types/node-fetch': 2.6.9
