@@ -99,8 +99,8 @@ importers:
         specifier: ^2.0.12
         version: 2.0.12
       '@webflow/webflow-cli':
-        specifier: ^1.6.13
-        version: 1.6.13
+        specifier: ^1.7.0
+        version: 1.7.0
       canvas-confetti:
         specifier: ^1.9.3
         version: 1.9.3
@@ -2199,8 +2199,9 @@ packages:
   '@webflow/designer-extension-typings@2.0.12':
     resolution: {integrity: sha512-kj5KR/AMGWfFMwNgFuSZwuQtcRQ24XnoT/d6rMz/VOfSrmVsFdRe987JDYHr8jWlJ/6visbPdXBRLDmJEo9lMA==}
 
-  '@webflow/webflow-cli@1.6.13':
-    resolution: {integrity: sha512-fxs/5cftWQp6Hkoc+1kdyz6vwWxj5GM5iMOxAj/7J+wlM0n0PEhKhagLVLRfUib/A03lecZMShs1ZUzwJwwqbg==}
+  '@webflow/webflow-cli@1.7.0':
+    resolution: {integrity: sha512-GG88wpQlXgw2nIql2SCGkn7NQ4IHbGS9OfXeBjv2iikyyW8CyQycxMuxneK6kMeiuzlNbs33VWR0Y/rEF3woLw==}
+    engines: {node: '>=18.16.0'}
     hasBin: true
 
   abort-controller@3.0.0:
@@ -3983,6 +3984,7 @@ packages:
   wrangler@4.14.0:
     resolution: {integrity: sha512-WhypgOBEYuUMo/ZFw8MgZ0wtyE7EmDanytjD8Me+OMm62raKU9V9DZTlF1UVLkNfilfQNlRbMnFRdzSBji/MEA==}
     engines: {node: '>=18.0.0'}
+    deprecated: Workers with configured tail consumers would sometimes prevent wrangler dev from running. Downgrade to 4.13.2 to workaround this issue
     hasBin: true
     peerDependencies:
       '@cloudflare/workers-types': ^4.20250428.0
@@ -5740,7 +5742,7 @@ snapshots:
 
   '@webflow/designer-extension-typings@2.0.12': {}
 
-  '@webflow/webflow-cli@1.6.13':
+  '@webflow/webflow-cli@1.7.0':
     dependencies:
       commander: 10.0.1
 
