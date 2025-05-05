@@ -136,7 +136,7 @@ importers:
         version: 1.0.2
       openai:
         specifier: ^4.96.2
-        version: 4.96.2(ws@8.18.1)(zod@3.24.3)
+        version: 4.96.2(ws@8.18.1)(zod@3.24.4)
       react:
         specifier: ^19.1.0
         version: 19.1.0
@@ -165,8 +165,8 @@ importers:
         specifier: ^3.7.0
         version: 3.7.0(react@19.1.0)
       zod:
-        specifier: ^3.24.3
-        version: 3.24.3
+        specifier: ^3.24.4
+        version: 3.24.4
     devDependencies:
       '@testing-library/jest-dom':
         specifier: ^6.6.3
@@ -3983,6 +3983,7 @@ packages:
   wrangler@4.14.0:
     resolution: {integrity: sha512-WhypgOBEYuUMo/ZFw8MgZ0wtyE7EmDanytjD8Me+OMm62raKU9V9DZTlF1UVLkNfilfQNlRbMnFRdzSBji/MEA==}
     engines: {node: '>=18.0.0'}
+    deprecated: Workers with configured tail consumers would sometimes prevent wrangler dev from running. Downgrade to 4.13.2 to workaround this issue
     hasBin: true
     peerDependencies:
       '@cloudflare/workers-types': ^4.20250428.0
@@ -4054,8 +4055,8 @@ packages:
   zod@3.22.3:
     resolution: {integrity: sha512-EjIevzuJRiRPbVH4mGc8nApb/lVLKVpmUhAaR5R5doKGfAnGJ6Gr3CViAVjP+4FWSxCsybeWQdcgCtbX+7oZug==}
 
-  zod@3.24.3:
-    resolution: {integrity: sha512-HhY1oqzWCQWuUqvBFnsyrtZRhyPeR7SUGv+C4+MsisMuVfSPx8HpwWqH8tRahSlt6M3PiFAcoeFhZAqIXTxoSg==}
+  zod@3.24.4:
+    resolution: {integrity: sha512-OdqJE9UDRPwWsrHjLN2F8bPxvwJBK22EHLWtanu0LSYr5YqzsaaW3RMgmjwr8Rypg5k+meEJdSPXJZXE/yqOMg==}
 
 snapshots:
 
@@ -6898,7 +6899,7 @@ snapshots:
 
   ohash@2.0.11: {}
 
-  openai@4.96.2(ws@8.18.1)(zod@3.24.3):
+  openai@4.96.2(ws@8.18.1)(zod@3.24.4):
     dependencies:
       '@types/node': 18.19.87
       '@types/node-fetch': 2.6.9
@@ -6909,7 +6910,7 @@ snapshots:
       node-fetch: 2.7.0
     optionalDependencies:
       ws: 8.18.1
-      zod: 3.24.3
+      zod: 3.24.4
     transitivePeerDependencies:
       - encoding
 
@@ -7691,4 +7692,4 @@ snapshots:
 
   zod@3.22.3: {}
 
-  zod@3.24.3: {}
+  zod@3.24.4: {}
