@@ -1187,36 +1187,69 @@ const getPageAssets = async (): Promise<Array<{ url: string, alt: string, type: 
 };
 
 const renderRecommendation = (check: SEOCheck) => {
-  // List of image-related check titles
-  const imageRelatedChecks = [
-    "Image File Size",
-    "Image Alt Attributes",
-    "Next-Gen Image Formats",
-    "OG Image"
-  ];
-  
+  // Special case for OG Image - only show the recommendation text, no image display
+  if (check.title === "OG Image") {
+    return (
+      <p className="text-sm text-text2 whitespace-pre-wrap break-words">
+        {check.recommendation}
+      </p>
+    );
+  }
+
   // Special handling for image-related checks
-  if (imageRelatedChecks.includes(check.title) && check.imageData && check.imageData.length > 0) {
+  if (check.imageData && check.imageData.length > 0) {
+    // Different display settings based on check type
+    let showMimeType = false;
+    let showFileSize = false;
+    let showAltText = false;
+    
+    // Configure display settings based on check title
+    switch (check.title) {
+      case "Image Alt Attributes":
+        // For alt text check, show alt text only
+        showMimeType = false;
+        showFileSize = false;
+        showAltText = true;
+        break;
+      case "Image File Size":
+        // For file size check, show size only
+        showMimeType = false;
+        showFileSize = true;
+        showAltText = false;
+        break;
+      case "Next-Gen Image Formats":
+        // For image format check, show mime type only
+        showMimeType = true;
+        showFileSize = false;
+        showAltText = false;
+        break;
+      default:
+        // Default behavior for any other image checks
+        showMimeType = true;
+        showFileSize = true;
+        showAltText = false;
+    }
+
     return (
       <>
-        {/* Display AI recommendation if available */}
         {check.recommendation && (
           <p className="text-sm text-text2 whitespace-pre-wrap break-words mb-4">
             {check.recommendation}
           </p>
         )}
         
-        {/* Display image thumbnails */}
         <ImageSizeDisplay 
           images={check.imageData}
-          showMimeType={check.title !== "Image Alt Attributes"}
+          showMimeType={showMimeType}
+          showFileSize={showFileSize}
+          showAltText={showAltText}
           className="mt-2"
         />
       </>
     );
   }
-  
-  // Default rendering for other checks
+
+  // Default rendering for other types of checks
   return (
     <p className="text-sm text-text2 whitespace-pre-wrap break-words">
       {check.recommendation}

@@ -29,3 +29,10 @@ STATE = "webflow-seo-copilot-dev"
 [dev]
 port = 8787
 local_protocol = "http"
+
+[build]
+command = "pnpm build"
+
+[build.upload]
+format = "modules"
+main = "./index.js"

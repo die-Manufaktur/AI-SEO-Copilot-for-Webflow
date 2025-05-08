@@ -1,22 +1,41 @@
 import React from 'react';
 import { cn } from "../lib/utils";
 
+function formatFileSize(sizeInKB: number): string {
+  if (!sizeInKB) return "Unknown";
+  
+  if (sizeInKB < 1000) {
+    return `${sizeInKB.toFixed(1)} KB`;
+  } else {
+    return `${(sizeInKB / 1000).toFixed(1)} MB`;
+  }
+}
+
 interface ImageInfo {
   url: string;
   shortName: string;
   size: number;
   mimeType?: string;
-  isOptimized?: boolean; // Add flag to indicate if image is optimized or not
-  source?: string; // Add source property to indicate the image source
+  isOptimized?: boolean;
+  source?: string;
+  alt?: string; // Add alt property to ImageInfo
 }
 
 interface ImageSizeDisplayProps {
   images: ImageInfo[];
   className?: string;
   showMimeType?: boolean;
+  showFileSize?: boolean;
+  showAltText?: boolean; // New prop to show alt text
 }
 
-export function ImageSizeDisplay({ images, className, showMimeType = true }: ImageSizeDisplayProps) {
+export function ImageSizeDisplay({ 
+  images, 
+  className, 
+  showMimeType = true,
+  showFileSize = true,
+  showAltText = false // Default to false to maintain backward compatibility
+}: ImageSizeDisplayProps) {
   if (!images || images.length === 0) {
     return null;
   }
@@ -53,11 +72,25 @@ export function ImageSizeDisplay({ images, className, showMimeType = true }: Ima
                 )}
               </div>
               <p className="text-xs flex items-center">
-                <span className={image.isOptimized ? "text-greenText" : "text-redText"}>
-                  {image.size}KB
-                </span>
+                {/* Show file size if enabled */}
+                {showFileSize && (
+                  <span className={image.isOptimized ? "text-greenText" : "text-redText"}>
+                    {formatFileSize(image.size)}
+                  </span>
+                )}
+                
+                {/* Show mime type if enabled */}
                 {showMimeType && (
-                  <span className="text-text3 ml-1">• {image.mimeType || 'Unknown'}</span>
+                  <span className={showFileSize ? "text-text3 ml-1" : ""}>
+                    {showFileSize && "• "}{image.mimeType || 'Unknown'}
+                  </span>
+                )}
+                
+                {/* Show alt text if enabled */}
+                {showAltText && (
+                  <span className="text-text3">
+                    {image.alt ? `"${image.alt}"` : 'No alt text'}
+                  </span>
                 )}
               </p>
             </div>

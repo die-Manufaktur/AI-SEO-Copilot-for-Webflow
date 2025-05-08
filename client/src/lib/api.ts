@@ -1,4 +1,17 @@
 import type { SEOAnalysisResult, WebflowPageData, AnalyzeSEORequest } from "../../../shared/types";
+import { createLogger } from '../lib/utils';
+
+const logger = createLogger('[API]');
+const assetLogger = createLogger('[SEO Assets]');
+
+// Add this near the top of your file
+type Asset = {
+  url: string;
+  alt: string;
+  type: string;
+  size?: number;
+  source?: string;
+};
 
 // Helper function to determine the appropriate API URL based on environment
 export const getApiBaseUrl = (): string => {
@@ -6,7 +19,7 @@ export const getApiBaseUrl = (): string => {
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     const workerPort = 8787;
     const workerUrl = `http://127.0.0.1:${workerPort}`;
-    console.log(`[API] Using local development worker at ${workerUrl}`);
+    logger.info(`Using local development worker at ${workerUrl}`);
     return workerUrl;
   }
   
@@ -169,218 +182,271 @@ export async function registerDomains(domains: string[]): Promise<{ success: boo
  * Collects all page assets including collection images and background images
  * @returns Array of page assets with metadata
  */
-export async function collectPageAssets(): Promise<Array<{ url: string, alt: string, type: string, size?: number, mimeType?: string, source?: string }>> {
-  const assets: Array<{ url: string, alt: string, type: string, size?: number, mimeType?: string, source?: string }> = [];
+export async function collectPageAssets(): Promise<Asset[]> {
+  const assets: Asset[] = [];
   const processedUrls = new Set<string>();
+  const baseUrl = new URL(window.location.href);
   
   try {
-    console.log('[SEO Assets] Starting comprehensive collection of page assets');
+    assetLogger.info('Starting comprehensive collection of page assets');
     
-    // 1. Get all <img> elements
-    const imgElements = Array.from(document.querySelectorAll('img'));
-    console.log(`[SEO Assets] Found ${imgElements.length} standard img elements`);
-    
-    // 2. Get all <picture> elements and their source/img children
-    const pictureElements = Array.from(document.querySelectorAll('picture source'));
-    console.log(`[SEO Assets] Found ${pictureElements.length} picture source elements`);
-    
-    // 3. Get all elements with background images
-    const elementsWithBackgroundImage: Element[] = [];
-    
-    // Walk through all elements to find those with background images
-    const walkDOM = (node: Element): void => {
-      // Check computed style for background image
-      const style = window.getComputedStyle(node);
-      const bgImage = style.backgroundImage;
-      
-      if (bgImage && bgImage !== 'none' && !bgImage.includes('gradient')) {
-        elementsWithBackgroundImage.push(node);
+    // 1. Try to get images from Webflow page data first
+    try {
+      const pageData = await getWebflowPageData();
+      if (pageData && pageData.ogImage) {
+        assetLogger.info(`Found OG image: ${pageData.ogImage}`);
+        const asset: Asset = {
+          url: pageData.ogImage,
+          alt: 'OG Image',
+          type: 'image',
+          source: 'webflow-meta'
+        };
+        
+        // Try to get size but don't block if it fails
+        const size = await getImageSize(pageData.ogImage, baseUrl);
+        if (size) {
+          asset.size = size;
+          assetLogger.info(`OG image size: ${formatBytes(size)}`);
+        }
+        
+        assets.push(asset);
+        processedUrls.add(pageData.ogImage);
       }
-      
-      // Recursively check children (limited depth to avoid performance issues)
-      if (node.children.length > 0 && elementsWithBackgroundImage.length < 100) {
-        Array.from(node.children).forEach(child => walkDOM(child as Element));
-      }
-    };
-    
-    // Only scan a sample of the DOM for background images to avoid performance issues
-    const mainElements = Array.from(document.querySelectorAll('main, header, footer, section, .w-container, .container'));
-    if (mainElements.length > 0) {
-      mainElements.forEach(el => walkDOM(el));
-    } else {
-      walkDOM(document.body);
+    } catch (error) {
+      assetLogger.error(`Error getting Webflow page data: ${error}`);
     }
     
-    console.log(`[SEO Assets] Found ${elementsWithBackgroundImage.length} elements with background images`);
+    // 2. Get all <img> elements (standard approach)
+    const imgElements = Array.from(document.querySelectorAll('img'));
+    assetLogger.info(`Found ${imgElements.length} standard img elements`);
     
-    // 4. Process <img> elements
+    // Process standard <img> elements
     for (const img of imgElements) {
       const src = img.getAttribute('src');
-      if (!src || src.startsWith('data:') || processedUrls.has(src)) continue;
+      
+      if (!src) {
+        assetLogger.info(`Skipping image with no src attribute`);
+        continue;
+      }
+      
+      if (src.startsWith('data:')) {
+        assetLogger.info(`Skipping data URI image`);
+        continue;
+      }
+      
+      if (processedUrls.has(src)) {
+        assetLogger.info(`Skipping duplicate image URL: ${src}`);
+        continue;
+      }
       
       processedUrls.add(src);
       
+      // Create the asset first, then try to get size
+      const asset: Asset = {
+        url: src,
+        alt: img.getAttribute('alt') || '',
+        type: 'image'
+      };
+      
+      // Try to get size but don't block if it fails
       try {
-        // Fetch image for size and type information
-        const response = await fetch(src, { method: 'HEAD' });
-        const contentLength = response.headers.get('content-length');
-        const contentType = response.headers.get('content-type');
-        
-        assets.push({
-          url: src,
-          alt: img.getAttribute('alt') || '',
-          type: 'image',
-          size: contentLength ? parseInt(contentLength, 10) : undefined,
-          mimeType: contentType || undefined
-        });
-      } catch (error) {
-        // Still include image without size info on fetch error
-        assets.push({
-          url: src,
-          alt: img.getAttribute('alt') || '',
-          type: 'image'
-        });
+        const size = await getImageSize(src, baseUrl);
+        if (size) {
+          asset.size = size;
+          assetLogger.info(`Image size for ${src}: ${formatBytes(size)}`);
+        } else {
+          assetLogger.info(`Could not determine size for ${src}`);
+        }
+      } catch (sizeError) {
+        assetLogger.error(`Error getting size for ${src}: ${sizeError}`);
       }
       
-      // Also process srcset if available
-      const srcset = img.getAttribute('srcset');
-      if (srcset) {
-        const srcsetUrls = srcset.split(',')
-          .map(s => s.trim().split(' ')[0])
-          .filter(url => url && !url.startsWith('data:') && !processedUrls.has(url));
-          
-        for (const srcsetUrl of srcsetUrls) {
-          if (processedUrls.has(srcsetUrl)) continue;
-          processedUrls.add(srcsetUrl);
-          
-          try {
-            const response = await fetch(srcsetUrl, { method: 'HEAD' });
-            const contentLength = response.headers.get('content-length');
-            const contentType = response.headers.get('content-type');
-            
-            assets.push({
-              url: srcsetUrl,
-              alt: img.getAttribute('alt') || '',
-              type: 'image',
-              size: contentLength ? parseInt(contentLength, 10) : undefined,
-              mimeType: contentType || undefined
-            });
-          } catch (error) {
-            assets.push({
-              url: srcsetUrl,
-              alt: img.getAttribute('alt') || '',
-              type: 'image'
-            });
+      assets.push(asset);
+      assetLogger.info(`Added image: ${src}`);
+    }
+    
+    // 3. Get background images (if any)
+    try {
+      const allElements = document.querySelectorAll('*');
+      let bgImagesFound = 0;
+      
+      for (const element of Array.from(allElements)) {
+        const style = window.getComputedStyle(element);
+        const bgImage = style.backgroundImage;
+        
+        if (bgImage && bgImage !== 'none') {
+          // Extract URL from "url('...')" format
+          const match = bgImage.match(/url\(['"]?(.*?)['"]?\)/);
+          if (match && match[1] && !match[1].startsWith('data:')) {
+            const bgUrl = match[1];
+            if (!processedUrls.has(bgUrl)) {
+              processedUrls.add(bgUrl);
+              
+              // Create the asset first, then try to get size
+              const asset: Asset = {
+                url: bgUrl,
+                alt: '',
+                type: 'background-image'
+              };
+              
+              // Try to get size but don't block if it fails
+              try {
+                const size = await getImageSize(bgUrl, baseUrl);
+                if (size) {
+                  asset.size = size;
+                  assetLogger.info(`Background image size for ${bgUrl}: ${formatBytes(size)}`);
+                }
+              } catch (sizeError) {
+                assetLogger.error(`Error getting size for ${bgUrl}: ${sizeError}`);
+              }
+              
+              assets.push(asset);
+              bgImagesFound++;
+            }
           }
         }
       }
+      assetLogger.info(`Found ${bgImagesFound} elements with background images`);
+    } catch (error) {
+      assetLogger.error(`Error getting background images: ${error}`);
     }
     
-    // 5. Process <picture> source elements
-    for (const source of pictureElements) {
-      const srcset = source.getAttribute('srcset');
-      if (!srcset) continue;
-      
-      const srcsetUrls = srcset.split(',')
-        .map(s => s.trim().split(' ')[0])
-        .filter(url => url && !url.startsWith('data:') && !processedUrls.has(url));
-        
-      for (const srcsetUrl of srcsetUrls) {
-        if (processedUrls.has(srcsetUrl)) continue;
-        processedUrls.add(srcsetUrl);
-        
-        try {
-          const response = await fetch(srcsetUrl, { method: 'HEAD' });
-          const contentLength = response.headers.get('content-length');
-          const contentType = response.headers.get('content-type');
-          
-          // Find the img element in the same picture to get alt text
-          const parentPicture = source.closest('picture');
-          const imgInPicture = parentPicture?.querySelector('img');
-          const alt = imgInPicture?.getAttribute('alt') || '';
-          
-          assets.push({
-            url: srcsetUrl,
-            alt: alt,
-            type: 'image',
-            size: contentLength ? parseInt(contentLength, 10) : undefined,
-            mimeType: contentType || undefined
-          });
-        } catch (error) {
-          const parentPicture = source.closest('picture');
-          const imgInPicture = parentPicture?.querySelector('img');
-          const alt = imgInPicture?.getAttribute('alt') || '';
-          
-          assets.push({
-            url: srcsetUrl,
-            alt: alt,
-            type: 'image'
-          });
-        }
+    // Log result summary
+    assetLogger.info(`Final assets array length: ${assets.length}`);
+    if (assets.length === 0) {
+      assetLogger.warn('No assets were collected, something may be wrong');
+    } else {
+      assetLogger.info('First asset for verification:', assets[0]);
+      if (assets[0].size) {
+        assetLogger.info(`Size: ${formatBytes(assets[0].size)}`);
       }
     }
     
-    // 6. Process background images
-    for (const element of elementsWithBackgroundImage) {
-      const style = window.getComputedStyle(element);
-      const bgImage = style.backgroundImage;
-      
-      // Extract URLs from background-image
-      const urlMatches = bgImage.match(/url\(['"]?([^'"()]+)['"]?\)/g) || [];
-      
-      for (const urlMatch of urlMatches) {
-        const url = urlMatch.replace(/url\(['"]?([^'"()]+)['"]?\)/, '$1');
-        if (!url || url.startsWith('data:') || processedUrls.has(url)) continue;
-        processedUrls.add(url);
-        
-        try {
-          const response = await fetch(url, { method: 'HEAD' });
-          const contentLength = response.headers.get('content-length');
-          const contentType = response.headers.get('content-type');
-          
-          assets.push({
-            url: url,
-            alt: element.getAttribute('aria-label') || element.getAttribute('title') || element.textContent?.trim().substring(0, 50) || '',
-            type: 'background-image',
-            size: contentLength ? parseInt(contentLength, 10) : undefined,
-            mimeType: contentType || undefined
-          });
-        } catch (error) {
-          assets.push({
-            url: url,
-            alt: element.getAttribute('aria-label') || element.getAttribute('title') || element.textContent?.trim().substring(0, 50) || '',
-            type: 'background-image'
-          });
-        }
-      }
-    }
-    
-    // 7. Look for inline SVGs
-    const svgElements = Array.from(document.querySelectorAll('svg'));
-    console.log(`[SEO Assets] Found ${svgElements.length} inline SVG elements`);
-    
-    for (const svg of svgElements) {
-      const title = svg.querySelector('title')?.textContent || '';
-      const desc = svg.querySelector('desc')?.textContent || '';
-      const ariaLabel = svg.getAttribute('aria-label') || '';
-      const svgId = svg.id;
-      
-      // Only include significant SVGs (larger than icons)
-      const { width, height } = svg.getBoundingClientRect();
-      if (width >= 50 || height >= 50) {
-        assets.push({
-          url: `#svg-${svgId || assets.length}`,
-          alt: title || desc || ariaLabel || '',
-          type: 'svg',
-          mimeType: 'image/svg+xml'
-        });
-      }
-    }
-    
-    console.log(`[SEO Assets] Successfully collected ${assets.length} total assets with metadata`);
+    assetLogger.info(`Successfully collected ${assets.length} total assets with metadata`);
+    assetLogger.info('Assets with sizes:', assets.filter(a => a.size !== undefined).length);
   } catch (error) {
-    console.error('[SEO Assets] Error collecting page assets:', error);
+    assetLogger.error(`Error in collectPageAssets: ${error}`);
   }
   
   return assets;
+}
+
+// Helper function to get Webflow page data
+async function getWebflowPageData() {
+  if (typeof webflow === 'undefined') {
+    return null;
+  }
+  
+  try {
+    const currentPage = await webflow.getCurrentPage();
+    return {
+      ogImage: await currentPage.getOpenGraphImage()
+    };
+  } catch (error) {
+    assetLogger.error(`Error in getWebflowPageData: ${error}`);
+    return null;
+  }
+}
+
+/**
+ * Gets the size of an image, with fallback mechanisms
+ * @param imageUrl The URL of the image
+ * @param baseUrl The base URL for resolving relative URLs
+ * @returns The size of the image in bytes, or undefined if unable to determine
+ */
+async function getImageSize(imageUrl: string, baseUrl: URL): Promise<number | undefined> {
+  try {
+    // Resolve relative URLs
+    const fullUrl = new URL(imageUrl, baseUrl.origin).toString();
+
+    // First try: HEAD request (most efficient)
+    try {
+      const response = await fetch(fullUrl, { 
+        method: 'HEAD',
+        cache: 'no-store'
+      });
+      
+      if (response.ok) {
+        const contentLength = response.headers.get('content-length');
+        if (contentLength) {
+          return parseInt(contentLength, 10);
+        }
+      }
+    } catch (headError) {
+      assetLogger.debug(`HEAD request failed for ${imageUrl}: ${headError}`);
+      // Continue to fallback
+    }
+    
+    // Second try: XHR fallback (better CORS handling for binary data)
+    return new Promise((resolve) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', fullUrl, true);
+      xhr.responseType = 'blob';
+      
+      xhr.onload = function() {
+        if (xhr.status === 200) {
+          resolve(xhr.response.size);
+        } else {
+          resolve(undefined);
+        }
+      };
+      
+      xhr.onerror = function() {
+        resolve(undefined);
+      };
+      
+      xhr.send();
+      
+      // Set timeout in case request hangs
+      setTimeout(() => resolve(undefined), 5000);
+    });
+  } catch (error) {
+    assetLogger.error(`Error getting size for image ${imageUrl}: ${error}`);
+    return undefined;
+  }
+}
+
+/**
+ * Format bytes to a human-readable string
+ * @param bytes The number of bytes
+ * @returns Formatted string (e.g. "1.5 KB")
+ */
+function formatBytes(bytes?: number): string {
+  if (!bytes) return "Unknown size";
+
+  if (bytes < 1024) return bytes + " bytes";
+  else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
+  else return (bytes / 1048576).toFixed(1) + " MB";
+}
+
+// In the fetchFromAPI function
+export async function fetchFromAPI<T>(endpoint: string, data: any): Promise<T> {
+  // Get worker URL from environment or use local development worker
+  const workerUrl = import.meta.env.VITE_WORKER_URL || 'http://127.0.0.1:8787';
+  logger.info(`Using worker at ${workerUrl}`);
+  
+  try {
+    logger.debug(`Sending request to ${workerUrl}${endpoint}`, data);
+    const response = await fetch(`${workerUrl}${endpoint}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+    
+    logger.debug(`Got response with status: ${response.status}`);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      logger.error(`API error (${response.status}): ${errorText}`);
+      throw new Error(`API error: ${response.status} ${errorText}`);
+    }
+    
+    const result = await response.json();
+    return result as T;
+  } catch (error) {
+    logger.error(`API fetch error: ${error instanceof Error ? error.message : String(error)}`);
+    throw error;
+  }
 }

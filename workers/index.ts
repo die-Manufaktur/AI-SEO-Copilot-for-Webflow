@@ -897,7 +897,7 @@ async function analyzeSEOElements(
   // Use the finally determined ogImageToCheck
   ogImageCheck.passed = !!ogImageToCheck;
   ogImageCheck.description = ogImageCheck.passed
-    ? `Open Graph image is set: ${ogImageToCheck}. ${getSuccessMessage(ogImageCheck.title)}`
+    ? getSuccessMessage(ogImageCheck.title)
     : "Open Graph image is not set. This image is shown when the page is shared on social media.";
 
   if (!ogImageCheck.passed) {
