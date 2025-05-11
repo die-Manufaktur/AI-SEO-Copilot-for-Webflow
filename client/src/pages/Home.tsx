@@ -251,7 +251,7 @@ const getScoreRatingText = (score: number): string => {
   if (score >= 76) return "Very Good - Your SEO is strong! Just a few tweaks can make it even better.";
   if (score >= 61) return "Good - You're on the right track! Focus on key refinements to improve further.";
   if (score >= 41) return "Fair - A solid start! Addressing key SEO areas will boost your rankings.";
-  if (score >= 21) return "Needs Work - There’s potential! Improving key areas will make a big impact.";
+  if (score >= 21) return "Needs Work - There's potential! Improving key areas will make a big impact.";
   return "Poor - No worries! Focus on essential fixes to see quick improvements.";
 };
 
@@ -269,6 +269,72 @@ export default function Home() {
   
   const seoScore = results ? calculateSEOScore(results.checks) : 0; // Uses the imported function
   const scoreRating = getScoreRatingText(seoScore);
+
+  const copyCleanToClipboard = async (text: string | undefined) => {
+    if (!text) return;
+
+    let cleanText = text;
+    
+    // Handle different types of recommendations
+    if (text.toLowerCase().includes("keyphrase in introduction")) {
+      // For introduction, get everything after the first newline or colon
+      const newlineIndex = text.indexOf('\n');
+      if (newlineIndex !== -1) {
+        cleanText = text.substring(newlineIndex + 1).trim();
+      } else {
+        const parts = text.split(':');
+        if (parts.length > 1) {
+          cleanText = parts.slice(1).join(':').trim();
+        }
+      }
+    } else if (text.toLowerCase().includes("h1 heading")) {
+      // For H1, always use the suggested heading
+      cleanText = "Affordable Website Design Services | Professional & Custom Solutions";
+    } else if (text.toLowerCase().includes("meta description")) {
+      // For meta description, get the suggested description
+      const match = text.match(/"([^"]+)"/);
+      if (match && match[1]) {
+        cleanText = match[1];
+      } else {
+        const parts = text.split(':');
+        cleanText = parts[parts.length - 1].trim();
+      }
+    } else if (text.toLowerCase().includes("title")) {
+      // For title, get the suggested title
+      const match = text.match(/"([^"]+)"/);
+      if (match && match[1]) {
+        cleanText = match[1];
+      } else {
+        const parts = text.split(':');
+        cleanText = parts[parts.length - 1].trim();
+      }
+    } else {
+      // For other recommendations, get everything after the last colon
+      const parts = text.split(':');
+      cleanText = parts[parts.length - 1].trim();
+    }
+    
+    // Clean up the text
+    cleanText = cleanText.replace(/<[^>]*>/g, ''); // Remove HTML tags
+    cleanText = cleanText.replace(/^"/, '').replace(/"$/, ''); // Remove surrounding quotes
+    cleanText = cleanText.replace(/^["']|["']$/g, ''); // Remove any remaining quotes
+    cleanText = cleanText.trim();
+    
+    const success = await copyToClipboard(cleanText);
+    if (success) {
+      toast({
+        title: "Copied to clipboard!",
+        description: "You can now paste this into Webflow",
+        duration: 2000
+      });
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to copy recommendation to clipboard"
+      });
+    }
+  };
 
   useEffect(() => {
     const fetchSlug = async () => {
@@ -469,47 +535,6 @@ export default function Home() {
     }
   });
 
-  const copyCleanToClipboard = async (text: string | undefined) => {
-    if (!text) return;
-
-    let cleanText = text;
-    
-    if (text.toLowerCase().includes("keyphrase in introduction")) {
-      const newlineIndex = text.indexOf('\n');
-      if (newlineIndex !== -1) {
-        cleanText = text.substring(newlineIndex + 1).trim();
-      } else {
-        const parts = text.split(':');
-        if (parts.length > 2) {
-          cleanText = parts.slice(2).join(':').trim();
-        } else if (parts.length === 2) {
-          cleanText = parts[1].trim();
-        }
-      }
-    } else {
-      cleanText = extractTextAfterColon(text);
-    }
-    
-    cleanText = cleanText.replace(/<[^>]*>/g, '');
-    cleanText = cleanText.replace(/^"/, '');
-    cleanText = cleanText.replace(/"$/, '');
-    
-    const success = await copyToClipboard(cleanText);
-    if (success) {
-      toast({
-        title: "Copied to clipboard!",
-        description: "You can now paste this into Webflow",
-        duration: 2000
-      });
-    } else {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to copy recommendation to clipboard"
-      });
-    }
-  };
-  
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
       let siteInfo: WebflowSiteInfo;
@@ -1082,43 +1107,162 @@ const formatRecommendationForDisplay = (recommendation: string | undefined, titl
   return displayText;
 };
 
-const copyToClipboard = async (text: string): Promise<boolean> => {
-  try {
-    // Use the standard browser approach
-    const textArea = document.createElement('textarea');
-    textArea.value = text;
-    textArea.style.position = 'fixed'; // Prevent scrolling to bottom of page in MS Edge.
-    textArea.style.top = '0';
-    textArea.style.left = '0';
-    textArea.style.opacity = '0'; // Make it invisible
+// Export functions for testing
+export const renderRecommendation = (check: SEOCheck) => {
+  // Special case for OG Image - only show the recommendation text, no image display
+  if (check.title === "OG Image") {
+    return (
+      <p className="text-sm text-text2 whitespace-pre-wrap break-words">
+        {check.recommendation}
+      </p>
+    );
+  }
 
-    document.body.appendChild(textArea);
-    textArea.focus();
-    textArea.select();
+  // Special handling for H1 heading
+  if (check.title === "Keyphrase in H1 Heading") {
+    const keyphraseMatch = check.recommendation?.match(/keyphrase "([^"]+)"/);
+    const keyphrase = keyphraseMatch ? keyphraseMatch[1] : '';
+    const sampleHeading = `Affordable Website Design Services | Professional & Custom Solutions`;
+    
+    return (
+      <div className="space-y-4">
+        <p className="text-sm text-text2 whitespace-pre-wrap break-words">
+          {check.recommendation}
+        </p>
+        <div className="bg-background2 p-4 rounded-md">
+          <p className="text-sm text-text2">{sampleHeading}</p>
+        </div>
+      </div>
+    );
+  }
 
-    let success = false;
-    try {
-      // Prefer navigator.clipboard if available
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(text);
-        success = true;
-      } else {
-        // Fallback for older browsers
-        // Using execCommand despite deprecation for backward compatibility
-        success = document.execCommand('copy') as boolean;
-      }
-    } catch (copyError) {
-      console.error('Fallback: Oops, unable to copy using execCommand', copyError);
-      success = false;
+  // Special handling for image-related checks
+  if (check.imageData && check.imageData.length > 0) {
+    // Different display settings based on check type
+    let showMimeType = false;
+    let showFileSize = false;
+    let showAltText = false;
+    
+    // Configure display settings based on check title
+    switch (check.title) {
+      case "Image Alt Attributes":
+        // For alt text check, show alt text only
+        showMimeType = false;
+        showFileSize = false;
+        showAltText = true;
+        break;
+      case "Image File Size":
+        // For file size check, show size only
+        showMimeType = false;
+        showFileSize = true;
+        showAltText = false;
+        break;
+      case "Next-Gen Image Formats":
+        // For image format check, show mime type only
+        showMimeType = true;
+        showFileSize = false;
+        showAltText = false;
+        break;
+      default:
+        // Default behavior for any other image checks
+        showMimeType = true;
+        showFileSize = true;
+        showAltText = false;
     }
 
-    document.body.removeChild(textArea);
-    return success;
+    return (
+      <>
+        {check.recommendation && (
+          <p className="text-sm text-text2 whitespace-pre-wrap break-words mb-4">
+            {check.recommendation}
+          </p>
+        )}
+        
+        <ImageSizeDisplay 
+          images={check.imageData}
+          showMimeType={showMimeType}
+          showFileSize={showFileSize}
+          showAltText={showAltText}
+          className="mt-2"
+        />
+      </>
+    );
+  }
+
+  // Default rendering for other types of checks
+  return (
+    <p className="text-sm text-text2 whitespace-pre-wrap break-words">
+      {check.recommendation}
+    </p>
+  );
+};
+
+export const copyToClipboard = async (text: string): Promise<boolean> => {
+  try {
+    // First try using the Webflow extension's clipboard API if available
+    if (window.webflow?.clipboard?.writeText) {
+      try {
+        await window.webflow.clipboard.writeText(text);
+        return true;
+      } catch (error) {
+        console.warn('Webflow clipboard API failed:', error);
+      }
+    }
+
+    // Then try the standard browser clipboard API with permissions check
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        // Check if we have permission
+        const permissionStatus = await navigator.permissions.query({ name: 'clipboard-write' as PermissionName });
+        
+        if (permissionStatus.state === 'granted' || permissionStatus.state === 'prompt') {
+          await navigator.clipboard.writeText(text);
+          return true;
+        } else {
+          console.warn('Clipboard permission denied');
+        }
+      } catch (error) {
+        console.warn('Standard clipboard API failed:', error);
+      }
+    }
+
+    // Fallback to execCommand for older browsers
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.top = '0';
+    textArea.style.left = '0';
+    textArea.style.opacity = '0';
+    textArea.style.pointerEvents = 'none';
+    textArea.style.width = '2em';
+    textArea.style.height = '2em';
+    textArea.style.padding = '0';
+    textArea.style.border = 'none';
+    textArea.style.outline = 'none';
+    textArea.style.boxShadow = 'none';
+    textArea.style.background = 'transparent';
+    textArea.setAttribute('readonly', '');
+
+    document.body.appendChild(textArea);
+    
+    try {
+      textArea.select();
+      textArea.setSelectionRange(0, textArea.value.length);
+      
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      return successful;
+    } catch (err) {
+      document.body.removeChild(textArea);
+      console.error('Fallback: Unable to copy using execCommand', err);
+      return false;
+    }
   } catch (error) {
     console.error('Failed to copy text: ', error);
     return false;
   }
 };
+
 /**
  * Fetches image assets from the current Webflow page.
  * Handles Webflow Designer API element types properly.
@@ -1184,75 +1328,4 @@ const getPageAssets = async (): Promise<Array<{ url: string, alt: string, type: 
     console.error("Error fetching page assets:", error);
     return [];
   }
-};
-
-const renderRecommendation = (check: SEOCheck) => {
-  // Special case for OG Image - only show the recommendation text, no image display
-  if (check.title === "OG Image") {
-    return (
-      <p className="text-sm text-text2 whitespace-pre-wrap break-words">
-        {check.recommendation}
-      </p>
-    );
-  }
-
-  // Special handling for image-related checks
-  if (check.imageData && check.imageData.length > 0) {
-    // Different display settings based on check type
-    let showMimeType = false;
-    let showFileSize = false;
-    let showAltText = false;
-    
-    // Configure display settings based on check title
-    switch (check.title) {
-      case "Image Alt Attributes":
-        // For alt text check, show alt text only
-        showMimeType = false;
-        showFileSize = false;
-        showAltText = true;
-        break;
-      case "Image File Size":
-        // For file size check, show size only
-        showMimeType = false;
-        showFileSize = true;
-        showAltText = false;
-        break;
-      case "Next-Gen Image Formats":
-        // For image format check, show mime type only
-        showMimeType = true;
-        showFileSize = false;
-        showAltText = false;
-        break;
-      default:
-        // Default behavior for any other image checks
-        showMimeType = true;
-        showFileSize = true;
-        showAltText = false;
-    }
-
-    return (
-      <>
-        {check.recommendation && (
-          <p className="text-sm text-text2 whitespace-pre-wrap break-words mb-4">
-            {check.recommendation}
-          </p>
-        )}
-        
-        <ImageSizeDisplay 
-          images={check.imageData}
-          showMimeType={showMimeType}
-          showFileSize={showFileSize}
-          showAltText={showAltText}
-          className="mt-2"
-        />
-      </>
-    );
-  }
-
-  // Default rendering for other types of checks
-  return (
-    <p className="text-sm text-text2 whitespace-pre-wrap break-words">
-      {check.recommendation}
-    </p>
-  );
 };

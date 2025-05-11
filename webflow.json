@@ -12,6 +12,7 @@
   ],
   "permissions": {
     "clipboard-write": "Needed to help you copy SEO recommendations directly to your clipboard",
+    "clipboard-read": "Needed to help you copy SEO recommendations directly to your clipboard",
     "designer:siteInfo:read": "Needed to access information about your site",
     "hostPattern_WebflowSite": true,
     "site:read": true,
