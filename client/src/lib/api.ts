@@ -363,7 +363,11 @@ async function getImageSize(imageUrl: string, baseUrl: URL): Promise<number | un
     try {
       const response = await fetch(fullUrl, { 
         method: 'HEAD',
-        cache: 'no-store'
+        cache: 'no-store',
+        headers: {
+          'Accept': '*/*',
+          'Cache-Control': 'no-cache'
+        }
       });
       
       if (response.ok) {
@@ -382,6 +386,8 @@ async function getImageSize(imageUrl: string, baseUrl: URL): Promise<number | un
       const xhr = new XMLHttpRequest();
       xhr.open('GET', fullUrl, true);
       xhr.responseType = 'blob';
+      xhr.setRequestHeader('Cache-Control', 'no-cache');
+      xhr.setRequestHeader('Accept', '*/*');
       
       xhr.onload = function() {
         if (xhr.status === 200) {
