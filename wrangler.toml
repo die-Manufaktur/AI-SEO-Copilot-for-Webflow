@@ -32,7 +32,3 @@ local_protocol = "http"
 
 [build]
 command = "pnpm build"
-
-[build.upload]
-format = "modules"
-main = "./index.js"

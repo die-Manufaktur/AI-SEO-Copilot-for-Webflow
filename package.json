@@ -13,11 +13,14 @@
     "build:worker": "npx wrangler deploy workers/index.ts --env production",
     "build:all": "pnpm build && pnpm build:worker",
     "start-dev": "concurrently \"pnpm dev\" \"pnpm dev:worker\"",
-    "dev:watch-css": "tailwindcss -i ./client/src/index.css -o ./client/src/output.css --watch",
+    "dev:watch-css": "./node_modules/.bin/tailwindcss -i ./client/src/index.css -o ./client/src/output.css --watch",
     "dev:all": "concurrently \"pnpm dev:worker\" \"pnpm dev:watch-css\" \"pnpm dev\"",
     "prebuild": "node scripts/check-env.js",
     "test": "vitest run",
-    "test:connection": "npx tsx test-connection.ts"
+    "test:connection": "npx tsx test-connection.ts",
+    "dev:setup": "pnpm build && pnpm build:worker",
+    "dev:start": "concurrently \"pnpm dev:worker\" \"pnpm dev\"",
+    "dev:full": "pnpm dev:setup && pnpm dev:start"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.6.3",
@@ -50,7 +53,7 @@
     "ts-node": "^10.9.2",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3",
-    "vite": "^5.4.19",
+    "vite": "^6.3.5",
     "vite-plugin-svgr": "^3.3.0",
     "vite-tsconfig-paths": "^4.3.2",
     "vitest": "^3.1.3",

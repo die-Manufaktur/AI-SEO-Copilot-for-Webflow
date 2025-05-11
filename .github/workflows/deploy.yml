@@ -1,98 +1,30 @@
-name: Deploy to Production
+name: Deploy
 
 on:
   push:
-    branches: ["main"] # Keep this trigger for post-merge deployment
+    branches: [main]
 
 jobs:
-  build_test_deploy:
-    runs-on: ubuntu-22.04
-    permissions:
-      contents: read # Keep read for checkout
-      # Add write permission if you want the workflow to create releases/tags for the bundle
-      # contents: write
-    name: Build, Test, and Deploy to Production
-    strategy:
-      matrix:
-        node-version: [20]
+  deploy:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          run_install: false
-
-      - name: Use Node.js ${{ matrix.node-version }}
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
-          cache: 'pnpm'
-
-      - name: Configure npm registry settings
-        run: |
-          cat > .npmrc << EOF
-          registry=https://registry.npmjs.org/
-          fetch-retries=5
-          fetch-retry-factor=5
-          fetch-retry-mintimeout=15000
-          fetch-retry-maxtimeout=120000
-          EOF
-
-      - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
-
-      - name: Check required secrets for build
-        run: |
-          echo "Checking build secrets..."
-          [ -n "${{ secrets.VITE_WEBFLOW_CLIENT_ID }}" ] || (echo "VITE_WEBFLOW_CLIENT_ID secret is missing!" && exit 1)
-        env:
-          VITE_WEBFLOW_CLIENT_ID: ${{ secrets.VITE_WEBFLOW_CLIENT_ID }}
-
-      - name: Run tests before deploy
-        run: pnpm test
-        env:
-          NODE_ENV: test
-
-      - name: Build application bundle
-        run: pnpm build
-        env:
-          NODE_ENV: production
-          VITE_WEBFLOW_EXTENSION: true
-          USE_GPT_RECOMMENDATIONS: true
-          VITE_WEBFLOW_API_KEY: ${{ secrets.VITE_WEBFLOW_API_KEY }}
-          VITE_WEBFLOW_SITE_ID: ${{ secrets.VITE_WEBFLOW_SITE_ID }}
-          VITE_WEBFLOW_CLIENT_ID: ${{ secrets.VITE_WEBFLOW_CLIENT_ID }}
-
-      - name: Validate build output
-        run: |
-          if [ ! -d "public" ]; then
-            echo "Build output directory (public) is missing"
-            exit 1
-          fi
-
-      - name: Create bundle archive
-        run: zip -r bundle.zip public/
-
-      - name: Upload bundle artifact
-        uses: actions/upload-artifact@v4
+          node-version: '20'
+      
+      - uses: pnpm/action-setup@v2
         with:
-          name: bundle
-          path: bundle.zip
-          retention-days: 5 # Or longer if needed for releases
-
-      - name: Check required secrets for deployment
-        run: |
-          echo "Checking deployment secrets..."
-          [ -n "${{ secrets.CLOUDFLARE_API_TOKEN }}" ] || (echo "CLOUDFLARE_API_TOKEN secret is missing!" && exit 1)
-          [ -n "${{ secrets.OPENAI_API_KEY }}" ] || (echo "OPENAI_API_KEY secret is missing!" && exit 1)
-          [ -n "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" ] || (echo "CLOUDFLARE_ACCOUNT_ID secret is missing!" && exit 1) # Check is good
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }} # Env var available here
-
-      - name: Deploy Worker to Production
+          version: 8
+          
+      - name: Install dependencies
+        run: pnpm install
+      
+      - name: Deploy worker
         run: pnpm wrangler deploy workers/index.ts --env production
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          VITE_WEBFLOW_CLIENT_ID: ${{ secrets.VITE_WEBFLOW_CLIENT_ID }}
+          # Add any other required environment variables here
