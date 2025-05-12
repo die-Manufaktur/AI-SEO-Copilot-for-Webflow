@@ -89,7 +89,7 @@
     "@radix-ui/react-toggle-group": "^1.1.9",
     "@radix-ui/react-tooltip": "^1.2.6",
     "@tailwindcss/postcss": "^4.1.5",
-    "@tanstack/react-query": "^5.75.5",
+    "@tanstack/react-query": "^5.76.0",
     "@vitejs/plugin-react": "^4.4.1",
     "@webflow/designer-extension-typings": "^2.0.12",
     "@webflow/webflow-cli": "^1.7.1",
