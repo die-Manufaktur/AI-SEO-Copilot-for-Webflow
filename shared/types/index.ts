@@ -50,8 +50,9 @@ export interface SchemaMarkupResult {
  * Webflow Page Data fetched from Designer API
  */
 export interface WebflowPageData {
-  title: string;
-  metaDescription: string;
+  title?: string;
+  metaDescription?: string;
+  canonicalUrl?: string;
   ogTitle: string;
   ogDescription: string;
   ogImage: string;
@@ -84,20 +85,22 @@ export interface ScrapedPageData {
     css: Resource[];
   };
   schemaMarkup: SchemaMarkupResult;
+  ogTitle: string;
+  ogDescription: string;
 }
 
 /**
  * SEO Analysis Result
  */
 export interface SEOAnalysisResult {
-  checks: SEOCheck[];
+  keyphrase: string;
+  url: string;
+  isHomePage: boolean;
+  score: number;
+  totalChecks: number;
   passedChecks: number;
   failedChecks: number;
-  url: string;
-  score: number;
-  ogData?: OGMetadata;
-  timestamp: string;
-  apiDataUsed: boolean;
+  checks: SEOCheck[];
 }
 
 /**

@@ -267,7 +267,7 @@ export default function Home() {
   const [_urls, setUrls] = useState<string[]>([]);
   const [showedPerfectScoreMessage, setShowedPerfectScoreMessage] = useState<boolean>(false);
   
-  const seoScore = results ? calculateSEOScore(results.checks) : 0; // Uses the imported function
+  const seoScore = results ? calculateSEOScore(results.checks) : 0;
   const scoreRating = getScoreRatingText(seoScore);
 
   const copyCleanToClipboard = async (text: string | undefined) => {
@@ -275,49 +275,12 @@ export default function Home() {
 
     let cleanText = text;
     
-    // Handle different types of recommendations
-    if (text.toLowerCase().includes("keyphrase in introduction")) {
-      // For introduction, get everything after the first newline or colon
-      const newlineIndex = text.indexOf('\n');
-      if (newlineIndex !== -1) {
-        cleanText = text.substring(newlineIndex + 1).trim();
-      } else {
-        const parts = text.split(':');
-        if (parts.length > 1) {
-          cleanText = parts.slice(1).join(':').trim();
-        }
-      }
-    } else if (text.toLowerCase().includes("h1 heading")) {
-      // For H1, always use the suggested heading
-      cleanText = "Affordable Website Design Services | Professional & Custom Solutions";
-    } else if (text.toLowerCase().includes("meta description")) {
-      // For meta description, get the suggested description
-      const match = text.match(/"([^"]+)"/);
-      if (match && match[1]) {
-        cleanText = match[1];
-      } else {
-        const parts = text.split(':');
-        cleanText = parts[parts.length - 1].trim();
-      }
-    } else if (text.toLowerCase().includes("title")) {
-      // For title, get the suggested title
-      const match = text.match(/"([^"]+)"/);
-      if (match && match[1]) {
-        cleanText = match[1];
-      } else {
-        const parts = text.split(':');
-        cleanText = parts[parts.length - 1].trim();
-      }
-    } else {
-      // For other recommendations, get everything after the last colon
-      const parts = text.split(':');
-      cleanText = parts[parts.length - 1].trim();
-    }
+    // For recommendations, just use the text directly without trying to extract parts
+    // This ensures we copy the actual recommendation, not just the keyphrase
     
     // Clean up the text
     cleanText = cleanText.replace(/<[^>]*>/g, ''); // Remove HTML tags
-    cleanText = cleanText.replace(/^"/, '').replace(/"$/, ''); // Remove surrounding quotes
-    cleanText = cleanText.replace(/^["']|["']$/g, ''); // Remove any remaining quotes
+    cleanText = cleanText.replace(/^["']|["']$/g, ''); // Remove surrounding quotes
     cleanText = cleanText.trim();
     
     const success = await copyToClipboard(cleanText);
@@ -462,7 +425,6 @@ export default function Home() {
     onSuccess: (data) => {
       let modifiedData = { ...data }; // Clone the data to avoid direct mutation
 
-      // --- MODIFICATION START ---
       // Check if it's the homepage and modify the URL check result accordingly
       if (isHomePage) {
         const urlCheckIndex = modifiedData.checks.findIndex(check => check.title === "Keyphrase in URL");
@@ -617,11 +579,11 @@ export default function Home() {
       const webflowVariablePattern = /\{\{wf\s+\{&quot;.*?&quot;\\\}\s*\}\}/;
       const pageDataForApi: Partial<WebflowPageData> = { ...rawPageData }; // Start with all data
 
-      if (webflowVariablePattern.test(rawPageData.title)) {
+      if (rawPageData.title && webflowVariablePattern.test(rawPageData.title)) {
         console.log("[Home onSubmit] Dynamic pattern detected in title. Omitting from API call.");
         delete pageDataForApi.title; // Omit title if dynamic
       }
-      if (webflowVariablePattern.test(rawPageData.metaDescription)) {
+      if (rawPageData.metaDescription && webflowVariablePattern.test(rawPageData.metaDescription)) {
         console.log("[Home onSubmit] Dynamic pattern detected in meta description. Omitting from API call.");
         delete pageDataForApi.metaDescription; // Omit description if dynamic
       }
@@ -639,11 +601,9 @@ export default function Home() {
            // Keep it for now, worker logic handles this case
        }
 
-
       // --- Fetch page assets ---
       const pageAssets = await getPageAssets();
       
-      // --- Prepare final analysis request ---
       // Map the Webflow API siteInfo to match the expected format in shared types
       const mappedSiteInfo = {
         ...siteInfo,
@@ -989,25 +949,33 @@ export default function Home() {
                                 </div>
                               </div>
                               {!check.passed && check.recommendation && shouldShowCopyButton(check.title) && (
-                                <CopyTooltip content={<p>Copy recommendation to clipboard</p>}>
-                                  <motion.div
-                                    whileHover={{ scale: 1.1 }}
-                                    whileTap={{ scale: 0.9 }}
-                                    className="ml-4"
-                                  >
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="flex items-center gap-2"
-                                      onClick={async () => {
-                                        await copyCleanToClipboard(check.recommendation || '');
-                                      }}
-                                    >
-                                      <Copy className="h-4 w-4" />
-                                      Copy
-                                    </Button>
-                                  </motion.div>
-                                </CopyTooltip>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <motion.div
+                                        whileHover={{ scale: 1.1 }}
+                                        whileTap={{ scale: 0.9 }}
+                                        className="ml-4"
+                                      >
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="flex items-center gap-2"
+                                          onClick={async () => {
+                                            // Use copyCleanToClipboard instead of direct copyToClipboard
+                                            await copyCleanToClipboard(check.recommendation || '');
+                                          }}
+                                        >
+                                          <Copy className="h-4 w-4" />
+                                          Copy
+                                        </Button>
+                                      </motion.div>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Copy recommendation to clipboard</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
                               )}
                             </div>
                             {!check.passed && check.recommendation && (
@@ -1018,7 +986,24 @@ export default function Home() {
                                 className="mt-4 text-sm p-4 bg-background3 rounded-md w-full"
                                 style={{ backgroundColor: 'var(--background3)' }}
                               >
-                                {renderRecommendation(check)}
+                                {check.imageData && check.imageData.length > 0 ? (
+                                  <>
+                                    <p className="text-sm text-text2 whitespace-pre-wrap break-words mb-4">
+                                      {check.recommendation}
+                                    </p>
+                                    
+                                    <ImageSizeDisplay 
+                                      images={check.imageData}
+                                      showMimeType={check.title === "Next-Gen Image Formats"}
+                                      showFileSize={check.title === "Image File Size" || check.title !== "Image Alt Attributes"}
+                                      showAltText={check.title === "Image Alt Attributes"}
+                                      className="mt-2"
+                                    />
+                                  </>
+                                ) : (
+                                  // Keep current rendering for all other checks
+                                  check.recommendation
+                                )}
                               </motion.div>
                             )}
                           </motion.div>
@@ -1118,19 +1103,18 @@ export const renderRecommendation = (check: SEOCheck) => {
     );
   }
 
-  // Special handling for H1 heading
-  if (check.title === "Keyphrase in H1 Heading") {
-    const keyphraseMatch = check.recommendation?.match(/keyphrase "([^"]+)"/);
-    const keyphrase = keyphraseMatch ? keyphraseMatch[1] : '';
-    const sampleHeading = `Affordable Website Design Services | Professional & Custom Solutions`;
-    
+  // Special handling for meta description, title, and H1 heading
+  if (check.title === "Keyphrase in Meta Description" || 
+      check.title === "Keyphrase in Title" || 
+      check.title === "Keyphrase in H1 Heading") {
     return (
       <div className="space-y-4">
         <p className="text-sm text-text2 whitespace-pre-wrap break-words">
           {check.recommendation}
         </p>
         <div className="bg-background2 p-4 rounded-md">
-          <p className="text-sm text-text2">{sampleHeading}</p>
+          <p className="text-sm font-medium">Suggested {check.title.replace('Keyphrase in ', '')}:</p>
+          <p className="text-sm text-text2 mt-1">{check.recommendation}</p>
         </div>
       </div>
     );

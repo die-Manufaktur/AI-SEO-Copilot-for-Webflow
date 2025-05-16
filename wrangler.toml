@@ -6,29 +6,3 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 USE_GPT_RECOMMENDATIONS = "true"
 ALLOWED_ORIGINS = "https://webflow.com,https://*.webflow-ext.com,https://*.webflow.io,http://localhost:1337,http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:1337"
-
-[observability.logs]
-enabled = true
-
-[env.production]
-workers_dev = true
-
-[env.production.vars]
-USE_GPT_RECOMMENDATIONS = "true"
-ALLOWED_ORIGINS = "https://webflow.com,https://*.webflow-ext.com,https://*.webflow.io"
-STATE = "webflow-seo-copilot-prod"
-
-[env.development]
-workers_dev = true
-
-[env.development.vars]
-USE_GPT_RECOMMENDATIONS = "true"
-ALLOWED_ORIGINS = "https://webflow.com,https://*.webflow-ext.com,https://*.webflow.io,http://localhost:1337,http://localhost:5173"
-STATE = "webflow-seo-copilot-dev"
-
-[dev]
-port = 8787
-local_protocol = "http"
-
-[build]
-command = "pnpm build"

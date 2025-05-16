@@ -91,3 +91,5 @@ dist-ssr
 # Cloudflare specific
 .mf/
 .miniflare/
+
+.github/instructions.md
