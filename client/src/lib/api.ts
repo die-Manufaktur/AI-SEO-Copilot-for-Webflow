@@ -13,18 +13,24 @@ type Asset = {
   source?: string;
 };
 
-// Helper function to determine the appropriate API URL based on environment
-export const getApiBaseUrl = (): string => {
-  // For local development environment
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    const workerPort = 8787;
-    const workerUrl = `http://127.0.0.1:${workerPort}`;
-    logger.info(`Using local development worker at ${workerUrl}`);
-    return workerUrl;
-  }
-  
-  // Otherwise use production URL
-  return 'https://seo-copilot-api.paul-130.workers.dev';
+// Check how the API base URL is determined
+const getApiBaseUrl = () => {
+  try {
+    // Check if running in Webflow extension
+    if (!!window.webflow) {
+      return "https://seo-copilot-api-production.paul-130.workers.dev"; // Production URL
+    }
+  } catch {}
+
+  try {
+    // Check if running locally
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      return "http://localhost:8787"; // Development URL
+    }
+  } catch {}
+
+  // Default to production URL
+  return "https://seo-copilot-api-production.paul-130.workers.dev";
 }
 
 // Update the error handling in analyzeSEO function
@@ -45,9 +51,10 @@ export async function analyzeSEO({
   console.log(`[SEO Analyzer] Collected ${pageAssets.length} assets with size information`);
   
   // Identify which images are potentially from collections
-  if (webflowPageData?.designerImages) {
-    const designerImageUrls = new Set(webflowPageData.designerImages.map((img: { url: string }) => 
-      new URL(img.url).pathname.split('/').pop()?.toLowerCase() || ''));
+  if (webflowPageData?.designerImages && Array.isArray(webflowPageData.designerImages)) {
+    const designerImageUrls = new Set(
+      webflowPageData.designerImages.map((img: { url: string }) => img.url)
+    );
     
     // Mark collection images (any images not found in designer data)
     pageAssets.forEach(asset => {

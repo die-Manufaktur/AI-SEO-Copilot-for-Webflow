@@ -5,15 +5,16 @@ export interface SEOCheck {
   title: string;
   description: string;
   passed: boolean;
-  recommendation?: string;
   priority: 'high' | 'medium' | 'low';
+  recommendation?: string;
+  introPhrase?: string; // New field for copyable recommendations
   imageData?: Array<{
+    url: string;
     name: string;
     shortName: string;
-    size: number;
-    url: string;
+    size?: number;
     mimeType?: string;
-    isOptimized?: boolean;
+    alt?: string;
   }>;
 }
 
@@ -33,8 +34,7 @@ export interface OGMetadata {
  */
 export interface Resource {
   url: string;
-  content?: string;
-  minified?: boolean;
+  // Add other properties if needed
 }
 
 /**
@@ -50,39 +50,44 @@ export interface SchemaMarkupResult {
  * Webflow Page Data fetched from Designer API
  */
 export interface WebflowPageData {
-  title: string;
-  metaDescription: string;
-  ogTitle: string;
-  ogDescription: string;
-  ogImage: string;
-  usesTitleAsOGTitle: boolean;
-  usesDescriptionAsOGDescription: boolean;
-  designerImages?: Array<{ 
-    url: string;
-    alt?: string;
-    width?: number;
-    height?: number;
-    id?: string;
-  }>;
+  title?: string;
+  metaDescription?: string;
+  canonicalUrl?: string;
+  openGraphImage?: string;
+  hasOpenGraphImage?: boolean;
+  usesTitleAsOpenGraphTitle?: boolean;
+  usesDescriptionAsOpenGraphDescription?: boolean;
+  designerImages?: Array<{ url: string }>;
+  // Keep any existing properties
 }
 
 /**
  * Scraped data from webpage
  */
 export interface ScrapedPageData {
+  url: string;
   title: string;
   metaDescription: string;
-  content: string;
+  headings: Array<{
+    level: number;
+    text: string;
+  }>;
   paragraphs: string[];
-  headings: Array<{ level: number; text: string }>;
-  images: Array<{ src: string; alt: string; size?: number }>;
+  images: Array<{
+    src: string;
+    alt: string;
+    size?: number;
+  }>;
   internalLinks: string[];
   outboundLinks: string[];
-  url: string;
   resources: {
     js: Resource[];
     css: Resource[];
   };
+  canonicalUrl: string;
+  metaKeywords: string;
+  ogImage: string;
+  content: string;
   schemaMarkup: SchemaMarkupResult;
 }
 
@@ -90,14 +95,14 @@ export interface ScrapedPageData {
  * SEO Analysis Result
  */
 export interface SEOAnalysisResult {
-  checks: SEOCheck[];
+  keyphrase: string;
+  url: string;
+  isHomePage: boolean;
+  score: number;
+  totalChecks: number;
   passedChecks: number;
   failedChecks: number;
-  url: string;
-  score: number;
-  ogData?: OGMetadata;
-  timestamp: string;
-  apiDataUsed: boolean;
+  checks: SEOCheck[];
 }
 
 /**

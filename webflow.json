@@ -16,8 +16,7 @@
     "designer:siteInfo:read": "Needed to access information about your site",
     "hostPattern_WebflowSite": true,
     "site:read": true,
-    "externalApi:https://seo-copilot-api.paul-130.workers.dev": "Needed to connect to SEO analysis service",
-    "externalApi:http://localhost:8787": "Needed for local development testing"
+    "externalApi:https://seo-copilot-api-production.paul-130.workers.dev": "Needed to connect to SEO analysis service"
   },
   "config_pages": [
     {

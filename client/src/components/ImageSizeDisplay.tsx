@@ -13,12 +13,13 @@ function formatFileSize(sizeInKB: number): string {
 
 interface ImageInfo {
   url: string;
+  name: string;
   shortName: string;
-  size: number;
+  size?: number; // Now optional to match the data structure
   mimeType?: string;
+  alt?: string;
+  source?: 'collection' | 'page';
   isOptimized?: boolean;
-  source?: string;
-  alt?: string; // Add alt property to ImageInfo
 }
 
 interface ImageSizeDisplayProps {
@@ -75,7 +76,7 @@ export function ImageSizeDisplay({
                 {/* Show file size if enabled */}
                 {showFileSize && (
                   <span className={image.isOptimized ? "text-greenText" : "text-redText"}>
-                    {formatFileSize(image.size)}
+                    {formatFileSize(image.size || 0)} {/* Provide a default value */}
                   </span>
                 )}
                 
