@@ -89,7 +89,7 @@
     "dotenv": "^16.5.0",
     "embla-carousel-react": "^8.6.0",
     "framer-motion": "^12.11.4",
-    "hono": "^4.7.9",
+    "hono": "^4.7.10",
     "input-otp": "^1.4.2",
     "net": "^1.0.2",
     "openai": "^4.98.0",
