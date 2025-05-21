@@ -38,9 +38,10 @@ import styled from 'styled-components';
 import Footer from "../components/Footer";
 import { extractTextAfterColon } from "./../lib/utils";
 import React from 'react';
-import { calculateSEOScore } from '../../../shared/utils/seoUtils'; // Import from shared utils
+import { calculateSEOScore } from '../../../shared/utils/seoUtils';
 import { CopyTooltip } from "../components/ui/copy-tooltip";
 import { ImageSizeDisplay } from "../components/ImageSizeDisplay";
+import { sanitizeText, decodeHtmlEntities } from "../../../shared/utils/stringUtils";
 
 const formSchema = z.object({
   keyphrase: z.string().min(2, "Keyphrase must be at least 2 characters")
@@ -73,20 +74,17 @@ const iconAnimation = {
   }
 };
 
-const shouldShowCopyButton = (checkTitle: string) => {
-  return !checkTitle.toLowerCase().includes("density") &&
-         !checkTitle.toLowerCase().includes("image format") &&
-         !checkTitle.toLowerCase().includes("content length") &&
-         !checkTitle.toLowerCase().includes("og image") &&
-         !checkTitle.toLowerCase().includes("heading hierarchy") &&
-         !checkTitle.toLowerCase().includes("code minification") &&
-         !checkTitle.toLowerCase().includes("schema markup") &&
-         !checkTitle.toLowerCase().includes("image file size") &&
-         !checkTitle.toLowerCase().includes("image alt attributes") &&
-         !checkTitle.toLowerCase().includes("og title") &&
-         !checkTitle.toLowerCase().includes("og description") &&
-         !checkTitle.toLowerCase().includes("h2");
-};
+// Helper function to determine if a check should show a copy button
+function shouldShowCopyButton(checkTitle: string): boolean {
+  return [
+    "Keyphrase in Title",
+    "Keyphrase in Meta Description",
+    "Keyphrase in H1 Heading",
+    "Keyphrase in H2 Headings",
+    "Keyphrase in Introduction",
+    "Keyphrase in URL"
+  ].includes(checkTitle);
+}
 
 // Get priority icon based on priority level
 export const getPriorityIcon = (priority: string, className: string = "h-4 w-4") => {
@@ -154,19 +152,18 @@ const fetchPageInfo = async (
   try {
     if (webflow) {
       const currentPage = await webflow.getCurrentPage();
+      // We still need these for basic page identification
       const currentSlug = await currentPage.getSlug();
       const isHome = await currentPage.isHomepage();
       setSlug(currentSlug);
       setIsHomePage(isHome);
     } else {
       console.warn("Webflow API not available for fetching page info.");
-      // Set default values or handle the absence of Webflow API
       setSlug(null);
       setIsHomePage(false);
     }
   } catch (error) {
     console.error("Error fetching page info:", error);
-    // Set default/error state
     setSlug(null);
     setIsHomePage(false);
   }
@@ -270,52 +267,37 @@ export default function Home() {
   const seoScore = results ? calculateSEOScore(results.checks) : 0;
   const scoreRating = getScoreRatingText(seoScore);
 
-  const copyCleanToClipboard = async (text: string | undefined) => {
-    if (!text) return;
-
-    let cleanText = text;
-    
-    // For recommendations, just use the text directly without trying to extract parts
-    // This ensures we copy the actual recommendation, not just the keyphrase
-    
-    // Clean up the text
-    cleanText = cleanText.replace(/<[^>]*>/g, ''); // Remove HTML tags
-    cleanText = cleanText.replace(/^["']|["']$/g, ''); // Remove surrounding quotes
-    cleanText = cleanText.trim();
-    
-    const success = await copyToClipboard(cleanText);
-    if (success) {
+  const copyToClipboard = async (text: string): Promise<boolean> => {
+    try {
+      // Decode HTML entities before copying to clipboard
+      const decodedText = decodeHtmlEntities(text);
+      await navigator.clipboard.writeText(decodedText);
+      
       toast({
-        title: "Copied to clipboard!",
-        description: "You can now paste this into Webflow",
-        duration: 2000
+        title: "Copied!",
+        description: "The recommendation has been copied to your clipboard.",
       });
-    } else {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to copy recommendation to clipboard"
-      });
+      return true;
+    } catch (err) {
+      console.error("Error copying to clipboard:", err);
+      return false;
     }
   };
 
-  useEffect(() => {
-    const fetchSlug = async () => {
-      const currentSlug = await getPageSlug();
-      setSlug(currentSlug);
-      
-      try {
-        if (webflow) {
-          const currentPage = await webflow.getCurrentPage();
-          const isHome = await currentPage.isHomepage();
-          setIsHomePage(isHome);
-        }
-      } catch (error) {
-        setIsHomePage(false);
-      }
-    };
-    fetchSlug();
-  }, []);
+  const copyCleanToClipboard = async (text: string | undefined) => {
+    if (!text) return false;
+    
+    // Always sanitize text before copying
+    const sanitizedText = sanitizeText(text);
+    
+    try {
+      await navigator.clipboard.writeText(sanitizedText);
+      return true;
+    } catch (err) {
+      console.error('Failed to copy: ', err);
+      return false;
+    }
+  };
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -344,57 +326,44 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (webflow) {
-      let currentPageId: string | null = null;
-      
-      const getCurrentPageId = async () => {
-        try {
-          const currentPage = await webflow.getCurrentPage();
-          if (currentPage) {
-            currentPageId = currentPage.id;
-          }
-        } catch (error) {
-        }
-      };
-      
-      getCurrentPageId();
-      
-      const unsubscribe = webflow.subscribe('currentpage', async () => {
-        try {
-          const currentPage = await webflow.getCurrentPage();
-          const newCurrentPage = currentPage;
+    // Store the current page path to detect actual changes
+    let currentPagePath: string | null = null;
+    
+    // Initialize on mount
+    const initCurrentPage = async () => {
+      try {
+        const page = await webflow.getCurrentPage();
+        currentPagePath = await page.getPublishPath();
+      } catch (error) {
+        console.error("Failed to get initial page path:", error);
+      }
+    };
+    initCurrentPage();
+    
+    const unsubscribe = webflow.subscribe('currentpage', async () => {
+      try {
+        // Get the new page
+        const newPage = await webflow.getCurrentPage();
+        const newPagePath = await newPage.getPublishPath();
+        
+        // Only reload if the page path has actually changed
+        if (newPagePath !== currentPagePath) {
+          currentPagePath = newPagePath;
+          console.log(`Page changed to: ${newPagePath} - reloading app`);
           
-          if (newCurrentPage && newCurrentPage.id !== currentPageId) {
-            currentPageId = newCurrentPage.id;
-            
-            setTimeout(() => {
-              window.location.reload();
-            }, 100);
-          }
-        } catch (error) {
+          // Give Webflow a moment to complete the page change
+          setTimeout(() => {
+            window.location.reload();
+          }, 300); // Slightly longer delay for stability
         }
-      });
-      
-      return () => {
-        unsubscribe();
-      };
-    }
-  }, []);
-
-  useEffect(() => {
-    if (webflow) {
-      const unsubscribe = webflow.subscribe('currentpage', async () => {
-        try {
-          await fetchPageInfo(setSlug, setIsHomePage);
-        } catch (error) {
-          console.error("Error fetching page info:", error);
-        }
-      });
-      
-      return () => {
-        unsubscribe();
-      };
-    }
+      } catch (error) {
+        console.error("Error handling page change:", error);
+      }
+    });
+    
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -457,7 +426,6 @@ export default function Home() {
           modifiedData.checks = newChecks;
         }
       }
-      // --- MODIFICATION END ---
 
       setResults(modifiedData); // Set state with potentially modified data
       setSelectedCategory(null);
@@ -500,21 +468,9 @@ export default function Home() {
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
       let siteInfo: WebflowSiteInfo;
-      try {
-        if (!webflow) {
-          throw new Error("Webflow API not available.");
-        }
-        siteInfo = await webflow.getSiteInfo();
-        if (siteInfo?.shortName) {
-          setStagingName(siteInfo.shortName);
-        }
-      } catch (error) {
-        toast({
-          variant: "destructive",
-          title: "Error Fetching Site Info",
-          description: error instanceof Error ? error.message : "Could not get site info from Webflow."
-        });
-        return;
+      siteInfo = await webflow.getSiteInfo();
+      if (siteInfo?.shortName) {
+        setStagingName(siteInfo.shortName);
       }
 
       if (!siteInfo || !siteInfo.domains || siteInfo.domains.length === 0) {
@@ -540,26 +496,18 @@ export default function Home() {
       const baseUrl = mostRecentDomain.url.startsWith('http') ? mostRecentDomain.url : `https://${mostRecentDomain.url}`;
 
       let publishPath = "";
-      let currentPage; // Let TypeScript infer the type
-      let rawPageData: WebflowPageData; // Store the raw data from API
+      let currentPage;
+      let rawPageData: WebflowPageData;
 
       try {
-        if (!webflow) {
-          throw new Error("Webflow API not available.");
-        }
         currentPage = await webflow.getCurrentPage();
         publishPath = (await currentPage.getPublishPath()) ?? "";
         setIsHomePage(await currentPage.isHomepage());
 
-        // Fetch raw data from Webflow API
         rawPageData = {
-          title: await currentPage.getTitle(),
-          metaDescription: await currentPage.getDescription(),
-          ogTitle: await currentPage.getOpenGraphTitle(),
-          ogDescription: await currentPage.getOpenGraphDescription(),
-          ogImage: (await currentPage.getOpenGraphImage()) ?? '', // Provide default empty string if null
-          usesTitleAsOGTitle: await currentPage.usesTitleAsOpenGraphTitle(),
-          usesDescriptionAsOGDescription: await currentPage.usesDescriptionAsOpenGraphDescription(),
+          openGraphImage: (await currentPage.getOpenGraphImage()) ?? '',
+          usesTitleAsOpenGraphTitle: await currentPage.usesTitleAsOpenGraphTitle(),
+          usesDescriptionAsOpenGraphDescription: await currentPage.usesDescriptionAsOpenGraphDescription()
         };
         console.log("[Home onSubmit] Fetched Raw Webflow Page Data:", rawPageData);
 
@@ -575,46 +523,17 @@ export default function Home() {
       const finalUrlPath = publishPath === '/' ? '' : publishPath;
       const url = `${baseUrl}${finalUrlPath.startsWith('/') ? '' : '/'}${finalUrlPath}`;
 
-      // --- Logic to handle dynamic fields ---
-      const webflowVariablePattern = /\{\{wf\s+\{&quot;.*?&quot;\\\}\s*\}\}/;
-      const pageDataForApi: Partial<WebflowPageData> = { ...rawPageData }; // Start with all data
-
-      if (rawPageData.title && webflowVariablePattern.test(rawPageData.title)) {
-        console.log("[Home onSubmit] Dynamic pattern detected in title. Omitting from API call.");
-        delete pageDataForApi.title; // Omit title if dynamic
-      }
-      if (rawPageData.metaDescription && webflowVariablePattern.test(rawPageData.metaDescription)) {
-        console.log("[Home onSubmit] Dynamic pattern detected in meta description. Omitting from API call.");
-        delete pageDataForApi.metaDescription; // Omit description if dynamic
-      }
-       // Also check OG fields if they might be dynamic and need scraping verification (though worker handles fallback)
-       if (rawPageData.ogTitle && webflowVariablePattern.test(rawPageData.ogTitle)) {
-           console.log("[Home onSubmit] Dynamic pattern detected in OG title. Worker will verify/fallback.");
-           // Keep it for now, worker logic decides based on usesTitleAsOGTitle and scraping
-       }
-       if (rawPageData.ogDescription && webflowVariablePattern.test(rawPageData.ogDescription)) {
-           console.log("[Home onSubmit] Dynamic pattern detected in OG description. Worker will verify/fallback.");
-           // Keep it for now, worker logic decides based on usesDescriptionAsOGDescription and scraping
-       }
-        if (rawPageData.ogImage && webflowVariablePattern.test(rawPageData.ogImage)) {
-           console.log("[Home onSubmit] Dynamic pattern detected in OG image. Worker will warn/ignore.");
-           // Keep it for now, worker logic handles this case
-       }
-
-      // --- Fetch page assets ---
-      const pageAssets = await getPageAssets();
+      const pageDataForApi: Partial<WebflowPageData> = { ...rawPageData };
       
-      // Map the Webflow API siteInfo to match the expected format in shared types
       const mappedSiteInfo = {
         ...siteInfo,
         domains: siteInfo.domains.map(domain => ({
           ...domain,
-          // Add required properties from shared types that are missing in Webflow API response
           id: domain.url,
           name: domain.url.split('://').pop() || '',
           host: domain.url.replace(/^https?:\/\//i, ''),
           publicUrl: domain.url,
-          publishedOn: domain.lastPublished || '' // Use empty string instead of null to satisfy type constraint
+          publishedOn: domain.lastPublished || ''
         }))
       };
 
@@ -624,8 +543,7 @@ export default function Home() {
         isHomePage,
         siteInfo: mappedSiteInfo,
         publishPath,
-        webflowPageData: pageDataForApi as WebflowPageData,
-        pageAssets
+        webflowPageData: pageDataForApi as WebflowPageData
       };
 
       console.log("[Home onSubmit] Sending data to API:", analysisData);
@@ -962,7 +880,6 @@ export default function Home() {
                                           size="sm"
                                           className="flex items-center gap-2"
                                           onClick={async () => {
-                                            // Use copyCleanToClipboard instead of direct copyToClipboard
                                             await copyCleanToClipboard(check.recommendation || '');
                                           }}
                                         >
@@ -1077,239 +994,12 @@ const formatRecommendationForDisplay = (recommendation: string | undefined, titl
         // Join everything after the first colon
         displayText = parts.slice(1).join(':').trim();
       }
-      // If only one part or less, keep original (minus title potentially)
     }
   } else {
     // General cleanup: extract text after colon if present and seems appropriate
     displayText = extractTextAfterColon(recommendation);
   }
 
-  // Remove potential HTML tags for safer display
-  displayText = displayText.replace(/<[^>]*>/g, '');
-  // Remove surrounding quotes if present
-  displayText = displayText.replace(/^"/, '').replace(/"$/, '');
-
-  return displayText;
-};
-
-// Export functions for testing
-export const renderRecommendation = (check: SEOCheck) => {
-  // Special case for OG Image - only show the recommendation text, no image display
-  if (check.title === "OG Image") {
-    return (
-      <p className="text-sm text-text2 whitespace-pre-wrap break-words">
-        {check.recommendation}
-      </p>
-    );
-  }
-
-  // Special handling for meta description, title, and H1 heading
-  if (check.title === "Keyphrase in Meta Description" || 
-      check.title === "Keyphrase in Title" || 
-      check.title === "Keyphrase in H1 Heading") {
-    return (
-      <div className="space-y-4">
-        <p className="text-sm text-text2 whitespace-pre-wrap break-words">
-          {check.recommendation}
-        </p>
-        <div className="bg-background2 p-4 rounded-md">
-          <p className="text-sm font-medium">Suggested {check.title.replace('Keyphrase in ', '')}:</p>
-          <p className="text-sm text-text2 mt-1">{check.recommendation}</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Special handling for image-related checks
-  if (check.imageData && check.imageData.length > 0) {
-    // Different display settings based on check type
-    let showMimeType = false;
-    let showFileSize = false;
-    let showAltText = false;
-    
-    // Configure display settings based on check title
-    switch (check.title) {
-      case "Image Alt Attributes":
-        // For alt text check, show alt text only
-        showMimeType = false;
-        showFileSize = false;
-        showAltText = true;
-        break;
-      case "Image File Size":
-        // For file size check, show size only
-        showMimeType = false;
-        showFileSize = true;
-        showAltText = false;
-        break;
-      case "Next-Gen Image Formats":
-        // For image format check, show mime type only
-        showMimeType = true;
-        showFileSize = false;
-        showAltText = false;
-        break;
-      default:
-        // Default behavior for any other image checks
-        showMimeType = true;
-        showFileSize = true;
-        showAltText = false;
-    }
-
-    return (
-      <>
-        {check.recommendation && (
-          <p className="text-sm text-text2 whitespace-pre-wrap break-words mb-4">
-            {check.recommendation}
-          </p>
-        )}
-        
-        <ImageSizeDisplay 
-          images={check.imageData}
-          showMimeType={showMimeType}
-          showFileSize={showFileSize}
-          showAltText={showAltText}
-          className="mt-2"
-        />
-      </>
-    );
-  }
-
-  // Default rendering for other types of checks
-  return (
-    <p className="text-sm text-text2 whitespace-pre-wrap break-words">
-      {check.recommendation}
-    </p>
-  );
-};
-
-export const copyToClipboard = async (text: string): Promise<boolean> => {
-  try {
-    // First try using the Webflow extension's clipboard API if available
-    if (window.webflow?.clipboard?.writeText) {
-      try {
-        await window.webflow.clipboard.writeText(text);
-        return true;
-      } catch (error) {
-        console.warn('Webflow clipboard API failed:', error);
-      }
-    }
-
-    // Then try the standard browser clipboard API with permissions check
-    if (navigator.clipboard && window.isSecureContext) {
-      try {
-        // Check if we have permission
-        const permissionStatus = await navigator.permissions.query({ name: 'clipboard-write' as PermissionName });
-        
-        if (permissionStatus.state === 'granted' || permissionStatus.state === 'prompt') {
-          await navigator.clipboard.writeText(text);
-          return true;
-        } else {
-          console.warn('Clipboard permission denied');
-        }
-      } catch (error) {
-        console.warn('Standard clipboard API failed:', error);
-      }
-    }
-
-    // Fallback to execCommand for older browsers
-    const textArea = document.createElement('textarea');
-    textArea.value = text;
-    textArea.style.position = 'fixed';
-    textArea.style.top = '0';
-    textArea.style.left = '0';
-    textArea.style.opacity = '0';
-    textArea.style.pointerEvents = 'none';
-    textArea.style.width = '2em';
-    textArea.style.height = '2em';
-    textArea.style.padding = '0';
-    textArea.style.border = 'none';
-    textArea.style.outline = 'none';
-    textArea.style.boxShadow = 'none';
-    textArea.style.background = 'transparent';
-    textArea.setAttribute('readonly', '');
-
-    document.body.appendChild(textArea);
-    
-    try {
-      textArea.select();
-      textArea.setSelectionRange(0, textArea.value.length);
-      
-      const successful = document.execCommand('copy');
-      document.body.removeChild(textArea);
-      return successful;
-    } catch (err) {
-      document.body.removeChild(textArea);
-      console.error('Fallback: Unable to copy using execCommand', err);
-      return false;
-    }
-  } catch (error) {
-    console.error('Failed to copy text: ', error);
-    return false;
-  }
-};
-
-/**
- * Fetches image assets from the current Webflow page.
- * Handles Webflow Designer API element types properly.
- */
-const getPageAssets = async (): Promise<Array<{ url: string, alt: string, type: string }>> => {
-  if (!webflow) {
-    console.warn("Webflow API not available");
-    return [];
-  }
-
-  try {
-    // Get all elements on the page
-    const elements = await webflow.getAllElements();
-    
-    // Extract image elements
-    const images: Array<{ url: string, alt: string, type: string }> = [];
-    
-    for (const element of elements) {
-      // Use type assertions to access potentially undefined properties
-      const anyElement = element as any;
-      
-      // Check if this element has properties that suggest it's an image
-      const elementType = anyElement.type || (anyElement.component && anyElement.component.type);
-      const isImageElement = 
-        (typeof anyElement.tag === 'string' && anyElement.tag.toLowerCase() === 'img') || 
-        (typeof elementType === 'string' && elementType.toLowerCase().includes('image'));
-      
-      if (isImageElement) {
-        // Handle different ways attributes might be stored in Webflow elements
-        let src = '';
-        let alt = '';
-        
-        // Try to get src and alt attributes from different possible locations
-        if (Array.isArray(anyElement.customAttributes)) {
-          // If it's an array of attribute objects
-          const srcAttr = anyElement.customAttributes.find((attr: { name: string; value: string }) => attr.name === 'src');
-          const altAttr = anyElement.customAttributes.find((attr: { name: string; value: string }) => attr.name === 'alt');
-          src = srcAttr?.value || '';
-          alt = altAttr?.value || '';
-        } else if (typeof anyElement.attributes === 'object' && anyElement.attributes) {
-          // If it's an object with key-value pairs
-          const attributes = anyElement.attributes as Record<string, string>;
-          src = attributes.src || '';
-          alt = attributes.alt || '';
-        } else if (typeof anyElement.src === 'string') {
-          // Direct property access
-          src = anyElement.src;
-          alt = typeof anyElement.alt === 'string' ? anyElement.alt : '';
-        }
-        
-        if (src) {
-          images.push({
-            url: src,
-            alt: alt,
-            type: 'image'
-          });
-        }
-      }
-    }
-    
-    return images;
-  } catch (error) {
-    console.error("Error fetching page assets:", error);
-    return [];
-  }
+  // Apply sanitization as the final step
+  return sanitizeText(displayText);
 };

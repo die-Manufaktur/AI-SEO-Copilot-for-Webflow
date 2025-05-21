@@ -10,12 +10,10 @@ import {
   WebflowPageData,
   ScrapedPageData,
   SEOAnalysisResult,
-  WebflowDomain,
-  WebflowSiteInfo,
-  AnalyzeSEORequest
 } from '../shared/types/index';
-import { calculateSEOScore } from '../shared/utils/seoUtils';
 import { shortenFileName } from '../shared/utils/fileUtils';
+import * as cheerio from 'cheerio';
+import { sanitizeText } from '../shared/utils/stringUtils';
 
 // --- Constants ---
 const analyzerCheckPriorities: Record<string, 'high' | 'medium' | 'low'> = {
@@ -38,15 +36,6 @@ const analyzerCheckPriorities: Record<string, 'high' | 'medium' | 'low'> = {
   "Schema Markup": "medium",
   "Image File Size": "medium"
 };
-
-// Fallback recommendations if AI is unavailable
-const analyzerFallbackRecommendations: Record<string, (params: any) => string> = {
-  "Schema Markup": () =>
-    `Add structured data markup using JSON-LD format in a script tag with type="application/ld+json". Include appropriate schema types from schema.org relevant to your content. Test your markup with Google's Rich Results Test tool.`,
-  // Add more fallbacks as needed
-};
-
-// Function is now imported from shared utils
 
 /**
  * Gets a success message for a passed SEO check.
@@ -109,25 +98,40 @@ async function getAIRecommendation(
   keyphrase: string,
   env: any, 
   context?: string
-): Promise<string> {
+): Promise<string | { introPhrase: string; copyableContent: string }> {
   try {
-    if (!env.OPENAI_API_KEY) {
-      console.warn("[SEO Analyzer] OpenAI API key not found");
-      return analyzerFallbackRecommendations[checkType]?.({ keyphrase }) || 
-        `Improve your ${checkType.toLowerCase()} to boost SEO performance.`;
-    }
-
     const openai = new OpenAI({
       apiKey: env.OPENAI_API_KEY,
     });
 
-    // Create a detailed prompt for better recommendations
-    const prompt = `You are an expert SEO consultant helping a Webflow user improve their website. 
-      Provide a specific, actionable recommendation for the "${checkType}" check which failed for a webpage targeting the keyphrase "${keyphrase}".
-      
-      Additional context: ${context || "No additional context provided."}
-      
-      Provide ONLY the recommendation text in a clear, professional tone. Be specific and actionable. Do not include labels, formatting or explanations that this is a recommendation.`;
+    // Determine if this check type should have a copyable recommendation
+    const needsCopyableContent = shouldHaveCopyButton(checkType);
+    
+    const systemPrompt = needsCopyableContent 
+      ? `You are an SEO expert providing ready-to-use content.
+         Create a single, concise, and optimized ${checkType.toLowerCase()} that naturally incorporates the keyphrase.
+         Return ONLY the final content with no additional explanation, quotes, or formatting.
+         The content must be directly usable by copying and pasting.
+         Focus on being specific, clear, and immediately usable.`
+      : `You are an SEO expert providing ultra-concise advice.
+         Give exactly two very short sentences (max 12 words each) for fixing this SEO issue.
+         First sentence: Why this matters (be direct, no fluff).
+         Second sentence: What specific action to take (be clear and actionable).
+         Focus on brevity - each sentence must be 12 words or less.`;
+
+    const userPrompt = needsCopyableContent
+      ? `Create a perfect ${checkType.toLowerCase()} for the keyphrase "${keyphrase}".
+         Current content: ${context || 'None'}
+         Remember to:
+         - Keep optimal length for the content type (title: 50-60 chars, meta description: 120-155 chars)
+         - Make it compelling and relevant
+         - ONLY return the final content with no explanations or formatting`
+      : `Fix this SEO issue: "${checkType}" for keyphrase "${keyphrase}".
+         Current status: ${context || 'Not specified'}
+         Provide two extremely short sentences (max 12 words each):
+         1. Why it matters (be direct)
+         2. What to do (be specific)
+         No explanation or additional text - just the two sentences.`;
 
     const maxRetries = 2;
     let retries = 0;
@@ -138,13 +142,25 @@ async function getAIRecommendation(
         response = await openai.chat.completions.create({
           model: "gpt-3.5-turbo",
           messages: [
-            { role: "system", content: "You are an expert SEO consultant providing specific, actionable advice." },
-            { role: "user", content: prompt }
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt }
           ],
-          temperature: 0.4,
           max_tokens: 250,
+          temperature: 0.4,
         });
-        break;
+        // Apply sanitization immediately when receiving the response
+        const sanitizedContent = sanitizeText(response.choices[0]?.message?.content?.trim() || '');
+        
+        // Return the sanitized content
+        if (shouldHaveCopyButton(checkType)) {
+          const introPhrase = getRandomIntroPhrase(checkType);
+          return {
+            introPhrase,
+            copyableContent: sanitizedContent
+          };
+        }
+        
+        return sanitizedContent;
       } catch (error) {
         if (retries === maxRetries) throw error;
         retries++;
@@ -157,12 +173,20 @@ async function getAIRecommendation(
       throw new Error("No recommendation received from OpenAI");
     }
 
-    return response.choices[0].message.content.trim();
+    const recommendation = sanitizeText(response.choices[0]?.message.content.trim());
+    
+    // For copyable content checks, add a random intro phrase
+    if (needsCopyableContent) {
+      return {
+        introPhrase: getRandomIntroPhrase(checkType),
+        copyableContent: recommendation
+      };
+    } else {
+      return recommendation;
+    }
   } catch (error) {
-    console.error(`[SEO Analyzer] Error generating AI recommendation for ${checkType}:`, error);
-    // Return fallback recommendation
-    return analyzerFallbackRecommendations[checkType]?.({ keyphrase }) || 
-      `Improve your ${checkType.toLowerCase()} to boost SEO performance.`;
+    console.error(`[SEO Analyzer] Error generating AI recommendation:`, error);
+    throw new Error(`Failed to get AI recommendation for ${checkType}`);
   }
 }
 
@@ -171,6 +195,7 @@ interface Env {
   USE_GPT_RECOMMENDATIONS?: string;
   WEBFLOW_API_KEY?: string;
   OPENAI_API_KEY?: string;
+  ALLOWED_ORIGINS?: string;
   // Add other environment variables as needed
 }
 
@@ -204,18 +229,12 @@ function validateAnalyzeRequest(body: unknown): body is AnalyzeSEORequestBody {
  */
 async function scrapeWebPage(url: string, env: Env, keyphrase: string): Promise<ScrapedPageData> {
   try {
-    // Validate URL
-    let parsedUrl: URL;
-    try {
-      parsedUrl = new URL(url);
-    } catch (error) {
-      throw new Error(`Invalid URL format: ${url}`);
-    }
-
+    // Fetch the web page content
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'SEO-Analyzer/1.0',
-        'Accept': 'text/html',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5'
       }
     });
 
@@ -223,229 +242,160 @@ async function scrapeWebPage(url: string, env: Env, keyphrase: string): Promise<
       throw new Error(`Failed to fetch page: ${response.status} ${response.statusText}`);
     }
 
-    const contentType = response.headers.get('content-type');
-    if (!contentType?.includes('text/html')) {
-      throw new Error(`Invalid content type: ${contentType}. Expected HTML content.`);
-    }
-
     const html = await response.text();
-    if (!html) {
-      throw new Error('Empty response received from the server');
-    }
+    const $ = cheerio.load(html);
     
-    // Extract title
-    const titleRegex = /<title>([^<]*)<\/title>/i;
-    const titleMatch = titleRegex.exec(html);
-    const title = titleMatch ? titleMatch[1].trim() : '';
-
+    // Extract page title
+    const title = $('title').text().trim() || $('meta[property="og:title"]').attr('content') || '';
+    
     // Extract meta description
-    const metaRegex = /<meta\s+name=["']description["']\s+content=["']([^"']*)["']/i;
-    const metaMatch = metaRegex.exec(html);
-    const metaDescription = metaMatch ? metaMatch[1].trim() : '';
-
-    // Extract headings
-    const headings: Array<{ level: number; text: string }> = [];
-    const headingMatches = html.matchAll(/<h([1-6])[^>]*>(.*?)<\/h\1>/gi);
-    for (const match of headingMatches) {
-      const level = parseInt(match[1]);
-      // Remove any HTML tags inside the heading
-      const text = match[2].replace(/<[^>]*>/g, '').trim();
-      headings.push({ level, text });
-    }
-
+    const metaDescription = $('meta[name="description"]').attr('content') || 
+                          $('meta[property="og:description"]').attr('content') || '';
+    
+    // Extract headings (h1-h6)
+    const headings = [] as Array<{level: number, text: string}>;
+    $('h1, h2, h3, h4, h5, h6').each((_, element) => {
+      if (element.type === 'tag') {
+        const tagName = element.tagName?.toLowerCase();
+        if (tagName && tagName.startsWith('h')) {
+          const level = parseInt(tagName.substring(1), 10);
+          headings.push({
+            level,
+            text: $(element).text().trim()
+          });
+        }
+      }
+    });
+    
     // Extract paragraphs
     const paragraphs: string[] = [];
-    const paragraphMatches = html.matchAll(/<p[^>]*>(.*?)<\/p>/gi);
-    for (const match of paragraphMatches) {
-      // Remove any HTML tags inside the paragraph
-      const text = match[1].replace(/<[^>]*>/g, '').trim();
+    $('p').each((_, element) => {
+      const text = $(element).text().trim();
       if (text) paragraphs.push(text);
-    }
-
-    // Combine paragraphs for content
-    const content = paragraphs.join(' ');
-
-    // Extract images with alt text
-    const images: Array<{ src: string; alt: string }> = [];
-    const imageMatches = html.matchAll(/<img[^>]*src=["']([^"']*)["'][^>]*alt=["']([^"']*)["'][^>]*>|<img[^>]*alt=["']([^"']*)["'][^>]*src=["']([^"']*)["'][^>]*>/gi);
-    for (const match of imageMatches) {
-      const src = match[1] || match[4];
-      const alt = match[2] || match[3] || '';
-      images.push({ src, alt });
-    }
-
-    // Extract links (internal and external)
+    });
+    
+    // Extract images
+    const images = [] as Array<{src: string, alt: string, size?: number}>;
+    $('img').each((_, element) => {
+      const src = $(element).attr('src') || '';
+      if (src) {
+        images.push({
+          src,
+          alt: $(element).attr('alt') || '',
+        });
+      }
+    });
+    
+    // Extract internal and outbound links - convert to strings as required by type
     const internalLinks: string[] = [];
     const outboundLinks: string[] = [];
-    const urlObj = new URL(url);
-    const domain = urlObj.hostname;
     
-    const linkMatches = html.matchAll(/<a[^>]*href=["']([^"']*)["'][^>]*>/gi);
-    for (const match of linkMatches) {
-      let link = match[1].trim();
-      if (!link || link.startsWith('#') || link.startsWith('javascript:')) continue;
-      
+    const urlObj = new URL(url);
+    const baseDomain = urlObj.hostname;
+    
+    $('a[href]').each((_, element) => {
       try {
-        // Handle relative URLs
-        if (link.startsWith('/')) {
-          link = `${urlObj.protocol}//${domain}${link}`;
-        } else if (!link.startsWith('http')) {
-          link = new URL(link, url).href;
+        const href = $(element).attr('href') || '';
+        if (!href || href.startsWith('#') || href.startsWith('javascript:')) {
+          return; // Skip anchors, javascript links
         }
         
-        const linkUrl = new URL(link);
-        if (linkUrl.hostname === domain) {
-          internalLinks.push(link);
+        // Resolve relative URLs
+        let fullUrl;
+        try {
+          fullUrl = new URL(href, url).href;
+        } catch {
+          return; // Skip malformed URLs
+        }
+        
+        const linkUrl = new URL(fullUrl);
+        
+        if (linkUrl.hostname === baseDomain) {
+          internalLinks.push(fullUrl);
         } else {
-          outboundLinks.push(link);
+          outboundLinks.push(fullUrl);
         }
       } catch (error) {
-        console.error(`[SEO Analyzer] Error parsing link: ${link}`, error);
+        // Skip invalid URLs
       }
+    });
+    
+    // Extract script and CSS resources - match Resource type
+    interface Resource {
+      url: string;
+      // Add any other properties the Resource type might have
     }
-
-    // Extract JS and CSS resources
-    const resources: { js: Resource[]; css: Resource[] } = {
-      js: [],
-      css: []
+    
+    const resources = {
+      js: [] as Resource[],
+      css: [] as Resource[]
     };
     
-    // JS resources
-    const scriptMatches = html.matchAll(/<script[^>]*src=["']([^"']*)["'][^>]*>/gi);
-    for (const match of scriptMatches) {
-      const url = match[1].trim();
-      if (url) resources.js.push({ url });
-    }
+    $('script[src]').each((_, element) => {
+      const src = $(element).attr('src');
+      if (src) resources.js.push({ url: src });
+    });
     
-    // CSS resources
-    const cssMatches = html.matchAll(/<link[^>]*rel=["']stylesheet["'][^>]*href=["']([^"']*)["'][^>]*>/gi);
-    for (const match of cssMatches) {
-      const url = match[1].trim();
-      if (url) resources.css.push({ url });
-    }
-
-    // Detect schema markup
-    const schemaMarkup: SchemaMarkupResult = {
+    $('link[rel="stylesheet"][href]').each((_, element) => {
+      const href = $(element).attr('href');
+      if (href) resources.css.push({ url: href });
+    });
+    
+    // Extract schema markup (JSON-LD)
+    const schemaMarkup = {
       hasSchema: false,
-      schemaTypes: [],
+      schemaTypes: [] as string[],
       schemaCount: 0
     };
-    
-    // Enhanced schema markup detection
-    const schemaTypes: string[] = [];
-    let schemaCount = 0;
-    
-    // Look for JSON-LD schema
-    const jsonLdMatches = html.matchAll(/<script\s+type=["']application\/ld\+json["'][^>]*>([^<]+)<\/script>/gi);
-    if (jsonLdMatches) {
-      for (const match of jsonLdMatches) {
-        try {
-          const scriptContent = match[1];
-          if (scriptContent) {
-            const schema = JSON.parse(scriptContent);
-            if (schema['@type']) {
-              schemaTypes.push(schema['@type']);
-              schemaCount++;
-            }
-            // Handle array of schemas
-            if (Array.isArray(schema)) {
-              schema.forEach(item => {
-                if (item['@type']) {
-                  schemaTypes.push(item['@type']);
-                  schemaCount++;
-                }
-              });
-            }
+    $('script[type="application/ld+json"]').each((_, element) => {
+      try {
+        const json = JSON.parse($(element).html() || '{}');
+        const schemaType = json['@type'];
+        
+        if (schemaType) {
+          schemaMarkup.hasSchema = true;
+          if (Array.isArray(schemaType)) {
+            schemaMarkup.schemaTypes = [...schemaMarkup.schemaTypes, ...schemaType];
+          } else {
+            schemaMarkup.schemaTypes.push(schemaType);
           }
-        } catch (error) {
-          console.error("[SEO Analyzer] Error parsing JSON-LD schema:", error);
+          schemaMarkup.schemaCount++;
         }
+      } catch (error) {
+        console.error('[SEO Analyzer] Error parsing JSON-LD schema:', error);
       }
-    }
+    });
     
-    // Look for microdata schema
-    const microdataMatches = html.matchAll(/itemtype=["']https?:\/\/schema\.org\/([^"']+)["']/gi);
-    if (microdataMatches) {
-      for (const match of microdataMatches) {
-        const typeMatch = match[1];
-        if (typeMatch) {
-          schemaTypes.push(typeMatch);
-          schemaCount++;
-        }
-      }
-    }
+    // Extract canonical URL
+    const canonicalUrl = $('link[rel="canonical"]').attr('href') || url;
     
-    // Look for RDFa schema
-    const rdfaMatches = html.matchAll(/vocab=["']https?:\/\/schema\.org\/["']/gi);
-    if (rdfaMatches) {
-      rdfaMatches.forEach(() => {
-        const typeMatch = html.match(/typeof=["']([^"']+)["']/i);
-        if (typeMatch && typeMatch[1]) {
-          schemaTypes.push(typeMatch[1]);
-          schemaCount++;
-        }
-      });
-    }
+    // Extract meta keywords
+    const metaKeywords = $('meta[name="keywords"]').attr('content') || '';
     
-    // Create schema markup result
-    const schemaMarkupResult: SchemaMarkupResult = {
-      hasSchema: schemaCount > 0,
-      schemaTypes: [...new Set(schemaTypes)], // Remove duplicates
-      schemaCount
-    };
+    // Extract Open Graph image
+    const ogImage = $('meta[property="og:image"]').attr('content') || '';
     
-    // Update the scraped data with the new schema markup result
+    // Extract all text content for keyword density analysis
+    const bodyText = $('body').text().trim();
+    
+    // Build the scraped data object according to ScrapedPageData interface
     const scrapedData: ScrapedPageData = {
-      title: title || '',
-      metaDescription: metaDescription || '',
-      content: html,
-      paragraphs,
+      url,
+      title,
+      metaDescription,
       headings,
-      images: images || [],
+      paragraphs,
+      images,
       internalLinks,
       outboundLinks,
-      url,
       resources,
-      schemaMarkup,
-      ogTitle: '',
-      ogDescription: ''
+      canonicalUrl,
+      metaKeywords,
+      ogImage,
+      content: bodyText,
+      schemaMarkup
     };
-
-    const schemaCheck = {
-      title: "Schema Markup",
-      passed: false,
-      description: "",
-      recommendation: ""
-    };
-
-    schemaCheck.passed = schemaMarkupResult.hasSchema;
     
-    if (schemaCheck.passed) {
-      const uniqueTypes = schemaMarkupResult.schemaTypes.join(", ");
-      schemaCheck.description = `Found schema markup with types: ${uniqueTypes}. ${getSuccessMessage(schemaCheck.title)}`;
-    } else {
-      schemaCheck.description = "No schema markup detected on the page.";
-      
-      // Get AI recommendation if enabled
-      if (env.USE_GPT_RECOMMENDATIONS === "true") {
-        try {
-          schemaCheck.recommendation = await getAIRecommendation(
-            schemaCheck.title,
-            keyphrase,
-            env,
-            "No schema markup found on the page."
-          );
-        } catch (error) {
-          console.error("[SEO Analyzer] Error getting AI recommendation for schema markup:", error);
-          schemaCheck.recommendation = `Add schema markup to your page to help search engines understand your content better and potentially display rich results in search listings. Consider using JSON-LD format for better compatibility.`;
-        }
-      } else {
-        schemaCheck.recommendation = `Add schema markup to your page to help search engines understand your content better and potentially display rich results in search listings. Consider using JSON-LD format for better compatibility.`;
-      }
-    }
-
-    scrapedData.schemaMarkup = schemaMarkupResult;
-
     return scrapedData;
   } catch (error) {
     console.error('[SEO Analyzer] Error scraping web page:', error);
@@ -506,7 +456,7 @@ function handleCors(request: Request | Record<string, any>): Response | Record<s
     'Access-Control-Allow-Origin': origin || '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Max-Age': '86400', // 24 hours
+    'Access-Control-Max-Age': '86400',
   };
   
   // Handle OPTIONS request (preflight)
@@ -563,12 +513,11 @@ async function analyzeSEOElements(
   titleCheck.passed = pageTitle.toLowerCase().includes(normalizedKeyphrase);
   
   if (titleCheck.passed) {
-    titleCheck.description = `Great! Your title includes the keyphrase "${keyphrase}".`;
+    titleCheck.description = getSuccessMessage(titleCheck.title);
   } else {
     titleCheck.description = `Keyphrase "${keyphrase}" not found in title: "${pageTitle}"`;
     
-    if (env.USE_GPT_RECOMMENDATIONS === "true" && env.OPENAI_API_KEY) {
-      try {
+    try {
         const context = `Create a complete, ready-to-use page title (50-60 characters) that includes the keyphrase "${keyphrase}" naturally. Current title: "${pageTitle || 'None'}"`;
         
         const aiSuggestion = await getAIRecommendation(
@@ -578,22 +527,10 @@ async function analyzeSEOElements(
           context
         );
         
-        if (aiSuggestion) {
-          // Check if AI suggestion contains the keyphrase
-          if (aiSuggestion.toLowerCase().includes(normalizedKeyphrase)) {
-            titleCheck.recommendation = aiSuggestion;
-          } else {
-            // AI didn't include the keyphrase, create a fallback that does
-            titleCheck.recommendation = `${keyphrase.charAt(0).toUpperCase() + keyphrase.slice(1)} | ${pageTitle}`;
-          }
-        }
+        handleRecommendationResult(aiSuggestion, titleCheck);
       } catch (error) {
         console.error("[SEO Analyzer] Error getting AI recommendation for title:", error);
-        titleCheck.recommendation = `${keyphrase.charAt(0).toUpperCase() + keyphrase.slice(1)} | ${pageTitle}`;
       }
-    } else {
-      titleCheck.recommendation = `${keyphrase.charAt(0).toUpperCase() + keyphrase.slice(1)} | ${pageTitle}`;
-    }
   }
   checks.push(titleCheck);
   
@@ -617,13 +554,11 @@ async function analyzeSEOElements(
   metaDescriptionCheck.passed = metaDescription.toLowerCase().includes(normalizedKeyphrase);
 
   if (metaDescriptionCheck.passed) {
-    metaDescriptionCheck.description = `Great! Your meta description includes the keyphrase "${keyphrase}".`;
+    metaDescriptionCheck.description = getSuccessMessage(metaDescriptionCheck.title);
   } else {
     metaDescriptionCheck.description = `Keyphrase "${keyphrase}" not found in meta description: "${metaDescription}"`;
     
-    // Generate a suggested meta description with the keyphrase included
-    if (env.USE_GPT_RECOMMENDATIONS === "true" && env.OPENAI_API_KEY) {
-      try {
+    try {
         const context = `Create a complete, ready-to-use meta description (120-155 characters) that includes the keyphrase "${keyphrase}" naturally. Current meta description: "${metaDescription || 'None'}"`;
         
         const aiSuggestion = await getAIRecommendation(
@@ -633,24 +568,10 @@ async function analyzeSEOElements(
           context
         );
         
-        if (aiSuggestion) {
-          // Check if AI suggestion contains the keyphrase
-          if (aiSuggestion.toLowerCase().includes(normalizedKeyphrase)) {
-            metaDescriptionCheck.recommendation = aiSuggestion;
-          } else {
-            // AI didn't include the keyphrase, create a fallback that does include it
-            metaDescriptionCheck.recommendation = `Discover everything you need to know about ${keyphrase}. Our comprehensive guide provides expert insights and solutions related to ${keyphrase} to help you achieve optimal results.`;
-          }
-        }
+        handleRecommendationResult(aiSuggestion, metaDescriptionCheck);
       } catch (error) {
         console.error("[SEO Analyzer] Error getting AI recommendation for meta description:", error);
-        // Provide a fallback that includes the keyphrase
-        metaDescriptionCheck.recommendation = `${pageTitle || 'Our website'} offers essential information about ${keyphrase}. Learn more about ${keyphrase} and how our products/services can help address your needs.`;
       }
-    } else {
-      // If AI recommendations are disabled, provide a useful recommendation template
-      metaDescriptionCheck.recommendation = `${pageTitle || 'Our website'} offers essential information about ${keyphrase}. Learn more about ${keyphrase} and how our products/services can help address your needs.`;
-    }
   }
   checks.push(metaDescriptionCheck);
   
@@ -678,22 +599,17 @@ async function analyzeSEOElements(
   } else {
     urlCheck.description = `Keyphrase "${keyphrase}" not found in URL: "${canonicalUrl}"`;
     
-    // Get AI recommendation if enabled
-    if (env.USE_GPT_RECOMMENDATIONS === "true") {
-      try {
-        urlCheck.recommendation = await getAIRecommendation(
+    try {
+        const urlResult = await getAIRecommendation(
           urlCheck.title,
           keyphrase,
           env,
-          `Current URL: "${canonicalUrl}"`
+          `Keyphrase "${keyphrase}" not found in URL: "${canonicalUrl}"`
         );
+        handleRecommendationResult(urlResult, urlCheck);
       } catch (error) {
         console.error("[SEO Analyzer] Error getting AI recommendation for URL:", error);
-        urlCheck.recommendation = `Consider including your keyphrase "${keyphrase}" in the URL for better SEO. Current URL: "${canonicalUrl}"`;
       }
-    } else {
-      urlCheck.recommendation = `Consider including your keyphrase "${keyphrase}" in the URL for better SEO. Current URL: "${canonicalUrl}"`;
-    }
   }
   checks.push(urlCheck);
   
@@ -717,28 +633,23 @@ async function analyzeSEOElements(
   contentLengthCheck.passed = wordCount >= minWordCount;
 
   if (contentLengthCheck.passed) {
-    contentLengthCheck.description = `Content length is optimal (${wordCount} words). ${getSuccessMessage(contentLengthCheck.title)}`;
+    contentLengthCheck.description = getSuccessMessage(contentLengthCheck.title);
   } else {
     contentLengthCheck.description = `Content length is ${wordCount} words, which is below the recommended minimum of ${minWordCount} words.`;
     
-    // Generate AI recommendation or fallback for word count
-    if (env.USE_GPT_RECOMMENDATIONS === "true") {
-      try {
+    try {
         const context = `Content length is currently ${wordCount} words but should be at least ${minWordCount} words (ideally around ${optimalWordCount} words).`;
         
-        contentLengthCheck.recommendation = await getAIRecommendation(
+        const contentLengthResult = await getAIRecommendation(
           contentLengthCheck.title,
-          "content optimization",
+          keyphrase,
           env,
           context
         );
+        handleRecommendationResult(contentLengthResult, contentLengthCheck);
       } catch (error) {
         console.error("[SEO Analyzer] Error getting AI recommendation for content length:", error);
-        contentLengthCheck.recommendation = `Increase your content length to at least ${minWordCount} words (ideally ${optimalWordCount} words) for better SEO performance. Current word count: ${wordCount} words.`;
       }
-    } else {
-      contentLengthCheck.recommendation = `Increase your content length to at least ${minWordCount} words (ideally ${optimalWordCount} words) for better SEO performance. Current word count: ${wordCount} words.`;
-    }
   }
   checks.push(contentLengthCheck);
   
@@ -778,7 +689,7 @@ async function analyzeSEOElements(
   keyphraseDensityCheck.passed = density >= minDensity && density <= maxDensity;
   
   if (keyphraseDensityCheck.passed) {
-    keyphraseDensityCheck.description = `Keyphrase density is optimal (${density.toFixed(2)}%). ${getSuccessMessage(keyphraseDensityCheck.title)}`;
+    keyphraseDensityCheck.description = getSuccessMessage(keyphraseDensityCheck.title);
   } else {
     keyphraseDensityCheck.description = `Keyphrase density is ${density.toFixed(2)}%. `;
     
@@ -790,22 +701,19 @@ async function analyzeSEOElements(
       keyphraseDensityCheck.description += `Consider using the keyphrase less often to avoid keyword stuffing. Current density: ${density.toFixed(2)}%.`;
     }
     
-    // Get AI recommendation if enabled
-    if (env.USE_GPT_RECOMMENDATIONS === "true") {
-      try {
-        keyphraseDensityCheck.recommendation = await getAIRecommendation(
+    try {
+        const context = `Current keyphrase density: ${density.toFixed(2)}%. Target density range: ${minDensity}-${maxDensity}%.`;
+        
+        const keyphraseDensityResult = await getAIRecommendation(
           keyphraseDensityCheck.title,
           keyphrase,
           env,
-          `Current keyphrase density: ${density.toFixed(2)}%. Target density range: ${minDensity}-${maxDensity}%.`
+          context
         );
+        handleRecommendationResult(keyphraseDensityResult, keyphraseDensityCheck);
       } catch (error) {
         console.error("[SEO Analyzer] Error getting AI recommendation for keyphrase density:", error);
-        keyphraseDensityCheck.recommendation = `Adjust your keyphrase usage to achieve a density between ${minDensity} and ${maxDensity}%. Current density: ${density.toFixed(2)}%.`;
       }
-    } else {
-      keyphraseDensityCheck.recommendation = `Adjust your keyphrase usage to achieve a density between ${minDensity} and ${maxDensity}%. Current density: ${density.toFixed(2)}%.`;
-    }
   }
   checks.push(keyphraseDensityCheck);
   
@@ -820,7 +728,6 @@ async function analyzeSEOElements(
   // Get the first paragraph from the scraped data
   const firstParagraph = scrapedData.paragraphs[0] || '';
   
-  // Check if the keyphrase is in the first paragraph
   keyphraseInIntroCheck.passed = firstParagraph.toLowerCase().includes(normalizedKeyphrase);
   
   if (keyphraseInIntroCheck.passed) {
@@ -828,22 +735,17 @@ async function analyzeSEOElements(
   } else {
     keyphraseInIntroCheck.description = `Keyphrase "${keyphrase}" not found in the introduction.`;
     
-    // Get AI recommendation if enabled
-    if (env.USE_GPT_RECOMMENDATIONS === "true") {
-      try {
-        keyphraseInIntroCheck.recommendation = await getAIRecommendation(
+    try {
+        const keyphraseInIntroResult = await getAIRecommendation(
           keyphraseInIntroCheck.title,
           keyphrase,
           env,
           `First paragraph: "${firstParagraph}"`
         );
+        handleRecommendationResult(keyphraseInIntroResult, keyphraseInIntroCheck);
       } catch (error) {
         console.error("[SEO Analyzer] Error getting AI recommendation for keyphrase in introduction:", error);
-        keyphraseInIntroCheck.recommendation = `Include the keyphrase "${keyphrase}" in the first paragraph of your content to improve SEO.`;
       }
-    } else {
-      keyphraseInIntroCheck.recommendation = `Include the keyphrase "${keyphrase}" in the first paragraph of your content to improve SEO.`;
-    }
   }
   checks.push(keyphraseInIntroCheck);
   
@@ -855,33 +757,38 @@ async function analyzeSEOElements(
     priority: analyzerCheckPriorities["Image Alt Attributes"]
   };
   
-  // Check if all images have alt attributes
   const imagesWithoutAlt = scrapedData.images.filter(img => !img.alt || img.alt.trim().length === 0);
   imageAltCheck.passed = imagesWithoutAlt.length === 0;
   
   if (imageAltCheck.passed) {
-    imageAltCheck.description = `All images have alt attributes. ${getSuccessMessage(imageAltCheck.title)}`;
+    imageAltCheck.description = getSuccessMessage(imageAltCheck.title);
   } else {
     imageAltCheck.description = `Found ${imagesWithoutAlt.length} image(s) without alt attributes.`;
     
-    // Get AI recommendation if enabled
-    if (env.USE_GPT_RECOMMENDATIONS === "true") {
-      try {
-        imageAltCheck.recommendation = await getAIRecommendation(
+    try {
+        const imageAltResult = await getAIRecommendation(
           imageAltCheck.title,
           keyphrase,
           env,
           `${imagesWithoutAlt.length} image(s) found without alt attributes.`
         );
+        handleRecommendationResult(imageAltResult, imageAltCheck);
       } catch (error) {
         console.error("[SEO Analyzer] Error getting AI recommendation for image alt attributes:", error);
-        imageAltCheck.recommendation = `Add descriptive alt attributes to all images to improve accessibility and SEO.`;
       }
-    } else {
-      imageAltCheck.recommendation = `Add descriptive alt attributes to all images to improve accessibility and SEO.`;
-    }
   }
   checks.push(imageAltCheck);
+  
+  if (!imageAltCheck.passed) {
+    imageAltCheck.imageData = imagesWithoutAlt.map(img => ({
+      url: img.src,
+      name: img.src.split('/').pop() || 'unknown',
+      shortName: shortenFileName(img.src.split('/').pop() || 'unknown', 10),
+      size: img.size ? Math.round(img.size / 1024) : 0,
+      mimeType: 'Unknown',
+      alt: img.alt || ''
+    }));
+  }
   
   // --- Internal Links Check ---
   const internalLinksCheck: SEOCheck = {
@@ -891,30 +798,24 @@ async function analyzeSEOElements(
     priority: analyzerCheckPriorities["Internal Links"]
   };
   
-  // Check if there are internal links
   internalLinksCheck.passed = scrapedData.internalLinks.length > 0;
   
   if (internalLinksCheck.passed) {
-    internalLinksCheck.description = `Internal links are present. ${getSuccessMessage(internalLinksCheck.title)}`;
+    internalLinksCheck.description = getSuccessMessage(internalLinksCheck.title);
   } else {
     internalLinksCheck.description = `No internal links found on the page.`;
     
-    // Get AI recommendation if enabled
-    if (env.USE_GPT_RECOMMENDATIONS === "true") {
-      try {
-        internalLinksCheck.recommendation = await getAIRecommendation(
+    try {
+        const internalLinksResult = await getAIRecommendation(
           internalLinksCheck.title,
           keyphrase,
           env,
           "No internal links found on the page."
         );
+        handleRecommendationResult(internalLinksResult, internalLinksCheck);
       } catch (error) {
         console.error("[SEO Analyzer] Error getting AI recommendation for internal links:", error);
-        internalLinksCheck.recommendation = `Add internal links to your content to improve navigation and SEO. Link to other relevant pages or posts on your website.`;
       }
-    } else {
-      internalLinksCheck.recommendation = `Add internal links to your content to improve navigation and SEO. Link to other relevant pages or posts on your website.`;
-    }
   }
   checks.push(internalLinksCheck);
   
@@ -926,30 +827,24 @@ async function analyzeSEOElements(
     priority: analyzerCheckPriorities["Outbound Links"]
   };
   
-  // Check if there are outbound links
   outboundLinksCheck.passed = scrapedData.outboundLinks.length > 0;
   
   if (outboundLinksCheck.passed) {
-    outboundLinksCheck.description = `Outbound links are present. ${getSuccessMessage(outboundLinksCheck.title)}`;
+    outboundLinksCheck.description = getSuccessMessage(outboundLinksCheck.title);
   } else {
     outboundLinksCheck.description = `No outbound links found on the page.`;
     
-    // Get AI recommendation if enabled
-    if (env.USE_GPT_RECOMMENDATIONS === "true") {
-      try {
-        outboundLinksCheck.recommendation = await getAIRecommendation(
+    try {
+        const outboundLinksResult = await getAIRecommendation(
           outboundLinksCheck.title,
           keyphrase,
           env,
           "No outbound links found on the page."
         );
+        handleRecommendationResult(outboundLinksResult, outboundLinksCheck);
       } catch (error) {
         console.error("[SEO Analyzer] Error getting AI recommendation for outbound links:", error);
-        outboundLinksCheck.recommendation = `Include outbound links to reputable sources in your content to provide additional value and context to your readers.`;
       }
-    } else {
-      outboundLinksCheck.recommendation = `Include outbound links to reputable sources in your content to provide additional value and context to your readers.`;
-    }
   }
   checks.push(outboundLinksCheck);
   
@@ -961,8 +856,7 @@ async function analyzeSEOElements(
     priority: analyzerCheckPriorities["Next-Gen Image Formats"]
   };
   
-  // Check if images are in next-gen formats (e.g., WebP)
-  const nextGenImageFormats = ['webp', 'avif'];
+  const nextGenImageFormats = ['webp', 'avif', 'svg'];
   const imagesInNextGenFormats = scrapedData.images.filter(img => {
     const ext = img.src.split('.').pop()?.toLowerCase();
     return ext && nextGenImageFormats.includes(ext);
@@ -971,28 +865,38 @@ async function analyzeSEOElements(
   nextGenImagesCheck.passed = imagesInNextGenFormats.length === scrapedData.images.length;
   
   if (nextGenImagesCheck.passed) {
-    nextGenImagesCheck.description = `All images are in next-gen formats. ${getSuccessMessage(nextGenImagesCheck.title)}`;
+    nextGenImagesCheck.description = getSuccessMessage(nextGenImagesCheck.title);
   } else {
     nextGenImagesCheck.description = `Found ${imagesInNextGenFormats.length} image(s) in next-gen formats, out of ${scrapedData.images.length}.`;
     
-    // Get AI recommendation if enabled
-    if (env.USE_GPT_RECOMMENDATIONS === "true") {
-      try {
-        nextGenImagesCheck.recommendation = await getAIRecommendation(
+    try {
+        const nextGenImagesResult = await getAIRecommendation(
           nextGenImagesCheck.title,
           keyphrase,
           env,
           `${imagesInNextGenFormats.length} image(s) found in next-gen formats.`
         );
+        handleRecommendationResult(nextGenImagesResult, nextGenImagesCheck);
       } catch (error) {
         console.error("[SEO Analyzer] Error getting AI recommendation for next-gen image formats:", error);
-        nextGenImagesCheck.recommendation = `Convert your images to next-gen formats like WebP or AVIF to reduce file size and improve loading speed.`;
       }
-    } else {
-      nextGenImagesCheck.recommendation = `Convert your images to next-gen formats like WebP or AVIF to reduce file size and improve loading speed.`;
-    }
   }
   checks.push(nextGenImagesCheck);
+  
+  if (!nextGenImagesCheck.passed) {
+    const nonNextGenImages = scrapedData.images.filter(img => {
+      const ext = img.src.split('.').pop()?.toLowerCase();
+      return !ext || !nextGenImageFormats.includes(ext);
+    });
+    
+    nextGenImagesCheck.imageData = nonNextGenImages.map(img => ({
+      url: img.src,
+      name: img.src.split('/').pop() || 'unknown',
+      shortName: shortenFileName(img.src.split('/').pop() || 'unknown', 10),
+      size: 0,
+      mimeType: img.src.split('.').pop()?.toLowerCase() || 'Unknown'
+    }));
+  }
   
   // --- OG Image Check ---
   const ogImageCheck: SEOCheck = {
@@ -1002,33 +906,25 @@ async function analyzeSEOElements(
     priority: analyzerCheckPriorities["OG Image"]
   };
   
-  // Check if OG image is set
-  const ogImageMeta = scrapedData.content.match(/<meta property=["']og:image["'] content=["']([^"']+)["']/i);
-  const ogImageUrl = ogImageMeta ? ogImageMeta[1] : '';
-  
-  ogImageCheck.passed = !!ogImageUrl;
-  
+  // Check if OG image is set based on Webflow data or HTML scraping
+  let hasOgImage = false;
+
+  if (useApiData && webflowPageData && webflowPageData.hasOpenGraphImage !== undefined) {
+    // If we have Webflow data, use it directly
+    hasOgImage = webflowPageData.hasOpenGraphImage;
+  } else {
+    // Fallback to HTML scraping
+    const ogImageMeta = scrapedData.content.match(/<meta property=["']og:image["'] content=["']([^"']+)["']/i);
+    hasOgImage = !!ogImageMeta;
+  }
+
+  ogImageCheck.passed = hasOgImage;
+
   if (ogImageCheck.passed) {
-    ogImageCheck.description = `Open Graph image is set. ${getSuccessMessage(ogImageCheck.title)}`;
+    ogImageCheck.description = getSuccessMessage(ogImageCheck.title);
   } else {
     ogImageCheck.description = `No Open Graph image found. Recommended for social media sharing.`;
-    
-    // Get AI recommendation if enabled
-    if (env.USE_GPT_RECOMMENDATIONS === "true") {
-      try {
-        ogImageCheck.recommendation = await getAIRecommendation(
-          ogImageCheck.title,
-          keyphrase,
-          env,
-          "No Open Graph image found on the page."
-        );
-      } catch (error) {
-        console.error("[SEO Analyzer] Error getting AI recommendation for OG image:", error);
-        ogImageCheck.recommendation = `Add an Open Graph image to your page to improve how your content is displayed on social media. Recommended size: 1200x630 pixels.`;
-      }
-    } else {
-      ogImageCheck.recommendation = `Add an Open Graph image to your page to improve how your content is displayed on social media. Recommended size: 1200x630 pixels.`;
-    }
+    ogImageCheck.recommendation = `Add an Open Graph image to your page to improve how your content is displayed on social media. Recommended size: 1200x630 pixels.`;
   }
   checks.push(ogImageCheck);
   
@@ -1040,37 +936,36 @@ async function analyzeSEOElements(
     priority: analyzerCheckPriorities["OG Title and Description"]
   };
   
-  // Check if OG title and description are set
-  const ogTitleMeta = scrapedData.content.match(/<meta property=["']og:title["'] content=["']([^"']+)["']/i);
-  const ogDescriptionMeta = scrapedData.content.match(/<meta property=["']og:description["'] content=["']([^"']+)["']/i);
-  const ogTitle = ogTitleMeta ? ogTitleMeta[1] : '';
-  const ogDescription = ogDescriptionMeta ? ogDescriptionMeta[1] : '';
-  
-  ogTitleDescCheck.passed = !!(ogTitle && ogDescription);
-  
-  if (ogTitleDescCheck.passed) {
-    ogTitleDescCheck.description = `Open Graph title and description are set. ${getSuccessMessage(ogTitleDescCheck.title)}`;
-  } else {
-    ogTitleDescCheck.description = `Open Graph title or description is missing.`;
+    const titleCheckPassed = checks.find(check => check.title === "Keyphrase in Title")?.passed || false;
+    const metaDescCheckPassed = checks.find(check => check.title === "Keyphrase in Meta Description")?.passed || false;
     
-    // Get AI recommendation if enabled
-    if (env.USE_GPT_RECOMMENDATIONS === "true") {
-      try {
-        ogTitleDescCheck.recommendation = await getAIRecommendation(
-          ogTitleDescCheck.title,
-          keyphrase,
-          env,
-          "Open Graph title or description is missing."
-        );
-      } catch (error) {
-        console.error("[SEO Analyzer] Error getting AI recommendation for OG title and description:", error);
-        ogTitleDescCheck.recommendation = `Add an Open Graph title and description to your page to improve how your content is displayed on social media. Title length: 60 characters max, Description length: 110 characters max.`;
-      }
+    // Convert potentially undefined values to boolean with nullish coalescing
+    const usesTitleAsOG = webflowPageData?.usesTitleAsOpenGraphTitle ?? true;
+    const usesDescAsOG = webflowPageData?.usesDescriptionAsOpenGraphDescription ?? true;
+
+    ogTitleDescCheck.passed = titleCheckPassed && metaDescCheckPassed && usesTitleAsOG && usesDescAsOG;
+    if (ogTitleDescCheck.passed) {
+      ogTitleDescCheck.description = getSuccessMessage(ogTitleDescCheck.title);
     } else {
-      ogTitleDescCheck.recommendation = `Add an Open Graph title and description to your page to improve how your content is displayed on social media. Title length: 60 characters max, Description length: 110 characters max.`;
+      ogTitleDescCheck.description = `Open Graph title or description is missing.`;
+      
+      // Case 1: Title or Meta Description check fails
+      const titleCheckFailed = checks.find(check => check.title === "Keyphrase in Title" && !check.passed);
+      const metaDescriptionCheckFailed = checks.find(check => check.title === "Keyphrase in Meta Description" && !check.passed);
+      
+      if (titleCheckFailed || metaDescriptionCheckFailed) {
+        ogTitleDescCheck.recommendation = `First fix your ${titleCheckFailed ? 'page title' : ''}${titleCheckFailed && metaDescriptionCheckFailed ? ' and ' : ''}${metaDescriptionCheckFailed ? 'meta description' : ''}, then set your Open Graph title and description to use these values in Webflow page settings.`;
+      }
+      // Case 2: Title and Meta Description pass but settings don't use them
+      else {      
+        if (usesTitleAsOG === false || usesDescAsOG === false) {
+          ogTitleDescCheck.recommendation = `Your page ${!usesTitleAsOG ? 'title' : ''}${!usesTitleAsOG && !usesDescAsOG ? ' and ' : ''}${!usesDescAsOG ? 'meta description' : ''} ${!usesTitleAsOG && !usesDescAsOG ? 'are' : 'is'} not set to be used for Open Graph. Open Webflow page settings and enable "Use page title for Open Graph title" and "Use page description for Open Graph description".`;
+        } else {
+          ogTitleDescCheck.recommendation = `Add an Open Graph title and description to your page to improve how your content is displayed on social media. Title length: 60 characters max, Description length: 110 characters max.`;
+        }
+      }
     }
-  }
-  checks.push(ogTitleDescCheck);
+    checks.push(ogTitleDescCheck);
   
   // --- H1 Check ---
   const h1Check: SEOCheck = {
@@ -1090,45 +985,24 @@ async function analyzeSEOElements(
   );
   
   if (h1Check.passed) {
-    h1Check.description = `Great! Your H1 heading includes the keyphrase "${keyphrase}".`;
+    h1Check.description = getSuccessMessage(h1Check.title);
   } else {
-    h1Check.description = h1Text ? 
-      `Keyphrase "${keyphrase}" not found in H1 heading: "${h1Text}"` : 
-      `No H1 heading found, or keyphrase "${keyphrase}" is missing from the H1.`;
+    h1Check.description = `Keyphrase "${keyphrase}" not found in H1: "${h1Text}"`;
     
-    if (env.USE_GPT_RECOMMENDATIONS === "true" && env.OPENAI_API_KEY) {
-      try {
-        const context = `Create a complete, ready-to-use H1 heading that includes the keyphrase "${keyphrase}" naturally. Current H1: "${h1Text || 'None'}", Page title: "${pageTitle}"`;
+    try {
+        const context = `Create a complete, ready-to-use H1 (30-50 characters) that includes the keyphrase "${keyphrase}" naturally. Current H1 heading: "${h1Text || 'None'}"`;
         
-        const aiSuggestion = await getAIRecommendation(
+        const h1CheckResult = await getAIRecommendation(
           "Keyphrase in H1 Heading",
           keyphrase,
           env,
           context
         );
         
-        if (aiSuggestion) {
-          // Check if AI suggestion contains the keyphrase
-          if (aiSuggestion.toLowerCase().includes(normalizedKeyphrase)) {
-            h1Check.recommendation = aiSuggestion;
-          } else {
-            // AI didn't include the keyphrase, create a fallback that does
-            h1Check.recommendation = h1Text ? 
-              `${h1Text} - ${keyphrase.charAt(0).toUpperCase() + keyphrase.slice(1)}` : 
-              `${keyphrase.charAt(0).toUpperCase() + keyphrase.slice(1)} | ${pageTitle}`;
-          }
-        }
+        handleRecommendationResult(h1CheckResult, h1Check);
       } catch (error) {
         console.error("[SEO Analyzer] Error getting AI recommendation for H1 heading:", error);
-        h1Check.recommendation = h1Text ? 
-          `${h1Text} - ${keyphrase.charAt(0).toUpperCase() + keyphrase.slice(1)}` : 
-          `${keyphrase.charAt(0).toUpperCase() + keyphrase.slice(1)} | ${pageTitle}`;
       }
-    } else {
-      h1Check.recommendation = h1Text ? 
-        `${h1Text} - ${keyphrase.charAt(0).toUpperCase() + keyphrase.slice(1)}` : 
-        `${keyphrase.charAt(0).toUpperCase() + keyphrase.slice(1)} | ${pageTitle}`;
-    }
   }
   checks.push(h1Check);
   
@@ -1149,22 +1023,17 @@ async function analyzeSEOElements(
   } else {
     h2Check.description = `Keyphrase "${keyphrase}" not found in H2 headings.`;
     
-    // Get AI recommendation if enabled
-    if (env.USE_GPT_RECOMMENDATIONS === "true") {
-      try {
-        h2Check.recommendation = await getAIRecommendation(
+    try {
+        const h2Result = await getAIRecommendation(
           h2Check.title,
           keyphrase,
           env,
           `H2 headings: "${h2Headings.map(h => h.text).join(', ')}".`
         );
+        handleRecommendationResult(h2Result, h2Check);
       } catch (error) {
         console.error("[SEO Analyzer] Error getting AI recommendation for H2 headings:", error);
-        h2Check.recommendation = `Include the keyphrase "${keyphrase}" in at least one H2 heading to improve SEO.`;
       }
-    } else {
-      h2Check.recommendation = `Include the keyphrase "${keyphrase}" in at least one H2 heading to improve SEO.`;
-    }
   }
   checks.push(h2Check);
   
@@ -1187,26 +1056,21 @@ async function analyzeSEOElements(
   headingHierarchyCheck.passed = hasProperHierarchy;
   
   if (headingHierarchyCheck.passed) {
-    headingHierarchyCheck.description = `Heading hierarchy is correct. ${getSuccessMessage(headingHierarchyCheck.title)}`;
+    headingHierarchyCheck.description = getSuccessMessage(headingHierarchyCheck.title);
   } else {
     headingHierarchyCheck.description = `Improper heading hierarchy detected.`;
     
-    // Get AI recommendation if enabled
-    if (env.USE_GPT_RECOMMENDATIONS === "true") {
-      try {
-        headingHierarchyCheck.recommendation = await getAIRecommendation(
+    try {
+        const headingHierarchyResult = await getAIRecommendation(
           headingHierarchyCheck.title,
           keyphrase,
           env,
           "Improper heading hierarchy detected."
         );
+        handleRecommendationResult(headingHierarchyResult, headingHierarchyCheck);
       } catch (error) {
         console.error("[SEO Analyzer] Error getting AI recommendation for heading hierarchy:", error);
-        headingHierarchyCheck.recommendation = `Ensure proper heading hierarchy: one H1, followed by H2s, H3s, etc. Avoid skipping heading levels.`;
       }
-    } else {
-      headingHierarchyCheck.recommendation = `Ensure proper heading hierarchy: one H1, followed by H2s, H3s, etc. Avoid skipping heading levels.`;
-    }
   }
   checks.push(headingHierarchyCheck);
   
@@ -1228,26 +1092,21 @@ async function analyzeSEOElements(
   codeMinificationCheck.passed = areJsFilesMinified && areCssFilesMinified;
   
   if (codeMinificationCheck.passed) {
-    codeMinificationCheck.description = `JS and CSS files are minified. ${getSuccessMessage(codeMinificationCheck.title)}`;
+    codeMinificationCheck.description = getSuccessMessage(codeMinificationCheck.title);
   } else {
     codeMinificationCheck.description = `JS and/or CSS files are not minified.`;
     
-    // Get AI recommendation if enabled
-    if (env.USE_GPT_RECOMMENDATIONS === "true") {
-      try {
-        codeMinificationCheck.recommendation = await getAIRecommendation(
+    try {
+        const codeMinificationResult = await getAIRecommendation(
           codeMinificationCheck.title,
           keyphrase,
           env,
           "JS and/or CSS files are not minified."
         );
+        handleRecommendationResult(codeMinificationResult, codeMinificationCheck);
       } catch (error) {
         console.error("[SEO Analyzer] Error getting AI recommendation for code minification:", error);
-        codeMinificationCheck.recommendation = `Minify your JS and CSS files to reduce file size and improve loading speed. Use tools like Terser for JS and CSSNano for CSS.`;
       }
-    } else {
-      codeMinificationCheck.recommendation = `Minify your JS and CSS files to reduce file size and improve loading speed. Use tools like Terser for JS and CSSNano for CSS.`;
-    }
   }
   checks.push(codeMinificationCheck);
   
@@ -1264,26 +1123,21 @@ async function analyzeSEOElements(
   
   if (schemaCheck.passed) {
     const schemaTypes = scrapedData.schemaMarkup.schemaTypes.join(", ");
-    schemaCheck.description = `Schema markup is present (types: ${schemaTypes}). ${getSuccessMessage(schemaCheck.title)}`;
+    schemaCheck.description = getSuccessMessage(schemaCheck.title);
   } else {
     schemaCheck.description = `No schema markup found.`;
     
-    // Get AI recommendation if enabled
-    if (env.USE_GPT_RECOMMENDATIONS === "true") {
-      try {
-        schemaCheck.recommendation = await getAIRecommendation(
+    try {
+        const schemaResult = await getAIRecommendation(
           schemaCheck.title,
           keyphrase,
           env,
           "No schema markup found on the page."
         );
+        handleRecommendationResult(schemaResult, schemaCheck);
       } catch (error) {
         console.error("[SEO Analyzer] Error getting AI recommendation for schema markup:", error);
-        schemaCheck.recommendation = `Add schema markup to your page to help search engines understand your content better and potentially display rich results in search listings. Consider using JSON-LD format for better compatibility.`;
       }
-    } else {
-      schemaCheck.recommendation = `Add schema markup to your page to help search engines understand your content better and potentially display rich results in search listings. Consider using JSON-LD format for better compatibility.`;
-    }
   }
   checks.push(schemaCheck);
   
@@ -1346,24 +1200,18 @@ async function analyzeSEOElements(
   } else {
     imageSizeCheck.description = `${largeImages.length} out of ${totalImages} images exceed the recommended size of ${MAX_IMAGE_SIZE_KB}KB. Large images slow down page loading.`;
     
-    // Generate AI recommendation or fallback
-    if (env.USE_GPT_RECOMMENDATIONS === "true") {
-      try {
-        const context = `Found ${largeImages.length} large images out of ${totalImages} total. 
-          Large images: ${largeImages.map(img => `${img.shortName} (${img.size}KB, ${img.mimeType || 'unknown'})`).join(', ')}.`;
-        imageSizeCheck.recommendation = await getAIRecommendation(
+    try {
+        const context = `Found ${largeImages.length} large images out of ${totalImages} total.`;
+        const imageSizeResult = await getAIRecommendation(
           imageSizeCheck.title,
           "image optimization",
           env,
           context
         );
+        handleRecommendationResult(imageSizeResult, imageSizeCheck);
       } catch (error) {
         console.error("[SEO Analyzer] Error generating AI recommendation for image size:", error);
-        imageSizeCheck.recommendation = `Compress these ${largeImages.length} large images to improve page load times.`;
       }
-    } else {
-      imageSizeCheck.recommendation = `Compress these ${largeImages.length} large images to improve page load times.`;
-    }
     
     // Add structured data for client rendering
     imageSizeCheck.imageData = largeImages;
@@ -1482,4 +1330,133 @@ app.post('/api/analyze', async (c) => {
   }
 });
 
+app.use('/api/*', cors({
+  origin: (origin, c) => {
+    const allowedOrigins = (c.env as Env).ALLOWED_ORIGINS?.split(',') || [];
+    // Make sure this includes webflow.com and *.webflow.io domains
+    const isAllowed = allowedOrigins.some(allowed => {
+      return origin === allowed || 
+        (allowed.includes('*') && origin && origin.endsWith(allowed.replace('*.', '.')));
+    });
+    return isAllowed ? origin : null;
+  },
+  allowHeaders: ['Content-Type', 'Authorization'],
+  allowMethods: ['POST', 'GET', 'OPTIONS'],
+  maxAge: 600,
+}));
+
 export default app;
+
+export const introForCopyableRecommendation: Record<string, string[]> = {
+  "Keyphrase in Title": [
+    "Here's an optimized title tag:",
+    "Try this SEO-friendly title:",
+    "Consider this title for better rankings:"
+  ],
+  "Keyphrase in Meta Description": [
+    "Here's an engaging meta description:",
+    "Try this compelling meta description:",
+    "Consider this description to improve CTR:"
+  ],
+  "Keyphrase in H1 Heading": [
+    "Here's an effective H1 heading:",
+    "Try this attention-grabbing H1:",
+    "Consider this main heading for your page:"
+  ],
+  "Keyphrase in H2 Headings": [
+    "Here's a strong H2 subheading:",
+    "Try this supporting H2 heading:",
+    "Consider this subheading to organize your content:"
+  ],
+  "Keyphrase in Introduction": [
+    "Here's an engaging introduction paragraph:",
+    "Try this opening paragraph:",
+    "Consider this introduction to hook your readers:"
+  ],
+  "Keyphrase in URL": [
+    "Here's an SEO-friendly URL structure:",
+    "Try this optimized URL slug:",
+    "Consider this clean URL pattern:"
+  ],
+  // Add others as needed
+};
+
+// Helper to get a random intro phrase
+export function getRandomIntroPhrase(checkType: string): string {
+  const intros = introForCopyableRecommendation[checkType] || 
+    introForCopyableRecommendation["Keyphrase in Title"]; // fallback
+  return intros[Math.floor(Math.random() * intros.length)];
+}
+
+// Helper to determine if a check should have a copy button
+export function shouldHaveCopyButton(checkType: string): boolean {
+  return [
+    "Keyphrase in Title",
+    "Keyphrase in Meta Description",
+    "Keyphrase in H1 Heading",
+    "Keyphrase in H2 Headings",
+    "Keyphrase in Introduction",
+    "Keyphrase in URL"
+  ].includes(checkType);
+}
+
+// Add this helper function to decode HTML entities
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&ndash;/g, '–')
+    .replace(/&mdash;/g, '—')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&#38;/g, '&')
+    .replace(/&#x26;/g, '&');
+}
+
+/**
+ * Removes or replaces problematic Unicode characters with ASCII equivalents
+ * @param text The text to sanitize
+ * @returns Text with only ASCII characters
+ */
+function sanitizeUnicode(text: string): string {
+  if (!text) return '';
+  
+  return text
+    // Replace smart/curly quotes with straight quotes
+    .replace(/[\u2018\u2019]/g, "'") 
+    .replace(/[\u201C\u201D]/g, '"')
+    
+    // Replace en/em dashes with hyphens
+    .replace(/[\u2013\u2014]/g, '-')
+    
+    // Replace ellipsis with three periods
+    .replace(/\u2026/g, '...')
+    
+    // Replace non-breaking space with regular space
+    .replace(/\u00A0/g, ' ')
+    
+    // Replace bullets with asterisks
+    .replace(/[\u2022\u2023\u25E6\u2043\u2219]/g, '*')
+    
+    // Remove zero-width spaces, soft hyphens, etc.
+    .replace(/[\u200B-\u200F\u2060\uFEFF\u00AD]/g, '')
+    
+    // Finally, strip any remaining non-ASCII characters
+    .replace(/[^\x00-\x7F]/g, '');
+}
+
+function handleRecommendationResult(
+  result: string | { introPhrase: string; copyableContent: string },
+  check: SEOCheck
+) {
+  if (typeof result === 'string') {
+    check.recommendation = sanitizeText(result);
+  } else {
+    check.recommendation = sanitizeText(result.copyableContent);
+    if ('introPhrase' in result) {
+      check.introPhrase = sanitizeText(result.introPhrase);
+    }
+  }
+}
