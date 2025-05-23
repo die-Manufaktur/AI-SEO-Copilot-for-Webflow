@@ -10,16 +10,9 @@ export default defineConfig({
   plugins: [
     react(),
   ],
-  // Set the root directory to 'client' for build and dev server context
   root: path.resolve(__dirname, 'client'),
-  // Base path relative to the output directory root
   base: './',
-  optimizeDeps: {
-    exclude: ['whatwg-url', 'jsdom']
-  },
   build: {
-    // Output directory relative to the project root (one level up from 'client')
-    // Use path.resolve to ensure it points correctly outside the 'root' dir
     outDir: path.resolve(__dirname, 'public'),
     emptyOutDir: true, // Clean the 'public' directory before build
     sourcemap: false,
@@ -47,7 +40,6 @@ export default defineConfig({
     manifest: true, // Generate manifest.json in outDir/.vite/
   },
   css: {
-    // Path relative to project root
     postcss: path.resolve(__dirname, 'postcss.config.mjs'),
   },
   resolve: {
