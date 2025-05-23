@@ -42,6 +42,7 @@ import { calculateSEOScore } from '../../../shared/utils/seoUtils';
 import { CopyTooltip } from "../components/ui/copy-tooltip";
 import { ImageSizeDisplay } from "../components/ImageSizeDisplay";
 import { sanitizeText, decodeHtmlEntities } from "../../../shared/utils/stringUtils";
+import { copyTextToClipboard } from "../utils/clipboard";
 
 const formSchema = z.object({
   keyphrase: z.string().min(2, "Keyphrase must be at least 2 characters")
@@ -269,53 +270,56 @@ export default function Home() {
 
   const copyToClipboard = async (text: string): Promise<boolean> => {
     try {
-      // Decode HTML entities before copying to clipboard
-      const decodedText = decodeHtmlEntities(text);
-      await navigator.clipboard.writeText(decodedText);
+      const success = await copyTextToClipboard(text);
       
+      if (success) {
+        toast({
+          title: "Copied!",
+          description: "The recommendation has been copied to your clipboard.",
+        });
+        return true;
+      } else {
+        // Show manual copy instructions if automation fails
+        toast({
+          title: "Clipboard access denied",
+          description: "Please press Ctrl+C (Cmd+C on Mac) to copy the selected text.",
+          variant: "destructive",
+        });
+        return false;
+      }
+    } catch (err) {
+      console.error("Error in clipboard operation:", err);
       toast({
-        title: "Copied!",
-        description: "The recommendation has been copied to your clipboard.",
+        title: "Unable to copy",
+        description: "Please select the text manually and copy.",
+        variant: "destructive",
       });
-      return true;
-    } catch (err) {
-      console.error("Error copying to clipboard:", err);
-      return false;
-    }
-  };
-
-  const copyCleanToClipboard = async (text: string | undefined) => {
-    if (!text) return false;
-    
-    // Always sanitize text before copying
-    const sanitizedText = sanitizeText(text);
-    
-    try {
-      await navigator.clipboard.writeText(sanitizedText);
-      return true;
-    } catch (err) {
-      console.error('Failed to copy: ', err);
       return false;
     }
   };
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      if (event.origin !== 'http://localhost:1337' && event.origin !== `https://${stagingName}.webflow.io`) {
+      // Valid origin check
+      if (event.origin !== 'http://localhost:1337' && !event.origin.endsWith('.webflow.io')) {
         return;
       }
 
-      if (event.data.name === 'copyToClipboard') {
-        const text = event.data.data;
-        navigator.clipboard.writeText(text).then(() => {
-        }).catch(() => {
-        });
+      if (event.data.name === 'copyToClipboard' || event.data.type === 'clipboardCopy') {
+        const text = event.data.data || event.data.text;
+        copyToClipboard(text)
+          .then(success => {
+            console.log("Copy result:", success ? "success" : "failed");
+          })
+          .catch(error => {
+            console.error("Copy error:", error);
+          });
       }
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [stagingName]);
+  }, []);
 
   useEffect(() => {
     toast({
@@ -880,7 +884,7 @@ export default function Home() {
                                           size="sm"
                                           className="flex items-center gap-2"
                                           onClick={async () => {
-                                            await copyCleanToClipboard(check.recommendation || '');
+                                            await copyToClipboard(check.recommendation || '');
                                           }}
                                         >
                                           <Copy className="h-4 w-4" />
@@ -905,10 +909,6 @@ export default function Home() {
                               >
                                 {check.imageData && check.imageData.length > 0 ? (
                                   <>
-                                    <p className="text-sm text-text2 whitespace-pre-wrap break-words mb-4">
-                                      {check.recommendation}
-                                    </p>
-                                    
                                     <ImageSizeDisplay 
                                       images={check.imageData}
                                       showMimeType={check.title === "Next-Gen Image Formats"}
@@ -929,7 +929,7 @@ export default function Home() {
                     </ScrollArea>
                   ) : (
                     <div className="space-y-6">
-                      {groupedChecks && Object.entries(groupedChecks).map(([category, checks]) => {
+                      {groupedChecks && Object.entries(groupChecksByCategory(results.checks)).map(([category, checks]) => {
                         const status = getCategoryStatus(checks);
                         const passedCount = checks.filter(check => check.passed).length;
                         return (
@@ -975,31 +975,3 @@ export default function Home() {
     </motion.div>
   );
 }
-
-// Helper function to format recommendation text for display
-const formatRecommendationForDisplay = (recommendation: string | undefined, title: string): string => {
-  if (!recommendation) return "";
-
-  let displayText = recommendation;
-
-  // Handle specific formatting for "Keyphrase in Introduction"
-  if (title.toLowerCase().includes("keyphrase in introduction")) {
-    const newlineIndex = recommendation.indexOf('\n');
-    if (newlineIndex !== -1) {
-      displayText = recommendation.substring(newlineIndex + 1).trim();
-    } else {
-      // Fallback if no newline: try splitting by colon
-      const parts = recommendation.split(':');
-      if (parts.length > 1) {
-        // Join everything after the first colon
-        displayText = parts.slice(1).join(':').trim();
-      }
-    }
-  } else {
-    // General cleanup: extract text after colon if present and seems appropriate
-    displayText = extractTextAfterColon(recommendation);
-  }
-
-  // Apply sanitization as the final step
-  return sanitizeText(displayText);
-};

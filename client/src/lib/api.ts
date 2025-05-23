@@ -14,22 +14,38 @@ type Asset = {
 };
 
 // Check how the API base URL is determined
-const getApiBaseUrl = () => {
+export const getApiUrl = () => {
+  // Force local development API during development
+  const FORCE_LOCAL_DEV = true; // Toggle this when needed
+  
   try {
-    // Check if running in Webflow extension
+    // When in development mode with FORCE_LOCAL_DEV enabled, always use local worker
+    if (FORCE_LOCAL_DEV && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")) {
+      const devWorkerUrl = "http://localhost:8787";
+      console.info("🛠️ [DEV] Using local development Worker URL:", devWorkerUrl);
+      return devWorkerUrl;
+    }
+    
+    // Standard Webflow environment check
     if (!!window.webflow) {
-      return "https://seo-copilot-api-production.paul-130.workers.dev"; // Production URL
+      console.info("Using production API URL for Webflow Extension");
+      return "https://seo-copilot-api-production.paul-130.workers.dev";
     }
-  } catch {}
-
+  } catch (e) {
+    console.error("Error determining API URL:", e);
+  }
+  
+  // Local development without forcing
   try {
-    // Check if running locally
     if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
-      return "http://localhost:8787"; // Development URL
+      const devWorkerUrl = "http://localhost:8787";
+      console.info("Using development Worker URL:", devWorkerUrl);
+      return devWorkerUrl;
     }
   } catch {}
-
-  // Default to production URL
+  
+  // Fallback to production
+  console.info("Falling back to production API URL");
   return "https://seo-copilot-api-production.paul-130.workers.dev";
 }
 
@@ -43,7 +59,7 @@ export async function analyzeSEO({
   webflowPageData,
   debug = true
 }: AnalyzeSEORequest): Promise<SEOAnalysisResult> {
-  const apiBaseUrl = getApiBaseUrl();
+  const apiBaseUrl = getApiUrl();
   console.log("[SEO Analyzer] Starting analysis with API endpoint:", apiBaseUrl);
   
   // Collect image assets with size information
@@ -153,7 +169,7 @@ export async function fetchOAuthToken(authCode: string): Promise<string> {
  * @returns Response from server
  */
 export async function registerDomains(domains: string[]): Promise<{ success: boolean; message: string }> {
-  const baseUrl = getApiBaseUrl();
+  const baseUrl = getApiUrl();
   
   try {
     const response = await fetch(`${baseUrl}/api/register-domains`, {

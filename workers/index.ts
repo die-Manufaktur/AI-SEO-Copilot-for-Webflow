@@ -4,18 +4,15 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { 
   SEOCheck,
-  OGMetadata,
-  Resource,
-  SchemaMarkupResult,
   WebflowPageData,
   ScrapedPageData,
   SEOAnalysisResult,
+  Resource
 } from '../shared/types/index';
 import { shortenFileName } from '../shared/utils/fileUtils';
 import * as cheerio from 'cheerio';
 import { sanitizeText } from '../shared/utils/stringUtils';
 
-// --- Constants ---
 const analyzerCheckPriorities: Record<string, 'high' | 'medium' | 'low'> = {
   "Keyphrase in Title": "high",
   "Keyphrase in Meta Description": "high",
@@ -99,12 +96,11 @@ async function getAIRecommendation(
   env: any, 
   context?: string
 ): Promise<string | { introPhrase: string; copyableContent: string }> {
-  try {
+  try {    
     const openai = new OpenAI({
       apiKey: env.OPENAI_API_KEY,
     });
-
-    // Determine if this check type should have a copyable recommendation
+    
     const needsCopyableContent = shouldHaveCopyButton(checkType);
     
     const systemPrompt = needsCopyableContent 
@@ -113,11 +109,10 @@ async function getAIRecommendation(
          Return ONLY the final content with no additional explanation, quotes, or formatting.
          The content must be directly usable by copying and pasting.
          Focus on being specific, clear, and immediately usable.`
-      : `You are an SEO expert providing ultra-concise advice.
-         Give exactly two very short sentences (max 12 words each) for fixing this SEO issue.
+      : `You are an SEO expert providing actionable advice.
+         Give two short sentences (max 20 words each) for fixing this SEO issue.
          First sentence: Why this matters (be direct, no fluff).
-         Second sentence: What specific action to take (be clear and actionable).
-         Focus on brevity - each sentence must be 12 words or less.`;
+         Second sentence: What specific action to take (be clear and actionable).`;
 
     const userPrompt = needsCopyableContent
       ? `Create a perfect ${checkType.toLowerCase()} for the keyphrase "${keyphrase}".
@@ -126,9 +121,9 @@ async function getAIRecommendation(
          - Keep optimal length for the content type (title: 50-60 chars, meta description: 120-155 chars)
          - Make it compelling and relevant
          - ONLY return the final content with no explanations or formatting`
-      : `Fix this SEO issue: "${checkType}" for keyphrase "${keyphrase}".
+      : `Fix this SEO issue: "${checkType}" for keyphrase "${keyphrase}" if a keyphrase is appropriate for the check.
          Current status: ${context || 'Not specified'}
-         Provide two extremely short sentences (max 12 words each):
+         Provide two concise sentences (max 20 words each):
          1. Why it matters (be direct)
          2. What to do (be specific)
          No explanation or additional text - just the two sentences.`;
@@ -145,8 +140,8 @@ async function getAIRecommendation(
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt }
           ],
-          max_tokens: 250,
-          temperature: 0.4,
+          max_tokens: 500,
+          temperature: 0.5,
         });
         // Apply sanitization immediately when receiving the response
         const sanitizedContent = sanitizeText(response.choices[0]?.message?.content?.trim() || '');
@@ -229,7 +224,6 @@ function validateAnalyzeRequest(body: unknown): body is AnalyzeSEORequestBody {
  */
 async function scrapeWebPage(url: string, env: Env, keyphrase: string): Promise<ScrapedPageData> {
   try {
-    // Fetch the web page content
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -319,12 +313,6 @@ async function scrapeWebPage(url: string, env: Env, keyphrase: string): Promise<
         // Skip invalid URLs
       }
     });
-    
-    // Extract script and CSS resources - match Resource type
-    interface Resource {
-      url: string;
-      // Add any other properties the Resource type might have
-    }
     
     const resources = {
       js: [] as Resource[],
@@ -700,20 +688,6 @@ async function analyzeSEOElements(
     if (density > maxDensity) {
       keyphraseDensityCheck.description += `Consider using the keyphrase less often to avoid keyword stuffing. Current density: ${density.toFixed(2)}%.`;
     }
-    
-    try {
-        const context = `Current keyphrase density: ${density.toFixed(2)}%. Target density range: ${minDensity}-${maxDensity}%.`;
-        
-        const keyphraseDensityResult = await getAIRecommendation(
-          keyphraseDensityCheck.title,
-          keyphrase,
-          env,
-          context
-        );
-        handleRecommendationResult(keyphraseDensityResult, keyphraseDensityCheck);
-      } catch (error) {
-        console.error("[SEO Analyzer] Error getting AI recommendation for keyphrase density:", error);
-      }
   }
   checks.push(keyphraseDensityCheck);
   
@@ -909,9 +883,9 @@ async function analyzeSEOElements(
   // Check if OG image is set based on Webflow data or HTML scraping
   let hasOgImage = false;
 
-  if (useApiData && webflowPageData && webflowPageData.hasOpenGraphImage !== undefined) {
-    // If we have Webflow data, use it directly
-    hasOgImage = webflowPageData.hasOpenGraphImage;
+  if (useApiData && webflowPageData) {
+    // Check for openGraphImage string from client
+    hasOgImage = !!webflowPageData.openGraphImage;
   } else {
     // Fallback to HTML scraping
     const ogImageMeta = scrapedData.content.match(/<meta property=["']og:image["'] content=["']([^"']+)["']/i);
@@ -1074,41 +1048,145 @@ async function analyzeSEOElements(
   }
   checks.push(headingHierarchyCheck);
   
-  // --- Code Minification Check ---
+  // --- Enhanced Code Minification Check ---
   const codeMinificationCheck: SEOCheck = {
     title: "Code Minification",
     description: "",
     passed: false,
     priority: analyzerCheckPriorities["Code Minification"]
   };
-  
-  // Check if JS and CSS files are minified
-  const jsFiles = scrapedData.resources.js;
-  const cssFiles = scrapedData.resources.css;
-  
-  const areJsFilesMinified = jsFiles.every(file => file.url.split('.').pop()?.toLowerCase() === 'min');
-  const areCssFilesMinified = cssFiles.every(file => file.url.split('.').pop()?.toLowerCase() === 'min');
-  
-  codeMinificationCheck.passed = areJsFilesMinified && areCssFilesMinified;
-  
+
+  /**
+   * Enhanced minification detection with multiple strategies
+   */
+  function analyzeMinification(jsFiles: Resource[], cssFiles: Resource[]): {
+    passed: boolean;
+    jsMinified: number;
+    cssMinified: number;
+    totalJs: number;
+    totalCss: number;
+    details: string[];
+  } {
+    const details: string[] = [];
+    
+    // Helper function to check if a file is likely minified
+    function isLikelyMinified(url: string): boolean {
+      const urlLower = url.toLowerCase();
+      
+      // 1. Check for explicit .min. in filename
+      if (urlLower.includes('.min.')) {
+        return true;
+      }
+      
+      // 2. Check for common CDN patterns that auto-minify
+      const autoMinifyingCDNs = [
+        'cdnjs.cloudflare.com',
+        'unpkg.com',
+        'jsdelivr.net',
+        'googleapis.com',
+        'gstatic.com',
+        'assets.webflow.com', // Webflow auto-minifies
+        'global-uploads.webflow.com'
+      ];
+      
+      if (autoMinifyingCDNs.some(cdn => urlLower.includes(cdn))) {
+        return true;
+      }
+      
+      // 3. Check for build tool patterns (webpack, vite, etc.)
+      if (urlLower.match(/\.(js|css)\?v=|\/build\/|\/dist\/|\.bundle\.|\.chunk\./)) {
+        return true;
+      }
+      
+      // 4. Check for hash-based filenames (common in modern builds)
+      if (urlLower.match(/\.[a-f0-9]{8,}\.(js|css)$/)) {
+        return true;
+      }
+      
+      return false;
+    }
+    
+    // Analyze JS files
+    const jsMinified = jsFiles.filter(file => isLikelyMinified(file.url)).length;
+    const totalJs = jsFiles.length;
+    
+    // Analyze CSS files
+    const cssMinified = cssFiles.filter(file => isLikelyMinified(file.url)).length;
+    const totalCss = cssFiles.length;
+    
+    // Determine if check passes
+    let passed = false;
+    
+    if (totalJs === 0 && totalCss === 0) {
+      passed = true; // No files to minify
+      details.push("No external JS or CSS files detected");
+    } else {
+      // Calculate minification percentage
+      const totalFiles = totalJs + totalCss;
+      const minifiedFiles = jsMinified + cssMinified;
+      const minificationRate = minifiedFiles / totalFiles;
+      
+      // Pass if 80% or more files are minified
+      passed = minificationRate >= 0.8;
+      
+      if (totalJs > 0) {
+        details.push(`JS files: ${jsMinified}/${totalJs} minified`);
+      }
+      if (totalCss > 0) {
+        details.push(`CSS files: ${cssMinified}/${totalCss} minified`);
+      }
+    }
+    
+    return {
+      passed,
+      jsMinified,
+      cssMinified,
+      totalJs,
+      totalCss,
+      details
+    };
+  }
+
+  // Run the enhanced analysis
+  const minificationAnalysis = analyzeMinification(
+    scrapedData.resources.js, 
+    scrapedData.resources.css
+  );
+
+  codeMinificationCheck.passed = minificationAnalysis.passed;
+
   if (codeMinificationCheck.passed) {
     codeMinificationCheck.description = getSuccessMessage(codeMinificationCheck.title);
+    if (minificationAnalysis.details.length > 0) {
+      codeMinificationCheck.description += ` (${minificationAnalysis.details.join(', ')})`;
+    }
   } else {
-    codeMinificationCheck.description = `JS and/or CSS files are not minified.`;
+    const unminifiedJs = minificationAnalysis.totalJs - minificationAnalysis.jsMinified;
+    const unminifiedCss = minificationAnalysis.totalCss - minificationAnalysis.cssMinified;
+    
+    codeMinificationCheck.description = 
+      `Code optimization needed: ${unminifiedJs} JS and ${unminifiedCss} CSS files appear unminified.`;
     
     try {
-        const codeMinificationResult = await getAIRecommendation(
-          codeMinificationCheck.title,
-          keyphrase,
-          env,
-          "JS and/or CSS files are not minified."
-        );
-        handleRecommendationResult(codeMinificationResult, codeMinificationCheck);
-      } catch (error) {
-        console.error("[SEO Analyzer] Error getting AI recommendation for code minification:", error);
-      }
+      const context = `Found ${unminifiedJs} unminified JS files and ${unminifiedCss} unminified CSS files out of ${minificationAnalysis.totalJs + minificationAnalysis.totalCss} total files.`;
+      
+      const codeMinificationResult = await getAIRecommendation(
+        codeMinificationCheck.title,
+        keyphrase,
+        env,
+        context
+      );
+      handleRecommendationResult(codeMinificationResult, codeMinificationCheck);
+    } catch (error) {
+      console.error("[SEO Analyzer] Error getting AI recommendation for code minification:", error);
+      // Fallback recommendation
+      codeMinificationCheck.recommendation = 
+        "Enable minification in your build process or use a CDN that automatically minifies assets. This reduces file sizes and improves page load speed.";
+    }
   }
+
   checks.push(codeMinificationCheck);
+
   
   // --- Schema Markup Check ---
   const schemaCheck: SEOCheck = {
@@ -1124,20 +1202,16 @@ async function analyzeSEOElements(
   if (schemaCheck.passed) {
     const schemaTypes = scrapedData.schemaMarkup.schemaTypes.join(", ");
     schemaCheck.description = getSuccessMessage(schemaCheck.title);
+    
+    // Optionally add details about what schema types were found
+    if (schemaTypes) {
+      schemaCheck.description += ` (${schemaTypes})`;
+    }
   } else {
     schemaCheck.description = `No schema markup found.`;
     
-    try {
-        const schemaResult = await getAIRecommendation(
-          schemaCheck.title,
-          keyphrase,
-          env,
-          "No schema markup found on the page."
-        );
-        handleRecommendationResult(schemaResult, schemaCheck);
-      } catch (error) {
-        console.error("[SEO Analyzer] Error getting AI recommendation for schema markup:", error);
-      }
+    // Replace AI recommendation with static recommendation
+    schemaCheck.recommendation = "Add structured data using Schema.org markup to help search engines understand your content. Visit schema.org to find the appropriate schema type for your page content (e.g., Article, Product, LocalBusiness).";
   }
   checks.push(schemaCheck);
   
@@ -1327,6 +1401,45 @@ app.post('/api/analyze', async (c) => {
   } catch (error) {
     console.error('[SEO Analyzer] Error in /api/analyze route:', error);
     return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Test OpenAI connection route
+app.get('/test-openai', async (c) => {
+  try {
+    console.log('🧪 TEST-OPENAI ENDPOINT CALLED');
+    
+    // Log environment availability
+    const apiKey = (c.env as Env).OPENAI_API_KEY;
+    if (apiKey) {
+      const keyStart = apiKey.substring(0, 4);
+      const keyEnd = apiKey.substring(apiKey.length - 4);
+      console.log(`🔑 TEST ROUTE: API Key available: ${keyStart}...${keyEnd}`);
+    } else {
+      console.log('❌ TEST ROUTE: API Key missing!');
+      return c.json({ error: 'OpenAI API Key not configured' }, 500);
+    }
+    
+    const openai = new OpenAI({
+      apiKey: (c.env as Env).OPENAI_API_KEY,
+    });
+    
+    console.log('⚡ TEST ROUTE: Testing OpenAI connection...');
+    
+    const response = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [{ role: "user", content: "Say hello" }],
+      max_tokens: 5
+    });
+    
+    console.log(`✅ TEST ROUTE: Connection successful! Response: ${response.choices[0].message.content}`);
+    return c.json({ 
+      success: true, 
+      message: response.choices[0].message.content 
+    });
+  } catch (error) {
+    console.error('❌ TEST ROUTE: Error:', error);
+    return c.json({ error: String(error) }, 500);
   }
 });
 

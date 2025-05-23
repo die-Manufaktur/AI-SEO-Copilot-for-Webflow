@@ -6,10 +6,11 @@
   "type": "module",
   "scripts": {
     "check": "tsc",
-    "dev": "concurrently -r \"vite --cors --force warn\" \"vite build --mode development && webflow extension serve\" \"npx wrangler dev ./workers/index.ts --port 8787\"",
+    "dev": "concurrently -r \"vite --cors --force\" \"vite build --mode development && webflow extension serve\" \"npx wrangler dev ./workers/index.ts --port 8787\"",
     "build": "vite build && npx wrangler deploy workers/index.ts --env production && webflow extension bundle"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.2.4",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^14.3.1",
     "@testing-library/react-hooks": "^8.0.1",
@@ -79,7 +80,7 @@
     "@tanstack/react-query": "^5.76.1",
     "@vitejs/plugin-react": "^4.4.1",
     "@webflow/designer-extension-typings": "^2.0.12",
-    "@webflow/webflow-cli": "^1.7.1",
+    "@webflow/webflow-cli": "^1.7.4",
     "canvas-confetti": "^1.9.3",
     "cheerio": "^1.0.0",
     "class-variance-authority": "^0.7.1",
@@ -100,11 +101,12 @@
     "sanitize-html": "^2.17.0",
     "styled-components": "^6.1.18",
     "tailwind-merge": "^3.3.0",
+    "undici": "^7.10.0",
     "vaul": "^1.1.2",
     "wouter": "^3.7.0",
     "zod": "^3.24.4"
   },
-  "packageManager": "pnpm@10.8.1+sha512.c50088ba998c67b8ca8c99df8a5e02fd2ae2e2b29aaf238feaa9e124248d3f48f9fb6db2424949ff901cffbb5e0f0cc1ad6aedb602cd29450751d11c35023677",
+  "packageManager": "pnpm@10.11.0+sha512.6540583f41cc5f628eb3d9773ecee802f4f9ef9923cc45b69890fb47991d4b092964694ec3a4f738a420c918a333062c8b925d312f42e4f0c263eb603551f977",
   "workspaces": [
     "packages/*"
   ]

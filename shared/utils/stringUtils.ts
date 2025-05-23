@@ -1,23 +1,26 @@
 /**
- * Decodes all HTML entities in a string to their corresponding characters
+ * Decodes HTML entities in a string
+ * @param html The HTML string containing entities to decode
+ * @returns The string with HTML entities decoded
  */
-export function decodeHtmlEntities(text: string): string {
-  if (!text) return '';
-  
-  // Create a temporary element to leverage the browser's native HTML decoding
-  const doc = new DOMParser().parseFromString(text, 'text/html');
-  const decodedText = doc.documentElement.textContent || '';
-  
-  // Handle edge cases that DOMParser might miss
-  return decodedText
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&#x2F;/g, '/')
-    .replace(/&#x3D;/g, '=')
-    .replace(/&#x60;/g, '`');
+export function decodeHtmlEntities(html: string): string {
+  // Check if running in browser or Node.js environment
+  if (typeof DOMParser !== 'undefined') {
+    // Browser environment - use DOMParser
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    return doc.body.textContent || '';
+  } else {
+    // Node.js environment - use simple replacement
+    return html
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&amp;/g, '&')
+      // Add other common entities as needed
+      .replace(/&#x2F;/g, '/')
+      .replace(/&#x3D;/g, '=');
+  }
 }
 
 /**

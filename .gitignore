@@ -15,7 +15,7 @@ bundle.zip
 .env
 .env.*
 !.env.example
-.dev.vars
+.dev.vars*
 .prod.vars
 *.local
 .wrangler/

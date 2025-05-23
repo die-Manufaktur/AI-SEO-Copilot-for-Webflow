@@ -73,21 +73,20 @@ export function ImageSizeDisplay({
                 )}
               </div>
               <p className="text-xs flex items-center">
-                {/* Show file size if enabled */}
-                {showFileSize && (
+                {showFileSize && !showMimeType && (
                   <span className={image.isOptimized ? "text-greenText" : "text-redText"}>
-                    {formatFileSize(image.size || 0)} {/* Provide a default value */}
+                    {formatFileSize(image.size || 0)}
                   </span>
                 )}
                 
-                {/* Show mime type if enabled */}
+                {/* For Next-Gen Image Formats check, show only the file extension */}
                 {showMimeType && (
-                  <span className={showFileSize ? "text-text3 ml-1" : ""}>
-                    {showFileSize && "• "}{image.mimeType || 'Unknown'}
+                  <span className="text-sm text-muted-foreground">
+                    {/* For Next-Gen Image Formats check, show only the file extension without the bullet */}
+                    {image.mimeType || ''}
                   </span>
                 )}
                 
-                {/* Show alt text if enabled */}
                 {showAltText && (
                   <span className="text-text3">
                     {image.alt ? `"${image.alt}"` : 'No alt text'}
