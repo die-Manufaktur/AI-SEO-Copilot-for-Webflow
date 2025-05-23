@@ -22,30 +22,31 @@ export const getApiUrl = () => {
     // When in development mode with FORCE_LOCAL_DEV enabled, always use local worker
     if (FORCE_LOCAL_DEV && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")) {
       const devWorkerUrl = "http://localhost:8787";
-      console.info("🛠️ [DEV] Using local development Worker URL:", devWorkerUrl);
       return devWorkerUrl;
     }
     
     // Standard Webflow environment check
     if (!!window.webflow) {
-      console.info("Using production API URL for Webflow Extension");
+      // Remove direct console log and use logger instead
+      logger.debug("Using production API URL for Webflow Extension");
       return "https://seo-copilot-api-production.paul-130.workers.dev";
     }
   } catch (e) {
-    console.error("Error determining API URL:", e);
+    logger.error("Error determining API URL:", e);
   }
   
   // Local development without forcing
   try {
     if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
       const devWorkerUrl = "http://localhost:8787";
-      console.info("Using development Worker URL:", devWorkerUrl);
+      logger.debug("Using development Worker URL:", devWorkerUrl);
       return devWorkerUrl;
     }
-  } catch {}
+  } catch (e) {
+    // Handle any errors
+  }
   
-  // Fallback to production
-  console.info("Falling back to production API URL");
+  logger.debug("Falling back to production API URL");
   return "https://seo-copilot-api-production.paul-130.workers.dev";
 }
 
@@ -60,11 +61,11 @@ export async function analyzeSEO({
   debug = true
 }: AnalyzeSEORequest): Promise<SEOAnalysisResult> {
   const apiBaseUrl = getApiUrl();
-  console.log("[SEO Analyzer] Starting analysis with API endpoint:", apiBaseUrl);
+  logger.info("[SEO Analyzer] Starting analysis with API endpoint:", apiBaseUrl);
   
   // Collect image assets with size information
   const pageAssets = await collectPageAssets();
-  console.log(`[SEO Analyzer] Collected ${pageAssets.length} assets with size information`);
+  logger.info(`[SEO Analyzer] Collected ${pageAssets.length} assets with size information`);
   
   // Identify which images are potentially from collections
   if (webflowPageData?.designerImages && Array.isArray(webflowPageData.designerImages)) {
@@ -83,7 +84,7 @@ export async function analyzeSEO({
     });
     
     const collectionImages = pageAssets.filter(asset => asset.source === 'collection');
-    console.log(`[SEO Analyzer] Identified ${collectionImages.length} potential collection images`);
+    logger.info(`[SEO Analyzer] Identified ${collectionImages.length} potential collection images`);
   }
   
   try {
@@ -161,44 +162,6 @@ export async function fetchOAuthToken(authCode: string): Promise<string> {
 
   const data = await response.json();
   return data.token;
-}
-
-/**
- * Register domains with the server to be added to the allowlist
- * @param domains Array of domain URLs to register
- * @returns Response from server
- */
-export async function registerDomains(domains: string[]): Promise<{ success: boolean; message: string }> {
-  const baseUrl = getApiUrl();
-  
-  try {
-    const response = await fetch(`${baseUrl}/api/register-domains`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ domains })
-    });
-
-    const data = await response.json();
-    
-    if (!response.ok) {
-      return { 
-        success: false, 
-        message: data.message || "Failed to register domains" 
-      };
-    }
-
-    return { 
-      success: true, 
-      message: data.message || "Domains registered successfully" 
-    };
-  } catch (error) {
-    return { 
-      success: false, 
-      message: `Error registering domains: ${error instanceof Error ? error.message : String(error)}` 
-    };
-  }
 }
 
 /**

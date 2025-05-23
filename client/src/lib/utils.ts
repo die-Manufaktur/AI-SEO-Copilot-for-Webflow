@@ -1,8 +1,8 @@
-import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
 
 /**
@@ -13,7 +13,9 @@ export function cn(...inputs: ClassValue[]) {
 export function extractDomainFromUrl(url: string): string {
   try {
     // Add protocol if missing
-    const urlWithProtocol = url.startsWith('http') ? url : `https://${url}`;
+    const urlWithProtocol = url.startsWith("http")
+      ? url
+      : `https://${url}`;
     const urlObj = new URL(urlWithProtocol);
     return urlObj.hostname;
   } catch (e) {
@@ -32,7 +34,7 @@ export function extractTextAfterColon(text: string | undefined | null): string {
   if (!text) {
     return "";
   }
-  const colonIndex = text.indexOf(':');
+  const colonIndex = text.indexOf(":");
   if (colonIndex === -1) {
     return text.trim(); // Return trimmed original if no colon
   }
@@ -42,7 +44,7 @@ export function extractTextAfterColon(text: string | undefined | null): string {
 /**
  * Log level types
  */
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+export type LogLevel = "debug" | "info" | "warn" | "error";
 
 /**
  * Logger configuration options
@@ -69,43 +71,30 @@ export interface Logger {
   error: (message: any, ...args: any[]) => void;
 }
 
-/**
- * Creates a namespaced logger that only logs in development mode by default
- * @param namespace The logger namespace (usually module name)
- * @param options Logger configuration options
- * @returns Logger object with debug, info, warn, and error methods
- */
-export function createLogger(prefix: string) {
-  const logStyles = {
-    debug: 'color: #7f8c8d',
-    info: 'color: #2980b9',
-    warn: 'color: #f39c12',
-    error: 'color: #c0392b',
-  };
+// Determine if we're in production
+const isProduction = () => {
+  return process.env.NODE_ENV === 'production' || 
+         import.meta.env?.MODE === 'production' ||
+         window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+};
 
-  // In production, return no-op functions for all log levels
-  if (process.env.NODE_ENV === 'production') {
-    return {
-      debug: () => {},
-      info: () => {},
-      warn: () => {},
-      error: () => {}
-    };
-  }
-  
-  // In development, maintain existing logging behavior
+export const createLogger = (namespace: string) => {
   return {
     debug: (...args: any[]) => {
-      console.log(`%c${prefix}`, logStyles.debug, ...args);
+      if (!isProduction()) {
+        console.debug(`${namespace}:`, ...args);
+      }
     },
     info: (...args: any[]) => {
-      console.log(`%c${prefix}`, logStyles.info, ...args);
+      if (!isProduction()) {
+        console.info(`${namespace}:`, ...args);
+      }
     },
     warn: (...args: any[]) => {
-      console.warn(`%c${prefix}`, logStyles.warn, ...args);
+      console.warn(`${namespace}:`, ...args);
     },
     error: (...args: any[]) => {
-      console.error(`%c${prefix}`, logStyles.error, ...args);
+      console.error(`${namespace}:`, ...args);
     }
   };
-}
+};

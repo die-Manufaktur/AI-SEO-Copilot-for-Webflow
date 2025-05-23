@@ -28,21 +28,20 @@ import {
   TooltipTrigger,
 } from "../components/ui/tooltip";
 import { useToast } from "../hooks/use-toast";
-import { getPageSlug } from "../lib/get-page-slug";
 import { SEOCheck } from "shared/types";
-import { analyzeSEO, registerDomains } from "../lib/api";
+import { analyzeSEO } from "../lib/api";
 import type { SEOAnalysisResult, WebflowPageData, AnalyzeSEORequest } from "../lib/types";
 import { ProgressCircle } from "../components/ui/progress-circle";
 import { getLearnMoreUrl } from "../lib/docs-links";
 import styled from 'styled-components';
 import Footer from "../components/Footer";
-import { extractTextAfterColon } from "./../lib/utils";
+import { createLogger } from "./../lib/utils";
 import React from 'react';
 import { calculateSEOScore } from '../../../shared/utils/seoUtils';
-import { CopyTooltip } from "../components/ui/copy-tooltip";
 import { ImageSizeDisplay } from "../components/ImageSizeDisplay";
-import { sanitizeText, decodeHtmlEntities } from "../../../shared/utils/stringUtils";
 import { copyTextToClipboard } from "../utils/clipboard";
+
+const logger = createLogger("Home");
 
 const formSchema = z.object({
   keyphrase: z.string().min(2, "Keyphrase must be at least 2 characters")
@@ -309,7 +308,7 @@ export default function Home() {
         const text = event.data.data || event.data.text;
         copyToClipboard(text)
           .then(success => {
-            console.log("Copy result:", success ? "success" : "failed");
+            logger.info("Copy result:", success ? "success" : "failed");
           })
           .catch(error => {
             console.error("Copy error:", error);
@@ -353,7 +352,7 @@ export default function Home() {
         // Only reload if the page path has actually changed
         if (newPagePath !== currentPagePath) {
           currentPagePath = newPagePath;
-          console.log(`Page changed to: ${newPagePath} - reloading app`);
+          logger.info(`Page changed to: ${newPagePath} - reloading app`);
           
           // Give Webflow a moment to complete the page change
           setTimeout(() => {
@@ -513,7 +512,7 @@ export default function Home() {
           usesTitleAsOpenGraphTitle: await currentPage.usesTitleAsOpenGraphTitle(),
           usesDescriptionAsOpenGraphDescription: await currentPage.usesDescriptionAsOpenGraphDescription()
         };
-        console.log("[Home onSubmit] Fetched Raw Webflow Page Data:", rawPageData);
+        logger.info("[Home onSubmit] Fetched Raw Webflow Page Data:", rawPageData);
 
       } catch (error) {
         toast({
@@ -550,7 +549,7 @@ export default function Home() {
         webflowPageData: pageDataForApi as WebflowPageData
       };
 
-      console.log("[Home onSubmit] Sending data to API:", analysisData);
+      logger.info("[Home onSubmit] Sending data to API:", analysisData);
       mutation.mutate(analysisData);
 
     } catch (error) {
@@ -565,38 +564,6 @@ export default function Home() {
   };
 
   const groupedChecks = results ? groupChecksByCategory(results.checks) : null;
-
-  const registerDetectedDomains = async (detectedUrls: string[]) => {
-    if (!detectedUrls || detectedUrls.length === 0) return;
-
-    try {
-      const domains = detectedUrls
-        .filter(Boolean)
-        .map(url => {
-          try {
-            const urlWithProtocol = url.startsWith('http') ? url : `https://${url}`;
-            const urlObj = new URL(urlWithProtocol);
-            return urlObj.hostname;
-          } catch (e) {
-            return url;
-          }
-        })
-        .filter(Boolean);
-
-      if (domains.length > 0) {
-        
-        try {
-          const result = await registerDomains(domains);
-          
-          if (result.success) {
-          } else {
-          }
-        } catch (err) {
-        }
-      }
-    } catch (error) {
-    }
-  };
 
   useEffect(() => {
     const getUrls = async () => {
@@ -616,7 +583,6 @@ export default function Home() {
         
         if (detectedUrls && detectedUrls.length > 0) {
           setUrls(detectedUrls);
-          await registerDetectedDomains(detectedUrls);
         }
       } catch (error) {
       }

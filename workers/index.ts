@@ -1019,12 +1019,16 @@ async function analyzeSEOElements(
     priority: analyzerCheckPriorities["Heading Hierarchy"]
   };
   
-  // Check the heading hierarchy
   const headingLevels = scrapedData.headings.map(h => h.level);
   const hasProperHierarchy = (
-    headingLevels.includes(1) && // H1 should be present
-    headingLevels.filter(level => level === 1).length === 1 && // Only one H1
-    headingLevels.every((level, index) => index === 0 || level >= headingLevels[index - 1]) // Descending order
+    headingLevels.includes(1) &&
+    headingLevels.filter(level => level === 1).length === 1 &&
+    headingLevels.every((level, index) => 
+      index === 0 || //
+      level === headingLevels[index - 1] ||
+      level === headingLevels[index - 1] + 1 ||
+      level < headingLevels[index - 1]
+    )
   );
   
   headingHierarchyCheck.passed = hasProperHierarchy;
@@ -1056,9 +1060,6 @@ async function analyzeSEOElements(
     priority: analyzerCheckPriorities["Code Minification"]
   };
 
-  /**
-   * Enhanced minification detection with multiple strategies
-   */
   function analyzeMinification(jsFiles: Resource[], cssFiles: Resource[]): {
     passed: boolean;
     jsMinified: number;
@@ -1069,7 +1070,6 @@ async function analyzeSEOElements(
   } {
     const details: string[] = [];
     
-    // Helper function to check if a file is likely minified
     function isLikelyMinified(url: string): boolean {
       const urlLower = url.toLowerCase();
       
@@ -1121,12 +1121,10 @@ async function analyzeSEOElements(
       passed = true; // No files to minify
       details.push("No external JS or CSS files detected");
     } else {
-      // Calculate minification percentage
       const totalFiles = totalJs + totalCss;
       const minifiedFiles = jsMinified + cssMinified;
       const minificationRate = minifiedFiles / totalFiles;
       
-      // Pass if 80% or more files are minified
       passed = minificationRate >= 0.8;
       
       if (totalJs > 0) {
@@ -1164,25 +1162,8 @@ async function analyzeSEOElements(
     const unminifiedJs = minificationAnalysis.totalJs - minificationAnalysis.jsMinified;
     const unminifiedCss = minificationAnalysis.totalCss - minificationAnalysis.cssMinified;
     
-    codeMinificationCheck.description = 
-      `Code optimization needed: ${unminifiedJs} JS and ${unminifiedCss} CSS files appear unminified.`;
-    
-    try {
-      const context = `Found ${unminifiedJs} unminified JS files and ${unminifiedCss} unminified CSS files out of ${minificationAnalysis.totalJs + minificationAnalysis.totalCss} total files.`;
-      
-      const codeMinificationResult = await getAIRecommendation(
-        codeMinificationCheck.title,
-        keyphrase,
-        env,
-        context
-      );
-      handleRecommendationResult(codeMinificationResult, codeMinificationCheck);
-    } catch (error) {
-      console.error("[SEO Analyzer] Error getting AI recommendation for code minification:", error);
-      // Fallback recommendation
-      codeMinificationCheck.recommendation = 
-        "Enable minification in your build process or use a CDN that automatically minifies assets. This reduces file sizes and improves page load speed.";
-    }
+    codeMinificationCheck.description = `Code optimization needed: ${unminifiedJs} JS and ${unminifiedCss} CSS files appear unminified. Confirm that your page settings are set to minify code.`;
+    codeMinificationCheck.recommendation = "";
   }
 
   checks.push(codeMinificationCheck);
