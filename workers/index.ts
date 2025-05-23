@@ -1060,9 +1060,6 @@ async function analyzeSEOElements(
     priority: analyzerCheckPriorities["Code Minification"]
   };
 
-  /**
-   * Enhanced minification detection with multiple strategies
-   */
   function analyzeMinification(jsFiles: Resource[], cssFiles: Resource[]): {
     passed: boolean;
     jsMinified: number;
