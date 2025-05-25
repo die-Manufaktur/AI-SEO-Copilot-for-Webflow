@@ -16,9 +16,6 @@ An advanced SEO analysis tool that performs 18 comprehensive checks with AI-powe
 - Image Alt Text Optimization
 - AI-Powered SEO Recommendations
 - OpenGraph Tags Validation
-- Search Engine Preview
-- Mobile Responsiveness Check
-- Page Speed Insights
 - Schema Markup Validation
 - URL Optimization
 - Content Length Analysis
@@ -27,15 +24,6 @@ An advanced SEO analysis tool that performs 18 comprehensive checks with AI-powe
 - Next-Gen Image Format Detection
 - Code Minification Check
 - Image File Size Optimization
-
-## Installing in Webflow
-
-1. Open the Webflow Designer
-2. Go to Apps panel (keyboard shortcut: A)
-3. Search for "AI SEO Copilot"
-4. Click Install
-5. Configure your settings:
-      - Set your Webflow API credentials
 
 ## Local Development Setup
 
@@ -67,7 +55,7 @@ An advanced SEO analysis tool that performs 18 comprehensive checks with AI-powe
 
 4. Start development server:
    ```bash
-   pnpm start-dev
+   pnpm dev
    ```
 
 5. Access the app:
@@ -93,161 +81,76 @@ This template includes a suggested Prettier configuration in `.prettierrc` and u
 ### Running a development server
 
 ```
-pnpm start-dev
+pnpm dev
 ```
 
-The above command does a few things:
+The above command uses the Concurrently package to run a few commands at the same time:
+- First it starts the Vite development server, with options to force rebuild dependencies and offer CORS for local development.
+- It then builds the bundle in the /public folder that enables the app to be run in Webflow.
+- We serve the Webflow extension.
+- Finally, the dev version of the Cloudflare Worker is deployed. This is on port 8787 by default, but you can change this in the package.json.
 
-- Watches for changes in the `src/` folder and bundles the React application in the `public/` folder, as required by the Webflow CLI for bundling.
-- Spins up a process that serves your extension files from under `public/`
-
-The command outputs the URL under which your extension is being served. Use this as the “Development URL” for your app in the Webflow Designer’s Apps panel. You can then launch the extension from the same place.
+The default port to run the app on in Webflow is 1337, but you can change that as well.
 
 You will need to create and populate the .env file in the root of the project. This should contain at least the following environment variables:
 
 - `USE_GPT_RECOMMENDATIONS`: Set to "true" to enable AI-powered recommendations
 - `ENABLED_GPT_CHECKS`: Comma-separated list of enabled checks from the following options:
-  - Title Tag Optimization
-  - Meta Description Analysis
-  - Content Structure Verification
-  - Keyword Density Analysis
-  - Image Alt Text Optimization
-  - OpenGraph Tags Validation
-  - Search Engine Preview
-  - Mobile Responsiveness Check
-  - Page Speed Insights
-  - Schema Markup Validation
-  - URL Optimization
-  - Content Length Analysis
-  - Heading Hierarchy Check
-  - Internal & Outbound Link Analysis
-  - Next-Gen Image Format Detection
-  - Code Minification Check
-  - Image File Size Optimization
+  - Keyphrase in Title
+  - Keyphrase in Meta Description
+  - Keyphrase in URL
+  - Content Length
+  - Keyphrase Density
+  - Keyphrase in Introduction
+  - Image Alt Attributes
+  - Internal Links
+  - Outbound Links
+  - Next-Gen Image Formats
+  - OG Image
+  - OG Title and Description
+  - Keyphrase in H1 Heading
+  - Keyphrase in H2 Headings
+  - Heading Hierarchy
+  - Code Minification
+  - Schema Markup
 - `OPENAI_API_KEY`: Your OpenAI API key for AI-powered recommendations
-
-Once the server is running, you must open the Webflow Designer, and then launch the app. The default is localhost:1337, but you can change the local URL.
 
 ## Deployment and Installation
 
-Follow these steps to build, deploy and install the AI SEO Copilot:
+Once you've been developing your app locally, preparing it for production is done in a few simple steps.
 
-### Prerequisites
-1. Ensure you have access to the Webflow Designer
-2. Install the Webflow CLI globally:
-   ```bash
-   pnpm add -g @webflow/webflow-cli
-   ```
-3. Obtain your Webflow Client ID and API credentials from the Webflow Developer Portal
-4. Make sure you have Node.js (v20 or later) and pnpm installed
+### Build
+1. First, run pnpm check and make sure you don't have any syntax errors in your Typescript.
+2. Delete the public folder and bundle.zip file in your project if either or both of them already exist.
+3. Secondly, just run pnpm build. That's it! If you don't see any errors, you should have a bundle.zip file that you can upload to update your app in Webflow.
+
+We won't go into all the details of setting up a Webflow app here, but you should read the following before beginning development: https://developers.webflow.com/
 
 ### Setting up Environment Variables
-1. Copy .env.example to .env and fill in the necessary values:
-`cp .env.example .env`
-2. Configure you Cloudflare Workers secrets using Wrangler:
+Once you've deployed, you'll need the production worker to have access to the correct environment variables. Make sure to run the following commands in your terminal:
+
 `npx wrangler secret put OPENAI_API_KEY
 npx wrangler secret put WEBFLOW_CLIENT_SECRET
 npx wrangler secret put WEBFLOW_CLIENT_ID
 npx wrangler secret put WEBFLOW_REDIRECT_URI`
 
-### Building and Deploying
-1. Build both the client app and the Cloudflare Worker:
-`pnpm build:all`
-This will take the contents of the ./public folder and prepare a bundle.zip file
-2. Upload the extension bundle to Webflow:
-`webflow extension push`
+Your app should be production-ready at this point. YOu can install it from the Marketplace like any other app, or follow these instructions:
 
-### Activating the Extension
-1. Log in to your Webflow account
-2. Navigate to the Extensions section in the Webflow Designer
-3. Locate the AI SEO Copilot extension and activate it
-3. Configure settings in the Webflow Designer:
-  - Provide your OpenAI API Key and other required configuration
+## Installing in Webflow
 
-### Production Deployment Checklist
-- <input disabled="" type="checkbox"> Environment variables are set in .env
-- <input disabled="" type="checkbox"> Cloudflare Worker secrets are configured
-- <input disabled="" type="checkbox"> Client app is built with pnpm build
-- <input disabled="" type="checkbox"> Worker is deployed with pnpm build:worker
-- <input disabled="" type="checkbox"> Extension is uploaded to Webflow with webflow extension push
-
-## Installation Guide
-
-Follow these steps to install the AI SEO Copilot onto your Webflow site:
-
-### Prerequisites
-1. Ensure you have access to the Webflow Designer and the Webflow CLI installed globally:
-   ```bash
-   pnpm add -g @webflow/webflow-cli
-   ```
-2. Obtain your Webflow Client ID and API credentials from the Webflow Developer Portal.
-3. Make sure you have Node.js (v20 or later) and `pnpm` installed.
-
-### Steps to Install
-1. **Clone the Repository**:
-   Clone this repository to your local machine:
-   ```bash
-   git clone https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow
-   cd AI-SEO-Copilot-for-Webflow
-   ```
-
-2. **Install Dependencies**:
-   Install the required dependencies using `pnpm`:
-   ```bash
-   pnpm install --frozen-lockfile
-   ```
-
-3. **Build the Application**:
-   Build the application for deployment:
-   ```bash
-   pnpm build:all
-   ```
-
-4. **Deploy to Webflow**:
-   Use the Webflow CLI to deploy the extension:
-   ```bash
-   webflow deploy
-   ```
-   Ensure you have the following environment variables set:
-   - `VITE_WEBFLOW_CLIENT_ID`
-   - `OPENAI_API_KEY`
-   - `CLOUDFLARE_API_TOKEN`
-
-5. **Activate the Extension**:
-   - Log in to your Webflow account.
-   - Navigate to the **Extensions** section in the Webflow Designer.
-   - Locate the AI SEO Copilot extension and activate it.
-
-6. **Configure Settings**:
-   - Open the extension settings in Webflow Designer.
-   - Provide your OpenAI API Key and any other required configuration.
+1. Open the Webflow Designer
+2. Go to Apps panel (keyboard shortcut: E)
+3. Search for "AI SEO Copilot"
+4. Click Install
+5. Configure your settings:
+      - Set your Webflow API credentials
 
 ### Troubleshooting
-- If you encounter issues during deployment, ensure your environment variables are correctly set.
-- Check the Webflow CLI documentation for additional deployment options.
+If you're stuck with something and you think it may be a bug, please submit a bug report on our Github repo: https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/issues. Be sure to search through the closed issues to make sure the issue you're seeing hasn't already been solved by someone else! We try to push updates as often as possible, but this is a FOSS product, and things can fall behind sometimes.
 
-For further assistance, refer to the [Webflow Developer Documentation](https://developers.webflow.com/designer/docs/getting-started-designer-extensions).
-
-## Documentation
-
-Complete documentation available at [AI SEO Copilot Docs](https://ai-seo-copilot.gitbook.io/ai-seo-copilot):
-- Setup guides
-- API reference
-- Configuration options
-- Troubleshooting
-- Best practices
-- Feature guides
+Complete documentation available at [AI SEO Copilot Docs](https://ai-seo-copilot.gitbook.io/ai-seo-copilot)
 
 ## Contributing
 
 Please see [CONTRIBUTING.md](.github/CONTRIBUTING.md) for guidelines.
 Feature requests: [FeatureBase](https://aiseocopilot.featurebase.app)
-
-## Support
-- Issues: GitHub Issues
-- Questions: GitHub Discussions
-- Updates: [Roadmap](https://aiseocopilot.featurebase.app/roadmap)
-
-## License
-
-Licensed under MIT. See [LICENSE.md](LICENSE.md) for details.
