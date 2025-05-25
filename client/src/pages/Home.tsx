@@ -508,6 +508,8 @@ export default function Home() {
         setIsHomePage(await currentPage.isHomepage());
 
         rawPageData = {
+          title: "",
+          metaDescription: "",
           openGraphImage: (await currentPage.getOpenGraphImage()) ?? '',
           usesTitleAsOpenGraphTitle: await currentPage.usesTitleAsOpenGraphTitle(),
           usesDescriptionAsOpenGraphDescription: await currentPage.usesDescriptionAsOpenGraphDescription()

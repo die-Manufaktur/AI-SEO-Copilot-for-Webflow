@@ -1,18 +1,66 @@
 import OpenAI from 'openai';
 import { URL } from "url";
 import { Hono } from 'hono';
-import { cors } from 'hono/cors';
+import { corsMiddleware } from './middleware/cors';
 import { 
   SEOCheck,
   WebflowPageData,
   ScrapedPageData,
   SEOAnalysisResult,
-  Resource
+  Resource,
+  AnalyzeSEORequest
 } from '../shared/types/index';
 import { shortenFileName } from '../shared/utils/fileUtils';
 import * as cheerio from 'cheerio';
 import { sanitizeText } from '../shared/utils/stringUtils';
+import { create } from 'domain';
 
+const app = new Hono();
+
+app.use('*', corsMiddleware({
+  allowedOrigins: ['http://localhost:1337', 'http://127.0.0.1:1337']
+}));
+
+app.get('/health', (c) => {
+  return c.json({ status: 'ok' });
+});
+
+app.post('/api/analyze', async (c) => {
+  try {
+    const body = await c.req.json();
+    
+    if (!validateAnalyzeRequest(body)) {
+      return c.json({ error: 'Invalid request body' }, 400);
+    }
+    
+    const { keyphrase, url, isHomePage = false, webflowPageData, pageAssets } = body;
+    
+    const scrapedData = await scrapeWebPage(url, c.env as Env, keyphrase);
+    
+    const analysisResult = await analyzeSEOElements(
+      scrapedData, 
+      keyphrase, 
+      url, 
+      isHomePage, 
+      c.env as Env, 
+      webflowPageData, 
+      pageAssets
+    );
+    
+    return c.json(analysisResult);
+  } catch (error) {
+    console.error('[SEO Analyzer] Error in /api/analyze route:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * Maps SEO analyzer check names to their priority levels for content optimization.
+ * 
+ * This configuration object defines the relative importance of various SEO factors
+ * when analyzing web content. Priority levels help determine which issues should
+ * be addressed first during SEO optimization.
+ */
 const analyzerCheckPriorities: Record<string, 'high' | 'medium' | 'low'> = {
   "Keyphrase in Title": "high",
   "Keyphrase in Meta Description": "high",
@@ -110,9 +158,7 @@ async function getAIRecommendation(
          The content must be directly usable by copying and pasting.
          Focus on being specific, clear, and immediately usable.`
       : `You are an SEO expert providing actionable advice.
-         Give two short sentences (max 20 words each) for fixing this SEO issue.
-         First sentence: Why this matters (be direct, no fluff).
-         Second sentence: What specific action to take (be clear and actionable).`;
+         Provide a concise recommendation for the SEO check "${checkType}".`;
 
     const userPrompt = needsCopyableContent
       ? `Create a perfect ${checkType.toLowerCase()} for the keyphrase "${keyphrase}".
@@ -123,10 +169,7 @@ async function getAIRecommendation(
          - ONLY return the final content with no explanations or formatting`
       : `Fix this SEO issue: "${checkType}" for keyphrase "${keyphrase}" if a keyphrase is appropriate for the check.
          Current status: ${context || 'Not specified'}
-         Provide two concise sentences (max 20 words each):
-         1. Why it matters (be direct)
-         2. What to do (be specific)
-         No explanation or additional text - just the two sentences.`;
+         Provide concise but actionable advice in a couple of sentences.`;
 
     const maxRetries = 2;
     let retries = 0;
@@ -143,17 +186,7 @@ async function getAIRecommendation(
           max_tokens: 500,
           temperature: 0.5,
         });
-        // Apply sanitization immediately when receiving the response
         const sanitizedContent = sanitizeText(response.choices[0]?.message?.content?.trim() || '');
-        
-        // Return the sanitized content
-        if (shouldHaveCopyButton(checkType)) {
-          const introPhrase = getRandomIntroPhrase(checkType);
-          return {
-            introPhrase,
-            copyableContent: sanitizedContent
-          };
-        }
         
         return sanitizedContent;
       } catch (error) {
@@ -170,44 +203,31 @@ async function getAIRecommendation(
 
     const recommendation = sanitizeText(response.choices[0]?.message.content.trim());
     
-    // For copyable content checks, add a random intro phrase
-    if (needsCopyableContent) {
-      return {
-        introPhrase: getRandomIntroPhrase(checkType),
-        copyableContent: recommendation
-      };
-    } else {
-      return recommendation;
-    }
+    return recommendation;
   } catch (error) {
     console.error(`[SEO Analyzer] Error generating AI recommendation:`, error);
     throw new Error(`Failed to get AI recommendation for ${checkType}`);
   }
 }
 
-// Add environment interface at the top level
 interface Env {
   USE_GPT_RECOMMENDATIONS?: string;
   WEBFLOW_API_KEY?: string;
   OPENAI_API_KEY?: string;
   ALLOWED_ORIGINS?: string;
-  // Add other environment variables as needed
 }
 
-// Rename the local interface to avoid conflict
-interface AnalyzeSEORequestBody {
-  keyphrase: string;
-  url: string;
-  isHomePage?: boolean;
-  webflowPageData?: WebflowPageData;
-  pageAssets?: Array<{ url: string; alt: string; type: string; size?: number; mimeType?: string }>;
-}
-
-// Update validation function to use new interface name
-function validateAnalyzeRequest(body: unknown): body is AnalyzeSEORequestBody {
+/**
+ * Validates that an unknown body object conforms to the AnalyzeSEORequest interface.
+ * 
+ * @param body - The unknown object to validate
+ * @returns True if the body is a valid AnalyzeSEORequest, false otherwise
+ * 
+ */
+function validateAnalyzeRequest(body: unknown): body is AnalyzeSEORequest {
   if (!body || typeof body !== 'object') return false;
   
-  const request = body as AnalyzeSEORequestBody;
+  const request = body as AnalyzeSEORequest;
   return (
     typeof request.keyphrase === 'string' && request.keyphrase.length > 0 &&
     typeof request.url === 'string' && request.url.length > 0 &&
@@ -239,14 +259,11 @@ async function scrapeWebPage(url: string, env: Env, keyphrase: string): Promise<
     const html = await response.text();
     const $ = cheerio.load(html);
     
-    // Extract page title
     const title = $('title').text().trim() || $('meta[property="og:title"]').attr('content') || '';
     
-    // Extract meta description
     const metaDescription = $('meta[name="description"]').attr('content') || 
                           $('meta[property="og:description"]').attr('content') || '';
     
-    // Extract headings (h1-h6)
     const headings = [] as Array<{level: number, text: string}>;
     $('h1, h2, h3, h4, h5, h6').each((_, element) => {
       if (element.type === 'tag') {
@@ -261,14 +278,12 @@ async function scrapeWebPage(url: string, env: Env, keyphrase: string): Promise<
       }
     });
     
-    // Extract paragraphs
     const paragraphs: string[] = [];
     $('p').each((_, element) => {
       const text = $(element).text().trim();
       if (text) paragraphs.push(text);
     });
     
-    // Extract images
     const images = [] as Array<{src: string, alt: string, size?: number}>;
     $('img').each((_, element) => {
       const src = $(element).attr('src') || '';
@@ -280,7 +295,6 @@ async function scrapeWebPage(url: string, env: Env, keyphrase: string): Promise<
       }
     });
     
-    // Extract internal and outbound links - convert to strings as required by type
     const internalLinks: string[] = [];
     const outboundLinks: string[] = [];
     
@@ -291,15 +305,14 @@ async function scrapeWebPage(url: string, env: Env, keyphrase: string): Promise<
       try {
         const href = $(element).attr('href') || '';
         if (!href || href.startsWith('#') || href.startsWith('javascript:')) {
-          return; // Skip anchors, javascript links
+          return;
         }
         
-        // Resolve relative URLs
         let fullUrl;
         try {
           fullUrl = new URL(href, url).href;
         } catch {
-          return; // Skip malformed URLs
+          return;
         }
         
         const linkUrl = new URL(fullUrl);
@@ -329,7 +342,6 @@ async function scrapeWebPage(url: string, env: Env, keyphrase: string): Promise<
       if (href) resources.css.push({ url: href });
     });
     
-    // Extract schema markup (JSON-LD)
     const schemaMarkup = {
       hasSchema: false,
       schemaTypes: [] as string[],
@@ -354,19 +366,14 @@ async function scrapeWebPage(url: string, env: Env, keyphrase: string): Promise<
       }
     });
     
-    // Extract canonical URL
     const canonicalUrl = $('link[rel="canonical"]').attr('href') || url;
     
-    // Extract meta keywords
     const metaKeywords = $('meta[name="keywords"]').attr('content') || '';
     
-    // Extract Open Graph image
     const ogImage = $('meta[property="og:image"]').attr('content') || '';
     
-    // Extract all text content for keyword density analysis
     const bodyText = $('body').text().trim();
     
-    // Build the scraped data object according to ScrapedPageData interface
     const scrapedData: ScrapedPageData = {
       url,
       title,
@@ -389,73 +396,6 @@ async function scrapeWebPage(url: string, env: Env, keyphrase: string): Promise<
     console.error('[SEO Analyzer] Error scraping web page:', error);
     throw new Error(`Failed to analyze page: ${error instanceof Error ? error.message : String(error)}`);
   }
-}
-
-/**
- * Handles CORS preflight requests and required headers
- * @param request Incoming request (standard Request or Hono Request)
- * @returns CORS headers or preflight response
- */
-function handleCors(request: Request | Record<string, any>): Response | Record<string, string> {
-  // Get origin from request - handle both standard Request and Hono Request formats
-  let origin: string | null = null;
-  
-  // Check if it's a standard Request object with headers.get method
-  if ('headers' in request && typeof request.headers.get === 'function') {
-    origin = request.headers.get('Origin');
-  } 
-  // Check if it's a Hono Request object - use type assertion to access header method
-  else if ('header' in request && typeof request['header'] === 'function') {
-    origin = request['header']('Origin');
-  }
-  // Fallback for other request formats
-  else {
-    console.warn('[CORS] Could not determine request type to extract Origin header');
-  }
-  
-  const allowedOriginsStr = process.env.ALLOWED_ORIGINS || '';
-  const allowedOrigins = allowedOriginsStr.split(',');
-  
-  console.log('[CORS] Request origin:', origin);
-  console.log('[CORS] Allowed origins:', allowedOrigins);
-  
-  // Helper function to check if origin is allowed
-  const isAllowedOrigin = (origin: string | null): boolean => {
-    if (!origin) return false;
-    
-    // For local development, always allow localhost URLs
-    if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
-      return true;
-    }
-    
-    return allowedOrigins.some(allowed => {
-      if (allowed.includes('*')) {
-        const pattern = allowed.replace('*.', '(.+\\.)');
-        return new RegExp(`^${pattern}$`).test(origin);
-      }
-      return allowed === origin;
-    });
-  };
-  
-  const isAllowed = isAllowedOrigin(origin);
-  console.log('[CORS] Is origin allowed:', isAllowed);
-  
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': origin || '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Max-Age': '86400',
-  };
-  
-  // Handle OPTIONS request (preflight)
-  if (request.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 204,
-      headers: corsHeaders
-    });
-  }
-  
-  return corsHeaders; // Return headers for non-OPTIONS requests
 }
 
 /**
@@ -485,93 +425,45 @@ async function analyzeSEOElements(
   const useApiData = !!webflowPageData;
   
   // --- Title Check ---
-  const titleCheck: SEOCheck = {
-    title: "Keyphrase in Title",
-    description: "",
-    passed: false,
-    priority: analyzerCheckPriorities["Keyphrase in Title"]
-  };
-  
-  // Get title from API if available, otherwise use scraped data
-  const pageTitle = useApiData && webflowPageData?.title
-    ? webflowPageData.title
-    : scrapedData.title;
-  
-  // Check if title contains the keyphrase
-  titleCheck.passed = pageTitle.toLowerCase().includes(normalizedKeyphrase);
-  
-  if (titleCheck.passed) {
-    titleCheck.description = getSuccessMessage(titleCheck.title);
+  let pageTitle = '';
+  if (useApiData && webflowPageData?.title) {
+    pageTitle = webflowPageData.title;
   } else {
-    titleCheck.description = `Keyphrase "${keyphrase}" not found in title: "${pageTitle}"`;
-    
-    try {
-        const context = `Create a complete, ready-to-use page title (50-60 characters) that includes the keyphrase "${keyphrase}" naturally. Current title: "${pageTitle || 'None'}"`;
-        
-        const aiSuggestion = await getAIRecommendation(
-          "Keyphrase in Title",
-          keyphrase,
-          env,
-          context
-        );
-        
-        handleRecommendationResult(aiSuggestion, titleCheck);
-      } catch (error) {
-        console.error("[SEO Analyzer] Error getting AI recommendation for title:", error);
-      }
+    pageTitle = scrapedData.title || '';
   }
+  const titleCheck = await createSEOCheck(
+    "Keyphrase in Title",
+    () => pageTitle.toLowerCase().includes(normalizedKeyphrase),
+    `Great! Your title contains the keyphrase "${keyphrase}".`,
+    `Your title does not contain the keyphrase "${keyphrase}".`,
+    pageTitle,
+    keyphrase,
+    env
+  );
+
   checks.push(titleCheck);
   
   // --- Meta Description Check ---
-  const metaDescriptionCheck: SEOCheck = {
-    title: "Keyphrase in Meta Description",
-    description: "",
-    passed: false,
-    priority: analyzerCheckPriorities["Keyphrase in Meta Description"]
-  };
-  
-  // Get meta description from API if available, otherwise use scraped data
   let metaDescription = '';
   if (useApiData && webflowPageData?.metaDescription) {
     metaDescription = webflowPageData.metaDescription;
   } else {
     metaDescription = scrapedData.metaDescription || '';
   }
-  
-  // Check if meta description contains the keyphrase
-  metaDescriptionCheck.passed = metaDescription.toLowerCase().includes(normalizedKeyphrase);
 
-  if (metaDescriptionCheck.passed) {
-    metaDescriptionCheck.description = getSuccessMessage(metaDescriptionCheck.title);
-  } else {
-    metaDescriptionCheck.description = `Keyphrase "${keyphrase}" not found in meta description: "${metaDescription}"`;
-    
-    try {
-        const context = `Create a complete, ready-to-use meta description (120-155 characters) that includes the keyphrase "${keyphrase}" naturally. Current meta description: "${metaDescription || 'None'}"`;
-        
-        const aiSuggestion = await getAIRecommendation(
-          "Keyphrase in Meta Description",
-          keyphrase,
-          env,
-          context
-        );
-        
-        handleRecommendationResult(aiSuggestion, metaDescriptionCheck);
-      } catch (error) {
-        console.error("[SEO Analyzer] Error getting AI recommendation for meta description:", error);
-      }
-  }
+  const metaDescriptionCheck = await createSEOCheck(
+    "Keyphrase in Meta Description",
+    () => metaDescription.toLowerCase().includes(normalizedKeyphrase),
+    `Great! Your meta description contains the keyphrase "${keyphrase}".`,
+    `Keyphrase "${keyphrase}" not found in meta description: "${metaDescription}"`,
+    metaDescription,
+    keyphrase,
+    env
+  );
+
   checks.push(metaDescriptionCheck);
   
   // --- URL Check ---
-  const urlCheck: SEOCheck = {
-    title: "Keyphrase in URL",
-    description: "",
-    passed: false,
-    priority: analyzerCheckPriorities["Keyphrase in URL"]
-  };
-  
-  // Get the canonical URL from the API if available
   let canonicalUrl = useApiData && webflowPageData?.canonicalUrl
     ? webflowPageData.canonicalUrl
     : url;
@@ -579,66 +471,35 @@ async function analyzeSEOElements(
   // Normalize the URL for comparison
   const normalizedUrl = canonicalUrl.toLowerCase().trim();
   
-  // Check if the URL contains the keyphrase
-  urlCheck.passed = normalizedUrl.includes(normalizedKeyphrase);
+  const urlCheck = await createSEOCheck(
+    "Keyphrase in URL",
+    () => normalizedUrl.includes(normalizedKeyphrase),
+    `Good job! The keyphrase "${keyphrase}" is present in the URL slug.`,
+    `The URL "${canonicalUrl}" does not contain the keyphrase "${keyphrase}".`,
+    canonicalUrl,
+    keyphrase,
+    env
+  );
   
-  if (urlCheck.passed) {
-    urlCheck.description = getSuccessMessage(urlCheck.title);
-  } else {
-    urlCheck.description = `Keyphrase "${keyphrase}" not found in URL: "${canonicalUrl}"`;
-    
-    try {
-        const urlResult = await getAIRecommendation(
-          urlCheck.title,
-          keyphrase,
-          env,
-          `Keyphrase "${keyphrase}" not found in URL: "${canonicalUrl}"`
-        );
-        handleRecommendationResult(urlResult, urlCheck);
-      } catch (error) {
-        console.error("[SEO Analyzer] Error getting AI recommendation for URL:", error);
-      }
-  }
   checks.push(urlCheck);
   
   // --- Content Length Check ---
-  const contentLengthCheck: SEOCheck = {
-    title: "Content Length",
-    description: "",
-    passed: false,
-    priority: analyzerCheckPriorities["Content Length"]
-  };
-  
-  // Calculate word count instead of character count
   const contentWords = scrapedData.content.trim().split(/\s+/).filter(Boolean);
   const wordCount = contentWords.length;
 
   // Define word count thresholds
   const minWordCount = isHomePage ? 300 : 600;
-  const optimalWordCount = isHomePage ? 500 : 1200;
 
-  // Check if the word count is within the optimal range
-  contentLengthCheck.passed = wordCount >= minWordCount;
+  const contentLengthCheck = await createSEOCheck(
+    "Content Length",
+    () => wordCount >= minWordCount,
+    `Well done! Your content has ${wordCount} words, which meets the threshold of ${minWordCount} words ${isHomePage ? "(homepage)" : "(regular page)"}.`,
+    `Content length is ${wordCount} words, which is below the recommended minimum of ${minWordCount} words ${isHomePage ? "(homepage)" : "(regular page)"}.`,
+    scrapedData.content,
+    keyphrase,
+    env
+  );
 
-  if (contentLengthCheck.passed) {
-    contentLengthCheck.description = getSuccessMessage(contentLengthCheck.title);
-  } else {
-    contentLengthCheck.description = `Content length is ${wordCount} words, which is below the recommended minimum of ${minWordCount} words.`;
-    
-    try {
-        const context = `Content length is currently ${wordCount} words but should be at least ${minWordCount} words (ideally around ${optimalWordCount} words).`;
-        
-        const contentLengthResult = await getAIRecommendation(
-          contentLengthCheck.title,
-          keyphrase,
-          env,
-          context
-        );
-        handleRecommendationResult(contentLengthResult, contentLengthCheck);
-      } catch (error) {
-        console.error("[SEO Analyzer] Error getting AI recommendation for content length:", error);
-      }
-  }
   checks.push(contentLengthCheck);
   
   // --- Keyphrase Density Check ---
@@ -1177,21 +1038,18 @@ async function analyzeSEOElements(
     priority: analyzerCheckPriorities["Schema Markup"]
   };
   
-  // Check if schema markup is present
   schemaCheck.passed = scrapedData.schemaMarkup.hasSchema;
   
   if (schemaCheck.passed) {
     const schemaTypes = scrapedData.schemaMarkup.schemaTypes.join(", ");
     schemaCheck.description = getSuccessMessage(schemaCheck.title);
     
-    // Optionally add details about what schema types were found
     if (schemaTypes) {
       schemaCheck.description += ` (${schemaTypes})`;
     }
   } else {
     schemaCheck.description = `No schema markup found.`;
     
-    // Replace AI recommendation with static recommendation
     schemaCheck.recommendation = "Add structured data using Schema.org markup to help search engines understand your content. Visit schema.org to find the appropriate schema type for your page content (e.g., Article, Product, LocalBusiness).";
   }
   checks.push(schemaCheck);
@@ -1295,194 +1153,8 @@ async function analyzeSEOElements(
   return result;
 }
 
-// --- Hono server and routes setup ---
-const app = new Hono();
-
-// Global middleware
-app.use('*', async (c, next) => {
-  // Handle CORS
-  const corsHeaders = handleCors(c.req);
-  if (corsHeaders instanceof Response) {
-    return corsHeaders; // Preflight response
-  }
-  
-  // Set CORS headers
-  Object.entries(corsHeaders).forEach(([key, value]) => {
-    c.res.headers.set(key, value);
-  });
-  
-  // Continue to the next middleware/route
-  await next();
-});
-
-// Health check route
-app.get('/health', (c) => {
-  return c.json({ status: 'ok' });
-});
-
-// SEO analysis route
-app.post('/analyze-seo', async (c) => {
-  try {
-    const body = await c.req.json();
-    
-    // Validate request body
-    if (!validateAnalyzeRequest(body)) {
-      return c.json({ error: 'Invalid request body' }, 400);
-    }
-    
-    const { keyphrase, url, isHomePage = false, webflowPageData, pageAssets } = body;
-    
-    // Scrape the web page - add type assertion for env
-    const scrapedData = await scrapeWebPage(url, c.env as Env, keyphrase);
-    
-    // Perform SEO analysis - isHomePage now has a default value
-    const analysisResult = await analyzeSEOElements(
-      scrapedData, 
-      keyphrase, 
-      url, 
-      isHomePage, 
-      c.env as Env, 
-      webflowPageData, 
-      pageAssets
-    );
-    
-    return c.json(analysisResult);
-  } catch (error) {
-    console.error('[SEO Analyzer] Error in /analyze-seo route:', error);
-    return c.json({ error: 'Internal server error' }, 500);
-  }
-});
-
-// --- Add compatibility endpoint for the client ---
-app.post('/api/analyze', async (c) => {
-  try {
-    const body = await c.req.json();
-    
-    // Validate request body
-    if (!validateAnalyzeRequest(body)) {
-      return c.json({ error: 'Invalid request body' }, 400);
-    }
-    
-    const { keyphrase, url, isHomePage = false, webflowPageData, pageAssets } = body;
-    
-    // Reuse the existing functionality
-    const scrapedData = await scrapeWebPage(url, c.env as Env, keyphrase);
-    
-    const analysisResult = await analyzeSEOElements(
-      scrapedData, 
-      keyphrase, 
-      url, 
-      isHomePage, 
-      c.env as Env, 
-      webflowPageData, 
-      pageAssets
-    );
-    
-    return c.json(analysisResult);
-  } catch (error) {
-    console.error('[SEO Analyzer] Error in /api/analyze route:', error);
-    return c.json({ error: 'Internal server error' }, 500);
-  }
-});
-
-// Test OpenAI connection route
-app.get('/test-openai', async (c) => {
-  try {
-    console.log('🧪 TEST-OPENAI ENDPOINT CALLED');
-    
-    // Log environment availability
-    const apiKey = (c.env as Env).OPENAI_API_KEY;
-    if (apiKey) {
-      const keyStart = apiKey.substring(0, 4);
-      const keyEnd = apiKey.substring(apiKey.length - 4);
-      console.log(`🔑 TEST ROUTE: API Key available: ${keyStart}...${keyEnd}`);
-    } else {
-      console.log('❌ TEST ROUTE: API Key missing!');
-      return c.json({ error: 'OpenAI API Key not configured' }, 500);
-    }
-    
-    const openai = new OpenAI({
-      apiKey: (c.env as Env).OPENAI_API_KEY,
-    });
-    
-    console.log('⚡ TEST ROUTE: Testing OpenAI connection...');
-    
-    const response = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [{ role: "user", content: "Say hello" }],
-      max_tokens: 5
-    });
-    
-    console.log(`✅ TEST ROUTE: Connection successful! Response: ${response.choices[0].message.content}`);
-    return c.json({ 
-      success: true, 
-      message: response.choices[0].message.content 
-    });
-  } catch (error) {
-    console.error('❌ TEST ROUTE: Error:', error);
-    return c.json({ error: String(error) }, 500);
-  }
-});
-
-app.use('/api/*', cors({
-  origin: (origin, c) => {
-    const allowedOrigins = (c.env as Env).ALLOWED_ORIGINS?.split(',') || [];
-    // Make sure this includes webflow.com and *.webflow.io domains
-    const isAllowed = allowedOrigins.some(allowed => {
-      return origin === allowed || 
-        (allowed.includes('*') && origin && origin.endsWith(allowed.replace('*.', '.')));
-    });
-    return isAllowed ? origin : null;
-  },
-  allowHeaders: ['Content-Type', 'Authorization'],
-  allowMethods: ['POST', 'GET', 'OPTIONS'],
-  maxAge: 600,
-}));
-
 export default app;
 
-export const introForCopyableRecommendation: Record<string, string[]> = {
-  "Keyphrase in Title": [
-    "Here's an optimized title tag:",
-    "Try this SEO-friendly title:",
-    "Consider this title for better rankings:"
-  ],
-  "Keyphrase in Meta Description": [
-    "Here's an engaging meta description:",
-    "Try this compelling meta description:",
-    "Consider this description to improve CTR:"
-  ],
-  "Keyphrase in H1 Heading": [
-    "Here's an effective H1 heading:",
-    "Try this attention-grabbing H1:",
-    "Consider this main heading for your page:"
-  ],
-  "Keyphrase in H2 Headings": [
-    "Here's a strong H2 subheading:",
-    "Try this supporting H2 heading:",
-    "Consider this subheading to organize your content:"
-  ],
-  "Keyphrase in Introduction": [
-    "Here's an engaging introduction paragraph:",
-    "Try this opening paragraph:",
-    "Consider this introduction to hook your readers:"
-  ],
-  "Keyphrase in URL": [
-    "Here's an SEO-friendly URL structure:",
-    "Try this optimized URL slug:",
-    "Consider this clean URL pattern:"
-  ],
-  // Add others as needed
-};
-
-// Helper to get a random intro phrase
-export function getRandomIntroPhrase(checkType: string): string {
-  const intros = introForCopyableRecommendation[checkType] || 
-    introForCopyableRecommendation["Keyphrase in Title"]; // fallback
-  return intros[Math.floor(Math.random() * intros.length)];
-}
-
-// Helper to determine if a check should have a copy button
 export function shouldHaveCopyButton(checkType: string): boolean {
   return [
     "Keyphrase in Title",
@@ -1492,53 +1164,6 @@ export function shouldHaveCopyButton(checkType: string): boolean {
     "Keyphrase in Introduction",
     "Keyphrase in URL"
   ].includes(checkType);
-}
-
-// Add this helper function to decode HTML entities
-function decodeHtmlEntities(text: string): string {
-  return text
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&ndash;/g, '–')
-    .replace(/&mdash;/g, '—')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&#38;/g, '&')
-    .replace(/&#x26;/g, '&');
-}
-
-/**
- * Removes or replaces problematic Unicode characters with ASCII equivalents
- * @param text The text to sanitize
- * @returns Text with only ASCII characters
- */
-function sanitizeUnicode(text: string): string {
-  if (!text) return '';
-  
-  return text
-    // Replace smart/curly quotes with straight quotes
-    .replace(/[\u2018\u2019]/g, "'") 
-    .replace(/[\u201C\u201D]/g, '"')
-    
-    // Replace en/em dashes with hyphens
-    .replace(/[\u2013\u2014]/g, '-')
-    
-    // Replace ellipsis with three periods
-    .replace(/\u2026/g, '...')
-    
-    // Replace non-breaking space with regular space
-    .replace(/\u00A0/g, ' ')
-    
-    // Replace bullets with asterisks
-    .replace(/[\u2022\u2023\u25E6\u2043\u2219]/g, '*')
-    
-    // Remove zero-width spaces, soft hyphens, etc.
-    .replace(/[\u200B-\u200F\u2060\uFEFF\u00AD]/g, '')
-    
-    // Finally, strip any remaining non-ASCII characters
-    .replace(/[^\x00-\x7F]/g, '');
 }
 
 function handleRecommendationResult(
@@ -1553,4 +1178,59 @@ function handleRecommendationResult(
       check.introPhrase = sanitizeText(result.introPhrase);
     }
   }
+}
+
+/**
+ * Creates an SEO check with consistent error handling and recommendations
+ * @param title The title of the check
+ * @param checkFunction Function that returns true if check passes, false if it fails
+ * @param successMessage Message to show when check passes
+ * @param failureMessage Message to show when check fails
+ * @param context Additional context for AI recommendations
+ * @param keyphrase The target keyphrase
+ * @param env Environment variables for AI recommendations
+ * @returns A complete SEO check object
+ */
+async function createSEOCheck(
+  title: string,
+  checkFunction: () => boolean,
+  successMessage: string,
+  failureMessage: string,
+  context: string | undefined,
+  keyphrase: string,
+  env: Env
+): Promise<SEOCheck> {
+  const check: SEOCheck = {
+    title,
+    description: "",
+    passed: false,
+    priority: analyzerCheckPriorities[title] || "medium"
+  };
+  
+  try {
+    check.passed = checkFunction();
+  } catch (error) {
+    console.error(`[SEO Analyzer] Error evaluating check "${title}":`, error);
+    check.passed = false;
+  }
+  
+  if (check.passed) {
+    check.description = successMessage;
+  } else {
+    check.description = failureMessage;
+    
+    try {
+      const aiSuggestion = await getAIRecommendation(
+        title,
+        keyphrase,
+        env,
+        context
+      );
+      handleRecommendationResult(aiSuggestion, check);
+    } catch (error) {
+      console.error(`[SEO Analyzer] Error getting AI recommendation for ${title}:`, error);
+    }
+  }
+  
+  return check;
 }
