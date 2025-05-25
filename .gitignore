@@ -1,6 +1,7 @@
 # Dependencies
 node_modules/
 .pnpm-store/
+pnpm-lock.yaml
 
 # Production & Build
 /public
@@ -32,7 +33,7 @@ bundle.zip
 *.njsproj
 *.sln
 *.sw?
-.github/copilot-instructions.md
+.github/instructions/aiseocopilot.instructions.md
 
 # Logs & Debug
 logs
