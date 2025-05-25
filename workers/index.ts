@@ -301,7 +301,11 @@ async function scrapeWebPage(url: string, env: Env, keyphrase: string): Promise<
     $('a[href]').each((_, element) => {
       try {
         const href = $(element).attr('href') || '';
-        if (!href || href.startsWith('#') || href.startsWith('javascript:')) {
+        const normalizedHref = href.trim().toLowerCase();
+        if (!href || normalizedHref.startsWith('#') || 
+            normalizedHref.startsWith('javascript:') || 
+            normalizedHref.startsWith('data:') || 
+            normalizedHref.startsWith('vbscript:')) {
           return;
         }
         
