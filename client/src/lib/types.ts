@@ -2,7 +2,7 @@
 import type { SEOCheck } from '../../../shared/types';
 
 interface SEOAnalysisResult {
-  checks: SEOCheck[]; // Uses the imported SEOCheck
+  checks: SEOCheck[];
   passedChecks: number;
   failedChecks: number;
   url: string;
@@ -18,19 +18,17 @@ interface SEOAnalysisResult {
   apiDataUsed: boolean;
 }
 
-// NEW: Data fetched directly from Webflow API
 interface WebflowPageData {
   title: string;
   metaDescription: string;
   ogTitle: string;
   ogDescription: string;
   ogImage: string;
-  usesTitleAsOGTitle: boolean; // Added
-  usesDescriptionAsOGDescription: boolean; // Added
-  // Add other relevant fields if needed, e.g., search title/desc
+  usesTitleAsOGTitle: boolean;
+  usesDescriptionAsOGDescription: boolean;
 }
 
-// Re-export shared types for convenience in the client code
+// Only re-export shared types
 export type { 
   SEOCheck,
   OGMetadata, 
@@ -40,7 +38,4 @@ export type {
 } from '../../../shared/types';
 
 // Add any client-specific types here that don't make sense in the shared types
-export interface AnalyzeRequest {
-  url: string;
-  keyphrase: string;
-}
+// No duplicate interface definitions

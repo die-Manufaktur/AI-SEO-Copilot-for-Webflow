@@ -7,7 +7,7 @@ export interface SEOCheck {
   passed: boolean;
   priority: 'high' | 'medium' | 'low';
   recommendation?: string;
-  introPhrase?: string; // New field for copyable recommendations
+  introPhrase?: string;
   imageData?: Array<{
     url: string;
     name: string;
@@ -34,7 +34,6 @@ export interface OGMetadata {
  */
 export interface Resource {
   url: string;
-  // Add other properties if needed
 }
 
 /**
@@ -50,15 +49,16 @@ export interface SchemaMarkupResult {
  * Webflow Page Data fetched from Designer API
  */
 export interface WebflowPageData {
-  title?: string;
-  metaDescription?: string;
+  title: string;
+  metaDescription: string;
   canonicalUrl?: string;
   openGraphImage?: string;
-  hasOpenGraphImage?: boolean;
+  ogTitle?: string;
+  ogDescription?: string;
+  ogImage?: string;
   usesTitleAsOpenGraphTitle?: boolean;
   usesDescriptionAsOpenGraphDescription?: boolean;
   designerImages?: Array<{ url: string }>;
-  // Keep any existing properties
 }
 
 /**
@@ -103,6 +103,15 @@ export interface SEOAnalysisResult {
   passedChecks: number;
   failedChecks: number;
   checks: SEOCheck[];
+  ogData?: {
+    title: string;
+    description: string;
+    image: string;
+    imageWidth: string;
+    imageHeight: string;
+  };
+  timestamp?: string;
+  apiDataUsed?: boolean;
 }
 
 /**
@@ -132,10 +141,10 @@ export interface WebflowSiteInfo {
 export interface AnalyzeSEORequest {
   keyphrase: string;
   url: string;
-  isHomePage: boolean;
-  siteInfo: WebflowSiteInfo;
-  publishPath: string;
+  isHomePage?: boolean;
   webflowPageData?: WebflowPageData;
-  pageAssets?: Array<{ url: string, alt: string, type: string, size?: number, mimeType?: string }>;
+  pageAssets?: Array<{ url: string; alt: string; type: string; size?: number; mimeType?: string }>;
+  siteInfo?: WebflowSiteInfo;
+  publishPath?: string;
   debug?: boolean;
 }
