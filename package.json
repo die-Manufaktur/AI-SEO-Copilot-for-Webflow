@@ -7,7 +7,8 @@
   "scripts": {
     "check": "tsc",
     "dev": "concurrently -r \"vite --cors --force\" \"vite build --mode development && webflow extension serve\" \"npx wrangler dev ./workers/index.ts --port 8787\"",
-    "build": "vite build && npx wrangler deploy workers/index.ts --env production && webflow extension bundle"
+    "build": "vite build && webflow extension bundle",
+    "deploy": "npx wrangler deploy workers/index.ts --env production"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.2.4",

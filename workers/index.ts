@@ -13,13 +13,10 @@ import {
 import { shortenFileName } from '../shared/utils/fileUtils';
 import * as cheerio from 'cheerio';
 import { sanitizeText } from '../shared/utils/stringUtils';
-import { create } from 'domain';
 
 const app = new Hono();
 
-app.use('*', corsMiddleware({
-  allowedOrigins: ['http://localhost:1337', 'http://127.0.0.1:1337']
-}));
+app.use('*', corsMiddleware());
 
 app.get('/health', (c) => {
   return c.json({ status: 'ok' });
