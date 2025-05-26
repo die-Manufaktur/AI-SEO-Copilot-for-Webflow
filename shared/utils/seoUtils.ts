@@ -37,3 +37,19 @@ export const calculateSEOScore = (checks: SEOCheck[]): number => {
   // Calculate percentage score (0-100)
   return Math.round((earnedPoints / totalPossiblePoints) * 100);
 };
+
+/**
+ * Determines whether a copy button should be shown for a specific SEO check type
+ * @param checkTitle The title of the SEO check
+ * @returns Boolean indicating whether a copy button should be displayed
+ */
+export function shouldShowCopyButton(checkTitle: string): boolean {
+  return [
+    "Keyphrase in Title",
+    "Keyphrase in Meta Description", 
+    "Keyphrase in H1 Heading",
+    "Keyphrase in H2 Headings",
+    "Keyphrase in Introduction",
+    "Keyphrase in URL"
+  ].includes(checkTitle);
+}

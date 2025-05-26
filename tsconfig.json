@@ -22,5 +22,5 @@
     },
     "sourceMap": true
   },
-  "include": ["client/src", "client/src/types/**/*.d.ts", "workers"]
+  "include": ["client/src", "client/src/types/**/*.d.ts", "workers", "shared"]
 }

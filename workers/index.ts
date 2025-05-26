@@ -13,6 +13,7 @@ import {
 import { shortenFileName } from '../shared/utils/fileUtils';
 import * as cheerio from 'cheerio';
 import { sanitizeText } from '../shared/utils/stringUtils';
+import { shouldShowCopyButton } from '../shared/utils/seoUtils';
 
 const app = new Hono();
 
@@ -484,7 +485,6 @@ async function analyzeSEOElements(
   const contentWords = scrapedData.content.trim().split(/\s+/).filter(Boolean);
   const wordCount = contentWords.length;
 
-  // Define word count thresholds
   const minWordCount = isHomePage ? 300 : 600;
 
   const contentLengthCheck = await createSEOCheck(
@@ -499,7 +499,6 @@ async function analyzeSEOElements(
 
   checks.push(contentLengthCheck);
   
-  // --- Keyphrase Density Check ---
   const keyphraseDensityCheck: SEOCheck = {
     title: "Keyphrase Density",
     description: "",
@@ -507,31 +506,25 @@ async function analyzeSEOElements(
     priority: analyzerCheckPriorities["Keyphrase Density"]
   };
   
-  // Calculate keyphrase density
   function calculateKeyphraseDensity(content: string, keyphrase: string): number {
     const lowercaseContent = content.toLowerCase();
     const lowercaseKeyphrase = keyphrase.toLowerCase();
     
-    // Count occurrences of keyphrase in content
     const regex = new RegExp(lowercaseKeyphrase, 'g');
     const matches = lowercaseContent.match(regex);
     const occurrences = matches ? matches.length : 0;
     
-    // Calculate total word count
     const words = lowercaseContent.split(/\s+/);
     const wordCount = words.length || 1; // Avoid division by zero
     
-    // Calculate density (percentage)
     return (occurrences / wordCount) * 100;
   }
   
   const density = calculateKeyphraseDensity(scrapedData.content, keyphrase);
   
-  // Define optimal density range (in percentage) - this can be adjusted
   const minDensity = 0.5;
   const maxDensity = 2.5;
   
-  // Check if the keyphrase density is within the optimal range
   keyphraseDensityCheck.passed = density >= minDensity && density <= maxDensity;
   
   if (keyphraseDensityCheck.passed) {
@@ -550,35 +543,18 @@ async function analyzeSEOElements(
   checks.push(keyphraseDensityCheck);
   
   // --- Keyphrase in Introduction Check ---
-  const keyphraseInIntroCheck: SEOCheck = {
-    title: "Keyphrase in Introduction",
-    description: "",
-    passed: false,
-    priority: analyzerCheckPriorities["Keyphrase in Introduction"]
-  };
-  
-  // Get the first paragraph from the scraped data
   const firstParagraph = scrapedData.paragraphs[0] || '';
+
+  const keyphraseInIntroCheck = await createSEOCheck(
+    "Keyphrase in Introduction",
+    () => firstParagraph.toLowerCase().includes(normalizedKeyphrase),
+    `Nice! The keyphrase "${keyphrase}" appears in the first paragraph.`,
+    `Keyphrase "${keyphrase}" not found in the introduction: "${firstParagraph}"`,
+    firstParagraph,
+    keyphrase,
+    env
+  );
   
-  keyphraseInIntroCheck.passed = firstParagraph.toLowerCase().includes(normalizedKeyphrase);
-  
-  if (keyphraseInIntroCheck.passed) {
-    keyphraseInIntroCheck.description = getSuccessMessage(keyphraseInIntroCheck.title);
-  } else {
-    keyphraseInIntroCheck.description = `Keyphrase "${keyphrase}" not found in the introduction.`;
-    
-    try {
-        const keyphraseInIntroResult = await getAIRecommendation(
-          keyphraseInIntroCheck.title,
-          keyphrase,
-          env,
-          `First paragraph: "${firstParagraph}"`
-        );
-        handleRecommendationResult(keyphraseInIntroResult, keyphraseInIntroCheck);
-      } catch (error) {
-        console.error("[SEO Analyzer] Error getting AI recommendation for keyphrase in introduction:", error);
-      }
-  }
   checks.push(keyphraseInIntroCheck);
   
   // --- Image Alt Attributes Check ---
@@ -623,61 +599,29 @@ async function analyzeSEOElements(
   }
   
   // --- Internal Links Check ---
-  const internalLinksCheck: SEOCheck = {
-    title: "Internal Links",
-    description: "",
-    passed: false,
-    priority: analyzerCheckPriorities["Internal Links"]
-  };
+  const internalLinksCheck = await createSEOCheck(
+    "Internal Links",
+    () => scrapedData.internalLinks.length > 0,
+    `Great! You have internal links on the page.`,
+    `No internal links found on the page.`,
+    scrapedData.internalLinks.join(', '),
+    keyphrase,
+    env
+  );
   
-  internalLinksCheck.passed = scrapedData.internalLinks.length > 0;
-  
-  if (internalLinksCheck.passed) {
-    internalLinksCheck.description = getSuccessMessage(internalLinksCheck.title);
-  } else {
-    internalLinksCheck.description = `No internal links found on the page.`;
-    
-    try {
-        const internalLinksResult = await getAIRecommendation(
-          internalLinksCheck.title,
-          keyphrase,
-          env,
-          "No internal links found on the page."
-        );
-        handleRecommendationResult(internalLinksResult, internalLinksCheck);
-      } catch (error) {
-        console.error("[SEO Analyzer] Error getting AI recommendation for internal links:", error);
-      }
-  }
   checks.push(internalLinksCheck);
   
   // --- Outbound Links Check ---
-  const outboundLinksCheck: SEOCheck = {
-    title: "Outbound Links",
-    description: "",
-    passed: false,
-    priority: analyzerCheckPriorities["Outbound Links"]
-  };
+  const outboundLinksCheck = await createSEOCheck(
+    "Outbound Links",
+    () => scrapedData.outboundLinks.length > 0,
+    `Good! Outbound links are present.`,
+    `No outbound links found on the page.`,
+    scrapedData.outboundLinks.join(', '),
+    keyphrase,
+    env
+  );
   
-  outboundLinksCheck.passed = scrapedData.outboundLinks.length > 0;
-  
-  if (outboundLinksCheck.passed) {
-    outboundLinksCheck.description = getSuccessMessage(outboundLinksCheck.title);
-  } else {
-    outboundLinksCheck.description = `No outbound links found on the page.`;
-    
-    try {
-        const outboundLinksResult = await getAIRecommendation(
-          outboundLinksCheck.title,
-          keyphrase,
-          env,
-          "No outbound links found on the page."
-        );
-        handleRecommendationResult(outboundLinksResult, outboundLinksCheck);
-      } catch (error) {
-        console.error("[SEO Analyzer] Error getting AI recommendation for outbound links:", error);
-      }
-  }
   checks.push(outboundLinksCheck);
   
   // --- Next-Gen Image Formats Check ---
@@ -738,14 +682,11 @@ async function analyzeSEOElements(
     priority: analyzerCheckPriorities["OG Image"]
   };
   
-  // Check if OG image is set based on Webflow data or HTML scraping
   let hasOgImage = false;
 
   if (useApiData && webflowPageData) {
-    // Check for openGraphImage string from client
     hasOgImage = !!webflowPageData.openGraphImage;
   } else {
-    // Fallback to HTML scraping
     const ogImageMeta = scrapedData.content.match(/<meta property=["']og:image["'] content=["']([^"']+)["']/i);
     hasOgImage = !!ogImageMeta;
   }
@@ -771,7 +712,6 @@ async function analyzeSEOElements(
     const titleCheckPassed = checks.find(check => check.title === "Keyphrase in Title")?.passed || false;
     const metaDescCheckPassed = checks.find(check => check.title === "Keyphrase in Meta Description")?.passed || false;
     
-    // Convert potentially undefined values to boolean with nullish coalescing
     const usesTitleAsOG = webflowPageData?.usesTitleAsOpenGraphTitle ?? true;
     const usesDescAsOG = webflowPageData?.usesDescriptionAsOpenGraphDescription ?? true;
 
@@ -800,114 +740,60 @@ async function analyzeSEOElements(
     checks.push(ogTitleDescCheck);
   
   // --- H1 Check ---
-  const h1Check: SEOCheck = {
-    title: "Keyphrase in H1 Heading",
-    description: "",
-    passed: false,
-    priority: analyzerCheckPriorities["Keyphrase in H1 Heading"]
-  };
-  
-  // Extract H1 headings from content
   const h1Headings = scrapedData.headings.filter(heading => heading.level === 1).map(h => h.text);
   const h1Text = h1Headings.length > 0 ? h1Headings[0] : '';
 
-  // Check if any H1 heading contains the keyphrase
-  h1Check.passed = h1Headings.some(heading => 
-    heading.toLowerCase().includes(normalizedKeyphrase)
+  const h1Check = await createSEOCheck(
+    "Keyphrase in H1 Heading",
+    () => h1Text.toLowerCase().includes(normalizedKeyphrase),
+    `Great! The main H1 heading includes the keyphrase "${keyphrase}".`,
+    `Keyphrase "${keyphrase}" not found in H1: "${h1Text}"`,
+    h1Text,
+    keyphrase,
+    env
   );
-  
-  if (h1Check.passed) {
-    h1Check.description = getSuccessMessage(h1Check.title);
-  } else {
-    h1Check.description = `Keyphrase "${keyphrase}" not found in H1: "${h1Text}"`;
-    
-    try {
-        const context = `Create a complete, ready-to-use H1 (30-50 characters) that includes the keyphrase "${keyphrase}" naturally. Current H1 heading: "${h1Text || 'None'}"`;
-        
-        const h1CheckResult = await getAIRecommendation(
-          "Keyphrase in H1 Heading",
-          keyphrase,
-          env,
-          context
-        );
-        
-        handleRecommendationResult(h1CheckResult, h1Check);
-      } catch (error) {
-        console.error("[SEO Analyzer] Error getting AI recommendation for H1 heading:", error);
-      }
-  }
+
   checks.push(h1Check);
   
   // --- H2 Check ---
-  const h2Check: SEOCheck = {
-    title: "Keyphrase in H2 Headings",
-    description: "",
-    passed: false,
-    priority: analyzerCheckPriorities["Keyphrase in H2 Headings"]
-  };
-  
-  // Check if keyphrase is in any H2 heading
   const h2Headings = scrapedData.headings.filter(h => h.level === 2);
-  h2Check.passed = h2Headings.some(h => h.text.toLowerCase().includes(normalizedKeyphrase));
-  
-  if (h2Check.passed) {
-    h2Check.description = getSuccessMessage(h2Check.title);
-  } else {
-    h2Check.description = `Keyphrase "${keyphrase}" not found in H2 headings.`;
-    
-    try {
-        const h2Result = await getAIRecommendation(
-          h2Check.title,
-          keyphrase,
-          env,
-          `H2 headings: "${h2Headings.map(h => h.text).join(', ')}".`
-        );
-        handleRecommendationResult(h2Result, h2Check);
-      } catch (error) {
-        console.error("[SEO Analyzer] Error getting AI recommendation for H2 headings:", error);
-      }
-  }
+
+  const h2Check = await createSEOCheck(
+    "Keyphrase in H2 Headings",
+    () => h2Headings.some(h => h.text.toLowerCase().includes(normalizedKeyphrase)),
+    `Good! The keyphrase "${keyphrase}" is found in at least one H2 heading.`,
+    `Keyphrase "${keyphrase}" not found in any H2 headings.`,
+    h2Headings.map(h => h.text).join(', '),
+    keyphrase,
+    env
+  );
+
   checks.push(h2Check);
   
   // --- Heading Hierarchy Check ---
-  const headingHierarchyCheck: SEOCheck = {
-    title: "Heading Hierarchy",
-    description: "",
-    passed: false,
-    priority: analyzerCheckPriorities["Heading Hierarchy"]
-  };
   
   const headingLevels = scrapedData.headings.map(h => h.level);
   const hasProperHierarchy = (
     headingLevels.includes(1) &&
     headingLevels.filter(level => level === 1).length === 1 &&
     headingLevels.every((level, index) => 
-      index === 0 || //
+      index === 0 ||
       level === headingLevels[index - 1] ||
       level === headingLevels[index - 1] + 1 ||
       level < headingLevels[index - 1]
     )
   );
-  
-  headingHierarchyCheck.passed = hasProperHierarchy;
-  
-  if (headingHierarchyCheck.passed) {
-    headingHierarchyCheck.description = getSuccessMessage(headingHierarchyCheck.title);
-  } else {
-    headingHierarchyCheck.description = `Improper heading hierarchy detected.`;
-    
-    try {
-        const headingHierarchyResult = await getAIRecommendation(
-          headingHierarchyCheck.title,
-          keyphrase,
-          env,
-          "Improper heading hierarchy detected."
-        );
-        handleRecommendationResult(headingHierarchyResult, headingHierarchyCheck);
-      } catch (error) {
-        console.error("[SEO Analyzer] Error getting AI recommendation for heading hierarchy:", error);
-      }
-  }
+
+  const headingHierarchyCheck = await createSEOCheck(
+    "Heading Hierarchy",
+    () => hasProperHierarchy,
+    `Excellent! Your heading structure follows a logical hierarchy.`,
+    `Improper heading hierarchy detected. Ensure that H1 is used only once and H2s follow a logical order.`,
+    scrapedData.headings.map(h => `${h.text} (H${h.level})`).join(', '),
+    keyphrase,
+    env
+  );
+
   checks.push(headingHierarchyCheck);
   
   // --- Enhanced Code Minification Check ---
@@ -1132,10 +1018,8 @@ async function analyzeSEOElements(
   const passedChecks = checks.filter(check => check.passed);
   const failedChecks = checks.filter(check => !check.passed);
   
-  // Calculate overall SEO score (simple formula: % of passed checks)
   const seoScore = (passedChecks.length / checks.length) * 100;
   
-  // Prepare the final result
   const result: SEOAnalysisResult = {
     keyphrase,
     url,
@@ -1152,16 +1036,7 @@ async function analyzeSEOElements(
 
 export default app;
 
-export function shouldHaveCopyButton(checkType: string): boolean {
-  return [
-    "Keyphrase in Title",
-    "Keyphrase in Meta Description",
-    "Keyphrase in H1 Heading",
-    "Keyphrase in H2 Headings",
-    "Keyphrase in Introduction",
-    "Keyphrase in URL"
-  ].includes(checkType);
-}
+export const shouldHaveCopyButton = shouldShowCopyButton;
 
 function handleRecommendationResult(
   result: string | { introPhrase: string; copyableContent: string },

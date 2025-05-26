@@ -7,7 +7,6 @@ interface ImportMeta {
     readonly DEV: boolean;
     readonly PROD: boolean;
     readonly SSR: boolean;
-    // Add any other environment variables you use
     readonly [key: string]: string | boolean | undefined;
   }
 }
