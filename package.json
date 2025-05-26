@@ -90,7 +90,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "embla-carousel-react": "^8.6.0",
-    "framer-motion": "^12.11.4",
+    "framer-motion": "^12.14.0",
     "hono": "^4.7.9",
     "input-otp": "^1.4.2",
     "net": "^1.0.2",
