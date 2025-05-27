@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-This has been reset to the official release and these will be more robust moving forward.
+Check here for security updates.
 
 | Version        | Supported          |
 | -------        | ------------------ |
