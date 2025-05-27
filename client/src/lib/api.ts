@@ -99,7 +99,9 @@ export async function analyzeSEO({
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Accept': 'application/json'
           },
+          credentials: 'include', // Add this line
           body: JSON.stringify({
             keyphrase,
             url,
@@ -152,7 +154,9 @@ export async function fetchOAuthToken(authCode: string): Promise<string> {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'Accept': 'application/json'
     },
+    credentials: 'include', // Add this line
     body: JSON.stringify({ code: authCode }),
   });
 
@@ -422,8 +426,10 @@ export async function fetchFromAPI<T>(endpoint: string, data: any): Promise<T> {
     const response = await fetch(`${workerUrl}${endpoint}`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
       },
+      credentials: 'include', // Add this line for CORS with credentials
       body: JSON.stringify(data)
     });
     
