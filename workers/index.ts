@@ -257,6 +257,26 @@ async function scrapeWebPage(url: string, env: Env, keyphrase: string): Promise<
     const html = await response.text();
     const $ = cheerio.load(html);
     
+    const elementsToRemove = [
+      '.cookie-banner', '.cookie-consent', '#cookie-notice', '.cookie-policy', 
+      '[class*="cookie"]', '[id*="cookie"]', '[aria-label*="cookie"]',
+      
+      '.chat-widget', '.chatbot', '#intercom-container', '.crisp-client',
+      '.livechat-widget', '.drift-widget', '.zendesk-chat',
+      
+      '.popup', '.modal', '.notification-bar', '.promo-banner',
+      '[role="dialog"]:not([aria-label*="content"])',
+      '[aria-hidden="true"]'
+    ];
+    
+    elementsToRemove.forEach(selector => {
+      try {
+        $(selector).remove();
+      } catch (e) {
+        // Silently continue if a selector fails
+      }
+    });
+    
     const title = $('title').text().trim() || $('meta[property="og:title"]').attr('content') || '';
     
     const metaDescription = $('meta[name="description"]').attr('content') || 
@@ -302,7 +322,11 @@ async function scrapeWebPage(url: string, env: Env, keyphrase: string): Promise<
     $('a[href]').each((_, element) => {
       try {
         const href = $(element).attr('href') || '';
-        if (!href || href.startsWith('#') || href.startsWith('javascript:')) {
+        const normalizedHref = href.trim().toLowerCase();
+        if (!href || normalizedHref.startsWith('#') || 
+            normalizedHref.startsWith('javascript:') || 
+            normalizedHref.startsWith('data:') || 
+            normalizedHref.startsWith('vbscript:')) {
           return;
         }
         
