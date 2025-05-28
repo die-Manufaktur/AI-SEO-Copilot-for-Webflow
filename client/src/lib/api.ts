@@ -13,6 +13,13 @@ type Asset = {
   source?: string;
 };
 
+export function getApiBaseUrl(): string {
+  if (import.meta.env.DEV) {
+    return 'http://localhost:8787';
+  }
+  return 'https://ai-seo-copilot-api.your-domain.workers.dev';
+}
+
 // Check how the API base URL is determined
 export const getApiUrl = () => {
   // Force local development API during development

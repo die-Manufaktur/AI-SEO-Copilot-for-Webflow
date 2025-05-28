@@ -5,7 +5,7 @@ import { z } from "zod";
 import { useMutation } from "@tanstack/react-query";
 import confetti from 'canvas-confetti';
 import { Card, CardContent, CardHeader, CardTitle as OriginalCardTitle } from "../components/ui/card";
-import { Form, FormControl, FormField, FormItem, FormLabel } from "../components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "../components/ui/form";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { ScrollArea } from "../components/ui/scroll-area";
@@ -628,6 +628,7 @@ export default function Home() {
                             />
                           </motion.div>
                         </FormControl>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />

@@ -820,7 +820,7 @@ async function analyzeSEOElements(
 
   checks.push(headingHierarchyCheck);
   
-  // --- Enhanced Code Minification Check ---
+  // --- Code Minification Check ---
   const codeMinificationCheck: SEOCheck = {
     title: "Code Minification",
     description: "",
@@ -969,8 +969,7 @@ async function analyzeSEOElements(
     priority: analyzerCheckPriorities["Image File Size"]
   };
   
-  // Check image file sizes
-  const MAX_IMAGE_SIZE_KB = 300; // 300KB max recommended size
+  const MAX_IMAGE_SIZE_KB = 300;
   const largeImages: Array<{
     url: string;
     name: string;
@@ -980,7 +979,6 @@ async function analyzeSEOElements(
   }> = [];
   let totalImages = 0;
   
-  // Use page assets if available, otherwise fall back to scraped data
   if (pageAssets && pageAssets.length > 0) {
     totalImages = pageAssets.filter(asset => asset.type === "image").length;
     
@@ -1033,7 +1031,6 @@ async function analyzeSEOElements(
         console.error("[SEO Analyzer] Error generating AI recommendation for image size:", error);
       }
     
-    // Add structured data for client rendering
     imageSizeCheck.imageData = largeImages;
   }
   checks.push(imageSizeCheck);
