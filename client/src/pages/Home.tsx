@@ -5,7 +5,7 @@ import { z } from "zod";
 import { useMutation } from "@tanstack/react-query";
 import confetti from 'canvas-confetti';
 import { Card, CardContent, CardHeader, CardTitle as OriginalCardTitle } from "../components/ui/card";
-import { Form, FormControl, FormField, FormItem, FormLabel } from "../components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "../components/ui/form";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { ScrollArea } from "../components/ui/scroll-area";
@@ -40,6 +40,7 @@ import React from 'react';
 import { calculateSEOScore } from '../../../shared/utils/seoUtils';
 import { ImageSizeDisplay } from "../components/ImageSizeDisplay";
 import { copyTextToClipboard } from "../utils/clipboard";
+import { shouldShowCopyButton } from '../../../shared/utils/seoUtils';
 
 const logger = createLogger("Home");
 
@@ -73,18 +74,6 @@ const iconAnimation = {
     }
   }
 };
-
-// Helper function to determine if a check should show a copy button
-function shouldShowCopyButton(checkTitle: string): boolean {
-  return [
-    "Keyphrase in Title",
-    "Keyphrase in Meta Description",
-    "Keyphrase in H1 Heading",
-    "Keyphrase in H2 Headings",
-    "Keyphrase in Introduction",
-    "Keyphrase in URL"
-  ].includes(checkTitle);
-}
 
 // Get priority icon based on priority level
 export const getPriorityIcon = (priority: string, className: string = "h-4 w-4") => {
@@ -331,6 +320,12 @@ export default function Home() {
   useEffect(() => {
     // Store the current page path to detect actual changes
     let currentPagePath: string | null = null;
+    
+    // Check if webflow is available before proceeding
+    if (!webflow) {
+      console.warn("Webflow API not available");
+      return;
+    }
     
     // Initialize on mount
     const initCurrentPage = async () => {
@@ -639,6 +634,7 @@ export default function Home() {
                             />
                           </motion.div>
                         </FormControl>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />

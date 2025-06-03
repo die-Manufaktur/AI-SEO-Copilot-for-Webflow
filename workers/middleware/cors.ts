@@ -3,6 +3,7 @@ import { cors as honoCors } from 'hono/cors';
 
 /**
  * Configurable CORS middleware for the SEO Analyzer API
+ * Uses environment variables for configuration when available
  */
 export function corsMiddleware(options?: {
   allowedOrigins?: string[];

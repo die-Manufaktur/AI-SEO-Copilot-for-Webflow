@@ -1,4 +1,3 @@
-import React from 'react';
 import { cn } from "../lib/utils";
 
 function formatFileSize(sizeInKB: number): string {
@@ -79,10 +78,8 @@ export function ImageSizeDisplay({
                   </span>
                 )}
                 
-                {/* For Next-Gen Image Formats check, show only the file extension */}
                 {showMimeType && (
                   <span className="text-sm text-muted-foreground">
-                    {/* For Next-Gen Image Formats check, show only the file extension without the bullet */}
                     {image.mimeType || ''}
                   </span>
                 )}

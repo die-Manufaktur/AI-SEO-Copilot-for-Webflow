@@ -25,7 +25,11 @@ export default function WebflowAppWrapper({ children }: WebflowAppWrapperProps) 
   }, []);
 
   return (
-    <div id="webflow-app-wrapper" className="bg-background text-text1 min-h-screen">
+    <div 
+      id="webflow-app-wrapper" 
+      data-testid="webflow-app-wrapper"
+      className="bg-background text-text1 min-h-screen"
+    >
       {children}
     </div>
   );

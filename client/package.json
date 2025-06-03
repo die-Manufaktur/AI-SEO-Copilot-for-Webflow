@@ -1,0 +1,11 @@
+{
+  "name": "client",
+  "version": "1.0.0",
+  "scripts": {
+    "test": "vitest --coverage"
+  },
+  "devDependencies": {
+    "vitest": "^0.0.0",
+    "vite-plugin-istanbul": "^0.0.0"
+  }
+}
