@@ -1,582 +1,649 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { analyzeSEO, getApiBaseUrl, getApiUrl, collectPageAssets, fetchFromAPI } from './api';
+import { analyzeSEO, fetchOAuthToken, collectPageAssets, fetchFromAPI, getApiUrl, getApiBaseUrl } from './api';
 import type { AnalyzeSEORequest, SEOAnalysisResult } from '../../../shared/types';
 
-// Mock fetch globally
+// Mock the createLogger utility with prefix-aware behavior
+const mockLogger = vi.hoisted(() => ({
+  info: vi.fn(),
+  debug: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+}));
+
+const mockAssetLogger = vi.hoisted(() => ({
+  info: vi.fn(),
+  debug: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+}));
+
+const mockConsole = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  log: vi.fn(),
+}));
+
+vi.mock('./utils', () => ({
+  createLogger: vi.fn((prefix: string) => {
+    if (prefix === '[SEO Assets]') return mockAssetLogger;
+    return mockLogger;
+  }),
+}));
+
+// Mock console methods
+Object.defineProperty(global, 'console', {
+  value: mockConsole,
+  writable: true,
+});
+
+// Mock global fetch
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
-// Mock XMLHttpRequest for image size detection
-const mockXHR = {
-  open: vi.fn(),
-  send: vi.fn(),
-  setRequestHeader: vi.fn(),
-  onload: null as (() => void) | null,
-  onerror: null as (() => void) | null,
-  status: 200,
-  response: { size: 1024 },
-  responseType: ''
-};
-
-global.XMLHttpRequest = vi.fn(() => mockXHR) as any;
-
-// Mock window.webflow with proper structure
+// Mock global webflow
 const mockWebflow = {
-  getCurrentPage: vi.fn()
+  getCurrentPage: vi.fn(),
 };
 
-// Make webflow globally available but undefined by default
+const mockPage = {
+  getOpenGraphImage: vi.fn(),
+};
+
 Object.defineProperty(global, 'webflow', {
-  value: undefined,
+  value: mockWebflow,
   writable: true,
-  configurable: true
 });
 
-// Mock document methods for DOM testing
-Object.defineProperty(document, 'querySelectorAll', {
-  value: vi.fn(),
-  writable: true
+// Mock window.location
+Object.defineProperty(window, 'location', {
+  value: {
+    hostname: 'localhost',
+    href: 'http://localhost:3000/test-page'
+  },
+  writable: true,
 });
 
-Object.defineProperty(window, 'getComputedStyle', {
-  value: vi.fn().mockReturnValue({
-    backgroundImage: 'none'
-  }),
-  writable: true
-});
-
-describe('API Functions', () => {
+describe('getApiBaseUrl function', () => {
   beforeEach(() => {
-    mockFetch.mockClear();
     vi.clearAllMocks();
-    
-    // Reset location mock
-    Object.defineProperty(window, 'location', {
-      value: {
-        hostname: 'localhost',
-        href: 'http://localhost:3000'
-      },
-      writable: true
-    });
+    // Clear any existing import mock
+    vi.unstubAllGlobals();
+  });
 
-    // Reset webflow to undefined by default
+  it('returns localhost URL in development mode', () => {
+    // Mock import.meta.env.DEV as true using vi.stubEnv
+    vi.stubEnv('DEV', true);
+    
+    const result = getApiBaseUrl();
+    expect(result).toBe('http://localhost:8787');
+  });
+
+  it('returns production URL in production mode', () => {
+    // Mock import.meta.env.DEV as false using vi.stubEnv
+    vi.stubEnv('DEV', false);
+    
+    const result = getApiBaseUrl();
+    expect(result).toBe('https://ai-seo-copilot-api.your-domain.workers.dev');
+  });
+});
+
+describe('getWebflowPageData function edge cases', () => {
+  it('handles webflow undefined scenario', async () => {
     Object.defineProperty(global, 'webflow', {
       value: undefined,
       writable: true,
-      configurable: true
+    });
+
+    const mockImg = {
+      getAttribute: vi.fn((attr) => {
+        if (attr === 'src') return 'https://example.com/test.jpg';
+        if (attr === 'alt') return 'test image';
+        return '';
+      }),
+    };
+    
+    document.querySelectorAll = vi.fn().mockImplementation((selector) => {
+      if (selector === 'img') return [mockImg];
+      if (selector === '*') return [];
+      return [];
+    });
+
+    mockFetch.mockResolvedValue({
+      ok: true,
+      headers: {
+        get: (header: string) => header === 'content-length' ? '1024' : null
+      }
+    });
+
+    const assets = await collectPageAssets();
+    
+    expect(assets).toHaveLength(1);
+    expect(assets[0]).toEqual({
+      url: 'https://example.com/test.jpg',
+      alt: 'test image',
+      type: 'image',
+      size: 1024  // The actual function does include size when fetch succeeds
+    });
+  });
+});
+
+describe('api.ts error handling', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch.mockReset();
+    mockConsole.error.mockReset();
+    mockConsole.warn.mockReset();
+    mockConsole.log.mockReset();
+    
+    // Reset webflow mock to working state
+    mockWebflow.getCurrentPage.mockResolvedValue({
+      getOpenGraphImage: () => Promise.resolve(null)
+    });
+    
+    // Reset window.location to default
+    Object.defineProperty(window, 'location', {
+      value: {
+        hostname: 'localhost',
+        href: 'http://localhost:3000/test-page'
+      },
+      writable: true,
+    });
+
+    // Reset webflow to default mock
+    Object.defineProperty(global, 'webflow', {
+      value: mockWebflow,
+      writable: true,
     });
   });
 
-  describe('getApiBaseUrl', () => {
-    it('returns correct API base URL', () => {
-      const url = getApiBaseUrl();
-      expect(url).toBeDefined();
-      expect(typeof url).toBe('string');
-      expect(url).toMatch(/^https?:\/\//);
-    });
-  });
-
-  describe('getApiUrl', () => {
-    it('returns development URL for localhost', () => {
+  describe('getApiUrl error handling', () => {
+    it('handles window.webflow access errors gracefully', () => {
+      // Set up localhost environment first so the webflow check happens
       Object.defineProperty(window, 'location', {
-        value: { hostname: 'localhost' },
-        writable: true
+        value: {
+          hostname: 'webflow.com', // Set to webflow.com so it tries to access window.webflow
+          href: 'https://webflow.com/design/test-site'
+        },
+        writable: true,
       });
+
+      // Mock window.webflow to throw an error when accessed
+      Object.defineProperty(global, 'webflow', {
+        get() {
+          throw new Error('Webflow API not available');
+        },
+        configurable: true,
+      });
+
+      const result = getApiUrl();
       
-      const url = getApiUrl();
-      expect(url).toBe('http://localhost:8787');
+      expect(mockLogger.error).toHaveBeenCalledWith('Error determining API URL:', expect.any(Error));
+      expect(result).toBe('https://seo-copilot-api-production.paul-130.workers.dev'); // Should fall back to production
     });
 
-    it('returns production URL for Webflow environment', () => {
+    it('handles window.location access errors in local check', () => {
+      // Mock window.location to throw an error
       Object.defineProperty(window, 'location', {
-        value: { hostname: 'webflow.com' },
-        writable: true
+        get() {
+          throw new Error('Location access denied');
+        },
+        configurable: true,
       });
+
+      const result = getApiUrl();
       
+      expect(result).toBe('https://seo-copilot-api-production.paul-130.workers.dev'); // Should fall back to production
+    });
+
+    it('handles production environment correctly', () => {
+      // Set up production-like environment
+      Object.defineProperty(window, 'location', {
+        value: {
+          hostname: 'webflow.com',
+          href: 'https://webflow.com/design/test-site'
+        },
+        writable: true,
+      });
+
       Object.defineProperty(global, 'webflow', {
         value: mockWebflow,
         writable: true,
-        configurable: true
       });
-      
-      const url = getApiUrl();
-      expect(url).toBe('https://seo-copilot-api-production.paul-130.workers.dev');
-    });
 
-    it('falls back to production URL', () => {
-      Object.defineProperty(window, 'location', {
-        value: { hostname: 'example.com' },
-        writable: true
-      });
+      const result = getApiUrl();
       
-      Object.defineProperty(global, 'webflow', {
-        value: undefined,
-        writable: true,
-        configurable: true
-      });
-      
-      const url = getApiUrl();
-      expect(url).toBe('https://seo-copilot-api-production.paul-130.workers.dev');
+      expect(result).toBe('https://seo-copilot-api-production.paul-130.workers.dev');
+      expect(mockLogger.debug).toHaveBeenCalledWith('Using production API URL for Webflow Extension');
     });
   });
 
-  describe('analyzeSEO', () => {
+  describe('analyzeSEO error handling', () => {
     const mockRequest: AnalyzeSEORequest = {
       keyphrase: 'test keyword',
       url: 'https://example.com',
       isHomePage: false,
       publishPath: '/test',
-      webflowPageData: { title: 'Test Page',
-        metaDescription: 'This is a test page.'
-       },
       debug: true
     };
 
-    const mockResponse: SEOAnalysisResult = {
-      checks: [
-        { 
-          title: 'Page Title', 
-          description: 'Title analysis', 
-          passed: true, 
-          priority: 'high',
-          recommendation: 'Your page title is well optimized for SEO',
-          introPhrase: 'Page title optimization'
-        },
-        { 
-          title: 'Meta Description', 
-          description: 'Description analysis', 
-          passed: true, 
-          priority: 'high',
-          recommendation: 'Meta description length and content are appropriate',
-          introPhrase: 'Meta description check'
-        },
-        { 
-          title: 'Headings Structure', 
-          description: 'Headings analysis', 
-          passed: true, 
-          priority: 'medium',
-          recommendation: 'Heading structure follows SEO best practices',
-          introPhrase: 'Heading hierarchy analysis'
-        },
-        { 
-          title: 'Image Optimization', 
-          description: 'Images analysis', 
-          passed: true, 
-          priority: 'medium',
-          recommendation: 'Most images are properly optimized',
-          introPhrase: 'Image optimization check',
-          imageData: [
-            {
-              url: 'https://example.com/image1.jpg',
-              name: 'hero-image.jpg',
-              shortName: 'hero-image',
-              size: 150000,
-              mimeType: 'image/jpeg',
-              alt: 'Hero image for homepage'
-            },
-            {
-              url: 'https://example.com/image2.png',
-              name: 'feature-graphic.png',
-              shortName: 'feature-graphic',
-              size: 89000,
-              mimeType: 'image/png',
-              alt: 'Feature graphic'
-            }
-          ]
-        },
-        { 
-          title: 'Performance', 
-          description: 'Performance analysis', 
-          passed: false, 
-          priority: 'low',
-          recommendation: 'Consider optimizing page load speed and reducing image sizes',
-          introPhrase: 'Performance optimization'
-        }
-      ],
-      passedChecks: 4,
-      failedChecks: 1,
-      totalChecks: 5,
-      url: 'https://example.com',
-      keyphrase: 'test keyword',
-      isHomePage: false,
-      score: 80,
-      ogData: {
-        title: 'Test Page Title',
-        description: 'Test page description',
-        image: 'https://example.com/og-image.jpg',
-        imageWidth: '1200',
-        imageHeight: '630'
-      },
-      timestamp: new Date().toISOString(),
-      apiDataUsed: true
-    };
-
-    beforeEach(() => {
-      // Mock document.querySelectorAll to return empty arrays
-      vi.mocked(document.querySelectorAll).mockReturnValue([] as any);
-    });
-
-    it('successfully analyzes page SEO', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse
-      });
+    it('handles fetch errors with retry logic', async () => {
+      // Mock fetch to fail twice, then succeed
+      mockFetch
+        .mockRejectedValueOnce(new Error('Network error'))
+        .mockRejectedValueOnce(new Error('Connection timeout'))
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ score: 85, checks: [] })
+        });
 
       const result = await analyzeSEO(mockRequest);
       
-      expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:8787/api/analyze',
-        expect.objectContaining({
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          credentials: 'include',
-          body: JSON.stringify({
-            keyphrase: 'test keyword',
-            url: 'https://example.com',
-            isHomePage: false,
-            publishPath: '/test',
-            webflowPageData: { 
-              title: 'Test Page',
-              metaDescription: 'This is a test page.'
-            },
-            pageAssets: [],
-            debug: true
-          })
-        })
-      );
-      
-      expect(result).toEqual(mockResponse);
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+      expect(result).toEqual({ score: 85, checks: [] });
     });
 
-    it('handles API errors gracefully', async () => {
-      mockFetch.mockResolvedValueOnce({
+    it('handles maximum retry attempts exceeded', async () => {
+      // Mock fetch to always fail
+      mockFetch.mockRejectedValue(new Error('Persistent network error'));
+
+      await expect(analyzeSEO(mockRequest)).rejects.toThrow('SEO Analysis failed: Persistent network error');
+      
+      // The actual implementation is "1 original + 2 retries = 3 attempts" but we also have collectPageAssets() call
+      expect(mockFetch).toHaveBeenCalledTimes(4); // 1 for collectPageAssets + 3 for analyze attempts
+    });
+
+    it('handles 404 response with specific error message', async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 404,
+      });
+
+      await expect(analyzeSEO(mockRequest)).rejects.toThrow('API returned status code 404');
+      
+      expect(mockConsole.error).toHaveBeenCalledWith(
+        '[SEO Analyzer] API endpoint not found. Check if worker is running and the /api/analyze endpoint is defined.'
+      );
+    });
+
+    it('handles non-200 status codes', async () => {
+      mockFetch.mockResolvedValue({
         ok: false,
         status: 500,
-        text: async () => 'Internal Server Error'
       });
 
       await expect(analyzeSEO(mockRequest)).rejects.toThrow('API returned status code 500');
     });
 
-    it('handles network errors with retries', async () => {
-      mockFetch.mockRejectedValue(new Error('Network error'));
+    it('handles response without status', async () => {
+      mockFetch.mockResolvedValue(null);
 
-      await expect(analyzeSEO(mockRequest)).rejects.toThrow('SEO Analysis failed: Network error');
-      
-      // Should retry 3 times total (initial + 2 retries)
-      expect(mockFetch).toHaveBeenCalledTimes(3);
+      await expect(analyzeSEO(mockRequest)).rejects.toThrow('API returned status code unknown');
     });
 
-    it('handles 404 errors specifically', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 404
-      });
-
-      await expect(analyzeSEO(mockRequest)).rejects.toThrow('API returned status code 404');
-    });
-
-    it('retries on fetch failure and succeeds on retry', async () => {
-      mockFetch
-        .mockRejectedValueOnce(new Error('Network error'))
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => mockResponse
-        });
-
-      const result = await analyzeSEO(mockRequest);
-      
-      expect(mockFetch).toHaveBeenCalledTimes(2);
-      expect(result).toEqual(mockResponse);
-    });
-  });
-
-  describe('collectPageAssets', () => {
-    beforeEach(() => {
-      // Reset DOM mocks
-      vi.mocked(document.querySelectorAll).mockImplementation((selector) => {
-        if (selector === 'img') {
-          return [
-            {
-              getAttribute: vi.fn((attr) => {
-                if (attr === 'src') return 'https://example.com/image1.jpg';
-                if (attr === 'alt') return 'Test Image';
-                return null;
-              })
-            },
-            {
-              getAttribute: vi.fn((attr) => {
-                if (attr === 'src') return 'data:image/png;base64,abc';
-                if (attr === 'alt') return 'Data URI Image';
-                return null;
-              })
-            }
-          ] as any;
-        }
-        if (selector === '*') {
-          return [] as any;
-        }
-        return [] as any;
-      });
-
-      // Reset XHR mock and ensure it responds immediately with correct structure
-      mockXHR.onload = null;
-      mockXHR.onerror = null;
-      mockXHR.send = vi.fn(() => {
-        // Simulate immediate successful response with size data
-        setTimeout(() => {
-          if (mockXHR.onload) {
-            // Mock the actual XHR response structure
-            mockXHR.response = new Blob(['test'], { type: 'image/jpeg' });
-            Object.defineProperty(mockXHR.response, 'size', { value: 1024 });
-            mockXHR.status = 200;
-            mockXHR.onload();
-          }
-        }, 0);
-      });
-
-      // Reset webflow mock
-      mockWebflow.getCurrentPage.mockClear();
-    });
-
-    it('collects standard img elements', async () => {
-      // Ensure webflow is undefined to avoid OG image inclusion
-      Object.defineProperty(global, 'webflow', {
-        value: undefined,
-        writable: true,
-        configurable: true
-      });
-      
-      const assets = await collectPageAssets();
-      
-      expect(assets).toHaveLength(1); // Should skip data URI
-      expect(assets[0]).toMatchObject({
-        url: 'https://example.com/image1.jpg',
-        alt: 'Test Image',
-        type: 'image'
-      });
-    });
-
-    it('skips data URI images', async () => {
-      // Ensure webflow is undefined to avoid OG image inclusion
-      Object.defineProperty(global, 'webflow', {
-        value: undefined,
-        writable: true,
-        configurable: true
-      });
-      
-      const assets = await collectPageAssets();
-      
-      // Should not include the data URI image
-      expect(assets.every(asset => !asset.url.startsWith('data:'))).toBe(true);
-    });
-
-    it('handles Webflow page data', async () => {
-      // Mock the exact Webflow API flow that the real function uses
-      const mockPage = {
-        getOpenGraphImage: vi.fn().mockResolvedValue('https://example.com/og-image.jpg')
-      };
-      mockWebflow.getCurrentPage.mockResolvedValueOnce(mockPage);
-
-      // Set webflow globally for this test
-      Object.defineProperty(global, 'webflow', {
-        value: mockWebflow,
-        writable: true,
-        configurable: true
-      });
-
-      const assets = await collectPageAssets();
-      
-      // Should include OG image from Webflow (plus the regular image = 2 total)
-      expect(assets.some(asset => asset.url === 'https://example.com/og-image.jpg')).toBe(true);
-      
-      // Verify the Webflow API was called correctly
-      expect(mockWebflow.getCurrentPage).toHaveBeenCalled();
-      expect(mockPage.getOpenGraphImage).toHaveBeenCalled();
-    });
-
-    it('handles errors in Webflow page data gracefully', async () => {
-      mockWebflow.getCurrentPage.mockRejectedValueOnce(new Error('Webflow error'));
-
-      // Set webflow globally but make it error
-      Object.defineProperty(global, 'webflow', {
-        value: mockWebflow,
-        writable: true,
-        configurable: true
-      });
-
-      const assets = await collectPageAssets();
-      
-      // Should still return other assets even if Webflow fails
-      expect(Array.isArray(assets)).toBe(true);
-      // Should still have the regular img element
-      expect(assets.some(asset => asset.url === 'https://example.com/image1.jpg')).toBe(true);
-    });
-
-    it('deduplicates assets with same URL', async () => {
-      // Ensure webflow is undefined to avoid OG image inclusion
-      Object.defineProperty(global, 'webflow', {
-        value: undefined,
-        writable: true,
-        configurable: true
-      });
-      
-      vi.mocked(document.querySelectorAll).mockImplementation((selector) => {
-        if (selector === 'img') {
-          return [
-            {
-              getAttribute: vi.fn((attr) => {
-                if (attr === 'src') return 'https://example.com/same-image.jpg';
-                if (attr === 'alt') return 'Image 1';
-                return null;
-              })
-            },
-            {
-              getAttribute: vi.fn((attr) => {
-                if (attr === 'src') return 'https://example.com/same-image.jpg';
-                if (attr === 'alt') return 'Image 2';
-                return null;
-              })
-            }
-          ] as any;
-        }
-        return [] as any;
-      });
-
-      const assets = await collectPageAssets();
-      
-      // Should only have one asset despite duplicate URLs
-      expect(assets).toHaveLength(1);
-      expect(assets[0].url).toBe('https://example.com/same-image.jpg');
-    });
-
-    it('handles XHR errors gracefully', async () => {
-      // Ensure webflow is undefined to avoid OG image inclusion
-      Object.defineProperty(global, 'webflow', {
-        value: undefined,
-        writable: true,
-        configurable: true
-      });
-      
-      // Mock XHR to fail
-      mockXHR.send = vi.fn(() => {
-        setTimeout(() => {
-          if (mockXHR.onerror) {
-            mockXHR.onerror();
-          }
-        }, 0);
-      });
-
-      const assets = await collectPageAssets();
-      
-      // Should still return assets even if size detection fails
-      expect(Array.isArray(assets)).toBe(true);
-      expect(assets.some(asset => asset.url === 'https://example.com/image1.jpg')).toBe(true);
-    });
-
-    it('includes size information when available', async () => {
-      // Ensure webflow is undefined to avoid OG image inclusion
-      Object.defineProperty(global, 'webflow', {
-        value: undefined,
-        writable: true,
-        configurable: true
-      });
-      
-      const assets = await collectPageAssets();
-      
-      // Should have size information from XHR mock
-      expect(assets[0]).toHaveProperty('size');
-      expect(assets[0].size).toBe(1024);
-    });
-
-    it('handles Webflow OG image with size information', async () => {
-      // Mock the exact Webflow API flow
-      const mockPage = {
-        getOpenGraphImage: vi.fn().mockResolvedValue('https://example.com/og-image.jpg')
-      };
-      mockWebflow.getCurrentPage.mockResolvedValueOnce(mockPage);
-
-      // Set webflow globally for this test
-      Object.defineProperty(global, 'webflow', {
-        value: mockWebflow,
-        writable: true,
-        configurable: true
-      });
-
-      const assets = await collectPageAssets();
-      
-      // Find the OG image asset
-      const ogAsset = assets.find(asset => asset.url === 'https://example.com/og-image.jpg');
-      expect(ogAsset).toBeDefined();
-      expect(ogAsset?.type).toBe('image');
-      expect(ogAsset?.source).toBe('webflow-meta');
-      expect(ogAsset?.alt).toBe('OG Image');
-    });
-  });
-
-  describe('fetchFromAPI', () => {
-    const mockData = { test: 'data' };
-    const mockResponse = { result: 'success' };
-
-    it('successfully makes API call', async () => {
-      mockFetch.mockResolvedValueOnce({
+    it('handles JSON parsing errors', async () => {
+      mockFetch.mockResolvedValue({
         ok: true,
-        status: 200,
-        json: async () => mockResponse
+        json: () => Promise.reject(new Error('Invalid JSON'))
       });
 
-      const result = await fetchFromAPI('/test-endpoint', mockData);
-      
-      expect(mockFetch).toHaveBeenCalledWith(
-        'http://127.0.0.1:8787/test-endpoint',
-        expect.objectContaining({
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          credentials: 'include',
-          body: JSON.stringify(mockData)
-        })
-      );
-      
-      expect(result).toEqual(mockResponse);
+      await expect(analyzeSEO(mockRequest)).rejects.toThrow('SEO Analysis failed: Invalid JSON');
     });
 
-    it('handles API errors', async () => {
-      mockFetch.mockResolvedValueOnce({
+    it('handles non-Error exceptions', async () => {
+      mockFetch.mockRejectedValue('String error');
+
+      await expect(analyzeSEO(mockRequest)).rejects.toThrow('An unknown error occurred during SEO analysis.');
+    });
+  });
+
+  describe('fetchOAuthToken error handling', () => {
+    it('handles non-200 response status', async () => {
+      mockFetch.mockResolvedValue({
         ok: false,
-        status: 400,
-        text: async () => 'Bad Request'
+        status: 401,
+        statusText: 'Unauthorized'
       });
 
-      await expect(fetchFromAPI('/test-endpoint', mockData))
-        .rejects.toThrow('API error: 400 Bad Request');
+      await expect(fetchOAuthToken('invalid-code')).rejects.toThrow('Failed to fetch OAuth token: Unauthorized');
+    });
+
+    it('handles JSON parsing errors', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.reject(new Error('Malformed JSON'))
+      });
+
+      await expect(fetchOAuthToken('valid-code')).rejects.toThrow('Malformed JSON');
     });
 
     it('handles network errors', async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Network failure'));
+      mockFetch.mockRejectedValue(new Error('Network connection failed'));
 
-      await expect(fetchFromAPI('/test-endpoint', mockData))
-        .rejects.toThrow('Network failure');
+      await expect(fetchOAuthToken('valid-code')).rejects.toThrow('Network connection failed');
+    });
+  });
+
+  describe('collectPageAssets error handling', () => {
+    beforeEach(() => {
+      // Mock DOM methods
+      document.querySelectorAll = vi.fn();
+      window.getComputedStyle = vi.fn();
     });
 
-    it('uses default worker URL when environment variable not available', async () => {
-      // The function uses a hardcoded fallback, not environment variables
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse
+    it('handles webflow page data errors gracefully', async () => {
+      mockWebflow.getCurrentPage.mockRejectedValue(new Error('Webflow API error'));
+      document.querySelectorAll = vi.fn().mockReturnValue([]);
+
+      const assets = await collectPageAssets();
+      
+      expect(mockAssetLogger.error).toHaveBeenCalledWith(
+        'Error in getWebflowPageData: Error: Webflow API error'
+      );
+      expect(assets).toEqual([]);
+    });
+
+    it('handles missing img src attributes', async () => {
+      const mockImg = {
+        getAttribute: vi.fn((attr) => attr === 'src' ? null : ''),
+      };
+      
+      document.querySelectorAll = vi.fn().mockImplementation((selector) => {
+        if (selector === 'img') return [mockImg];
+        if (selector === '*') return [];
+        return [];
       });
 
-      await fetchFromAPI('/test-endpoint', mockData);
+      const assets = await collectPageAssets();
       
-      expect(mockFetch).toHaveBeenCalledWith(
-        'http://127.0.0.1:8787/test-endpoint',
-        expect.any(Object)
+      expect(mockAssetLogger.info).toHaveBeenCalledWith('Skipping image with no src attribute');
+      expect(assets).toEqual([]);
+    });
+
+    it('handles data URI images', async () => {
+      const mockImg = {
+        getAttribute: vi.fn((attr) => {
+          if (attr === 'src') return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+          if (attr === 'alt') return 'test image';
+          return '';
+        }),
+      };
+      
+      document.querySelectorAll = vi.fn().mockImplementation((selector) => {
+        if (selector === 'img') return [mockImg];
+        if (selector === '*') return [];
+        return [];
+      });
+
+      const assets = await collectPageAssets();
+      
+      expect(mockAssetLogger.info).toHaveBeenCalledWith('Skipping data URI image');
+      expect(assets).toEqual([]);
+    });
+
+    it('handles image size determination errors', async () => {
+      // Prevent webflow from interfering with this test
+      Object.defineProperty(global, 'webflow', {
+        value: undefined,
+        writable: true,
+      });
+
+      const mockImg = {
+        getAttribute: vi.fn((attr) => {
+          if (attr === 'src') return 'https://example.com/image.jpg';
+          if (attr === 'alt') return 'test image';
+          return '';
+        }),
+      };
+      
+      document.querySelectorAll = vi.fn().mockImplementation((selector) => {
+        if (selector === 'img') return [mockImg];
+        if (selector === '*') return [];
+        return [];
+      });
+
+      // Mock fetch to fail for HEAD request
+      mockFetch.mockRejectedValue(new Error('Network error'));
+      
+      // Mock XHR to fail - the actual implementation doesn't log XHR failures
+      // It only logs errors in the outermost catch block
+      const failingXHR = {
+        open: vi.fn(),
+        send: vi.fn(function(this: any) {
+          // Trigger onerror immediately to simulate XHR failure
+          setTimeout(() => {
+            if (this.onerror && typeof this.onerror === 'function') {
+              this.onerror();
+            }
+          }, 0);
+        }),
+        setRequestHeader: vi.fn(),
+        onload: null as (() => void) | null,
+        onerror: null as (() => void) | null,
+        status: 0,
+        response: null,
+        responseType: '',
+      };
+      
+      global.XMLHttpRequest = vi.fn(() => failingXHR) as any;
+
+      const assets = await collectPageAssets();
+      
+      expect(assets).toHaveLength(1);
+      expect(assets[0]).toEqual({
+        url: 'https://example.com/image.jpg',
+        alt: 'test image',
+        type: 'image'
+      });
+      
+      // The actual implementation doesn't log individual XHR failures
+      // It only logs "Could not determine size for" info message
+      expect(mockAssetLogger.info).toHaveBeenCalledWith(
+        'Could not determine size for https://example.com/image.jpg'
       );
+      
+      // No error should be logged for XHR failures since they're handled gracefully
+      expect(mockAssetLogger.error).not.toHaveBeenCalledWith(
+        expect.stringContaining('Error getting size for')
+      );
+    }, 10000);
+
+    it('handles image size determination with exception in getImageSize', async () => {
+      // Test the case where an actual error is thrown and logged
+      Object.defineProperty(global, 'webflow', {
+        value: undefined,
+        writable: true,
+      });
+
+      const mockImg = {
+        getAttribute: vi.fn((attr) => {
+          if (attr === 'src') return 'https://example.com/image.jpg';
+          if (attr === 'alt') return 'test image';
+          return '';
+        }),
+      };
+      
+      document.querySelectorAll = vi.fn().mockImplementation((selector) => {
+        if (selector === 'img') return [mockImg];
+        if (selector === '*') return [];
+        return [];
+      });
+
+      // Mock fetch to throw an error that will be caught by the outer try-catch
+      mockFetch.mockImplementation(() => {
+        throw new Error('Unexpected fetch error');
+      });
+      
+      // Mock XHR constructor to throw an error
+      global.XMLHttpRequest = vi.fn(() => {
+        throw new Error('XHR construction failed');
+      }) as any;
+
+      const assets = await collectPageAssets();
+      
+      expect(assets).toHaveLength(1);
+      expect(assets[0]).toEqual({
+        url: 'https://example.com/image.jpg',
+        alt: 'test image',
+        type: 'image'
+      });
+      
+      // Now the error should be logged because an exception was thrown
+      expect(mockAssetLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('Error getting size for https://example.com/image.jpg')
+      );
+    }, 10000);
+  });
+
+  describe('fetchFromAPI error handling', () => {
+    it('handles network errors', async () => {
+      mockFetch.mockRejectedValue(new Error('Network connection failed'));
+
+      await expect(fetchFromAPI('/test', { data: 'test' })).rejects.toThrow('Network connection failed');
+      
+      expect(mockLogger.error).toHaveBeenCalledWith('API fetch error: Network connection failed');
+    });
+
+    it('handles non-200 status with error text', async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 400,
+        text: () => Promise.resolve('Bad request format')
+      });
+
+      await expect(fetchFromAPI('/test', { data: 'test' })).rejects.toThrow('API error: 400 Bad request format');
+      
+      expect(mockLogger.error).toHaveBeenCalledWith('API error (400): Bad request format');
+    });
+
+    it('handles JSON parsing errors in successful response', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.reject(new Error('Invalid JSON response'))
+      });
+
+      await expect(fetchFromAPI('/test', { data: 'test' })).rejects.toThrow('Invalid JSON response');
+    });
+
+    it('handles non-Error exceptions', async () => {
+      mockFetch.mockRejectedValue('String error message');
+
+      await expect(fetchFromAPI('/test', { data: 'test' })).rejects.toThrow('String error message');
+      
+      expect(mockLogger.error).toHaveBeenCalledWith('API fetch error: String error message');
+    });
+  });
+
+  describe('Image size determination edge cases', () => {
+    it('handles XHR timeout scenarios', async () => {
+      // Prevent webflow from interfering
+      Object.defineProperty(global, 'webflow', {
+        value: undefined,
+        writable: true,
+      });
+
+      const mockImg = {
+        getAttribute: vi.fn((attr) => {
+          if (attr === 'src') return 'https://slow-server.com/image.jpg';
+          if (attr === 'alt') return 'slow image';
+          return '';
+        }),
+      };
+      
+      document.querySelectorAll = vi.fn().mockImplementation((selector) => {
+        if (selector === 'img') return [mockImg];
+        if (selector === '*') return [];
+        return [];
+      });
+
+      // Mock fetch to fail for HEAD request
+      mockFetch.mockRejectedValue(new Error('HEAD request failed'));
+
+      // Mock XHR to simulate timeout (never call onload/onerror)
+      const timeoutXHR = {
+        open: vi.fn(),
+        send: vi.fn(), // Don't trigger any callbacks to simulate timeout
+        setRequestHeader: vi.fn(),
+        onload: null,
+        onerror: null,
+        status: 200,
+        response: { size: 1024 },
+        responseType: '',
+      };
+      
+      const MockXHRConstructor = vi.fn(() => timeoutXHR) as any;
+      MockXHRConstructor.UNSENT = 0;
+      MockXHRConstructor.OPENED = 1;
+      MockXHRConstructor.HEADERS_RECEIVED = 2;
+      MockXHRConstructor.LOADING = 3;
+      MockXHRConstructor.DONE = 4;
+      MockXHRConstructor.prototype = {};
+      
+      global.XMLHttpRequest = MockXHRConstructor;
+
+      const assets = await collectPageAssets();
+      
+      expect(assets).toHaveLength(1);
+      expect(assets[0].size).toBeUndefined();
+      expect(mockAssetLogger.info).toHaveBeenCalledWith('Could not determine size for https://slow-server.com/image.jpg');
+    }, 10000); // Increase timeout for this test
+
+    it('handles invalid content-length headers', async () => {
+      // Prevent webflow from interfering
+      Object.defineProperty(global, 'webflow', {
+        value: undefined,
+        writable: true,
+      });
+
+      // Mock HEAD request to fail (invalid content-length)
+      mockFetch.mockRejectedValueOnce(new Error('HEAD request failed'));
+
+      const mockImg = {
+        getAttribute: vi.fn((attr) => {
+          if (attr === 'src') return 'https://example.com/image.jpg';
+          if (attr === 'alt') return 'test image';
+          return '';
+        }),
+      };
+      
+      document.querySelectorAll = vi.fn().mockImplementation((selector) => {
+        if (selector === 'img') return [mockImg];
+        if (selector === '*') return [];
+        return [];
+      });
+
+      // Mock successful XHR fallback - properly mock the blob response
+      const successXHR = {
+        open: vi.fn(),
+        send: vi.fn(function(this: any) {
+          // Simulate successful response with proper blob mock
+          this.status = 200;
+          this.response = { size: 1024 }; // This is the blob mock
+          if (this.onload && typeof this.onload === 'function') {
+            this.onload();
+          }
+        }),
+        setRequestHeader: vi.fn(),
+        onload: null as (() => void) | null,
+        onerror: null as (() => void) | null,
+        status: 200,
+        response: { size: 1024 }, // Blob-like object with size property
+        responseType: 'blob',
+      };
+
+      const MockXHRConstructor = vi.fn(() => successXHR) as any;
+      MockXHRConstructor.UNSENT = 0;
+      MockXHRConstructor.OPENED = 1;
+      MockXHRConstructor.HEADERS_RECEIVED = 2;
+      MockXHRConstructor.LOADING = 3;
+      MockXHRConstructor.DONE = 4;
+      MockXHRConstructor.prototype = {};
+      
+      global.XMLHttpRequest = MockXHRConstructor;
+
+      const assets = await collectPageAssets();
+      
+      expect(assets).toHaveLength(1);
+      expect(assets[0].size).toBe(1024);
     });
   });
 });

@@ -321,6 +321,12 @@ export default function Home() {
     // Store the current page path to detect actual changes
     let currentPagePath: string | null = null;
     
+    // Check if webflow is available before proceeding
+    if (!webflow) {
+      console.warn("Webflow API not available");
+      return;
+    }
+    
     // Initialize on mount
     const initCurrentPage = async () => {
       try {

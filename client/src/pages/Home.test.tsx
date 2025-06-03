@@ -1,11 +1,19 @@
-import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useEffect } from 'react';
 import { renderWithQueryClient } from '../test-utils';
 import Home from './Home';
 
 // Mock ResizeObserver for ScrollArea component
 global.ResizeObserver = vi.fn().mockImplementation(() => ({
+  observe: vi.fn(),
+  unobserve: vi.fn(),
+  disconnect: vi.fn(),
+}));
+
+// Mock IntersectionObserver
+global.IntersectionObserver = vi.fn().mockImplementation(() => ({
   observe: vi.fn(),
   unobserve: vi.fn(),
   disconnect: vi.fn(),
@@ -40,6 +48,15 @@ Object.defineProperty(global, 'webflow', {
   configurable: true
 });
 
+// Mock window.location
+Object.defineProperty(window, 'location', {
+  value: {
+    reload: vi.fn(),
+    hostname: 'localhost'
+  },
+  writable: true
+});
+
 // Mock WebflowDomain interface
 interface WebflowDomain {
   id: string;
@@ -67,8 +84,7 @@ const createMockAnalysis = (overrides: any = {}) => ({
       passed: true,
       priority: 'high' as const,
       description: 'The keyphrase appears in the page title',
-      recommendation: null,
-      category: 'Meta SEO'
+      recommendation: null
     }
   ],
   passedChecks: 1,
@@ -77,7 +93,8 @@ const createMockAnalysis = (overrides: any = {}) => ({
   url: 'https://example.com/test-page',
   keyphrase: 'test keyphrase',
   totalChecks: 1,
-  analysisDate: new Date().toISOString(),
+  isHomePage: false,
+  timestamp: new Date().toISOString(),
   ...overrides
 });
 
@@ -239,16 +256,14 @@ describe('Home Component', () => {
           passed: true, 
           priority: 'high', 
           description: 'The keyphrase appears in the page title',
-          recommendation: null,
-          category: 'Meta SEO'
+          recommendation: null
         },
         { 
           title: 'Keyphrase in Meta Description', 
           passed: false, 
           priority: 'high', 
           description: 'The keyphrase should appear in the meta description',
-          recommendation: 'Add your keyphrase to the meta description',
-          category: 'Meta SEO'
+          recommendation: 'Add your keyphrase to the meta description'
         }
       ],
       passedChecks: 1,
@@ -313,15 +328,15 @@ describe('Home Component', () => {
           passed: false, 
           priority: 'high', 
           description: 'The URL should contain the keyphrase for better SEO',
-          recommendation: 'Add keyphrase to URL slug',
-          category: 'Meta SEO'
+          recommendation: 'Add keyphrase to URL slug'
         }
       ],
       passedChecks: 0,
       failedChecks: 1,
       totalChecks: 1,
       score: 0,
-      url: 'https://example.com/'
+      url: 'https://example.com/',
+      isHomePage: true
     });
     
     vi.mocked(analyzeSEO).mockResolvedValue(mockAnalysis);
@@ -358,8 +373,7 @@ describe('Home Component', () => {
           passed: true, 
           priority: 'high', 
           description: 'The keyphrase appears in the page title',
-          recommendation: null,
-          category: 'Meta SEO'
+          recommendation: null
         }
       ]
     });
@@ -402,8 +416,7 @@ describe('Home Component', () => {
           passed: false, 
           priority: 'high', 
           description: 'The keyphrase should appear in the meta description',
-          recommendation: 'Add your keyphrase to the meta description',
-          category: 'Meta SEO'
+          recommendation: 'Add your keyphrase to the meta description'
         }
       ],
       passedChecks: 0,
@@ -450,8 +463,7 @@ describe('Home Component', () => {
           passed: true, 
           priority: 'high', 
           description: 'Perfect optimization achieved!',
-          recommendation: null,
-          category: 'Meta SEO'
+          recommendation: null
         }
       ],
       score: 100
@@ -512,16 +524,14 @@ describe('Home Component', () => {
           passed: true, 
           priority: 'high', 
           description: 'Passed check',
-          recommendation: null,
-          category: 'Meta SEO'
+          recommendation: null
         },
         { 
           title: 'Test Check 2', 
           passed: false, 
           priority: 'medium', 
           description: 'Failed check',
-          recommendation: 'Fix this issue',
-          category: 'Content Optimisation'
+          recommendation: 'Fix this issue'
         }
       ],
       passedChecks: 1,
@@ -558,24 +568,21 @@ describe('Home Component', () => {
           passed: true, 
           priority: 'high', 
           description: 'Title optimization is good',
-          recommendation: null,
-          category: 'Meta SEO'
+          recommendation: null
         },
         { 
           title: 'Content Length', 
           passed: false, 
           priority: 'medium', 
           description: 'Content could be longer',
-          recommendation: 'Add more content to reach optimal length',
-          category: 'Content Optimisation'
+          recommendation: 'Add more content to reach optimal length'
         },
         { 
           title: 'Internal Links', 
           passed: true, 
           priority: 'low', 
           description: 'Good internal linking',
-          recommendation: null,
-          category: 'Links'
+          recommendation: null
         }
       ],
       passedChecks: 2,
@@ -600,6 +607,484 @@ describe('Home Component', () => {
       expect(screen.getByText(/Content Optimisation/i)).toBeInTheDocument();
       // Use more specific selector for Links category to avoid ambiguity
       expect(screen.getByRole('heading', { name: /Links/i })).toBeInTheDocument();
+    });
+  });
+});
+
+describe('Home Component - Additional Coverage', () => {
+  const mockSiteInfo = {
+    id: 'site123',
+    name: 'Test Site',
+    shortName: 'test-site',
+    domains: [
+      {
+        id: 'domain1',
+        name: 'example.com',
+        url: 'https://example.com',
+        host: 'example.com',
+        publicUrl: 'https://example.com',
+        publishedOn: '2024-01-01T00:00:00Z',
+        lastPublished: '2024-01-01T00:00:00Z'
+      }
+    ]
+  };
+
+  const mockCurrentPage = {
+    getSlug: vi.fn(() => Promise.resolve('test-page')),
+    isHomepage: vi.fn(() => Promise.resolve(false)),
+    getPublishPath: vi.fn(() => Promise.resolve('/test-page')),
+    getOpenGraphImage: vi.fn(() => Promise.resolve('https://example.com/og-image.jpg')),
+    usesTitleAsOpenGraphTitle: vi.fn(() => Promise.resolve(true)),
+    usesDescriptionAsOpenGraphDescription: vi.fn(() => Promise.resolve(true))
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockWebflowApi.getCurrentPage.mockResolvedValue(mockCurrentPage);
+    mockWebflowApi.getSiteInfo.mockResolvedValue(mockSiteInfo);
+    
+    // Reset window.location.reload mock
+    vi.mocked(window.location.reload).mockClear();
+    
+    // Ensure webflow is available by default
+    Object.defineProperty(global, 'webflow', {
+      value: mockWebflowApi,
+      writable: true,
+      configurable: true
+    });
+  });
+
+  describe('Error Handling Scenarios', () => {
+    it('handles webflow API not available scenario', async () => {
+      // Mock webflow as undefined before rendering
+      Object.defineProperty(global, 'webflow', {
+        value: undefined,
+        writable: true,
+        configurable: true
+      });
+      
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      
+      renderWithQueryClient(<Home />);
+      
+      // Component should still render
+      expect(screen.getByText(/SEO Analysis Tool/i)).toBeInTheDocument();
+      
+      // Should log warning about webflow not being available
+      await waitFor(() => {
+        expect(consoleSpy).toHaveBeenCalledWith("Webflow API not available");
+      });
+      
+      consoleSpy.mockRestore();
+      
+      // Restore webflow for other tests
+      Object.defineProperty(global, 'webflow', {
+        value: mockWebflowApi,
+        writable: true,
+        configurable: true
+      });
+    });
+
+    it('handles getSiteInfo API errors', async () => {
+      mockWebflowApi.getSiteInfo.mockRejectedValue(new Error('Site info error'));
+      
+      const user = userEvent.setup();
+      renderWithQueryClient(<Home />);
+      
+      const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
+      const button = screen.getByText(/start optimizing your seo/i);
+      
+      await user.type(input, 'test keyphrase');
+      await user.click(button);
+      
+      // Should handle error gracefully and show toast
+      await waitFor(() => {
+        expect(button).not.toBeDisabled();
+      });
+    });
+
+    it('handles getCurrentPage API errors during analysis', async () => {
+      // Mock getCurrentPage to fail after the initial setup
+      mockWebflowApi.getCurrentPage
+        .mockResolvedValueOnce(mockCurrentPage) // Initial render succeeds
+        .mockRejectedValue(new Error('Page fetch error')); // Analysis fails
+      
+      const user = userEvent.setup();
+      renderWithQueryClient(<Home />);
+      
+      const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
+      const button = screen.getByText(/start optimizing your seo/i);
+      
+      await user.type(input, 'test keyphrase');
+      await user.click(button);
+      
+      // Should handle error and show toast
+      await waitFor(() => {
+        expect(button).not.toBeDisabled();
+      });
+    });
+  });
+
+  describe('Message Event Handling', () => {
+    it('handles clipboard copy message events from valid origins', async () => {
+      const { copyTextToClipboard } = await import('../utils/clipboard');
+      vi.mocked(copyTextToClipboard).mockResolvedValue(true);
+      
+      renderWithQueryClient(<Home />);
+      
+      // Wait for component to mount and message listener to be attached
+      await waitFor(() => {
+        expect(screen.getByText(/SEO Analysis Tool/i)).toBeInTheDocument();
+      });
+      
+      // Simulate message event from valid origin
+      const messageEvent = new MessageEvent('message', {
+        data: { name: 'copyToClipboard', data: 'test text' },
+        origin: 'http://localhost:1337'
+      });
+      
+      fireEvent(window, messageEvent);
+      
+      await waitFor(() => {
+        expect(copyTextToClipboard).toHaveBeenCalledWith('test text');
+      });
+    });
+
+    it('handles clipboard copy message events with type clipboardCopy', async () => {
+      const { copyTextToClipboard } = await import('../utils/clipboard');
+      vi.mocked(copyTextToClipboard).mockResolvedValue(true);
+      
+      renderWithQueryClient(<Home />);
+      
+      await waitFor(() => {
+        expect(screen.getByText(/SEO Analysis Tool/i)).toBeInTheDocument();
+      });
+      
+      // Simulate message event with different format
+      const messageEvent = new MessageEvent('message', {
+        data: { type: 'clipboardCopy', text: 'test text' },
+        origin: 'https://test.webflow.io'
+      });
+      
+      fireEvent(window, messageEvent);
+      
+      await waitFor(() => {
+        expect(copyTextToClipboard).toHaveBeenCalledWith('test text');
+      });
+    });
+
+    it('ignores message events from invalid origins', async () => {
+      const { copyTextToClipboard } = await import('../utils/clipboard');
+      
+      renderWithQueryClient(<Home />);
+      
+      await waitFor(() => {
+        expect(screen.getByText(/SEO Analysis Tool/i)).toBeInTheDocument();
+      });
+      
+      // Simulate message event from invalid origin
+      const messageEvent = new MessageEvent('message', {
+        data: { name: 'copyToClipboard', data: 'test text' },
+        origin: 'https://malicious-site.com'
+      });
+      
+      fireEvent(window, messageEvent);
+      
+      // Wait a bit to ensure no clipboard function is called
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Should not call clipboard function
+      expect(copyTextToClipboard).not.toHaveBeenCalled();
+    });
+
+    it('handles clipboard copy errors in message events', async () => {
+      const { copyTextToClipboard } = await import('../utils/clipboard');
+      vi.mocked(copyTextToClipboard).mockRejectedValue(new Error('Clipboard error'));
+      
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      
+      renderWithQueryClient(<Home />);
+      
+      await waitFor(() => {
+        expect(screen.getByText(/SEO Analysis Tool/i)).toBeInTheDocument();
+      });
+      
+      const messageEvent = new MessageEvent('message', {
+        data: { name: 'copyToClipboard', data: 'test text' },
+        origin: 'http://localhost:1337'
+      });
+      
+      fireEvent(window, messageEvent);
+      
+      await waitFor(() => {
+        // Update to match the actual error message from Home.tsx line ~280
+        expect(consoleSpy).toHaveBeenCalledWith('Error in clipboard operation:', expect.any(Error));
+      });
+      
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe('Page Change Subscription', () => {
+    it('handles page path changes correctly', async () => {
+      let subscriptionCallback: Function | null = null;
+      
+      // Use direct function assignment to avoid TypeScript issues
+      const originalMock = mockWebflowApi.subscribe;
+      mockWebflowApi.subscribe = vi.fn((event: any, callback: any) => {
+        if (event === 'currentpage') {
+          subscriptionCallback = callback;
+        }
+        return () => {}; // unsubscribe function
+      });
+      
+      // Mock different page paths for before/after
+      mockCurrentPage.getPublishPath
+        .mockResolvedValueOnce('/initial-page') // Initial call
+        .mockResolvedValueOnce('/new-page'); // After change
+      
+      renderWithQueryClient(<Home />);
+      
+      // Wait for initial setup
+      await waitFor(() => {
+        expect(mockWebflowApi.subscribe).toHaveBeenCalled();
+      });
+      
+      // Trigger the page change
+      if (subscriptionCallback) {
+        await (subscriptionCallback as any)({});
+      }
+      
+      // Should trigger reload after path change
+      await waitFor(() => {
+        expect(window.location.reload).toHaveBeenCalled();
+      });
+      
+      // Restore original mock
+      mockWebflowApi.subscribe = originalMock;
+    });
+
+    it('does not reload when page path remains the same', async () => {
+      let subscriptionCallback: Function | null = null;
+      
+      const originalMock = mockWebflowApi.subscribe;
+      mockWebflowApi.subscribe = vi.fn((event: any, callback: any) => {
+        if (event === 'currentpage') {
+          subscriptionCallback = callback;
+        }
+        return () => {};
+      });
+      
+      // Mock same page path for both calls
+      mockCurrentPage.getPublishPath.mockResolvedValue('/same-page');
+      
+      renderWithQueryClient(<Home />);
+      
+      await waitFor(() => {
+        expect(mockWebflowApi.subscribe).toHaveBeenCalled();
+      });
+      
+      // Trigger the page change callback
+      if (subscriptionCallback) {
+        await (subscriptionCallback as any)({});
+      }
+      
+      // Should not reload since path didn't change
+      expect(window.location.reload).not.toHaveBeenCalled();
+      
+      // Restore original mock
+      mockWebflowApi.subscribe = originalMock;
+    });
+
+    it('handles page change subscription errors', async () => {
+      let subscriptionCallback: Function | null = null;
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      
+      const originalMock = mockWebflowApi.subscribe;
+      mockWebflowApi.subscribe = vi.fn((event: any, callback: any) => {
+        if (event === 'currentpage') {
+          subscriptionCallback = callback;
+        }
+        return () => {};
+      });
+      
+      // Mock getCurrentPage to throw error during the subscription callback
+      mockWebflowApi.getCurrentPage
+        .mockResolvedValueOnce(mockCurrentPage) // Initial setup succeeds
+        .mockRejectedValue(new Error('Page change error')); // Subscription callback fails
+      
+      renderWithQueryClient(<Home />);
+      
+      await waitFor(() => {
+        expect(mockWebflowApi.subscribe).toHaveBeenCalled();
+      });
+      
+      if (subscriptionCallback) {
+        await (subscriptionCallback as any)({});
+      }
+      
+      await waitFor(() => {
+        expect(consoleSpy).toHaveBeenCalledWith('Error handling page change:', expect.any(Error));
+      });
+      
+      consoleSpy.mockRestore();
+      // Restore original mock
+      mockWebflowApi.subscribe = originalMock;
+    });
+  });
+
+  describe('Test Mode Functionality', () => {
+    beforeEach(() => {
+      // Mock NODE_ENV for development mode
+      vi.stubEnv('NODE_ENV', 'development');
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('shows test button in development mode', () => {
+      renderWithQueryClient(<Home />);
+      
+      expect(screen.getByText(/🧪 Test 100 Score/)).toBeInTheDocument();
+    });
+
+    it('activates perfect score test mode with existing results', async () => {
+      const { analyzeSEO } = await import('../lib/api');
+      const confetti = await import('canvas-confetti');
+      
+      // First run analysis to have results
+      vi.mocked(analyzeSEO).mockResolvedValue({
+        checks: [
+          { title: 'Test Check', passed: false, priority: 'high', description: 'Test', recommendation: 'Fix this' }
+        ],
+        passedChecks: 0,
+        failedChecks: 1,
+        score: 0,
+        url: 'https://example.com',
+        keyphrase: 'test',
+        totalChecks: 1,
+        isHomePage: false,
+        timestamp: new Date().toISOString()
+      });
+      
+      const user = userEvent.setup();
+      renderWithQueryClient(<Home />);
+      
+      // Run initial analysis
+      const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
+      const analyzeButton = screen.getByText(/start optimizing your seo/i);
+      
+      await user.type(input, 'test keyphrase');
+      await user.click(analyzeButton);
+      
+      await waitFor(() => {
+        expect(screen.getByText(/Analysis Results/i)).toBeInTheDocument();
+      });
+      
+      // Now click the test button
+      const testButton = screen.getByText(/🧪 Test 100 Score/);
+      await user.click(testButton);
+      
+      // Should trigger confetti and show perfect score message
+      expect(confetti.default).toHaveBeenCalled();
+      await waitFor(() => {
+        expect(screen.getByText(/You are an absolute SEO legend/i)).toBeInTheDocument();
+      });
+    });
+
+    it('shows error when trying to test without existing results', async () => {
+      const user = userEvent.setup();
+      renderWithQueryClient(<Home />);
+      
+      const testButton = screen.getByText(/🧪 Test 100 Score/);
+      await user.click(testButton);
+      
+      // Should show error toast (though we can't easily test toast content)
+      // The button click should complete without crashing
+      expect(testButton).toBeInTheDocument();
+    });
+  });
+
+  describe('Image Data Display Logic', () => {
+    it('renders image data for image-related checks', async () => {
+      const { analyzeSEO } = await import('../lib/api');
+      
+      const mockAnalysisWithImages = {
+        checks: [
+          {
+            title: 'Image Alt Attributes',
+            passed: false,
+            priority: 'high' as const,
+            description: 'Images need alt attributes',
+            recommendation: 'Add alt text to images',
+            imageData: [
+              { 
+                url: 'https://example.com/image1.jpg', 
+                name: 'image1.jpg', 
+                shortName: 'image1', 
+                alt: '', 
+                size: 150000, 
+                mimeType: 'image/jpeg' 
+              }
+            ]
+          }
+        ],
+        passedChecks: 0,
+        failedChecks: 1,
+        score: 0,
+        url: 'https://example.com',
+        keyphrase: 'test',
+        totalChecks: 1,
+        isHomePage: false,
+        timestamp: new Date().toISOString()
+      };
+      
+      vi.mocked(analyzeSEO).mockResolvedValue(mockAnalysisWithImages);
+      
+      const user = userEvent.setup();
+      renderWithQueryClient(<Home />);
+      
+      const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
+      const button = screen.getByText(/start optimizing your seo/i);
+      
+      await user.type(input, 'test keyphrase');
+      await user.click(button);
+      
+      // Wait for analysis results to appear
+      await waitFor(() => {
+        expect(screen.getByText(/Analysis Results/i)).toBeInTheDocument();
+      });
+      
+      // Look for the Images and Assets category in the overview
+      await waitFor(() => {
+        expect(screen.getByText(/Images and Assets/i)).toBeInTheDocument();
+      });
+      
+      // Click on the Images and Assets category
+      const categoryButton = screen.getByText(/Images and Assets/i).closest('.cursor-pointer');
+      expect(categoryButton).toBeInTheDocument();
+      
+      await user.click(categoryButton!);
+      
+      // Wait for category details to load and verify the check title appears
+      await waitFor(() => {
+        expect(screen.getByText(/Image Alt Attributes/i)).toBeInTheDocument();
+      }, { timeout: 3000 });
+      
+      // Since the recommendation text is rendered through ImageSizeDisplay component
+      // when imageData is present, let's look for image-related content instead
+      await waitFor(() => {
+        // Look for image-related content that would be displayed by ImageSizeDisplay
+        const hasImageContent = 
+          screen.queryByText(/image1/i) ||
+          screen.queryByText(/jpg/i) ||
+          screen.queryByText(/150000/i) || // file size in bytes
+          screen.queryByText(/146.5/i) || // formatted file size in KB
+          screen.queryByText(/KB/i); // file size unit
+      
+        expect(hasImageContent).toBeInTheDocument();
+      });
     });
   });
 });
