@@ -41,6 +41,7 @@ import { calculateSEOScore } from '../../../shared/utils/seoUtils';
 import { ImageSizeDisplay } from "../components/ImageSizeDisplay";
 import { copyTextToClipboard } from "../utils/clipboard";
 import { shouldShowCopyButton } from '../../../shared/utils/seoUtils';
+import { generatePageId, saveKeywordsForPage, loadKeywordsForPage } from '../utils/keywordStorage';
 
 const logger = createLogger("Home");
 
@@ -252,6 +253,8 @@ export default function Home() {
   const [stagingName, setStagingName] = useState<string>('');
   const [_urls, setUrls] = useState<string[]>([]);
   const [showedPerfectScoreMessage, setShowedPerfectScoreMessage] = useState<boolean>(false);
+  const [currentPageId, setCurrentPageId] = useState<string>('');
+  const [keywordSaveStatus, setKeywordSaveStatus] = useState<'saved' | 'saving' | 'none'>('none');
   
   const seoScore = results ? calculateSEOScore(results.checks) : 0;
   const scoreRating = getScoreRatingText(seoScore);
@@ -383,6 +386,50 @@ export default function Home() {
     }
   });
 
+  // Load saved keywords when page context is available
+  useEffect(() => {
+    const initializePageKeywords = async () => {
+      try {
+        const page = await webflow.getCurrentPage();
+        const publishPath = await page.getPublishPath();
+        const isHomepage = await page.isHomepage();
+        
+        const pageId = generatePageId(publishPath, isHomepage);
+        setCurrentPageId(pageId);
+        
+        // Load saved keywords for this page
+        const savedKeywords = loadKeywordsForPage(pageId);
+        if (savedKeywords) {
+          form.setValue('keyphrase', savedKeywords);
+          setKeywordSaveStatus('saved');
+        } else {
+          setKeywordSaveStatus('none');
+        }
+      } catch (error) {
+        console.warn('Failed to initialize page keywords:', error);
+      }
+    };
+
+    if (webflow) {
+      initializePageKeywords();
+    }
+  }, [form]);
+
+  // Watch for keyphrase changes to update save status
+  const watchedKeyphrase = form.watch('keyphrase');
+  useEffect(() => {
+    if (currentPageId) {
+      const savedKeywords = loadKeywordsForPage(currentPageId);
+      if (watchedKeyphrase === savedKeywords && watchedKeyphrase) {
+        setKeywordSaveStatus('saved');
+      } else if (watchedKeyphrase && watchedKeyphrase !== savedKeywords) {
+        setKeywordSaveStatus('none');
+      } else if (!watchedKeyphrase) {
+        setKeywordSaveStatus('none');
+      }
+    }
+  }, [watchedKeyphrase, currentPageId]);
+
   const mutation = useMutation<SEOAnalysisResult, Error, AnalyzeSEORequest>({
     mutationFn: analyzeSEO,
     onMutate: () => {
@@ -464,6 +511,13 @@ export default function Home() {
   });
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    // Save keywords for current page
+    if (currentPageId && values.keyphrase) {
+      setKeywordSaveStatus('saving');
+      saveKeywordsForPage(currentPageId, values.keyphrase);
+      setKeywordSaveStatus('saved');
+    }
+    
     try {
       let siteInfo: WebflowSiteInfo;
       siteInfo = await webflow.getSiteInfo();
@@ -620,7 +674,19 @@ export default function Home() {
                     name="keyphrase"
                     render={({ field }: { field: any }) => (
                       <FormItem className="w-full">
-                        <FormLabel className="mb-1">Target keyphrase</FormLabel>
+                        <div className="flex justify-between items-center mb-1">
+                          <FormLabel className="mb-0">Target keyphrase</FormLabel>
+                          {/* Keyword Save Status Indicator */}
+                          <span className="text-xs font-medium" style={{
+                            color: keywordSaveStatus === 'saved' ? 'var(--greenText)' :
+                                   keywordSaveStatus === 'saving' ? 'var(--yellowText)' :
+                                   'var(--redText)'
+                          }}>
+                            {keywordSaveStatus === 'saved' ? 'Keyword saved for this page' :
+                             keywordSaveStatus === 'saving' ? 'Saving...' :
+                             'No keyword saved'}
+                          </span>
+                        </div>
                         <FormControl>
                           <motion.div
                             whileHover={{ scale: 1.01 }}
