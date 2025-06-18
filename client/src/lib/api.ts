@@ -13,14 +13,7 @@ type Asset = {
   source?: string;
 };
 
-export function getApiBaseUrl(): string {
-  if (import.meta.env.DEV) {
-    return 'http://localhost:8787';
-  }
-  return 'https://ai-seo-copilot-api.your-domain.workers.dev';
-}
-
-// Check how the API base URL is determined
+// Consolidated API URL determination function
 export const getApiUrl = () => {
   // Force local development API during development
   const FORCE_LOCAL_DEV = true; // Toggle this when needed
@@ -34,7 +27,6 @@ export const getApiUrl = () => {
     
     // Standard Webflow environment check
     if (!!window.webflow) {
-      // Remove direct console log and use logger instead
       logger.debug("Using production API URL for Webflow Extension");
       return "https://seo-copilot-api-production.paul-130.workers.dev";
     }
@@ -56,6 +48,9 @@ export const getApiUrl = () => {
   logger.debug("Falling back to production API URL");
   return "https://seo-copilot-api-production.paul-130.workers.dev";
 }
+
+// Deprecated - use getApiUrl() instead
+export const getApiBaseUrl = getApiUrl;
 
 // Update the error handling in analyzeSEO function
 export async function analyzeSEO({

@@ -14,6 +14,7 @@
     "deploy": "npx wrangler deploy workers/index.ts --env production"
   },
   "devDependencies": {
+    "@anthropic-ai/claude-code": "^1.0.25",
     "@cloudflare/vite-plugin": "^1.7.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",

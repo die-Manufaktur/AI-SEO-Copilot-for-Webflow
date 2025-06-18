@@ -28,9 +28,8 @@ import {
   TooltipTrigger,
 } from "../components/ui/tooltip";
 import { useToast } from "../hooks/use-toast";
-import { SEOCheck } from "shared/types";
 import { analyzeSEO } from "../lib/api";
-import type { SEOAnalysisResult, WebflowPageData, AnalyzeSEORequest } from "../lib/types";
+import type { SEOCheck, SEOAnalysisResult, WebflowPageData, AnalyzeSEORequest } from "../lib/types";
 import { ProgressCircle } from "../components/ui/progress-circle";
 import { getLearnMoreUrl } from "../lib/docs-links";
 import styled from 'styled-components';

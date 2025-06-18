@@ -180,6 +180,9 @@ importers:
         specifier: ^3.25.67
         version: 3.25.67
     devDependencies:
+      '@anthropic-ai/claude-code':
+        specifier: ^1.0.25
+        version: 1.0.25
       '@cloudflare/vite-plugin':
         specifier: ^1.7.0
         version: 1.7.0(rollup@4.43.0)(vite@6.3.5(@types/node@24.0.3)(jiti@2.4.2)(lightningcss@1.30.1)(terser@5.43.0)(tsx@4.20.3))(workerd@1.20250612.0)(wrangler@4.20.1)
@@ -298,6 +301,11 @@ packages:
   '@ampproject/remapping@2.3.0':
     resolution: {integrity: sha512-30iZtAPgz+LTIYoeivqYo853f02jBYSd5uGnGpkFV0M3xOt9aN73erkgYAmZU43x4VfqcnLxW9Kpg3R5LC4YYw==}
     engines: {node: '>=6.0.0'}
+
+  '@anthropic-ai/claude-code@1.0.25':
+    resolution: {integrity: sha512-5p4FLlFO4TuRf0zV0axiOxiAkUC8eer0lqJi/A/pA46LESv31Alw6xaNYgwQVkP6oSbP5PydK36u7YrB9QSaXQ==}
+    engines: {node: '>=18.0.0'}
+    hasBin: true
 
   '@asamuzakjp/css-color@3.2.0':
     resolution: {integrity: sha512-K1A6z8tS3XsmCMM86xoWdn7Fkdn9m6RSVtocUrJYIwZnFVkng/PvkEoWtOWmP+Scc6saYWHWZYbndEEXxl24jw==}
@@ -5863,6 +5871,15 @@ snapshots:
     dependencies:
       '@jridgewell/gen-mapping': 0.3.8
       '@jridgewell/trace-mapping': 0.3.25
+
+  '@anthropic-ai/claude-code@1.0.25':
+    optionalDependencies:
+      '@img/sharp-darwin-arm64': 0.33.5
+      '@img/sharp-darwin-x64': 0.33.5
+      '@img/sharp-linux-arm': 0.33.5
+      '@img/sharp-linux-arm64': 0.33.5
+      '@img/sharp-linux-x64': 0.33.5
+      '@img/sharp-win32-x64': 0.33.5
 
   '@asamuzakjp/css-color@3.2.0':
     dependencies:
