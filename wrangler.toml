@@ -6,14 +6,15 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 USE_GPT_RECOMMENDATIONS = "true"
 ALLOWED_ORIGINS = "https://webflow.com,https://*.webflow-ext.com,https://*.webflow.io,http://localhost:1337,http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:1337"
-
-[observability]  
-enabled = true  
-head_sampling_rate = 1 # Logs 100% of requests
+# OPENAI_API_KEY - Set via wrangler secret for security
 
 [dev]
 # Add these lines for better debugging
 port = 8787
+
+[observability]  
+enabled = true  
+head_sampling_rate = 1 # Logs 100% of requests
 
 [env.production]
 name = "seo-copilot-api-production"

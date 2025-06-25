@@ -210,9 +210,9 @@ async function getAIRecommendation(
 
 interface Env {
   USE_GPT_RECOMMENDATIONS?: string;
-  WEBFLOW_API_KEY?: string;
   OPENAI_API_KEY?: string;
   ALLOWED_ORIGINS?: string;
+  CLOUDFLARE_ENV?: string;
 }
 
 /**
