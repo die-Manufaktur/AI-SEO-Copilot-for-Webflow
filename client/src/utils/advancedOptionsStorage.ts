@@ -2,7 +2,19 @@
  * Utility for persisting advanced options per Webflow page
  */
 
+import { sanitizeText } from '../../../shared/utils/stringUtils';
+
 const STORAGE_KEY = 'webflow-seo-advanced-options';
+
+// Sanitize additional context for safe storage
+function sanitizeAdditionalContext(input: string): string {
+  if (!input || typeof input !== 'string') return '';
+  
+  return sanitizeText(input)
+    .replace(/<[^>]*>/g, '') // Remove any HTML tags
+    .substring(0, 2000) // Limit length
+    .trim();
+}
 
 export interface AdvancedOptions {
   pageType: string;
@@ -21,10 +33,13 @@ export function saveAdvancedOptionsForPage(pageId: string, options: AdvancedOpti
     const stored = localStorage.getItem(STORAGE_KEY);
     const pageOptions: PageAdvancedOptions = stored ? JSON.parse(stored) : {};
     
-    if (options.pageType.trim() || options.additionalContext.trim()) {
+    const sanitizedPageType = options.pageType.trim();
+    const sanitizedContext = sanitizeAdditionalContext(options.additionalContext);
+    
+    if (sanitizedPageType || sanitizedContext) {
       pageOptions[pageId] = {
-        pageType: options.pageType.trim(),
-        additionalContext: options.additionalContext.trim()
+        pageType: sanitizedPageType,
+        additionalContext: sanitizedContext
       };
     } else {
       // Remove entry if both fields are empty

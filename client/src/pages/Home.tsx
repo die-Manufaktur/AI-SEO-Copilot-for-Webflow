@@ -46,6 +46,8 @@ import { copyTextToClipboard } from "../utils/clipboard";
 import { shouldShowCopyButton } from '../../../shared/utils/seoUtils';
 import { generatePageId, saveKeywordsForPage, loadKeywordsForPage } from '../utils/keywordStorage';
 import { saveAdvancedOptionsForPage, loadAdvancedOptionsForPage, type AdvancedOptions } from '../utils/advancedOptionsStorage';
+import sanitizeHtml from 'sanitize-html';
+import { sanitizeText } from '../../../shared/utils/stringUtils';
 
 const logger = createLogger("Home");
 
@@ -75,6 +77,51 @@ const PAGE_TYPES = [
 const formSchema = z.object({
   keyphrase: z.string().min(2, "Keyphrase must be at least 2 characters")
 });
+
+// Additional context validation
+const MAX_CONTEXT_LENGTH = 2000;
+const validateAdditionalContext = (input: string): { isValid: boolean; message?: string; sanitized: string } => {
+  if (!input) return { isValid: true, sanitized: '' };
+  
+  // Check for excessive length
+  if (input.length > MAX_CONTEXT_LENGTH) {
+    return { 
+      isValid: false, 
+      message: `Context too long. Maximum ${MAX_CONTEXT_LENGTH} characters allowed.`,
+      sanitized: input.substring(0, MAX_CONTEXT_LENGTH)
+    };
+  }
+
+  // Check for script tags and other dangerous content
+  if (/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi.test(input)) {
+    return { 
+      isValid: false, 
+      message: 'Script tags are not allowed in context.',
+      sanitized: sanitizeHtml(input, { allowedTags: [], allowedAttributes: {} })
+    };
+  }
+
+  // Check for HTML event handlers
+  if (/<[^>]*on\w+\s*=/gi.test(input)) {
+    return { 
+      isValid: false, 
+      message: 'HTML event handlers are not allowed.',
+      sanitized: sanitizeHtml(input, { allowedTags: [], allowedAttributes: {} })
+    };
+  }
+
+  // Sanitize the input
+  const sanitized = sanitizeHtml(input, {
+    allowedTags: [], // No HTML tags allowed
+    allowedAttributes: {},
+    disallowedTagsMode: 'discard'
+  });
+
+  // Apply additional text sanitization
+  const finalSanitized = sanitizeText(sanitized).trim();
+
+  return { isValid: true, sanitized: finalSanitized };
+};
 
 const container = {
   hidden: { opacity: 0 },
@@ -287,6 +334,7 @@ export default function Home() {
   const [advancedOptionsEnabled, setAdvancedOptionsEnabled] = useState<boolean>(false);
   const [pageType, setPageType] = useState<string>('');
   const [additionalContext, setAdditionalContext] = useState<string>('');
+  const [additionalContextError, setAdditionalContextError] = useState<string>('');
   const [advancedOptionsSaveStatus, setAdvancedOptionsSaveStatus] = useState<'saved' | 'saving' | 'none'>('none');
   
   const seoScore = results ? calculateSEOScore(results.checks) : 0;
@@ -849,16 +897,45 @@ export default function Home() {
 
                           {/* Additional Context Textarea */}
                           <div className="space-y-2">
-                            <label className="text-sm font-medium">Additional Context</label>
+                            <label className="text-sm font-medium">
+                              Additional Context
+                              <span className="text-xs text-muted-foreground ml-2">
+                                ({additionalContext.length}/{MAX_CONTEXT_LENGTH} characters)
+                              </span>
+                            </label>
                             <textarea
                               value={additionalContext}
-                              onChange={(e) => setAdditionalContext(e.target.value)}
+                              onChange={(e) => {
+                                const input = e.target.value;
+                                const validation = validateAdditionalContext(input);
+                                
+                                if (validation.isValid) {
+                                  setAdditionalContext(validation.sanitized);
+                                  setAdditionalContextError('');
+                                } else {
+                                  // For invalid input, set the sanitized version and show error
+                                  setAdditionalContext(validation.sanitized);
+                                  setAdditionalContextError(validation.message || 'Invalid input detected');
+                                }
+                              }}
                               placeholder="Provide additional context about your page or goal (e.g., target audience, business model, competitive landscape, etc.)"
                               rows={4}
-                              className="w-full px-3 py-2 border border-input bg-background rounded-md text-sm placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                              className={`w-full px-3 py-2 border rounded-md text-sm placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                                additionalContextError 
+                                  ? 'border-red-500 focus:ring-red-500' 
+                                  : 'border-input bg-background focus:ring-ring'
+                              }`}
+                              maxLength={MAX_CONTEXT_LENGTH}
                             />
+                            {additionalContextError && (
+                              <p className="text-xs text-red-500 flex items-center gap-1">
+                                <AlertTriangle className="h-3 w-3" />
+                                {additionalContextError}
+                              </p>
+                            )}
                             <p className="text-xs text-muted-foreground">
-                              This information helps AI generate more targeted, relevant SEO recommendations
+                              This information helps AI generate more targeted, relevant SEO recommendations. 
+                              HTML tags and scripts are automatically removed for security.
                             </p>
                           </div>
 
