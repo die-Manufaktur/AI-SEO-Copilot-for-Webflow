@@ -182,7 +182,8 @@ describe('ImageSizeDisplay', () => {
   describe('image handling', () => {
     it('sets correct image attributes', () => {
       render(<ImageSizeDisplay images={mockImages} />);
-      const images = screen.getAllByRole('img');
+      // Use querySelector since images with empty alt are treated as presentation role
+      const images = document.querySelectorAll('img');
       
       expect(images[0]).toHaveAttribute('src', 'https://example.com/image1.jpg');
       expect(images[0]).toHaveAttribute('alt', '');
@@ -192,10 +193,11 @@ describe('ImageSizeDisplay', () => {
 
     it('handles image load errors with fallback', () => {
       render(<ImageSizeDisplay images={mockImages} />);
-      const image = screen.getAllByRole('img')[0];
+      // Use querySelector since images with empty alt are treated as presentation role
+      const image = document.querySelector('img');
       
       // Simulate image load error
-      fireEvent.error(image);
+      fireEvent.error(image!);
       
       // Check that fallback image is set
       expect(image).toHaveAttribute('src', expect.stringContaining('data:image/svg+xml;base64,'));
@@ -232,7 +234,8 @@ describe('ImageSizeDisplay', () => {
 
     it('applies correct image container styling', () => {
       render(<ImageSizeDisplay images={mockImages} />);
-      const imageContainer = screen.getAllByRole('img')[0].parentElement;
+      // Use querySelector since images with empty alt are treated as presentation role
+      const imageContainer = document.querySelector('img')?.parentElement;
       expect(imageContainer).toHaveClass('flex-shrink-0', 'w-10', 'h-10', 'overflow-hidden', 'rounded-md', 'bg-background2');
     });
   });

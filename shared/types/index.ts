@@ -147,4 +147,8 @@ export interface AnalyzeSEORequest {
   siteInfo?: WebflowSiteInfo;
   publishPath?: string;
   debug?: boolean;
+  advancedOptions?: {
+    pageType?: string;
+    additionalContext?: string;
+  };
 }
