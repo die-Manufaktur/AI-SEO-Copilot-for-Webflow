@@ -15,6 +15,24 @@ import * as cheerio from 'cheerio';
 import { sanitizeText } from '../shared/utils/stringUtils';
 import { shouldShowCopyButton } from '../shared/utils/seoUtils';
 
+// Sanitize input specifically for AI prompts to prevent prompt injection
+function sanitizeForAIPrompt(input: string): string {
+  if (!input || typeof input !== 'string') {
+    return '';
+  }
+
+  return sanitizeText(input)
+    // Remove prompt injection keywords (case insensitive)
+    .replace(/\b(ignore|forget|override|system|prompt|instruction|assistant|ai|model|openai|gpt|claude)\s*(previous|above|below|this|that|all|instructions?)\b/gi, '')
+    // Remove template/injection patterns
+    .replace(/[{}[\]]/g, '')
+    // Remove excessive punctuation that might be used for injection
+    .replace(/[!@#$%^&*()+=|\\:";'<>?,.\/]{3,}/g, '')
+    // Limit length for AI prompts
+    .substring(0, 1000)
+    .trim();
+}
+
 const app = new Hono();
 
 app.use('*', corsMiddleware());
@@ -160,7 +178,8 @@ async function getAIRecommendation(
         advancedContext += `\n- Page Type: ${advancedOptions.pageType}`;
       }
       if (advancedOptions.additionalContext) {
-        advancedContext += `\n- Additional Context: ${advancedOptions.additionalContext}`;
+        const sanitizedContext = sanitizeForAIPrompt(advancedOptions.additionalContext);
+        advancedContext += `\n- Additional Context: ${sanitizedContext}`;
       }
     }
     
