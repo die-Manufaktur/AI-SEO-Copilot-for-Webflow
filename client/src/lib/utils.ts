@@ -75,7 +75,8 @@ export interface Logger {
 const isProduction = () => {
   return process.env.NODE_ENV === 'production' || 
          import.meta.env?.MODE === 'production' ||
-         window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+         import.meta.env?.PROD === true ||
+         !import.meta.env?.DEV;
 };
 
 export const createLogger = (namespace: string) => {

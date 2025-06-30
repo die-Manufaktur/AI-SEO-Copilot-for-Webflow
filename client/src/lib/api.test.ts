@@ -75,38 +75,27 @@ describe('getApiBaseUrl function', () => {
     vi.unstubAllGlobals();
   });
 
-  it('returns localhost URL in development mode', () => {
-    // Mock import.meta.env.DEV as true using vi.stubEnv
-    vi.stubEnv('DEV', true);
+  it('returns development URL in development mode', () => {
+    // Mock import.meta.env.PROD as false and VITE_WORKER_URL for dev mode
+    vi.stubEnv('PROD', false);
+    vi.stubEnv('VITE_WORKER_URL', 'http://localhost:8787');
+    
+    // Mock window.webflow as undefined to prevent it from using production URL
+    Object.defineProperty(global, 'webflow', {
+      value: undefined,
+      writable: true,
+    });
     
     const result = getApiBaseUrl();
     expect(result).toBe('http://localhost:8787');
   });
 
   it('returns production URL in production mode', () => {
-    // Mock window.webflow to simulate Webflow extension environment
-    const originalWebflow = global.window.webflow;
-    const originalLocation = global.window.location;
-    
-    global.window.webflow = mockWebflow;
-    // Mock location.hostname to not be localhost to bypass FORCE_LOCAL_DEV
-    Object.defineProperty(global.window, 'location', {
-      value: {
-        ...originalLocation,
-        hostname: 'webflow.com'
-      },
-      writable: true
-    });
+    // Mock import.meta.env.PROD as true
+    vi.stubEnv('PROD', true);
     
     const result = getApiBaseUrl();
     expect(result).toBe('https://seo-copilot-api-production.paul-130.workers.dev');
-    
-    // Restore original state
-    global.window.webflow = originalWebflow;
-    Object.defineProperty(global.window, 'location', {
-      value: originalLocation,
-      writable: true
-    });
   });
 });
 
@@ -181,6 +170,10 @@ describe('api.ts error handling', () => {
 
   describe('getApiUrl error handling', () => {
     it('handles window.webflow access errors gracefully', () => {
+      // Mock production environment to ensure consistent behavior
+      vi.stubEnv('PROD', false);
+      vi.stubEnv('VITE_WORKER_URL', undefined);
+      
       // Set up localhost environment first so the webflow check happens
       Object.defineProperty(window, 'location', {
         value: {

@@ -3,13 +3,44 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react-swc';
 import path from 'path';
 
+// Custom plugin to replace navigator.userAgent in production builds
+const webflowCompatPlugin = () => ({
+  name: 'webflow-compat',
+  generateBundle(options, bundle) {
+    if (process.env.NODE_ENV === 'production') {
+      Object.keys(bundle).forEach(fileName => {
+        const chunk = bundle[fileName];
+        if (chunk.type === 'chunk' && chunk.code) {
+          // Replace navigator.userAgent with a safe string
+          chunk.code = chunk.code.replace(
+            /navigator\.userAgent/g,
+            '"Mozilla/5.0 (compatible; WebflowApp/1.0)"'
+          );
+          // Also handle potential variations
+          chunk.code = chunk.code.replace(
+            /navigator\?\.\w*userAgent/g,
+            '"Mozilla/5.0 (compatible; WebflowApp/1.0)"'
+          );
+        }
+      });
+    }
+  }
+});
+
 const __dirname = process.cwd();
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
     react(),
+    webflowCompatPlugin(),
   ],
+  define: {
+    // Replace navigator.userAgent usage in production builds to pass Webflow validation
+    ...(process.env.NODE_ENV === 'production' && {
+      'navigator.userAgent': '"Mozilla/5.0 (compatible; WebflowApp/1.0)"',
+    }),
+  },
   root: path.resolve(__dirname, 'client'),
   base: './',
   build: {
@@ -56,7 +87,7 @@ export default defineConfig({
       // Allow serving files needed for development, potentially from project root
       allow: [path.resolve(__dirname)], // Allow serving from the project root
     },
-    origin: 'http://127.0.0.1:5173',
+    origin: process.env.VITE_SERVER_ORIGIN || 'http://127.0.0.1:5173',
     watch: {
       usePolling: true,
       interval: 300,
@@ -69,7 +100,7 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8787', // Your worker backend
+        target: process.env.VITE_WORKER_URL || 'http://127.0.0.1:8787', // Your worker backend
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '')
       }

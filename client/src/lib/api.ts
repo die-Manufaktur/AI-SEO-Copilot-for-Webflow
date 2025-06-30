@@ -15,14 +15,19 @@ type Asset = {
 
 // Consolidated API URL determination function
 export const getApiUrl = () => {
-  // Force local development API during development
-  const FORCE_LOCAL_DEV = true; // Toggle this when needed
+  // In production builds, only use production URLs
+  if (import.meta.env.PROD) {
+    return "https://seo-copilot-api-production.paul-130.workers.dev";
+  }
+  
+  // Development mode logic using environment variables
+  const FORCE_LOCAL_DEV = import.meta.env.VITE_FORCE_LOCAL_DEV === "true";
+  const DEV_WORKER_URL = import.meta.env.VITE_WORKER_URL;
   
   try {
-    // When in development mode with FORCE_LOCAL_DEV enabled, always use local worker
-    if (FORCE_LOCAL_DEV && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")) {
-      const devWorkerUrl = "http://localhost:8787";
-      return devWorkerUrl;
+    // When FORCE_LOCAL_DEV is enabled and dev URL is configured
+    if (FORCE_LOCAL_DEV && DEV_WORKER_URL) {
+      return DEV_WORKER_URL;
     }
     
     // Standard Webflow environment check
@@ -34,15 +39,10 @@ export const getApiUrl = () => {
     logger.error("Error determining API URL:", e);
   }
   
-  // Local development without forcing
-  try {
-    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
-      const devWorkerUrl = "http://localhost:8787";
-      logger.debug("Using development Worker URL:", devWorkerUrl);
-      return devWorkerUrl;
-    }
-  } catch (e) {
-    // Handle any errors
+  // Development fallback - use configured URL if available
+  if (DEV_WORKER_URL) {
+    logger.debug("Using development Worker URL:", DEV_WORKER_URL);
+    return DEV_WORKER_URL;
   }
   
   logger.debug("Falling back to production API URL");
@@ -419,8 +419,8 @@ function formatBytes(bytes?: number): string {
 
 // In the fetchFromAPI function
 export async function fetchFromAPI<T>(endpoint: string, data: any): Promise<T> {
-  // Get worker URL from environment or use local development worker
-  const workerUrl = import.meta.env.VITE_WORKER_URL || 'http://127.0.0.1:8787';
+  // Use the consolidated API URL function
+  const workerUrl = getApiUrl();
   logger.info(`Using worker at ${workerUrl}`);
   
   try {
