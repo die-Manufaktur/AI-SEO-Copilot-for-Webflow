@@ -70,20 +70,27 @@ describe('getApiBaseUrl function', () => {
     vi.unstubAllGlobals();
   });
 
-  it('returns localhost URL in development mode', () => {
-    // Mock import.meta.env.DEV as true using vi.stubEnv
-    vi.stubEnv('DEV', true);
+  it('returns development URL in development mode', () => {
+    // Mock import.meta.env.PROD as false and VITE_WORKER_URL for dev mode
+    vi.stubEnv('PROD', false);
+    vi.stubEnv('VITE_WORKER_URL', 'http://localhost:8787');
+    
+    // Mock window.webflow as undefined to prevent it from using production URL
+    Object.defineProperty(global, 'webflow', {
+      value: undefined,
+      writable: true,
+    });
     
     const result = getApiBaseUrl();
     expect(result).toBe('http://localhost:8787');
   });
 
   it('returns production URL in production mode', () => {
-    // Mock import.meta.env.DEV as false using vi.stubEnv
-    vi.stubEnv('DEV', false);
+    // Mock import.meta.env.PROD as true
+    vi.stubEnv('PROD', true);
     
     const result = getApiBaseUrl();
-    expect(result).toBe('https://ai-seo-copilot-api.your-domain.workers.dev');
+    expect(result).toBe('https://seo-copilot-api-production.paul-130.workers.dev');
   });
 });
 
@@ -158,6 +165,10 @@ describe('api.ts error handling', () => {
 
   describe('getApiUrl error handling', () => {
     it('handles window.webflow access errors gracefully', () => {
+      // Mock production environment to ensure consistent behavior
+      vi.stubEnv('PROD', false);
+      vi.stubEnv('VITE_WORKER_URL', undefined);
+      
       // Set up localhost environment first so the webflow check happens
       Object.defineProperty(window, 'location', {
         value: {

@@ -68,7 +68,7 @@ const iconAnimation = {
   animate: {
     scale: 1,
     transition: {
-      type: "spring",
+      type: "spring" as const,
       stiffness: 260,
       damping: 20
     }
@@ -290,9 +290,18 @@ export default function Home() {
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      // Valid origin check
-      if (event.origin !== 'http://localhost:1337' && !event.origin.endsWith('.webflow.io')) {
-        return;
+      // Valid origin check - in production, only allow Webflow origins
+      if (import.meta.env.PROD) {
+        if (!event.origin.endsWith('.webflow.io')) {
+          return;
+        }
+      } else {
+        // Development: allow localhost and Webflow origins
+        const isDev = event.origin.includes('localhost') || event.origin.includes('127.0.0.1');
+        const isWebflow = event.origin.endsWith('.webflow.io');
+        if (!isDev && !isWebflow) {
+          return;
+        }
       }
 
       if (event.data.name === 'copyToClipboard' || event.data.type === 'clipboardCopy') {
