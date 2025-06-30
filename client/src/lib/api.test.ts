@@ -43,6 +43,11 @@ global.fetch = mockFetch;
 // Mock global webflow
 const mockWebflow = {
   getCurrentPage: vi.fn(),
+  setExtensionSize: vi.fn(),
+  getSiteInfo: vi.fn(),
+  getAllElements: vi.fn(),
+  getPublishPath: vi.fn(),
+  subscribe: vi.fn(),
 };
 
 const mockPage = {
@@ -238,6 +243,16 @@ describe('api.ts error handling', () => {
     };
 
     it('handles fetch errors with retry logic', async () => {
+      // Mock setTimeout globally to avoid delays
+      const originalSetTimeout = global.setTimeout;
+      global.setTimeout = vi.fn((callback: any) => {
+        // Execute callback immediately to skip delay
+        if (typeof callback === 'function') {
+          callback();
+        }
+        return 1 as any;
+      }) as any;
+      
       // Mock fetch to fail twice, then succeed
       mockFetch
         .mockRejectedValueOnce(new Error('Network error'))
@@ -251,17 +266,30 @@ describe('api.ts error handling', () => {
       
       expect(mockFetch).toHaveBeenCalledTimes(3);
       expect(result).toEqual({ score: 85, checks: [] });
-    });
+      
+      // Restore setTimeout
+      global.setTimeout = originalSetTimeout;
+    }, 15000);
 
     it('handles maximum retry attempts exceeded', async () => {
       // Mock fetch to always fail
       mockFetch.mockRejectedValue(new Error('Persistent network error'));
 
+      // Mock setTimeout to avoid actual delays
+      const originalSetTimeout = global.setTimeout;
+      global.setTimeout = vi.fn((cb) => {
+        cb();
+        return 1 as any;
+      }) as any;
+
       await expect(analyzeSEO(mockRequest)).rejects.toThrow('SEO Analysis failed: Persistent network error');
       
       // The actual implementation is "1 original + 2 retries = 3 attempts" but we also have collectPageAssets() call
       expect(mockFetch).toHaveBeenCalledTimes(4); // 1 for collectPageAssets + 3 for analyze attempts
-    });
+      
+      // Restore setTimeout
+      global.setTimeout = originalSetTimeout;
+    }, 10000);
 
     it('handles 404 response with specific error message', async () => {
       mockFetch.mockResolvedValue({
@@ -274,7 +302,7 @@ describe('api.ts error handling', () => {
       expect(mockConsole.error).toHaveBeenCalledWith(
         '[SEO Analyzer] API endpoint not found. Check if worker is running and the /api/analyze endpoint is defined.'
       );
-    });
+    }, 10000);
 
     it('handles non-200 status codes', async () => {
       mockFetch.mockResolvedValue({
@@ -282,14 +310,24 @@ describe('api.ts error handling', () => {
         status: 500,
       });
 
+      // Mock setTimeout to avoid actual delays
+      const originalSetTimeout = global.setTimeout;
+      global.setTimeout = vi.fn((cb) => {
+        cb();
+        return 1 as any;
+      }) as any;
+
       await expect(analyzeSEO(mockRequest)).rejects.toThrow('API returned status code 500');
-    });
+      
+      // Restore setTimeout
+      global.setTimeout = originalSetTimeout;
+    }, 10000);
 
     it('handles response without status', async () => {
       mockFetch.mockResolvedValue(null);
 
       await expect(analyzeSEO(mockRequest)).rejects.toThrow('API returned status code unknown');
-    });
+    }, 10000);
 
     it('handles JSON parsing errors', async () => {
       mockFetch.mockResolvedValue({
@@ -298,13 +336,23 @@ describe('api.ts error handling', () => {
       });
 
       await expect(analyzeSEO(mockRequest)).rejects.toThrow('SEO Analysis failed: Invalid JSON');
-    });
+    }, 10000);
 
     it('handles non-Error exceptions', async () => {
       mockFetch.mockRejectedValue('String error');
 
+      // Mock setTimeout to avoid actual delays
+      const originalSetTimeout = global.setTimeout;
+      global.setTimeout = vi.fn((cb) => {
+        cb();
+        return 1 as any;
+      }) as any;
+
       await expect(analyzeSEO(mockRequest)).rejects.toThrow('An unknown error occurred during SEO analysis.');
-    });
+      
+      // Restore setTimeout
+      global.setTimeout = originalSetTimeout;
+    }, 10000);
   });
 
   describe('fetchOAuthToken error handling', () => {

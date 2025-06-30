@@ -15,6 +15,24 @@ import * as cheerio from 'cheerio';
 import { sanitizeText } from '../shared/utils/stringUtils';
 import { shouldShowCopyButton } from '../shared/utils/seoUtils';
 
+// Sanitize input specifically for AI prompts to prevent prompt injection
+function sanitizeForAIPrompt(input: string): string {
+  if (!input || typeof input !== 'string') {
+    return '';
+  }
+
+  return sanitizeText(input)
+    // Remove prompt injection keywords (case insensitive)
+    .replace(/\b(ignore|forget|override|system|prompt|instruction|assistant|ai|model|openai|gpt|claude)\s*(previous|above|below|this|that|all|instructions?)\b/gi, '')
+    // Remove template/injection patterns
+    .replace(/[{}[\]]/g, '')
+    // Remove excessive punctuation that might be used for injection
+    .replace(/[!@#$%^&*()+=|\\:";'<>?,.\/]{3,}/g, '')
+    // Limit length for AI prompts
+    .substring(0, 1000)
+    .trim();
+}
+
 const app = new Hono();
 
 app.use('*', corsMiddleware());
@@ -31,7 +49,7 @@ app.post('/api/analyze', async (c) => {
       return c.json({ error: 'Invalid request body' }, 400);
     }
     
-    const { keyphrase, url, isHomePage = false, webflowPageData, pageAssets } = body;
+    const { keyphrase, url, isHomePage = false, webflowPageData, pageAssets, advancedOptions } = body;
     
     const scrapedData = await scrapeWebPage(url, c.env as Env, keyphrase);
     
@@ -42,7 +60,8 @@ app.post('/api/analyze', async (c) => {
       isHomePage, 
       c.env as Env, 
       webflowPageData, 
-      pageAssets
+      pageAssets,
+      advancedOptions
     );
     
     return c.json(analysisResult);
@@ -134,13 +153,15 @@ function getSuccessMessage(checkType: string): string {
  * @param keyphrase The target keyphrase
  * @param env Environment variables
  * @param context Additional context for the recommendation
+ * @param advancedOptions Advanced analysis options (page type, additional context)
  * @returns AI-powered recommendation or fallback message
  */
 async function getAIRecommendation(
   checkType: string,
   keyphrase: string,
   env: any, 
-  context?: string
+  context?: string,
+  advancedOptions?: { pageType?: string; additionalContext?: string }
 ): Promise<string | { introPhrase: string; copyableContent: string }> {
   try {    
     const openai = new OpenAI({
@@ -149,25 +170,47 @@ async function getAIRecommendation(
     
     const needsCopyableContent = shouldHaveCopyButton(checkType);
     
+    // Build advanced context string if available
+    let advancedContext = '';
+    if (advancedOptions?.pageType || advancedOptions?.additionalContext) {
+      advancedContext = '\n\nAdvanced Context:';
+      if (advancedOptions.pageType) {
+        advancedContext += `\n- Page Type: ${advancedOptions.pageType}`;
+      }
+      if (advancedOptions.additionalContext) {
+        const sanitizedContext = sanitizeForAIPrompt(advancedOptions.additionalContext);
+        advancedContext += `\n- Additional Context: ${sanitizedContext}`;
+      }
+    }
+    
     const systemPrompt = needsCopyableContent 
       ? `You are an SEO expert providing ready-to-use content.
          Create a single, concise, and optimized ${checkType.toLowerCase()} that naturally incorporates the keyphrase.
          Return ONLY the final content with no additional explanation, quotes, or formatting.
          The content must be directly usable by copying and pasting.
-         Focus on being specific, clear, and immediately usable.`
+         Focus on being specific, clear, and immediately usable.${advancedContext ? ' Consider the page type and additional context provided to make recommendations more relevant and specific.' : ''}`
       : `You are an SEO expert providing actionable advice.
-         Provide a concise recommendation for the SEO check "${checkType}".`;
+         Provide a concise recommendation for the SEO check "${checkType}".${advancedContext ? ' Consider the page type and additional context provided to make recommendations more relevant and specific.' : ''}`;
 
     const userPrompt = needsCopyableContent
       ? `Create a perfect ${checkType.toLowerCase()} for the keyphrase "${keyphrase}".
-         Current content: ${context || 'None'}
+         Current content: ${context || 'None'}${advancedContext}
          Remember to:
-         - Keep optimal length for the content type (title: 50-60 chars, meta description: 120-155 chars)
-         - Make it compelling and relevant
+         - Keep optimal length for the content type (title: 50-60 chars, meta description: 120-155 chars, introduction: 2-3 sentences)
+         - Make it compelling and relevant${advancedOptions?.pageType ? ` for a ${advancedOptions.pageType.toLowerCase()}` : ''}
+         - For introductions, rewrite the existing content to naturally include the keyphrase while maintaining the original message
          - ONLY return the final content with no explanations or formatting`
       : `Fix this SEO issue: "${checkType}" for keyphrase "${keyphrase}" if a keyphrase is appropriate for the check.
-         Current status: ${context || 'Not specified'}
-         Provide concise but actionable advice in a couple of sentences.`;
+         Current status: ${context || 'Not specified'}${advancedContext}
+         Provide concise but actionable advice in a couple of sentences${advancedOptions?.pageType ? ` tailored for a ${advancedOptions.pageType.toLowerCase()}` : ''}.`;
+
+    // Debug logging to verify advanced options are being used
+    if (advancedOptions?.pageType || advancedOptions?.additionalContext) {
+      console.log(`[SEO Analyzer] Using advanced options for ${checkType}:`, {
+        pageType: advancedOptions.pageType,
+        additionalContext: advancedOptions.additionalContext?.substring(0, 100) + '...'
+      });
+    }
 
     const maxRetries = 2;
     let retries = 0;
@@ -429,6 +472,7 @@ async function scrapeWebPage(url: string, env: Env, keyphrase: string): Promise<
  * @param env Environment variables
  * @param webflowPageData Optional data from Webflow API
  * @param pageAssets Optional page assets with size information
+ * @param advancedOptions Optional advanced analysis options
  * @returns Complete SEO analysis results
  */
 async function analyzeSEOElements(
@@ -438,7 +482,8 @@ async function analyzeSEOElements(
   isHomePage: boolean,
   env: Env,
   webflowPageData?: WebflowPageData,
-  pageAssets?: Array<{ url: string, alt: string, type: string, size?: number, mimeType?: string }>
+  pageAssets?: Array<{ url: string, alt: string, type: string, size?: number, mimeType?: string }>,
+  advancedOptions?: { pageType?: string; additionalContext?: string }
 ): Promise<SEOAnalysisResult> {
   const checks: SEOCheck[] = [];
   const normalizedKeyphrase = keyphrase.toLowerCase().trim();
@@ -460,7 +505,8 @@ async function analyzeSEOElements(
     `Your title does not contain the keyphrase "${keyphrase}".`,
     pageTitle,
     keyphrase,
-    env
+    env,
+    advancedOptions
   );
 
   checks.push(titleCheck);
@@ -480,7 +526,8 @@ async function analyzeSEOElements(
     `Keyphrase "${keyphrase}" not found in meta description: "${metaDescription}"`,
     metaDescription,
     keyphrase,
-    env
+    env,
+    advancedOptions
   );
 
   checks.push(metaDescriptionCheck);
@@ -500,7 +547,8 @@ async function analyzeSEOElements(
     `The URL "${canonicalUrl}" does not contain the keyphrase "${keyphrase}".`,
     canonicalUrl,
     keyphrase,
-    env
+    env,
+    advancedOptions
   );
   
   checks.push(urlCheck);
@@ -518,7 +566,8 @@ async function analyzeSEOElements(
     `Content length is ${wordCount} words, which is below the recommended minimum of ${minWordCount} words ${isHomePage ? "(homepage)" : "(regular page)"}.`,
     scrapedData.content,
     keyphrase,
-    env
+    env,
+    advancedOptions
   );
 
   checks.push(contentLengthCheck);
@@ -573,10 +622,11 @@ async function analyzeSEOElements(
     "Keyphrase in Introduction",
     () => firstParagraph.toLowerCase().includes(normalizedKeyphrase),
     `Nice! The keyphrase "${keyphrase}" appears in the first paragraph.`,
-    `Keyphrase "${keyphrase}" not found in the introduction: "${firstParagraph}"`,
+    `Keyphrase "${keyphrase}" not found in the introduction.`,
     firstParagraph,
     keyphrase,
-    env
+    env,
+    advancedOptions
   );
   
   checks.push(keyphraseInIntroCheck);
@@ -602,7 +652,8 @@ async function analyzeSEOElements(
           imageAltCheck.title,
           keyphrase,
           env,
-          `${imagesWithoutAlt.length} image(s) found without alt attributes.`
+          `${imagesWithoutAlt.length} image(s) found without alt attributes.`,
+          advancedOptions
         );
         handleRecommendationResult(imageAltResult, imageAltCheck);
       } catch (error) {
@@ -630,7 +681,8 @@ async function analyzeSEOElements(
     `No internal links found on the page.`,
     scrapedData.internalLinks.join(', '),
     keyphrase,
-    env
+    env,
+    advancedOptions
   );
   
   checks.push(internalLinksCheck);
@@ -643,7 +695,8 @@ async function analyzeSEOElements(
     `No outbound links found on the page.`,
     scrapedData.outboundLinks.join(', '),
     keyphrase,
-    env
+    env,
+    advancedOptions
   );
   
   checks.push(outboundLinksCheck);
@@ -674,7 +727,8 @@ async function analyzeSEOElements(
           nextGenImagesCheck.title,
           keyphrase,
           env,
-          `${imagesInNextGenFormats.length} image(s) found in next-gen formats.`
+          `${imagesInNextGenFormats.length} image(s) found in next-gen formats.`,
+          advancedOptions
         );
         handleRecommendationResult(nextGenImagesResult, nextGenImagesCheck);
       } catch (error) {
@@ -774,7 +828,8 @@ async function analyzeSEOElements(
     `Keyphrase "${keyphrase}" not found in H1: "${h1Text}"`,
     h1Text,
     keyphrase,
-    env
+    env,
+    advancedOptions
   );
 
   checks.push(h1Check);
@@ -789,7 +844,8 @@ async function analyzeSEOElements(
     `Keyphrase "${keyphrase}" not found in any H2 headings.`,
     h2Headings.map(h => h.text).join(', '),
     keyphrase,
-    env
+    env,
+    advancedOptions
   );
 
   checks.push(h2Check);
@@ -815,7 +871,8 @@ async function analyzeSEOElements(
     `Improper heading hierarchy detected. Ensure that H1 is used only once and H2s follow a logical order.`,
     scrapedData.headings.map(h => `${h.text} (H${h.level})`).join(', '),
     keyphrase,
-    env
+    env,
+    advancedOptions
   );
 
   checks.push(headingHierarchyCheck);
@@ -1024,7 +1081,8 @@ async function analyzeSEOElements(
           imageSizeCheck.title,
           "image optimization",
           env,
-          context
+          context,
+          advancedOptions
         );
         handleRecommendationResult(imageSizeResult, imageSizeCheck);
       } catch (error) {
@@ -1082,6 +1140,7 @@ function handleRecommendationResult(
  * @param context Additional context for AI recommendations
  * @param keyphrase The target keyphrase
  * @param env Environment variables for AI recommendations
+ * @param advancedOptions Advanced analysis options
  * @returns A complete SEO check object
  */
 async function createSEOCheck(
@@ -1091,7 +1150,8 @@ async function createSEOCheck(
   failureMessage: string,
   context: string | undefined,
   keyphrase: string,
-  env: Env
+  env: Env,
+  advancedOptions?: { pageType?: string; additionalContext?: string }
 ): Promise<SEOCheck> {
   const check: SEOCheck = {
     title,
@@ -1117,7 +1177,8 @@ async function createSEOCheck(
         title,
         keyphrase,
         env,
-        context
+        context,
+        advancedOptions
       );
       handleRecommendationResult(aiSuggestion, check);
     } catch (error) {

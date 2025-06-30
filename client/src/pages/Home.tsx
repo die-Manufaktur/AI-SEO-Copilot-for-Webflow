@@ -9,6 +9,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { ScrollArea } from "../components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { Switch } from "../components/ui/switch";
 import {
   Loader2,
   CheckCircle,
@@ -18,7 +20,9 @@ import {
   CircleAlert,
   Info,
   ChevronLeft,
-  ExternalLink
+  ExternalLink,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -41,12 +45,83 @@ import { ImageSizeDisplay } from "../components/ImageSizeDisplay";
 import { copyTextToClipboard } from "../utils/clipboard";
 import { shouldShowCopyButton } from '../../../shared/utils/seoUtils';
 import { generatePageId, saveKeywordsForPage, loadKeywordsForPage } from '../utils/keywordStorage';
+import { saveAdvancedOptionsForPage, loadAdvancedOptionsForPage, type AdvancedOptions } from '../utils/advancedOptionsStorage';
+import sanitizeHtml from 'sanitize-html';
+import { sanitizeText } from '../../../shared/utils/stringUtils';
 
 const logger = createLogger("Home");
+
+// Page type options for the dropdown
+const PAGE_TYPES = [
+  'Homepage',
+  'Category page',
+  'Product page',
+  'Blog post',
+  'Landing page',
+  'Contact page',
+  'About page',
+  'FAQ page',
+  'Service page',
+  'Portfolio/project page',
+  'Testimonial page',
+  'Location page',
+  'Legal page',
+  'Event page',
+  'Press/News page',
+  'Job/career page',
+  'Thank you page',
+  'Pillar page',
+  'Cluster page'
+];
 
 const formSchema = z.object({
   keyphrase: z.string().min(2, "Keyphrase must be at least 2 characters")
 });
+
+// Additional context validation
+const MAX_CONTEXT_LENGTH = 2000;
+const validateAdditionalContext = (input: string): { isValid: boolean; message?: string; sanitized: string } => {
+  if (!input) return { isValid: true, sanitized: '' };
+  
+  // Check for excessive length
+  if (input.length > MAX_CONTEXT_LENGTH) {
+    return { 
+      isValid: false, 
+      message: `Context too long. Maximum ${MAX_CONTEXT_LENGTH} characters allowed.`,
+      sanitized: input.substring(0, MAX_CONTEXT_LENGTH)
+    };
+  }
+
+  // Check for script tags and other dangerous content
+  if (/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi.test(input)) {
+    return { 
+      isValid: false, 
+      message: 'Script tags are not allowed in context.',
+      sanitized: sanitizeHtml(input, { allowedTags: [], allowedAttributes: {} })
+    };
+  }
+
+  // Check for HTML event handlers
+  if (/<[^>]*on\w+\s*=/gi.test(input)) {
+    return { 
+      isValid: false, 
+      message: 'HTML event handlers are not allowed.',
+      sanitized: sanitizeHtml(input, { allowedTags: [], allowedAttributes: {} })
+    };
+  }
+
+  // Sanitize the input
+  const sanitized = sanitizeHtml(input, {
+    allowedTags: [], // No HTML tags allowed
+    allowedAttributes: {},
+    disallowedTagsMode: 'discard'
+  });
+
+  // Apply additional text sanitization
+  const finalSanitized = sanitizeText(sanitized).trim();
+
+  return { isValid: true, sanitized: finalSanitized };
+};
 
 const container = {
   hidden: { opacity: 0 },
@@ -255,6 +330,13 @@ export default function Home() {
   const [currentPageId, setCurrentPageId] = useState<string>('');
   const [keywordSaveStatus, setKeywordSaveStatus] = useState<'saved' | 'saving' | 'none'>('none');
   
+  // Advanced options state
+  const [advancedOptionsEnabled, setAdvancedOptionsEnabled] = useState<boolean>(false);
+  const [pageType, setPageType] = useState<string>('');
+  const [additionalContext, setAdditionalContext] = useState<string>('');
+  const [additionalContextError, setAdditionalContextError] = useState<string>('');
+  const [advancedOptionsSaveStatus, setAdvancedOptionsSaveStatus] = useState<'saved' | 'saving' | 'none'>('none');
+  
   const seoScore = results ? calculateSEOScore(results.checks) : 0;
   const scoreRating = getScoreRatingText(seoScore);
 
@@ -413,6 +495,20 @@ export default function Home() {
         } else {
           setKeywordSaveStatus('none');
         }
+        
+        // Load saved advanced options for this page
+        const savedAdvancedOptions = loadAdvancedOptionsForPage(pageId);
+        if (savedAdvancedOptions.pageType || savedAdvancedOptions.additionalContext) {
+          setPageType(savedAdvancedOptions.pageType);
+          setAdditionalContext(savedAdvancedOptions.additionalContext);
+          setAdvancedOptionsEnabled(true);
+          setAdvancedOptionsSaveStatus('saved');
+        } else {
+          setPageType('');
+          setAdditionalContext('');
+          setAdvancedOptionsEnabled(false);
+          setAdvancedOptionsSaveStatus('none');
+        }
       } catch (error) {
         console.warn('Failed to initialize page keywords:', error);
       }
@@ -437,6 +533,28 @@ export default function Home() {
       }
     }
   }, [watchedKeyphrase, currentPageId]);
+
+  // Watch for advanced options changes to update save status
+  useEffect(() => {
+    if (currentPageId && advancedOptionsEnabled) {
+      const savedAdvancedOptions = loadAdvancedOptionsForPage(currentPageId);
+      const currentOptions = { pageType, additionalContext };
+      
+      // Only show 'saved' status if there are actual values saved
+      const hasSavedValues = savedAdvancedOptions.pageType || savedAdvancedOptions.additionalContext;
+      const hasCurrentValues = pageType || additionalContext;
+      
+      if (hasSavedValues && JSON.stringify(currentOptions) === JSON.stringify(savedAdvancedOptions)) {
+        setAdvancedOptionsSaveStatus('saved');
+      } else if (hasCurrentValues) {
+        setAdvancedOptionsSaveStatus('none');
+      } else {
+        setAdvancedOptionsSaveStatus('none');
+      }
+    } else {
+      setAdvancedOptionsSaveStatus('none');
+    }
+  }, [pageType, additionalContext, currentPageId, advancedOptionsEnabled]);
 
   const mutation = useMutation<SEOAnalysisResult, Error, AnalyzeSEORequest>({
     mutationFn: analyzeSEO,
@@ -526,6 +644,13 @@ export default function Home() {
       setKeywordSaveStatus('saved');
     }
     
+    // Save advanced options for current page
+    if (currentPageId && advancedOptionsEnabled && (pageType || additionalContext)) {
+      setAdvancedOptionsSaveStatus('saving');
+      saveAdvancedOptionsForPage(currentPageId, { pageType, additionalContext });
+      setAdvancedOptionsSaveStatus('saved');
+    }
+    
     try {
       let siteInfo: WebflowSiteInfo;
       siteInfo = await webflow.getSiteInfo();
@@ -605,7 +730,13 @@ export default function Home() {
         isHomePage,
         siteInfo: mappedSiteInfo,
         publishPath,
-        webflowPageData: pageDataForApi as WebflowPageData
+        webflowPageData: pageDataForApi as WebflowPageData,
+        ...(advancedOptionsEnabled && (pageType || additionalContext) && {
+          advancedOptions: {
+            pageType: pageType || undefined,
+            additionalContext: additionalContext || undefined
+          }
+        })
       };
 
       logger.info("[Home onSubmit] Sending data to API:", analysisData);
@@ -712,6 +843,130 @@ export default function Home() {
                       </FormItem>
                     )}
                   />
+                  
+                  {/* Advanced Tab Section */}
+                  <div className="border-t pt-4 mt-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h3 className="text-lg font-semibold">Advanced Analysis</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Get more accurate, tailored recommendations for your specific page type
+                        </p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          checked={advancedOptionsEnabled}
+                          onCheckedChange={(checked) => {
+                            setAdvancedOptionsEnabled(checked);
+                            // Clear advanced options when toggled off
+                            if (!checked) {
+                              setPageType('');
+                              setAdditionalContext('');
+                              setAdvancedOptionsSaveStatus('none');
+                              // Also clear saved options from storage
+                              if (currentPageId) {
+                                saveAdvancedOptionsForPage(currentPageId, { pageType: '', additionalContext: '' });
+                              }
+                            }
+                          }}
+                        />
+                        <span className="text-sm">{advancedOptionsEnabled ? 'On' : 'Off'}</span>
+                      </div>
+                    </div>
+
+                    <AnimatePresence>
+                      {advancedOptionsEnabled && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.3 }}
+                          className="space-y-4"
+                        >
+                          {/* Page Type Dropdown */}
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Page Type</label>
+                            <Select value={pageType} onValueChange={setPageType}>
+                              <SelectTrigger className="w-full border border-input bg-background">
+                                <SelectValue placeholder="Select a page type" />
+                              </SelectTrigger>
+                              <SelectContent className="bg-background border border-input shadow-md">
+                                {PAGE_TYPES.map((type) => (
+                                  <SelectItem 
+                                    key={type} 
+                                    value={type}
+                                    className="cursor-pointer focus:bg-accent focus:text-accent-foreground data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                                  >
+                                    {type}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {/* Additional Context Textarea */}
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">
+                              Additional Context
+                              <span className="text-xs text-muted-foreground ml-2">
+                                ({additionalContext.length}/{MAX_CONTEXT_LENGTH} characters)
+                              </span>
+                            </label>
+                            <textarea
+                              value={additionalContext}
+                              onChange={(e) => {
+                                const input = e.target.value;
+                                const validation = validateAdditionalContext(input);
+                                
+                                if (validation.isValid) {
+                                  setAdditionalContext(validation.sanitized);
+                                  setAdditionalContextError('');
+                                } else {
+                                  // For invalid input, set the sanitized version and show error
+                                  setAdditionalContext(validation.sanitized);
+                                  setAdditionalContextError(validation.message || 'Invalid input detected');
+                                }
+                              }}
+                              placeholder="Provide additional context about your page or goal (e.g., target audience, business model, competitive landscape, etc.)"
+                              rows={4}
+                              className={`w-full px-3 py-2 border rounded-md text-sm placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                                additionalContextError 
+                                  ? 'border-red-500 focus:ring-red-500' 
+                                  : 'border-input bg-background focus:ring-ring'
+                              }`}
+                              maxLength={MAX_CONTEXT_LENGTH}
+                            />
+                            {additionalContextError && (
+                              <p className="text-xs text-red-500 flex items-center gap-1">
+                                <AlertTriangle className="h-3 w-3" />
+                                {additionalContextError}
+                              </p>
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                              This information helps AI generate more targeted, relevant SEO recommendations. 
+                              HTML tags and scripts are automatically removed for security.
+                            </p>
+                          </div>
+
+                          {/* Advanced Options Save Status */}
+                          {(pageType || additionalContext || advancedOptionsSaveStatus === 'saving') && (
+                            <div className="flex justify-end">
+                              <span className="text-xs font-medium" style={{
+                                color: advancedOptionsSaveStatus === 'saved' ? 'var(--greenText)' :
+                                       advancedOptionsSaveStatus === 'saving' ? 'var(--yellowText)' :
+                                       'var(--redText)'
+                              }}>
+                                {advancedOptionsSaveStatus === 'saved' ? 'Advanced options saved for this page' :
+                                 advancedOptionsSaveStatus === 'saving' ? 'Saving...' :
+                                 'Advanced options not saved'}
+                              </span>
+                            </div>
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                  
                   <motion.div
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
