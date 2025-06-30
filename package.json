@@ -91,7 +91,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "cors": "^2.8.5",
-    "dotenv": "^16.5.0",
+    "dotenv": "^17.0.0",
     "embla-carousel-react": "^8.6.0",
     "framer-motion": "^12.18.1",
     "hono": "^4.7.11",
