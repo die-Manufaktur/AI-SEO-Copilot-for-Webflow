@@ -929,10 +929,10 @@ export default function Home() {
                               }}
                               placeholder="Provide additional context about your page or goal (e.g., target audience, business model, competitive landscape, etc.)"
                               rows={4}
-                              className={`w-full px-3 py-2 border rounded-md text-sm placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                              className={`w-full px-3 py-2 border rounded-md text-sm placeholder:text-muted-foreground resize-none ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                                 additionalContextError 
-                                  ? 'border-red-500 focus:ring-red-500' 
-                                  : 'border-input bg-background focus:ring-ring'
+                                  ? 'border-red-500 focus-visible:ring-red-500' 
+                                  : 'border-input bg-background'
                               }`}
                               maxLength={MAX_CONTEXT_LENGTH}
                             />
