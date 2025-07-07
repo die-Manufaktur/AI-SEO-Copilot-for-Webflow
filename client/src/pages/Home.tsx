@@ -647,7 +647,8 @@ export default function Home() {
     // Save advanced options for current page
     if (currentPageId && advancedOptionsEnabled && (pageType || additionalContext)) {
       setAdvancedOptionsSaveStatus('saving');
-      saveAdvancedOptionsForPage(currentPageId, { pageType, additionalContext });
+      const sanitizedContext = additionalContext ? validateAdditionalContext(additionalContext).sanitized : '';
+      saveAdvancedOptionsForPage(currentPageId, { pageType, additionalContext: sanitizedContext });
       setAdvancedOptionsSaveStatus('saved');
     }
     
@@ -734,7 +735,7 @@ export default function Home() {
         ...(advancedOptionsEnabled && (pageType || additionalContext) && {
           advancedOptions: {
             pageType: pageType || undefined,
-            additionalContext: additionalContext || undefined
+            additionalContext: additionalContext ? validateAdditionalContext(additionalContext).sanitized : undefined
           }
         })
       };
@@ -916,15 +917,14 @@ export default function Home() {
                               value={additionalContext}
                               onChange={(e) => {
                                 const input = e.target.value;
-                                const validation = validateAdditionalContext(input);
+                                setAdditionalContext(input);
                                 
-                                if (validation.isValid) {
-                                  setAdditionalContext(validation.sanitized);
-                                  setAdditionalContextError('');
-                                } else {
-                                  // For invalid input, set the sanitized version and show error
-                                  setAdditionalContext(validation.sanitized);
+                                // Only validate and show errors, don't sanitize during typing
+                                const validation = validateAdditionalContext(input);
+                                if (!validation.isValid) {
                                   setAdditionalContextError(validation.message || 'Invalid input detected');
+                                } else {
+                                  setAdditionalContextError('');
                                 }
                               }}
                               placeholder="Provide additional context about your page or goal (e.g., target audience, business model, competitive landscape, etc.)"
