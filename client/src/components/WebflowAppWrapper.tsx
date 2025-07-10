@@ -10,9 +10,9 @@ interface WebflowAppWrapperProps {
 
 export default function WebflowAppWrapper({ children }: WebflowAppWrapperProps) {
   useEffect(() => {
-    if (webflow && webflow.setExtensionSize) {
+    if (window.webflow && window.webflow.setExtensionSize) {
       try {
-        webflow.setExtensionSize({
+        window.webflow.setExtensionSize({
           width: 540,
           height: 720
         });
