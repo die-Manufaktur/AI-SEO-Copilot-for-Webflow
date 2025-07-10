@@ -6,19 +6,20 @@ import { sanitizeText } from '../../../shared/utils/stringUtils';
 
 const STORAGE_KEY = 'webflow-seo-advanced-options';
 
-// Sanitize additional context for safe storage
-function sanitizeAdditionalContext(input: string): string {
+// Sanitize secondary keywords for safe storage
+function sanitizeSecondaryKeywords(input: string): string {
   if (!input || typeof input !== 'string') return '';
   
   return sanitizeText(input)
     .replace(/<[^>]*>/g, '') // Remove any HTML tags
-    .substring(0, 2000) // Limit length
+    .substring(0, 500) // Limit length
     .trim();
 }
 
 export interface AdvancedOptions {
   pageType: string;
-  additionalContext: string;
+  secondaryKeywords?: string; // Renamed from additionalContext for clarity  
+  additionalContext?: string; // Deprecated: kept for backward compatibility
 }
 
 interface PageAdvancedOptions {
@@ -34,12 +35,15 @@ export function saveAdvancedOptionsForPage(pageId: string, options: AdvancedOpti
     const pageOptions: PageAdvancedOptions = stored ? JSON.parse(stored) : {};
     
     const sanitizedPageType = options.pageType.trim();
-    const sanitizedContext = sanitizeAdditionalContext(options.additionalContext);
+    // Support both new and old property names for backward compatibility
+    const contextToSanitize = options.secondaryKeywords || options.additionalContext || '';
+    const sanitizedContext = sanitizeSecondaryKeywords(contextToSanitize);
     
     if (sanitizedPageType || sanitizedContext) {
       pageOptions[pageId] = {
         pageType: sanitizedPageType,
-        additionalContext: sanitizedContext
+        secondaryKeywords: sanitizedContext,
+        additionalContext: sanitizedContext // Keep for backward compatibility
       };
     } else {
       // Remove entry if both fields are empty
@@ -58,13 +62,26 @@ export function saveAdvancedOptionsForPage(pageId: string, options: AdvancedOpti
 export function loadAdvancedOptionsForPage(pageId: string): AdvancedOptions {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return { pageType: '', additionalContext: '' };
+    if (!stored) return { pageType: '', secondaryKeywords: '', additionalContext: '' };
     
     const pageOptions: PageAdvancedOptions = JSON.parse(stored);
-    return pageOptions[pageId] || { pageType: '', additionalContext: '' };
+    const options = pageOptions[pageId];
+    
+    if (!options) {
+      return { pageType: '', secondaryKeywords: '', additionalContext: '' };
+    }
+    
+    // Handle backward compatibility: if only additionalContext exists, use it for secondaryKeywords
+    const secondaryKeywords = options.secondaryKeywords || options.additionalContext || '';
+    
+    return {
+      pageType: options.pageType || '',
+      secondaryKeywords,
+      additionalContext: secondaryKeywords // Keep for backward compatibility
+    };
   } catch (error) {
     console.warn('Failed to load advanced options from localStorage:', error);
-    return { pageType: '', additionalContext: '' };
+    return { pageType: '', secondaryKeywords: '', additionalContext: '' };
   }
 }
 

@@ -78,17 +78,18 @@ const formSchema = z.object({
   keyphrase: z.string().min(2, "Keyphrase must be at least 2 characters")
 });
 
-// Additional context validation
-const MAX_CONTEXT_LENGTH = 2000;
-const validateAdditionalContext = (input: string): { isValid: boolean; message?: string; sanitized: string } => {
+// Secondary keywords validation
+const MAX_KEYWORDS_LENGTH = 500;
+const MAX_KEYWORDS_COUNT = 10;
+const validateSecondaryKeywords = (input: string): { isValid: boolean; message?: string; sanitized: string } => {
   if (!input) return { isValid: true, sanitized: '' };
   
   // Check for excessive length
-  if (input.length > MAX_CONTEXT_LENGTH) {
+  if (input.length > MAX_KEYWORDS_LENGTH) {
     return { 
       isValid: false, 
-      message: `Context too long. Maximum ${MAX_CONTEXT_LENGTH} characters allowed.`,
-      sanitized: input.substring(0, MAX_CONTEXT_LENGTH)
+      message: `Keywords too long. Maximum ${MAX_KEYWORDS_LENGTH} characters allowed.`,
+      sanitized: input.substring(0, MAX_KEYWORDS_LENGTH)
     };
   }
 
@@ -96,7 +97,7 @@ const validateAdditionalContext = (input: string): { isValid: boolean; message?:
   if (/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi.test(input)) {
     return { 
       isValid: false, 
-      message: 'Script tags are not allowed in context.',
+      message: 'Script tags are not allowed in keywords.',
       sanitized: sanitizeHtml(input, { allowedTags: [], allowedAttributes: {} })
     };
   }
@@ -117,8 +118,30 @@ const validateAdditionalContext = (input: string): { isValid: boolean; message?:
     disallowedTagsMode: 'discard'
   });
 
-  // Apply additional text sanitization
-  const finalSanitized = sanitizeText(sanitized).trim();
+  // Split by commas and validate individual keywords
+  const keywords = sanitized.split(',').map(k => k.trim()).filter(k => k.length > 0);
+  
+  // Check for too many keywords
+  if (keywords.length > MAX_KEYWORDS_COUNT) {
+    return {
+      isValid: false,
+      message: `Too many keywords. Maximum ${MAX_KEYWORDS_COUNT} keywords allowed.`,
+      sanitized: keywords.slice(0, MAX_KEYWORDS_COUNT).join(', ')
+    };
+  }
+
+  // Check for keywords that are too short or too long
+  const invalidKeywords = keywords.filter(k => k.length < 2 || k.length > 50);
+  if (invalidKeywords.length > 0) {
+    return {
+      isValid: false,
+      message: 'Each keyword must be between 2-50 characters.',
+      sanitized: keywords.filter(k => k.length >= 2 && k.length <= 50).join(', ')
+    };
+  }
+
+  // Apply additional text sanitization and return cleaned keywords
+  const finalSanitized = keywords.map(k => sanitizeText(k).trim()).filter(k => k.length > 0).join(', ');
 
   return { isValid: true, sanitized: finalSanitized };
 };
@@ -244,7 +267,7 @@ const fetchPageInfo = async (
 const getCategoryStatus = (checks: SEOCheck[]) => {
   if (!checks || !Array.isArray(checks) || checks.length === 0) return "neutral";
 
-  const passedCount = checks.filter(check => check.passed).length;
+  const passedCount = checks.filter(check => check && typeof check.passed === 'boolean' && check.passed).length;
 
   if (passedCount === checks.length) return "complete";
   if (passedCount === 0) return "todo";
@@ -339,8 +362,8 @@ export default function Home() {
   // Advanced options state
   const [advancedOptionsEnabled, setAdvancedOptionsEnabled] = useState<boolean>(false);
   const [pageType, setPageType] = useState<string>('');
-  const [additionalContext, setAdditionalContext] = useState<string>('');
-  const [additionalContextError, setAdditionalContextError] = useState<string>('');
+  const [secondaryKeywords, setSecondaryKeywords] = useState<string>('');
+  const [secondaryKeywordsError, setSecondaryKeywordsError] = useState<string>('');
   const [advancedOptionsSaveStatus, setAdvancedOptionsSaveStatus] = useState<'saved' | 'saving' | 'none'>('none');
   
   const seoScore = results && results.checks && Array.isArray(results.checks) ? calculateSEOScore(results.checks) : 0;
@@ -508,14 +531,14 @@ export default function Home() {
         
         // Load saved advanced options for this page
         const savedAdvancedOptions = loadAdvancedOptionsForPage(pageId);
-        if (savedAdvancedOptions.pageType || savedAdvancedOptions.additionalContext) {
+        if (savedAdvancedOptions.pageType || savedAdvancedOptions.secondaryKeywords) {
           setPageType(savedAdvancedOptions.pageType);
-          setAdditionalContext(savedAdvancedOptions.additionalContext);
+          setSecondaryKeywords(savedAdvancedOptions.secondaryKeywords || '');
           setAdvancedOptionsEnabled(true);
           setAdvancedOptionsSaveStatus('saved');
         } else {
           setPageType('');
-          setAdditionalContext('');
+          setSecondaryKeywords('');
           setAdvancedOptionsEnabled(false);
           setAdvancedOptionsSaveStatus('none');
         }
@@ -548,13 +571,13 @@ export default function Home() {
   useEffect(() => {
     if (currentPageId && advancedOptionsEnabled) {
       const savedAdvancedOptions = loadAdvancedOptionsForPage(currentPageId);
-      const currentOptions = { pageType, additionalContext };
+      const currentOptions = { pageType, secondaryKeywords };
       
       // Only show 'saved' status if there are actual values saved
-      const hasSavedValues = savedAdvancedOptions.pageType || savedAdvancedOptions.additionalContext;
-      const hasCurrentValues = pageType || additionalContext;
+      const hasSavedValues = savedAdvancedOptions.pageType || savedAdvancedOptions.secondaryKeywords;
+      const hasCurrentValues = pageType || secondaryKeywords;
       
-      if (hasSavedValues && JSON.stringify(currentOptions) === JSON.stringify(savedAdvancedOptions)) {
+      if (hasSavedValues && JSON.stringify(currentOptions) === JSON.stringify({ pageType: savedAdvancedOptions.pageType, secondaryKeywords: savedAdvancedOptions.secondaryKeywords || '' })) {
         setAdvancedOptionsSaveStatus('saved');
       } else if (hasCurrentValues) {
         setAdvancedOptionsSaveStatus('none');
@@ -564,7 +587,7 @@ export default function Home() {
     } else {
       setAdvancedOptionsSaveStatus('none');
     }
-  }, [pageType, additionalContext, currentPageId, advancedOptionsEnabled]);
+  }, [pageType, secondaryKeywords, currentPageId, advancedOptionsEnabled]);
 
   const mutation = useMutation<SEOAnalysisResult, Error, AnalyzeSEORequest>({
     mutationFn: analyzeSEO,
@@ -683,10 +706,10 @@ export default function Home() {
     }
     
     // Save advanced options for current page
-    if (currentPageId && advancedOptionsEnabled && (pageType || additionalContext)) {
+    if (currentPageId && advancedOptionsEnabled && (pageType || secondaryKeywords)) {
       setAdvancedOptionsSaveStatus('saving');
-      const sanitizedContext = additionalContext ? validateAdditionalContext(additionalContext).sanitized : '';
-      saveAdvancedOptionsForPage(currentPageId, { pageType, additionalContext: sanitizedContext });
+      const sanitizedContext = secondaryKeywords ? validateSecondaryKeywords(secondaryKeywords).sanitized : '';
+      saveAdvancedOptionsForPage(currentPageId, { pageType, secondaryKeywords: sanitizedContext });
       setAdvancedOptionsSaveStatus('saved');
     }
     
@@ -772,6 +795,16 @@ export default function Home() {
         }))
       };
 
+      const sanitizedKeywords = secondaryKeywords ? validateSecondaryKeywords(secondaryKeywords).sanitized : undefined;
+      
+      console.log("[DEBUG] Advanced options check:", {
+        advancedOptionsEnabled,
+        pageType,
+        secondaryKeywords,
+        sanitizedKeywords,
+        willIncludeAdvancedOptions: !!(advancedOptionsEnabled && (pageType || secondaryKeywords))
+      });
+      
       const analysisData: AnalyzeSEORequest = {
         keyphrase: values.keyphrase,
         url,
@@ -779,14 +812,15 @@ export default function Home() {
         siteInfo: mappedSiteInfo,
         publishPath,
         webflowPageData: pageDataForApi as WebflowPageData,
-        ...(advancedOptionsEnabled && (pageType || additionalContext) && {
+        ...(advancedOptionsEnabled && (pageType || secondaryKeywords) && {
           advancedOptions: {
             pageType: pageType || undefined,
-            additionalContext: additionalContext ? validateAdditionalContext(additionalContext).sanitized : undefined
+            secondaryKeywords: sanitizedKeywords
           }
         })
       };
 
+      console.log("[DEBUG] Final analysis data:", analysisData);
       logger.info("[Home onSubmit] Sending data to API:", analysisData);
       mutation.mutate(analysisData);
 
@@ -898,7 +932,7 @@ export default function Home() {
                       <div>
                         <h3 className="text-lg font-semibold">Advanced Analysis</h3>
                         <p className="text-sm text-muted-foreground">
-                          Get more accurate, tailored recommendations for your specific page type
+                          Add secondary keywords and specify page type for more targeted SEO analysis
                         </p>
                       </div>
                       <div className="flex items-center space-x-2">
@@ -909,11 +943,11 @@ export default function Home() {
                             // Clear advanced options when toggled off
                             if (!checked) {
                               setPageType('');
-                              setAdditionalContext('');
+                              setSecondaryKeywords('');
                               setAdvancedOptionsSaveStatus('none');
                               // Also clear saved options from storage
                               if (currentPageId) {
-                                saveAdvancedOptionsForPage(currentPageId, { pageType: '', additionalContext: '' });
+                                saveAdvancedOptionsForPage(currentPageId, { pageType: '', secondaryKeywords: '' });
                               }
                             }
                           }}
@@ -952,60 +986,59 @@ export default function Home() {
                             </Select>
                           </div>
 
-                          {/* Additional Context Textarea */}
+                          {/* Secondary Keywords Input */}
                           <div className="space-y-2">
                             <label className="text-sm font-medium">
-                              Additional Context
+                              Secondary Keywords
                               <span className="text-xs text-muted-foreground ml-2">
-                                ({(additionalContext || '').length}/{MAX_CONTEXT_LENGTH} characters)
+                                ({(secondaryKeywords || '').length}/{MAX_KEYWORDS_LENGTH} characters)
                               </span>
                             </label>
                             <textarea
-                              value={additionalContext}
+                              value={secondaryKeywords}
                               onChange={(e) => {
                                 const input = e.target.value;
-                                setAdditionalContext(input);
+                                setSecondaryKeywords(input);
                                 
                                 // Only validate and show errors, don't sanitize during typing
-                                const validation = validateAdditionalContext(input);
+                                const validation = validateSecondaryKeywords(input);
                                 if (!validation.isValid) {
-                                  setAdditionalContextError(validation.message || 'Invalid input detected');
+                                  setSecondaryKeywordsError(validation.message || 'Invalid input detected');
                                 } else {
-                                  setAdditionalContextError('');
+                                  setSecondaryKeywordsError('');
                                 }
                               }}
-                              placeholder="Provide additional context about your page or goal (e.g., target audience, business model, competitive landscape, etc.)"
-                              rows={4}
+                              placeholder="Enter secondary keywords separated by commas (e.g., webflow expert, webflow specialist, cms developer)"
+                              rows={2}
                               className={`w-full px-3 py-2 border rounded-md text-sm placeholder:text-muted-foreground resize-none ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-                                additionalContextError 
+                                secondaryKeywordsError 
                                   ? 'border-red-500 focus-visible:ring-red-500' 
                                   : 'border-input bg-background'
                               }`}
-                              maxLength={MAX_CONTEXT_LENGTH}
+                              maxLength={MAX_KEYWORDS_LENGTH}
                             />
-                            {additionalContextError && (
+                            {secondaryKeywordsError && (
                               <p className="text-xs text-red-500 flex items-center gap-1">
                                 <AlertTriangle className="h-3 w-3" />
-                                {additionalContextError}
+                                {secondaryKeywordsError}
                               </p>
                             )}
                             <p className="text-xs text-muted-foreground">
-                              This information helps AI generate more targeted, relevant SEO recommendations. 
-                              HTML tags and scripts are automatically removed for security.
+                              Secondary keywords help your content rank for related terms. SEO checks will pass if either your main keyword or any secondary keyword is found.
                             </p>
                           </div>
 
                           {/* Advanced Options Save Status */}
-                          {(pageType || additionalContext || advancedOptionsSaveStatus === 'saving') && (
+                          {(pageType || secondaryKeywords || advancedOptionsSaveStatus === 'saving') && (
                             <div className="flex justify-end">
                               <span className="text-xs font-medium" style={{
                                 color: advancedOptionsSaveStatus === 'saved' ? 'var(--greenText)' :
                                        advancedOptionsSaveStatus === 'saving' ? 'var(--yellowText)' :
                                        'var(--redText)'
                               }}>
-                                {advancedOptionsSaveStatus === 'saved' ? 'Advanced options saved for this page' :
+                                {advancedOptionsSaveStatus === 'saved' ? 'Secondary keywords and page type saved for this page' :
                                  advancedOptionsSaveStatus === 'saving' ? 'Saving...' :
-                                 'Advanced options not saved'}
+                                 'Secondary keywords and page type not saved'}
                               </span>
                             </div>
                           )}
@@ -1176,6 +1209,13 @@ export default function Home() {
                                     )}
                                   </motion.div>
                                   {check.title}
+                                  
+                                  {/* Show which keyword was matched */}
+                                  {check.passed && check.matchedKeyword && (
+                                    <span className="ml-2 text-xs px-2 py-0.5 bg-background4 text-greenText rounded-sm border border-greenText/20">
+                                      {check.matchedKeyword}
+                                    </span>
+                                  )}
 
                                   <TooltipProvider>
                                     <Tooltip>
@@ -1270,8 +1310,9 @@ export default function Home() {
                   ) : (
                     <div className="space-y-6">
                       {groupedChecks && results && results.checks && Object.entries(groupChecksByCategory(results.checks)).map(([category, checks]) => {
+                        if (!checks || !Array.isArray(checks)) return null;
                         const status = getCategoryStatus(checks);
-                        const passedCount = checks.filter(check => check.passed).length;
+                        const passedCount = checks.filter(check => check && typeof check.passed === 'boolean' && check.passed).length;
                         return (
                           <motion.div
                             key={category}
@@ -1290,7 +1331,7 @@ export default function Home() {
                               </div>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-muted-foreground">
-                              {checks.map((check, idx) => (
+                              {checks.filter(check => check && check.title).map((check, idx) => (
                                 <div key={idx} className="flex items-center gap-1.5">
                                   {check.passed ? 
                                     <CheckCircle className="h-4 w-4 text-greenText flex-shrink-0" style={{color: 'var(--greenText)', stroke: 'var(--greenText)'}} /> : 

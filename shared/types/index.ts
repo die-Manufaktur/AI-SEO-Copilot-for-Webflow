@@ -8,6 +8,7 @@ export interface SEOCheck {
   priority: 'high' | 'medium' | 'low';
   recommendation?: string;
   introPhrase?: string;
+  matchedKeyword?: string; // Which keyword was found (primary or secondary)
   imageData?: Array<{
     url: string;
     name: string;
@@ -149,6 +150,7 @@ export interface AnalyzeSEORequest {
   debug?: boolean;
   advancedOptions?: {
     pageType?: string;
-    additionalContext?: string;
+    secondaryKeywords?: string; // Secondary keywords (comma-separated)
+    additionalContext?: string; // Deprecated: use secondaryKeywords instead
   };
 }
