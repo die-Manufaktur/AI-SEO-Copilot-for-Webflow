@@ -1,8 +1,10 @@
+packages:
+  - .
+  - packages/*
 ignoredBuiltDependencies:
+  - '@anthropic-ai/claude-code'
   - '@swc/core'
+  - '@tailwindcss/oxide'
+  - esbuild
   - sharp
   - workerd
-
-packages:
-  - '.'
-  - 'packages/*'

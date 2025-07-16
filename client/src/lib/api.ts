@@ -13,28 +13,31 @@ type Asset = {
   source?: string;
 };
 
-export function getApiBaseUrl(): string {
-  if (import.meta.env.DEV) {
-    return 'http://localhost:8787';
-  }
-  return 'https://ai-seo-copilot-api.your-domain.workers.dev';
-}
-
-// Check how the API base URL is determined
+// Consolidated API URL determination function
 export const getApiUrl = () => {
-  // Force local development API during development
-  const FORCE_LOCAL_DEV = true; // Toggle this when needed
+  // TEMPORARY: Force local development during testing
+  // TODO: Remove this hardcode when deploying to production
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return "http://localhost:8787";
+  }
+  
+  // In production builds, only use production URLs
+  if (import.meta.env.PROD) {
+    return "https://seo-copilot-api-production.paul-130.workers.dev";
+  }
+  
+  // Development mode logic using environment variables
+  const FORCE_LOCAL_DEV = import.meta.env.VITE_FORCE_LOCAL_DEV === "true";
+  const DEV_WORKER_URL = import.meta.env.VITE_WORKER_URL;
   
   try {
-    // When in development mode with FORCE_LOCAL_DEV enabled, always use local worker
-    if (FORCE_LOCAL_DEV && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")) {
-      const devWorkerUrl = "http://localhost:8787";
-      return devWorkerUrl;
+    // When FORCE_LOCAL_DEV is enabled and dev URL is configured
+    if (FORCE_LOCAL_DEV && DEV_WORKER_URL) {
+      return DEV_WORKER_URL;
     }
     
     // Standard Webflow environment check
     if (!!window.webflow) {
-      // Remove direct console log and use logger instead
       logger.debug("Using production API URL for Webflow Extension");
       return "https://seo-copilot-api-production.paul-130.workers.dev";
     }
@@ -42,20 +45,18 @@ export const getApiUrl = () => {
     logger.error("Error determining API URL:", e);
   }
   
-  // Local development without forcing
-  try {
-    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
-      const devWorkerUrl = "http://localhost:8787";
-      logger.debug("Using development Worker URL:", devWorkerUrl);
-      return devWorkerUrl;
-    }
-  } catch (e) {
-    // Handle any errors
+  // Development fallback - use configured URL if available
+  if (DEV_WORKER_URL) {
+    logger.debug("Using development Worker URL:", DEV_WORKER_URL);
+    return DEV_WORKER_URL;
   }
   
   logger.debug("Falling back to production API URL");
   return "https://seo-copilot-api-production.paul-130.workers.dev";
 }
+
+// Deprecated - use getApiUrl() instead
+export const getApiBaseUrl = getApiUrl;
 
 // Update the error handling in analyzeSEO function
 export async function analyzeSEO({
@@ -65,6 +66,7 @@ export async function analyzeSEO({
   siteInfo,
   publishPath,
   webflowPageData,
+  advancedOptions,
   debug = true
 }: AnalyzeSEORequest): Promise<SEOAnalysisResult> {
   const apiBaseUrl = getApiUrl();
@@ -72,7 +74,7 @@ export async function analyzeSEO({
   
   // Collect image assets with size information
   const pageAssets = await collectPageAssets();
-  logger.info(`[SEO Analyzer] Collected ${pageAssets.length} assets with size information`);
+  logger.info(`[SEO Analyzer] Collected ${pageAssets ? pageAssets.length : 0} assets with size information`);
   
   // Identify which images are potentially from collections
   if (webflowPageData?.designerImages && Array.isArray(webflowPageData.designerImages)) {
@@ -90,8 +92,8 @@ export async function analyzeSEO({
       }
     });
     
-    const collectionImages = pageAssets.filter(asset => asset.source === 'collection');
-    logger.info(`[SEO Analyzer] Identified ${collectionImages.length} potential collection images`);
+    const collectionImages = pageAssets ? pageAssets.filter(asset => asset.source === 'collection') : [];
+    logger.info(`[SEO Analyzer] Identified ${collectionImages ? collectionImages.length : 0} potential collection images`);
   }
   
   try {
@@ -117,6 +119,7 @@ export async function analyzeSEO({
             publishPath,
             webflowPageData,
             pageAssets,
+            advancedOptions,
             debug
           })
         });
@@ -215,7 +218,7 @@ export async function collectPageAssets(): Promise<Asset[]> {
     
     // 2. Get all <img> elements (standard approach)
     const imgElements = Array.from(document.querySelectorAll('img'));
-    assetLogger.info(`Found ${imgElements.length} standard img elements`);
+    assetLogger.info(`Found ${imgElements ? imgElements.length : 0} standard img elements`);
     
     // Process standard <img> elements
     for (const img of imgElements) {
@@ -309,18 +312,18 @@ export async function collectPageAssets(): Promise<Asset[]> {
     }
     
     // Log result summary
-    assetLogger.info(`Final assets array length: ${assets.length}`);
-    if (assets.length === 0) {
+    assetLogger.info(`Final assets array length: ${assets ? assets.length : 0}`);
+    if (!assets || assets.length === 0) {
       assetLogger.warn('No assets were collected, something may be wrong');
     } else {
       assetLogger.info('First asset for verification:', assets[0]);
-      if (assets[0].size) {
+      if (assets[0] && assets[0].size) {
         assetLogger.info(`Size: ${formatBytes(assets[0].size)}`);
       }
     }
     
-    assetLogger.info(`Successfully collected ${assets.length} total assets with metadata`);
-    assetLogger.info('Assets with sizes:', assets.filter(a => a.size !== undefined).length);
+    assetLogger.info(`Successfully collected ${assets ? assets.length : 0} total assets with metadata`);
+    assetLogger.info('Assets with sizes:', assets ? assets.filter(a => a.size !== undefined).length : 0);
   } catch (error) {
     assetLogger.error(`Error in collectPageAssets: ${error}`);
   }
@@ -330,12 +333,12 @@ export async function collectPageAssets(): Promise<Asset[]> {
 
 // Helper function to get Webflow page data
 async function getWebflowPageData() {
-  if (typeof webflow === 'undefined') {
+  if (typeof window.webflow === 'undefined') {
     return null;
   }
   
   try {
-    const currentPage = await webflow.getCurrentPage();
+    const currentPage = await window.webflow.getCurrentPage();
     return {
       ogImage: await currentPage.getOpenGraphImage()
     };
@@ -424,8 +427,8 @@ function formatBytes(bytes?: number): string {
 
 // In the fetchFromAPI function
 export async function fetchFromAPI<T>(endpoint: string, data: any): Promise<T> {
-  // Get worker URL from environment or use local development worker
-  const workerUrl = import.meta.env.VITE_WORKER_URL || 'http://127.0.0.1:8787';
+  // Use the consolidated API URL function
+  const workerUrl = getApiUrl();
   logger.info(`Using worker at ${workerUrl}`);
   
   try {

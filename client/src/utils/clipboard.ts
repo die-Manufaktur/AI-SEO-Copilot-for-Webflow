@@ -1,14 +1,11 @@
+import { sanitizeText } from '../../../shared/utils/stringUtils';
+
 /**
  * Multi-strategy clipboard utility with fallbacks
  */
 export const copyTextToClipboard = async (text: string): Promise<boolean> => {
-  // Clean and sanitize the text first
-  const sanitizedText = typeof text === 'string' ? 
-    text.replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'") : '';
+  // Clean and sanitize the text using shared utility
+  const sanitizedText = typeof text === 'string' ? sanitizeText(text) : '';
 
   // Strategy 1: Try the modern Clipboard API (with permissions)
   try {

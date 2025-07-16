@@ -75,7 +75,8 @@ export interface Logger {
 const isProduction = () => {
   return process.env.NODE_ENV === 'production' || 
          import.meta.env?.MODE === 'production' ||
-         window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+         import.meta.env?.PROD === true ||
+         !import.meta.env?.DEV;
 };
 
 export const createLogger = (namespace: string) => {
@@ -99,25 +100,4 @@ export const createLogger = (namespace: string) => {
   };
 }
 
-/**
- * Calculate SEO Score based on checks
- * @param checks Array of checks with passed status and priority
- * @returns Calculated SEO score (0-100)
- */
-export function calculateSEOScore(checks: Array<{ passed: boolean; priority: 'high' | 'medium' | 'low' }>): number {
-  if (checks.length === 0) return 0;
-  
-  const weights = { high: 3, medium: 2, low: 1 };
-  let totalWeight = 0;
-  let passedWeight = 0;
-  
-  checks.forEach(check => {
-    const weight = weights[check.priority];
-    totalWeight += weight;
-    if (check.passed) {
-      passedWeight += weight;
-    }
-  });
-  
-  return Math.round((passedWeight / totalWeight) * 100);
-}
+// Removed duplicate calculateSEOScore function - use shared version from '../../../shared/utils/seoUtils'

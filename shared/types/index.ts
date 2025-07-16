@@ -8,6 +8,7 @@ export interface SEOCheck {
   priority: 'high' | 'medium' | 'low';
   recommendation?: string;
   introPhrase?: string;
+  matchedKeyword?: string; // Which keyword was found (primary or secondary)
   imageData?: Array<{
     url: string;
     name: string;
@@ -147,4 +148,8 @@ export interface AnalyzeSEORequest {
   siteInfo?: WebflowSiteInfo;
   publishPath?: string;
   debug?: boolean;
+  advancedOptions?: {
+    pageType?: string;
+    secondaryKeywords?: string; // Secondary keywords (comma-separated)
+  };
 }

@@ -9,12 +9,21 @@ An advanced SEO analysis tool that performs 18 comprehensive checks with AI-powe
 
 ## Features
 
+- **🔍 Comprehensive SEO Analysis**: 18 different SEO checks covering all critical aspects
+- **🤖 AI-Powered Recommendations**: OpenAI-powered suggestions for improvements
+- **💾 Keyword Persistence**: Automatically saves keywords per page for seamless workflow
+- **📊 Visual Progress Tracking**: Real-time SEO score calculation and progress indicators
+- **🎯 Page-Specific Analysis**: Tailored analysis for homepage vs. other pages
+- **🖼️ Image Optimization**: Alt text, size, and format recommendations
+- **📱 Modern UI**: Clean, responsive interface with status indicators
+- **⚡ Fast Performance**: Optimized for quick analysis and feedback
+
+### SEO Checks Include:
 - Title Tag Optimization
 - Meta Description Analysis
 - Content Structure Verification
 - Keyword Density Analysis
 - Image Alt Text Optimization
-- AI-Powered SEO Recommendations
 - OpenGraph Tags Validation
 - Schema Markup Validation
 - URL Optimization
@@ -43,15 +52,13 @@ An advanced SEO analysis tool that performs 18 comprehensive checks with AI-powe
    cp .env.example .env
    ```
    Required environment variables:
-   - `USE_GPT_RECOMMENDATIONS`: Set to "true"
-   - `ENABLED_GPT_CHECKS`: Comma-separated list of enabled checks
-   - `VITE_WEBFLOW_API_KEY`: Your Webflow API key
-   - `VITE_WEBFLOW_SITE_ID`: Your Webflow site ID
-   - `VITE_WEBFLOW_CLIENT_ID`: Your Webflow client ID
-   - `WEBFLOW_CLIENT_SECRET`: Your Webflow client secret
-   - `WEBFLOW_REDIRECT_URI`: Authorized redirect URI for OAuth
-   - `OPENAI_API_KEY`: Your OpenAI API key
-   - `CLOUDFLARE_API_TOKEN`: Your Cloudflare API token (required for deployment)
+   - `OPENAI_API_KEY`: Your OpenAI API key for AI recommendations
+   - `USE_GPT_RECOMMENDATIONS`: Set to "true" to enable AI features
+   - `ALLOWED_ORIGINS`: CORS origins (usually includes Webflow domains)
+   
+   Optional development variables:
+   - `VITE_WORKER_URL`: Local worker URL (defaults to localhost:8787)
+   - `CLOUDFLARE_ENV`: Environment identifier
 
 4. Start development server:
    ```bash

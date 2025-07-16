@@ -146,6 +146,27 @@ input[name="keyphrase"] {
   --tw-ring-offset-color: var(--background1) !important;
 }
 
+/* Custom focus states for additional context textarea */
+textarea:focus {
+  outline-color: var(--text3) !important;
+  outline-style: solid !important;
+  outline-width: 2px !important;
+  outline-offset: 1px !important;
+  box-shadow: none !important;
+}
+
+textarea:focus-visible {
+  outline: none !important;
+  box-shadow: 0 0 0 2px var(--background1), 0 0 0 2px var(--text3) !important;
+  border-color: var(--text3) !important;
+}
+
+/* Direct Tailwind CSS variable override for textarea */
+textarea {
+  --tw-ring-color: var(--text3) !important;
+  --tw-ring-offset-color: var(--background1) !important;
+}
+
 .scrollarea-fix [data-radix-scroll-area-viewport] > div {
   display: block !important;
   min-width: auto !important;

@@ -1,0 +1,74 @@
+name: "[ADMIN] Feature Request"
+description: "Submit feature requests and enhancements (Admin only)"
+labels: ["feature", "admin"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Admin Feature Request
+        
+        This template is for administrators to submit internal feature requests and enhancements.
+        
+        Please provide detailed information about the requested feature.
+        
+  - type: input
+    id: feature-title
+    attributes:
+      label: Feature Title
+      description: Brief title describing the feature
+      placeholder: "Add new analytics dashboard"
+    validations:
+      required: true
+      
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority Level
+      description: How urgent is this feature?
+      options:
+        - Low
+        - Medium
+        - High
+        - Critical
+    validations:
+      required: true
+      
+  - type: textarea
+    id: description
+    attributes:
+      label: Feature Description
+      description: Detailed description of the feature request
+      placeholder: "Describe what you want to be built and why..."
+    validations:
+      required: true
+      
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance Criteria
+      description: Define what success looks like for this feature
+      placeholder: |
+        - [ ] Criteria 1
+        - [ ] Criteria 2
+        - [ ] Criteria 3
+    validations:
+      required: true
+      
+  - type: textarea
+    id: technical-notes
+    attributes:
+      label: Technical Considerations
+      description: Any technical requirements, constraints, or considerations
+      placeholder: "Database changes, API integrations, performance considerations, etc."
+    validations:
+      required: false
+      
+  - type: input
+    id: deadline
+    attributes:
+      label: Target Deadline
+      description: When is this feature needed? (optional)
+      placeholder: "YYYY-MM-DD or milestone name"
+    validations:
+      required: false
