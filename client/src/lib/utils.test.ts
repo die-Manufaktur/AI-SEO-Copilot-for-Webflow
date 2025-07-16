@@ -66,6 +66,21 @@ describe('Utils', () => {
 
     it('suppresses debug and info logs in production', () => {
       // Mock production environment
+      vi.stubEnv('NODE_ENV', 'production');
+      
+      // Mock import.meta.env for production 
+      const originalEnv = import.meta.env;
+      Object.defineProperty(import.meta, 'env', {
+        value: {
+          ...originalEnv,
+          MODE: 'production',
+          PROD: true,
+          DEV: false
+        },
+        writable: true,
+        configurable: true
+      });
+      
       Object.defineProperty(window, 'location', {
         value: { hostname: 'example.com' },
         writable: true
@@ -95,6 +110,13 @@ describe('Utils', () => {
       consoleDebugSpy.mockRestore();
       consoleWarnSpy.mockRestore();
       consoleErrorSpy.mockRestore();
+      
+      // Restore original environment
+      Object.defineProperty(import.meta, 'env', {
+        value: originalEnv,
+        writable: true,
+        configurable: true
+      });
     });
 
     it('handles multiple arguments', () => {

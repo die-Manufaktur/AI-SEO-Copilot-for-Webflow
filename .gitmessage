@@ -1,0 +1,46 @@
+# <type>(<scope>): <subject>
+#
+# <body>
+#
+# <footer>
+
+# --- COMMIT GUIDELINES ---
+# 
+# Type must be one of:
+#   feat     - A new feature
+#   fix      - A bug fix
+#   docs     - Documentation only changes
+#   style    - Changes that do not affect the meaning of the code
+#   refactor - A code change that neither fixes a bug nor adds a feature
+#   perf     - A code change that improves performance
+#   test     - Adding missing tests or correcting existing tests
+#   build    - Changes that affect the build system or external dependencies
+#   ci       - Changes to CI configuration files and scripts
+#   chore    - Other changes that don't modify src or test files
+#   revert   - Reverts a previous commit
+#
+# Scope (optional) can be:
+#   ui, api, worker, webflow, seo, auth, build, deps, config, release, docs, test, security, performance, accessibility
+#
+# Subject:
+#   - Use imperative, present tense: "change" not "changed" nor "changes"
+#   - Don't capitalize first letter
+#   - No dot (.) at the end
+#   - Maximum 72 characters
+#
+# Body (optional):
+#   - Use imperative, present tense
+#   - Wrap at 100 characters
+#   - Explain what and why vs. how
+#
+# Footer (optional):
+#   - Use for breaking changes: "BREAKING CHANGE: <description>"
+#   - Use for issue references: "Closes #123", "Fixes #456"
+#
+# Examples:
+#   feat(seo): Add secondary keywords functionality
+#   fix(ui): Resolve focus border issue in Page Type Input
+#   docs(README): Update installation instructions
+#   feat(api)!: Change API response format
+#   
+#   BREAKING CHANGE: API response format has changed

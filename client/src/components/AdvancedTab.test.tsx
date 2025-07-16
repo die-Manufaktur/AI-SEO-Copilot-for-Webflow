@@ -113,7 +113,7 @@ const TestAdvancedTab = () => {
           <div>
             <h3 className="text-lg font-semibold">Advanced Analysis</h3>
             <p className="text-sm text-muted-foreground">
-              Get more accurate, tailored recommendations for your specific page type
+              Add secondary keywords and specify page type for more targeted SEO analysis
             </p>
           </div>
           <div className="flex items-center space-x-2">
@@ -201,7 +201,7 @@ describe('Advanced Tab Component', () => {
       render(<TestAdvancedTab />);
       
       expect(screen.getByText('Advanced Analysis')).toBeInTheDocument();
-      expect(screen.getByText('Get more accurate, tailored recommendations for your specific page type')).toBeInTheDocument();
+      expect(screen.getByText('Add secondary keywords and specify page type for more targeted SEO analysis')).toBeInTheDocument();
       expect(screen.getByTestId('advanced-toggle')).toHaveTextContent('Off');
       expect(screen.queryByTestId('advanced-options-container')).not.toBeInTheDocument();
     });
@@ -310,7 +310,7 @@ describe('Advanced Tab Component', () => {
       // Toggle on
       await user.click(screen.getByTestId('advanced-toggle'));
       
-      const textarea = screen.getByTestId('additional-context-textarea');
+      const textarea = screen.getByTestId('secondary-keywords-textarea');
       const testContext = 'This is a test context for the page';
       
       await user.type(textarea, testContext);
@@ -325,11 +325,11 @@ describe('Advanced Tab Component', () => {
       // Toggle on
       await user.click(screen.getByTestId('advanced-toggle'));
       
-      const textarea = screen.getByTestId('additional-context-textarea');
+      const textarea = screen.getByTestId('secondary-keywords-textarea');
       
       expect(textarea).toHaveAttribute(
         'placeholder',
-        'Provide additional context about your page or goal (e.g., target audience, business model, competitive landscape, etc.)'
+        'Enter secondary keywords separated by commas (e.g., webflow expert, webflow specialist, cms developer)'
       );
     });
 
@@ -340,7 +340,7 @@ describe('Advanced Tab Component', () => {
       // Toggle on
       await user.click(screen.getByTestId('advanced-toggle'));
       
-      expect(screen.getByText('This information helps AI generate more targeted, relevant SEO recommendations')).toBeInTheDocument();
+      expect(screen.getByText('Secondary keywords help your content rank for related terms. SEO checks will pass if either your main keyword or any secondary keyword is found.')).toBeInTheDocument();
     });
   });
 
@@ -375,7 +375,7 @@ describe('Advanced Tab Component', () => {
       // Toggle on
       await user.click(screen.getByTestId('advanced-toggle'));
       
-      const textarea = screen.getByTestId('additional-context-textarea');
+      const textarea = screen.getByTestId('secondary-keywords-textarea');
       await user.type(textarea, 'Test context');
       
       expect(screen.getByTestId('save-status')).toHaveTextContent('Advanced options not saved');
@@ -391,7 +391,7 @@ describe('Advanced Tab Component', () => {
       await user.click(screen.getByTestId('advanced-toggle'));
       
       expect(screen.getByLabelText('Page Type')).toBeInTheDocument();
-      expect(screen.getByLabelText('Additional Context')).toBeInTheDocument();
+      expect(screen.getByLabelText('Secondary Keywords')).toBeInTheDocument();
     });
 
     it('should have proper heading structure', () => {
@@ -419,7 +419,7 @@ describe('Advanced Tab Component', () => {
       
       // 4. Enter additional context
       await user.type(
-        screen.getByTestId('additional-context-textarea'),
+        screen.getByTestId('secondary-keywords-textarea'),
         'Web development services for small businesses'
       );
       

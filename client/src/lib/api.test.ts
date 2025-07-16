@@ -94,6 +94,15 @@ describe('getApiBaseUrl function', () => {
     // Mock import.meta.env.PROD as true
     vi.stubEnv('PROD', true);
     
+    // Mock window.location to not be localhost for this test
+    Object.defineProperty(window, 'location', {
+      value: {
+        hostname: 'webflow.com'
+      },
+      writable: true,
+      configurable: true
+    });
+    
     const result = getApiBaseUrl();
     expect(result).toBe('https://seo-copilot-api-production.paul-130.workers.dev');
   });

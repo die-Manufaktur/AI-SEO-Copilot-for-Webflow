@@ -1,0 +1,160 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Release type'
+        required: true
+        default: 'auto'
+        type: choice
+        options:
+          - auto
+          - patch
+          - minor
+          - major
+
+jobs:
+  test:
+    name: Test & Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: '8'
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run type check
+        run: pnpm check
+
+      - name: Run tests
+        run: pnpm test
+
+      - name: Build project
+        run: pnpm build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-artifacts
+          path: |
+            bundle.zip
+            public/
+          retention-days: 7
+
+  release:
+    name: Create Draft Release
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: '8'
+          run_install: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: build-artifacts
+          path: .
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create Draft Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ "${{ github.event.inputs.release_type }}" != "auto" ]; then
+            # Manual release with specific version bump
+            npx semantic-release --debug --dry-run=false --ci=true --branches=main --preset=conventionalcommits --plugins='[
+              ["@semantic-release/commit-analyzer", {"preset": "conventionalcommits", "releaseRules": [{"type": "${{ github.event.inputs.release_type }}", "release": "${{ github.event.inputs.release_type }}"}]}],
+              ["@semantic-release/release-notes-generator", {"preset": "conventionalcommits"}],
+              ["@semantic-release/changelog", {"changelogFile": "CHANGELOG.md"}],
+              ["@semantic-release/exec", {"prepareCmd": "node scripts/update-versions.js ${nextRelease.version}"}],
+              ["@semantic-release/git", {"assets": ["package.json", "webflow.json", "wrangler.toml", "CHANGELOG.md"], "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"}],
+              ["@semantic-release/github", {"assets": [{"path": "bundle.zip", "label": "Webflow Extension Bundle"}], "draft": true, "prerelease": false}]
+            ]'
+          else
+            # Standard automatic release
+            npx semantic-release --debug
+          fi
+
+  # Additional job to publish releases (optional - you can also do this manually)
+  publish-release:
+    name: Publish Release
+    runs-on: ubuntu-latest
+    needs: release
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.release_type == 'publish'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Publish Draft Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get the latest draft release
+          RELEASE_ID=$(gh release list --limit 1 --json isDraft,databaseId --jq '.[] | select(.isDraft == true) | .databaseId')
+          
+          if [ -n "$RELEASE_ID" ]; then
+            # Publish the draft release
+            gh release edit $RELEASE_ID --draft=false
+            echo "✅ Published release $RELEASE_ID"
+          else
+            echo "❌ No draft release found to publish"
+            exit 1
+          fi
