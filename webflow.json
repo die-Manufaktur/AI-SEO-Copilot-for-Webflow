@@ -1,13 +1,17 @@
 {
   "$schema": "https://cdn.jsdelivr.net/gh/webflow/designer-extension-typings@latest/schema/webflow.manifest.schema.json",
   "name": "SEO Copilot",
-  "version": "3.0.0",
+  "version": "2.3.3",
   "schema_version": "2.0.0",
   "apiVersion": "2",
   "web_accessible_resources": [
     {
-      "resources": ["public/*"],
-      "matches": ["https://*.webflow.io/*"]
+      "resources": [
+        "public/*"
+      ],
+      "matches": [
+        "https://*.webflow.io/*"
+      ]
     }
   ],
   "permissions": {

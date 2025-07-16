@@ -17,8 +17,13 @@ type Asset = {
 export const getApiUrl = () => {
   // TEMPORARY: Force local development during testing
   // TODO: Remove this hardcode when deploying to production
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return "http://localhost:8787";
+  try {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return "http://localhost:8787";
+    }
+  } catch (error) {
+    logger.error('Error determining API URL:', error);
+    // Fall through to production URL
   }
   
   // In production builds, only use production URLs
