@@ -959,7 +959,7 @@ export default function Home() {
                           <div className="space-y-2">
                             <label className="text-sm font-medium">Page Type</label>
                             <Select value={pageType} onValueChange={setPageType}>
-                              <SelectTrigger className="w-full border border-input bg-background">
+                              <SelectTrigger className="focus:ring-0 focus:ring-offset-0">
                                 <SelectValue placeholder="Select a page type" />
                               </SelectTrigger>
                               <SelectContent className="bg-background border border-input shadow-md">
