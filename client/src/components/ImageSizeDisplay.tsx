@@ -36,7 +36,7 @@ export function ImageSizeDisplay({
   showFileSize = true,
   showAltText = false // Default to false to maintain backward compatibility
 }: ImageSizeDisplayProps) {
-  if (!images || images.length === 0) {
+  if (!images || !Array.isArray(images) || images.length === 0) {
     return null;
   }
 

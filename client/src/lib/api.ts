@@ -15,6 +15,12 @@ type Asset = {
 
 // Consolidated API URL determination function
 export const getApiUrl = () => {
+  // TEMPORARY: Force local development during testing
+  // TODO: Remove this hardcode when deploying to production
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return "http://localhost:8787";
+  }
+  
   // In production builds, only use production URLs
   if (import.meta.env.PROD) {
     return "https://seo-copilot-api-production.paul-130.workers.dev";
@@ -60,6 +66,7 @@ export async function analyzeSEO({
   siteInfo,
   publishPath,
   webflowPageData,
+  advancedOptions,
   debug = true
 }: AnalyzeSEORequest): Promise<SEOAnalysisResult> {
   const apiBaseUrl = getApiUrl();
@@ -67,7 +74,7 @@ export async function analyzeSEO({
   
   // Collect image assets with size information
   const pageAssets = await collectPageAssets();
-  logger.info(`[SEO Analyzer] Collected ${pageAssets.length} assets with size information`);
+  logger.info(`[SEO Analyzer] Collected ${pageAssets ? pageAssets.length : 0} assets with size information`);
   
   // Identify which images are potentially from collections
   if (webflowPageData?.designerImages && Array.isArray(webflowPageData.designerImages)) {
@@ -85,8 +92,8 @@ export async function analyzeSEO({
       }
     });
     
-    const collectionImages = pageAssets.filter(asset => asset.source === 'collection');
-    logger.info(`[SEO Analyzer] Identified ${collectionImages.length} potential collection images`);
+    const collectionImages = pageAssets ? pageAssets.filter(asset => asset.source === 'collection') : [];
+    logger.info(`[SEO Analyzer] Identified ${collectionImages ? collectionImages.length : 0} potential collection images`);
   }
   
   try {
@@ -112,6 +119,7 @@ export async function analyzeSEO({
             publishPath,
             webflowPageData,
             pageAssets,
+            advancedOptions,
             debug
           })
         });
@@ -210,7 +218,7 @@ export async function collectPageAssets(): Promise<Asset[]> {
     
     // 2. Get all <img> elements (standard approach)
     const imgElements = Array.from(document.querySelectorAll('img'));
-    assetLogger.info(`Found ${imgElements.length} standard img elements`);
+    assetLogger.info(`Found ${imgElements ? imgElements.length : 0} standard img elements`);
     
     // Process standard <img> elements
     for (const img of imgElements) {
@@ -304,18 +312,18 @@ export async function collectPageAssets(): Promise<Asset[]> {
     }
     
     // Log result summary
-    assetLogger.info(`Final assets array length: ${assets.length}`);
-    if (assets.length === 0) {
+    assetLogger.info(`Final assets array length: ${assets ? assets.length : 0}`);
+    if (!assets || assets.length === 0) {
       assetLogger.warn('No assets were collected, something may be wrong');
     } else {
       assetLogger.info('First asset for verification:', assets[0]);
-      if (assets[0].size) {
+      if (assets[0] && assets[0].size) {
         assetLogger.info(`Size: ${formatBytes(assets[0].size)}`);
       }
     }
     
-    assetLogger.info(`Successfully collected ${assets.length} total assets with metadata`);
-    assetLogger.info('Assets with sizes:', assets.filter(a => a.size !== undefined).length);
+    assetLogger.info(`Successfully collected ${assets ? assets.length : 0} total assets with metadata`);
+    assetLogger.info('Assets with sizes:', assets ? assets.filter(a => a.size !== undefined).length : 0);
   } catch (error) {
     assetLogger.error(`Error in collectPageAssets: ${error}`);
   }
@@ -325,12 +333,12 @@ export async function collectPageAssets(): Promise<Asset[]> {
 
 // Helper function to get Webflow page data
 async function getWebflowPageData() {
-  if (typeof webflow === 'undefined') {
+  if (typeof window.webflow === 'undefined') {
     return null;
   }
   
   try {
-    const currentPage = await webflow.getCurrentPage();
+    const currentPage = await window.webflow.getCurrentPage();
     return {
       ogImage: await currentPage.getOpenGraphImage()
     };

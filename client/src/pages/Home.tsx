@@ -78,17 +78,18 @@ const formSchema = z.object({
   keyphrase: z.string().min(2, "Keyphrase must be at least 2 characters")
 });
 
-// Additional context validation
-const MAX_CONTEXT_LENGTH = 2000;
-const validateAdditionalContext = (input: string): { isValid: boolean; message?: string; sanitized: string } => {
+// Secondary keywords validation
+const MAX_KEYWORDS_LENGTH = 500;
+const MAX_KEYWORDS_COUNT = 10;
+const validateSecondaryKeywords = (input: string): { isValid: boolean; message?: string; sanitized: string } => {
   if (!input) return { isValid: true, sanitized: '' };
   
   // Check for excessive length
-  if (input.length > MAX_CONTEXT_LENGTH) {
+  if (input.length > MAX_KEYWORDS_LENGTH) {
     return { 
       isValid: false, 
-      message: `Context too long. Maximum ${MAX_CONTEXT_LENGTH} characters allowed.`,
-      sanitized: input.substring(0, MAX_CONTEXT_LENGTH)
+      message: `Keywords too long. Maximum ${MAX_KEYWORDS_LENGTH} characters allowed.`,
+      sanitized: input.substring(0, MAX_KEYWORDS_LENGTH)
     };
   }
 
@@ -96,7 +97,7 @@ const validateAdditionalContext = (input: string): { isValid: boolean; message?:
   if (/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi.test(input)) {
     return { 
       isValid: false, 
-      message: 'Script tags are not allowed in context.',
+      message: 'Script tags are not allowed in keywords.',
       sanitized: sanitizeHtml(input, { allowedTags: [], allowedAttributes: {} })
     };
   }
@@ -117,8 +118,30 @@ const validateAdditionalContext = (input: string): { isValid: boolean; message?:
     disallowedTagsMode: 'discard'
   });
 
-  // Apply additional text sanitization
-  const finalSanitized = sanitizeText(sanitized).trim();
+  // Split by commas and validate individual keywords
+  const keywords = sanitized.split(',').map(k => k.trim()).filter(k => k.length > 0);
+  
+  // Check for too many keywords
+  if (keywords.length > MAX_KEYWORDS_COUNT) {
+    return {
+      isValid: false,
+      message: `Too many keywords. Maximum ${MAX_KEYWORDS_COUNT} keywords allowed.`,
+      sanitized: keywords.slice(0, MAX_KEYWORDS_COUNT).join(', ')
+    };
+  }
+
+  // Check for keywords that are too short or too long
+  const invalidKeywords = keywords.filter(k => k.length < 2 || k.length > 50);
+  if (invalidKeywords.length > 0) {
+    return {
+      isValid: false,
+      message: 'Each keyword must be between 2-50 characters.',
+      sanitized: keywords.filter(k => k.length >= 2 && k.length <= 50).join(', ')
+    };
+  }
+
+  // Apply additional text sanitization and return cleaned keywords
+  const finalSanitized = keywords.map(k => sanitizeText(k).trim()).filter(k => k.length > 0).join(', ');
 
   return { isValid: true, sanitized: finalSanitized };
 };
@@ -180,6 +203,10 @@ export const getPriorityText = (priority: string) => {
 
 // Group checks by category
 const groupChecksByCategory = (checks: SEOCheck[]) => {
+  if (!checks || !Array.isArray(checks) || checks.length === 0) {
+    return {};
+  }
+  
   const categories = {
     "Meta SEO": ["Keyphrase in Title", "Keyphrase in Meta Description", "Keyphrase in URL", "OG Title and Description"],
     "Content Optimisation": ["Content Length", "Keyphrase Density", "Keyphrase in Introduction", "Keyphrase in H1 Heading", "Keyphrase in H2 Headings", "Heading Hierarchy"],
@@ -197,8 +224,10 @@ const groupChecksByCategory = (checks: SEOCheck[]) => {
 
   // Group checks by category with fuzzy matching
   checks.forEach(check => {
+    if (!check || !check.title) return;
     for (const category in categories) {
-      if (categories[category as keyof typeof categories].includes(check.title)) {
+      const categoryItems = categories[category as keyof typeof categories];
+      if (categoryItems && Array.isArray(categoryItems) && categoryItems.includes(check.title)) {
         grouped[category].push(check);
         break;
       }
@@ -214,8 +243,8 @@ const fetchPageInfo = async (
   setIsHomePage: React.Dispatch<React.SetStateAction<boolean>>
 ) => {
   try {
-    if (webflow) {
-      const currentPage = await webflow.getCurrentPage();
+    if (window.webflow) {
+      const currentPage = await window.webflow.getCurrentPage();
       // We still need these for basic page identification
       const currentSlug = await currentPage.getSlug();
       const isHome = await currentPage.isHomepage();
@@ -236,9 +265,9 @@ const fetchPageInfo = async (
 
 // Get status for a category
 const getCategoryStatus = (checks: SEOCheck[]) => {
-  if (!checks || checks.length === 0) return "neutral";
+  if (!checks || !Array.isArray(checks) || checks.length === 0) return "neutral";
 
-  const passedCount = checks.filter(check => check.passed).length;
+  const passedCount = checks.filter(check => check && typeof check.passed === 'boolean' && check.passed).length;
 
   if (passedCount === checks.length) return "complete";
   if (passedCount === 0) return "todo";
@@ -291,7 +320,7 @@ const CardTitle = styled.h2`
 
 // Helper function to find the most recently published domain
 const getMostRecentlyPublishedDomain = (domains: WebflowDomain[]): WebflowDomain | null => {
-  if (!domains || domains.length === 0) {
+  if (!domains || !Array.isArray(domains) || domains.length === 0) {
     return null;
   }
 
@@ -333,11 +362,11 @@ export default function Home() {
   // Advanced options state
   const [advancedOptionsEnabled, setAdvancedOptionsEnabled] = useState<boolean>(false);
   const [pageType, setPageType] = useState<string>('');
-  const [additionalContext, setAdditionalContext] = useState<string>('');
-  const [additionalContextError, setAdditionalContextError] = useState<string>('');
+  const [secondaryKeywords, setSecondaryKeywords] = useState<string>('');
+  const [secondaryKeywordsError, setSecondaryKeywordsError] = useState<string>('');
   const [advancedOptionsSaveStatus, setAdvancedOptionsSaveStatus] = useState<'saved' | 'saving' | 'none'>('none');
   
-  const seoScore = results ? calculateSEOScore(results.checks) : 0;
+  const seoScore = results && results.checks && Array.isArray(results.checks) ? calculateSEOScore(results.checks) : 0;
   const scoreRating = getScoreRatingText(seoScore);
 
   const copyToClipboard = async (text: string): Promise<boolean> => {
@@ -415,7 +444,7 @@ export default function Home() {
     let currentPagePath: string | null = null;
     
     // Check if webflow is available before proceeding
-    if (!webflow) {
+    if (!window.webflow) {
       console.warn("Webflow API not available");
       return;
     }
@@ -423,7 +452,8 @@ export default function Home() {
     // Initialize on mount
     const initCurrentPage = async () => {
       try {
-        const page = await webflow.getCurrentPage();
+        if (!window.webflow) return;
+        const page = await window.webflow.getCurrentPage();
         currentPagePath = await page.getPublishPath();
       } catch (error) {
         console.error("Failed to get initial page path:", error);
@@ -431,10 +461,11 @@ export default function Home() {
     };
     initCurrentPage();
     
-    const unsubscribe = webflow.subscribe('currentpage', async () => {
+    const unsubscribe = window.webflow.subscribe('currentpage', async () => {
       try {
+        if (!window.webflow) return;
         // Get the new page
-        const newPage = await webflow.getCurrentPage();
+        const newPage = await window.webflow.getCurrentPage();
         const newPagePath = await newPage.getPublishPath();
         
         // Only reload if the page path has actually changed
@@ -480,7 +511,9 @@ export default function Home() {
   useEffect(() => {
     const initializePageKeywords = async () => {
       try {
-        const page = await webflow.getCurrentPage();
+        if (!window.webflow) return;
+        
+        const page = await window.webflow.getCurrentPage();
         const publishPath = await page.getPublishPath();
         const isHomepage = await page.isHomepage();
         
@@ -498,14 +531,14 @@ export default function Home() {
         
         // Load saved advanced options for this page
         const savedAdvancedOptions = loadAdvancedOptionsForPage(pageId);
-        if (savedAdvancedOptions.pageType || savedAdvancedOptions.additionalContext) {
+        if (savedAdvancedOptions.pageType || savedAdvancedOptions.secondaryKeywords) {
           setPageType(savedAdvancedOptions.pageType);
-          setAdditionalContext(savedAdvancedOptions.additionalContext);
+          setSecondaryKeywords(savedAdvancedOptions.secondaryKeywords || '');
           setAdvancedOptionsEnabled(true);
           setAdvancedOptionsSaveStatus('saved');
         } else {
           setPageType('');
-          setAdditionalContext('');
+          setSecondaryKeywords('');
           setAdvancedOptionsEnabled(false);
           setAdvancedOptionsSaveStatus('none');
         }
@@ -514,7 +547,7 @@ export default function Home() {
       }
     };
 
-    if (webflow) {
+    if (window.webflow) {
       initializePageKeywords();
     }
   }, [form]);
@@ -538,13 +571,13 @@ export default function Home() {
   useEffect(() => {
     if (currentPageId && advancedOptionsEnabled) {
       const savedAdvancedOptions = loadAdvancedOptionsForPage(currentPageId);
-      const currentOptions = { pageType, additionalContext };
+      const currentOptions = { pageType, secondaryKeywords };
       
       // Only show 'saved' status if there are actual values saved
-      const hasSavedValues = savedAdvancedOptions.pageType || savedAdvancedOptions.additionalContext;
-      const hasCurrentValues = pageType || additionalContext;
+      const hasSavedValues = savedAdvancedOptions.pageType || savedAdvancedOptions.secondaryKeywords;
+      const hasCurrentValues = pageType || secondaryKeywords;
       
-      if (hasSavedValues && JSON.stringify(currentOptions) === JSON.stringify(savedAdvancedOptions)) {
+      if (hasSavedValues && JSON.stringify(currentOptions) === JSON.stringify({ pageType: savedAdvancedOptions.pageType, secondaryKeywords: savedAdvancedOptions.secondaryKeywords || '' })) {
         setAdvancedOptionsSaveStatus('saved');
       } else if (hasCurrentValues) {
         setAdvancedOptionsSaveStatus('none');
@@ -554,7 +587,7 @@ export default function Home() {
     } else {
       setAdvancedOptionsSaveStatus('none');
     }
-  }, [pageType, additionalContext, currentPageId, advancedOptionsEnabled]);
+  }, [pageType, secondaryKeywords, currentPageId, advancedOptionsEnabled]);
 
   const mutation = useMutation<SEOAnalysisResult, Error, AnalyzeSEORequest>({
     mutationFn: analyzeSEO,
@@ -563,6 +596,34 @@ export default function Home() {
       setResults(null); // Clear previous results
     },
     onSuccess: (data) => {
+      // Validate API response structure
+      if (!data || !Array.isArray(data.checks) || data.checks.length === 0) {
+        console.error('Invalid API response structure:', data);
+        toast({
+          variant: "destructive",
+          title: "Invalid Response",
+          description: "The API returned an invalid response structure. Please try again."
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // Validate that each check has required properties
+      const hasInvalidChecks = data.checks.some(check => 
+        !check || typeof check.title !== 'string' || typeof check.passed !== 'boolean'
+      );
+      
+      if (hasInvalidChecks) {
+        console.error('Invalid check structure in API response:', data.checks);
+        toast({
+          variant: "destructive",
+          title: "Invalid Response",
+          description: "The API returned malformed check data. Please try again."
+        });
+        setIsLoading(false);
+        return;
+      }
+
       let modifiedData = { ...data }; // Clone the data to avoid direct mutation
 
       // Check if it's the homepage and modify the URL check result accordingly
@@ -645,16 +706,25 @@ export default function Home() {
     }
     
     // Save advanced options for current page
-    if (currentPageId && advancedOptionsEnabled && (pageType || additionalContext)) {
+    if (currentPageId && advancedOptionsEnabled && (pageType || secondaryKeywords)) {
       setAdvancedOptionsSaveStatus('saving');
-      const sanitizedContext = additionalContext ? validateAdditionalContext(additionalContext).sanitized : '';
-      saveAdvancedOptionsForPage(currentPageId, { pageType, additionalContext: sanitizedContext });
+      const sanitizedContext = secondaryKeywords ? validateSecondaryKeywords(secondaryKeywords).sanitized : '';
+      saveAdvancedOptionsForPage(currentPageId, { pageType, secondaryKeywords: sanitizedContext });
       setAdvancedOptionsSaveStatus('saved');
     }
     
     try {
+      if (!window.webflow) {
+        toast({
+          variant: "destructive",
+          title: "Webflow API Not Available",
+          description: "Unable to access Webflow API. Please ensure you're running this in a Webflow Designer Extension."
+        });
+        return;
+      }
+
       let siteInfo: WebflowSiteInfo;
-      siteInfo = await webflow.getSiteInfo();
+      siteInfo = await window.webflow.getSiteInfo();
       if (siteInfo?.shortName) {
         setStagingName(siteInfo.shortName);
       }
@@ -686,7 +756,7 @@ export default function Home() {
       let rawPageData: WebflowPageData;
 
       try {
-        currentPage = await webflow.getCurrentPage();
+        currentPage = await window.webflow.getCurrentPage();
         publishPath = (await currentPage.getPublishPath()) ?? "";
         setIsHomePage(await currentPage.isHomepage());
 
@@ -725,6 +795,8 @@ export default function Home() {
         }))
       };
 
+      const sanitizedKeywords = secondaryKeywords ? validateSecondaryKeywords(secondaryKeywords).sanitized : undefined;
+      
       const analysisData: AnalyzeSEORequest = {
         keyphrase: values.keyphrase,
         url,
@@ -732,14 +804,13 @@ export default function Home() {
         siteInfo: mappedSiteInfo,
         publishPath,
         webflowPageData: pageDataForApi as WebflowPageData,
-        ...(advancedOptionsEnabled && (pageType || additionalContext) && {
+        ...(advancedOptionsEnabled && (pageType || secondaryKeywords) && {
           advancedOptions: {
             pageType: pageType || undefined,
-            additionalContext: additionalContext ? validateAdditionalContext(additionalContext).sanitized : undefined
+            secondaryKeywords: sanitizedKeywords
           }
         })
       };
-
       logger.info("[Home onSubmit] Sending data to API:", analysisData);
       mutation.mutate(analysisData);
 
@@ -754,15 +825,15 @@ export default function Home() {
     }
   };
 
-  const groupedChecks = results ? groupChecksByCategory(results.checks) : null;
+  const groupedChecks = results && results.checks && Array.isArray(results.checks) ? groupChecksByCategory(results.checks) : null;
 
   useEffect(() => {
     const getUrls = async () => {
       try {
         const detectedUrls: string[] = [];
         
-        if (webflow) {
-          const siteInfo = await webflow.getSiteInfo();
+        if (window.webflow) {
+          const siteInfo = await window.webflow.getSiteInfo();
           if (siteInfo?.domains && siteInfo.domains.length > 0) {
             siteInfo.domains.forEach(domain => {
               if (domain.url) {
@@ -782,7 +853,7 @@ export default function Home() {
     getUrls();
   }, []);
 
-  const selectedCategoryChecks = selectedCategory && results ? 
+  const selectedCategoryChecks = selectedCategory && results && results.checks && Array.isArray(results.checks) ? 
     results.checks.filter(check => {
       const categories = groupChecksByCategory(results.checks);
       return categories[selectedCategory]?.includes(check);
@@ -851,7 +922,7 @@ export default function Home() {
                       <div>
                         <h3 className="text-lg font-semibold">Advanced Analysis</h3>
                         <p className="text-sm text-muted-foreground">
-                          Get more accurate, tailored recommendations for your specific page type
+                          Add secondary keywords and specify page type for more targeted SEO analysis
                         </p>
                       </div>
                       <div className="flex items-center space-x-2">
@@ -862,11 +933,11 @@ export default function Home() {
                             // Clear advanced options when toggled off
                             if (!checked) {
                               setPageType('');
-                              setAdditionalContext('');
+                              setSecondaryKeywords('');
                               setAdvancedOptionsSaveStatus('none');
                               // Also clear saved options from storage
                               if (currentPageId) {
-                                saveAdvancedOptionsForPage(currentPageId, { pageType: '', additionalContext: '' });
+                                saveAdvancedOptionsForPage(currentPageId, { pageType: '', secondaryKeywords: '' });
                               }
                             }
                           }}
@@ -905,60 +976,59 @@ export default function Home() {
                             </Select>
                           </div>
 
-                          {/* Additional Context Textarea */}
+                          {/* Secondary Keywords Input */}
                           <div className="space-y-2">
                             <label className="text-sm font-medium">
-                              Additional Context
+                              Secondary Keywords
                               <span className="text-xs text-muted-foreground ml-2">
-                                ({additionalContext.length}/{MAX_CONTEXT_LENGTH} characters)
+                                ({(secondaryKeywords || '').length}/{MAX_KEYWORDS_LENGTH} characters)
                               </span>
                             </label>
                             <textarea
-                              value={additionalContext}
+                              value={secondaryKeywords}
                               onChange={(e) => {
                                 const input = e.target.value;
-                                setAdditionalContext(input);
+                                setSecondaryKeywords(input);
                                 
                                 // Only validate and show errors, don't sanitize during typing
-                                const validation = validateAdditionalContext(input);
+                                const validation = validateSecondaryKeywords(input);
                                 if (!validation.isValid) {
-                                  setAdditionalContextError(validation.message || 'Invalid input detected');
+                                  setSecondaryKeywordsError(validation.message || 'Invalid input detected');
                                 } else {
-                                  setAdditionalContextError('');
+                                  setSecondaryKeywordsError('');
                                 }
                               }}
-                              placeholder="Provide additional context about your page or goal (e.g., target audience, business model, competitive landscape, etc.)"
-                              rows={4}
+                              placeholder="Enter secondary keywords separated by commas (e.g., webflow expert, webflow specialist, cms developer)"
+                              rows={2}
                               className={`w-full px-3 py-2 border rounded-md text-sm placeholder:text-muted-foreground resize-none ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-                                additionalContextError 
+                                secondaryKeywordsError 
                                   ? 'border-red-500 focus-visible:ring-red-500' 
                                   : 'border-input bg-background'
                               }`}
-                              maxLength={MAX_CONTEXT_LENGTH}
+                              maxLength={MAX_KEYWORDS_LENGTH}
                             />
-                            {additionalContextError && (
+                            {secondaryKeywordsError && (
                               <p className="text-xs text-red-500 flex items-center gap-1">
                                 <AlertTriangle className="h-3 w-3" />
-                                {additionalContextError}
+                                {secondaryKeywordsError}
                               </p>
                             )}
                             <p className="text-xs text-muted-foreground">
-                              This information helps AI generate more targeted, relevant SEO recommendations. 
-                              HTML tags and scripts are automatically removed for security.
+                              Secondary keywords help your content rank for related terms. SEO checks will pass if either your main keyword or any secondary keyword is found.
                             </p>
                           </div>
 
                           {/* Advanced Options Save Status */}
-                          {(pageType || additionalContext || advancedOptionsSaveStatus === 'saving') && (
+                          {(pageType || secondaryKeywords || advancedOptionsSaveStatus === 'saving') && (
                             <div className="flex justify-end">
                               <span className="text-xs font-medium" style={{
                                 color: advancedOptionsSaveStatus === 'saved' ? 'var(--greenText)' :
                                        advancedOptionsSaveStatus === 'saving' ? 'var(--yellowText)' :
                                        'var(--redText)'
                               }}>
-                                {advancedOptionsSaveStatus === 'saved' ? 'Advanced options saved for this page' :
+                                {advancedOptionsSaveStatus === 'saved' ? 'Secondary keywords and page type saved for this page' :
                                  advancedOptionsSaveStatus === 'saving' ? 'Saving...' :
-                                 'Advanced options not saved'}
+                                 'Secondary keywords and page type not saved'}
                               </span>
                             </div>
                           )}
@@ -988,7 +1058,7 @@ export default function Home() {
                       size="sm"
                       className="mt-2"
                       onClick={() => {
-                        const mockPerfectResult = results ? {
+                        const mockPerfectResult = results && results.checks ? {
                           ...results,
                           checks: results.checks.map(check => ({
                             ...check,
@@ -1148,6 +1218,8 @@ export default function Home() {
                                     </Tooltip>
                                   </TooltipProvider>
                                 </motion.div>
+                                
+                                {/* Always show description - keyword results are no longer displayed */}
                                 <div className="text-sm text-muted-foreground text-break">
                                   <p className="inline">{check.description}</p>
                                   {!check.passed && (
@@ -1200,7 +1272,7 @@ export default function Home() {
                                 className="mt-4 text-sm p-4 bg-background3 rounded-md w-full"
                                 style={{ backgroundColor: 'var(--background3)' }}
                               >
-                                {check.imageData && check.imageData.length > 0 ? (
+                                {check.imageData && Array.isArray(check.imageData) && check.imageData.length > 0 ? (
                                   <>
                                     <ImageSizeDisplay 
                                       images={check.imageData}
@@ -1222,9 +1294,10 @@ export default function Home() {
                     </ScrollArea>
                   ) : (
                     <div className="space-y-6">
-                      {groupedChecks && Object.entries(groupChecksByCategory(results.checks)).map(([category, checks]) => {
+                      {groupedChecks && results && results.checks && Object.entries(groupChecksByCategory(results.checks)).map(([category, checks]) => {
+                        if (!checks || !Array.isArray(checks)) return null;
                         const status = getCategoryStatus(checks);
-                        const passedCount = checks.filter(check => check.passed).length;
+                        const passedCount = checks.filter(check => check && typeof check.passed === 'boolean' && check.passed).length;
                         return (
                           <motion.div
                             key={category}
@@ -1243,7 +1316,7 @@ export default function Home() {
                               </div>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-muted-foreground">
-                              {checks.map((check, idx) => (
+                              {checks.filter(check => check && check.title).map((check, idx) => (
                                 <div key={idx} className="flex items-center gap-1.5">
                                   {check.passed ? 
                                     <CheckCircle className="h-4 w-4 text-greenText flex-shrink-0" style={{color: 'var(--greenText)', stroke: 'var(--greenText)'}} /> : 

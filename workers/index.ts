@@ -41,10 +41,15 @@ app.get('/health', (c) => {
   return c.json({ status: 'ok' });
 });
 
+app.get('/test-keywords', (c) => {
+  const testResult = checkKeywordMatch("Expert Web Developer for Affordable Website Design Services | PMDS", "web developer", "services");
+  return c.json({ testResult });
+});
+
 app.post('/api/analyze', async (c) => {
   try {
     const body = await c.req.json();
-    
+      
     if (!validateAnalyzeRequest(body)) {
       return c.json({ error: 'Invalid request body' }, 400);
     }
@@ -153,7 +158,7 @@ function getSuccessMessage(checkType: string): string {
  * @param keyphrase The target keyphrase
  * @param env Environment variables
  * @param context Additional context for the recommendation
- * @param advancedOptions Advanced analysis options (page type, additional context)
+ * @param advancedOptions Advanced analysis options (page type, secondary keywords)
  * @returns AI-powered recommendation or fallback message
  */
 async function getAIRecommendation(
@@ -161,7 +166,7 @@ async function getAIRecommendation(
   keyphrase: string,
   env: any, 
   context?: string,
-  advancedOptions?: { pageType?: string; additionalContext?: string }
+  advancedOptions?: { pageType?: string; secondaryKeywords?: string }
 ): Promise<string | { introPhrase: string; copyableContent: string }> {
   try {    
     const openai = new OpenAI({
@@ -170,16 +175,17 @@ async function getAIRecommendation(
     
     const needsCopyableContent = shouldHaveCopyButton(checkType);
     
-    // Build advanced context string if available
+    // Build advanced context string if available - support both new and old property names
+    const secondaryKeywords = advancedOptions?.secondaryKeywords;
     let advancedContext = '';
-    if (advancedOptions?.pageType || advancedOptions?.additionalContext) {
+    if (advancedOptions?.pageType || secondaryKeywords) {
       advancedContext = '\n\nAdvanced Context:';
       if (advancedOptions.pageType) {
         advancedContext += `\n- Page Type: ${advancedOptions.pageType}`;
       }
-      if (advancedOptions.additionalContext) {
-        const sanitizedContext = sanitizeForAIPrompt(advancedOptions.additionalContext);
-        advancedContext += `\n- Additional Context: ${sanitizedContext}`;
+      if (secondaryKeywords) {
+        const sanitizedContext = sanitizeForAIPrompt(secondaryKeywords);
+        advancedContext += `\n- Secondary Keywords: ${sanitizedContext}`;
       }
     }
     
@@ -204,13 +210,6 @@ async function getAIRecommendation(
          Current status: ${context || 'Not specified'}${advancedContext}
          Provide concise but actionable advice in a couple of sentences${advancedOptions?.pageType ? ` tailored for a ${advancedOptions.pageType.toLowerCase()}` : ''}.`;
 
-    // Debug logging to verify advanced options are being used
-    if (advancedOptions?.pageType || advancedOptions?.additionalContext) {
-      console.log(`[SEO Analyzer] Using advanced options for ${checkType}:`, {
-        pageType: advancedOptions.pageType,
-        additionalContext: advancedOptions.additionalContext?.substring(0, 100) + '...'
-      });
-    }
 
     const maxRetries = 2;
     let retries = 0;
@@ -464,6 +463,114 @@ async function scrapeWebPage(url: string, env: Env, keyphrase: string): Promise<
 }
 
 /**
+ * Helper function to check keywords in content with detailed results
+ * @param content Content to search in
+ * @param primaryKeyword Primary keyword
+ * @param secondaryKeywords Comma-separated secondary keywords
+ * @returns Object with overall match status and detailed results for each keyword
+ */
+function checkKeywordMatch(content: string, primaryKeyword: string, secondaryKeywords?: string): { 
+  found: boolean; 
+  matchedKeyword?: string;
+  keywordResults: Array<{ keyword: string; passed: boolean; isPrimary: boolean }>;
+} {
+  const results: Array<{ keyword: string; passed: boolean; isPrimary: boolean }> = [];
+  
+  if (!content || !primaryKeyword) {
+    return { found: false, keywordResults: [] };
+  }
+
+  const normalizedContent = content.toLowerCase();
+  
+  // Check primary keyword first
+  const normalizedPrimary = primaryKeyword.toLowerCase();
+  const primaryPassed = normalizedContent.includes(normalizedPrimary);
+  results.push({
+    keyword: primaryKeyword,
+    passed: primaryPassed,
+    isPrimary: true
+  });
+
+  // If primary passes, we're done (optimization)
+  if (primaryPassed) {
+    return { 
+      found: true, 
+      matchedKeyword: primaryKeyword,
+      keywordResults: results
+    };
+  }
+
+  // Check secondary keywords if provided
+  if (secondaryKeywords) {
+    const keywords = secondaryKeywords.split(',').map(k => k.trim()).filter(k => k.length > 0);
+    
+    for (const keyword of keywords) {
+      const normalizedKeyword = keyword.toLowerCase();
+      const keywordPassed = normalizedContent.includes(normalizedKeyword);
+      results.push({
+        keyword: keyword,
+        passed: keywordPassed,
+        isPrimary: false
+      });
+
+      // If this secondary keyword passes, we found a match
+      if (keywordPassed && !results.some(r => r.passed)) {
+        return { 
+          found: true, 
+          matchedKeyword: keyword,
+          keywordResults: results
+        };
+      }
+    }
+  }
+
+  // Check if any keyword passed
+  const anyPassed = results.some(r => r.passed);
+  const matchedKeyword = results.find(r => r.passed)?.keyword;
+
+  return { 
+    found: anyPassed, 
+    matchedKeyword,
+    keywordResults: results
+  };
+}
+
+/**
+ * Calculate keyword density for primary and secondary keywords combined
+ * @param content Content to analyze
+ * @param primaryKeyword Primary keyword
+ * @param secondaryKeywords Comma-separated secondary keywords
+ * @returns Keyword density percentage
+ */
+function calculateCombinedKeyphraseDensity(content: string, primaryKeyword: string, secondaryKeywords?: string): number {
+  if (!content || !primaryKeyword) return 0;
+
+  const lowercaseContent = content.toLowerCase();
+  let totalOccurrences = 0;
+
+  // Count primary keyword
+  const primaryRegex = new RegExp(primaryKeyword.toLowerCase(), 'g');
+  const primaryMatches = lowercaseContent.match(primaryRegex);
+  totalOccurrences += primaryMatches ? primaryMatches.length : 0;
+
+  // Count secondary keywords
+  if (secondaryKeywords) {
+    const keywords = secondaryKeywords.split(',').map(k => k.trim()).filter(k => k.length > 0);
+    
+    for (const keyword of keywords) {
+      const keywordRegex = new RegExp(keyword.toLowerCase(), 'g');
+      const keywordMatches = lowercaseContent.match(keywordRegex);
+      totalOccurrences += keywordMatches ? keywordMatches.length : 0;
+    }
+  }
+
+  const words = lowercaseContent.split(/\s+/);
+  const wordCount = words.length || 1;
+  
+  return (totalOccurrences / wordCount) * 100;
+}
+
+/**
  * Main SEO Analysis function - performs all checks and returns results
  * @param scrapedData Data scraped from the webpage
  * @param keyphrase Target SEO keyphrase
@@ -483,10 +590,13 @@ async function analyzeSEOElements(
   env: Env,
   webflowPageData?: WebflowPageData,
   pageAssets?: Array<{ url: string, alt: string, type: string, size?: number, mimeType?: string }>,
-  advancedOptions?: { pageType?: string; additionalContext?: string }
+  advancedOptions?: { pageType?: string; secondaryKeywords?: string }
 ): Promise<SEOAnalysisResult> {
   const checks: SEOCheck[] = [];
   const normalizedKeyphrase = keyphrase.toLowerCase().trim();
+  
+  // Extract secondary keywords from advanced options
+  const secondaryKeywords = advancedOptions?.secondaryKeywords?.trim() || '';
   
   // Determine if we're using API data
   const useApiData = !!webflowPageData;
@@ -498,15 +608,19 @@ async function analyzeSEOElements(
   } else {
     pageTitle = scrapedData.title || '';
   }
+  const titleKeywordMatch = checkKeywordMatch(pageTitle, keyphrase, secondaryKeywords);
   const titleCheck = await createSEOCheck(
     "Keyphrase in Title",
-    () => pageTitle.toLowerCase().includes(normalizedKeyphrase),
-    `Great! Your title contains the keyphrase "${keyphrase}".`,
-    `Your title does not contain the keyphrase "${keyphrase}".`,
+    () => titleKeywordMatch.found,
+    titleKeywordMatch.matchedKeyword ? 
+      `Great! Your title contains the keyword "${titleKeywordMatch.matchedKeyword}".` :
+      `Great! Your title contains the keyphrase "${keyphrase}".`,
+    `Your title does not contain the keyphrase "${keyphrase}"${secondaryKeywords ? ' or any secondary keywords' : ''}.`,
     pageTitle,
     keyphrase,
     env,
-    advancedOptions
+    advancedOptions,
+    titleKeywordMatch.matchedKeyword
   );
 
   checks.push(titleCheck);
@@ -519,15 +633,19 @@ async function analyzeSEOElements(
     metaDescription = scrapedData.metaDescription || '';
   }
 
+  const metaDescKeywordMatch = checkKeywordMatch(metaDescription, keyphrase, secondaryKeywords);
   const metaDescriptionCheck = await createSEOCheck(
     "Keyphrase in Meta Description",
-    () => metaDescription.toLowerCase().includes(normalizedKeyphrase),
-    `Great! Your meta description contains the keyphrase "${keyphrase}".`,
-    `Keyphrase "${keyphrase}" not found in meta description: "${metaDescription}"`,
+    () => metaDescKeywordMatch.found,
+    metaDescKeywordMatch.matchedKeyword ? 
+      `Great! Your meta description contains the keyword "${metaDescKeywordMatch.matchedKeyword}".` :
+      `Great! Your meta description contains the keyphrase "${keyphrase}".`,
+    `Keyphrase "${keyphrase}"${secondaryKeywords ? ' or any secondary keywords' : ''} not found in meta description: "${metaDescription}"`,
     metaDescription,
     keyphrase,
     env,
-    advancedOptions
+    advancedOptions,
+    metaDescKeywordMatch.matchedKeyword
   );
 
   checks.push(metaDescriptionCheck);
@@ -540,15 +658,19 @@ async function analyzeSEOElements(
   // Normalize the URL for comparison
   const normalizedUrl = canonicalUrl.toLowerCase().trim();
   
+  const urlKeywordMatch = checkKeywordMatch(canonicalUrl, keyphrase, secondaryKeywords);
   const urlCheck = await createSEOCheck(
     "Keyphrase in URL",
-    () => normalizedUrl.includes(normalizedKeyphrase),
-    `Good job! The keyphrase "${keyphrase}" is present in the URL slug.`,
-    `The URL "${canonicalUrl}" does not contain the keyphrase "${keyphrase}".`,
+    () => urlKeywordMatch.found,
+    urlKeywordMatch.matchedKeyword ? 
+      `Good job! The keyword "${urlKeywordMatch.matchedKeyword}" is present in the URL slug.` :
+      `Good job! The keyphrase "${keyphrase}" is present in the URL slug.`,
+    `The URL "${canonicalUrl}" does not contain the keyphrase "${keyphrase}"${secondaryKeywords ? ' or any secondary keywords' : ''}.`,
     canonicalUrl,
     keyphrase,
     env,
-    advancedOptions
+    advancedOptions,
+    urlKeywordMatch.matchedKeyword
   );
   
   checks.push(urlCheck);
@@ -579,21 +701,7 @@ async function analyzeSEOElements(
     priority: analyzerCheckPriorities["Keyphrase Density"]
   };
   
-  function calculateKeyphraseDensity(content: string, keyphrase: string): number {
-    const lowercaseContent = content.toLowerCase();
-    const lowercaseKeyphrase = keyphrase.toLowerCase();
-    
-    const regex = new RegExp(lowercaseKeyphrase, 'g');
-    const matches = lowercaseContent.match(regex);
-    const occurrences = matches ? matches.length : 0;
-    
-    const words = lowercaseContent.split(/\s+/);
-    const wordCount = words.length || 1; // Avoid division by zero
-    
-    return (occurrences / wordCount) * 100;
-  }
-  
-  const density = calculateKeyphraseDensity(scrapedData.content, keyphrase);
+  const density = calculateCombinedKeyphraseDensity(scrapedData.content, keyphrase, secondaryKeywords);
   
   const minDensity = 0.5;
   const maxDensity = 2.5;
@@ -618,15 +726,19 @@ async function analyzeSEOElements(
   // --- Keyphrase in Introduction Check ---
   const firstParagraph = scrapedData.paragraphs[0] || '';
 
+  const introKeywordMatch = checkKeywordMatch(firstParagraph, keyphrase, secondaryKeywords);
   const keyphraseInIntroCheck = await createSEOCheck(
     "Keyphrase in Introduction",
-    () => firstParagraph.toLowerCase().includes(normalizedKeyphrase),
-    `Nice! The keyphrase "${keyphrase}" appears in the first paragraph.`,
-    `Keyphrase "${keyphrase}" not found in the introduction.`,
+    () => introKeywordMatch.found,
+    introKeywordMatch.matchedKeyword ? 
+      `Nice! The keyword "${introKeywordMatch.matchedKeyword}" appears in the first paragraph.` :
+      `Nice! The keyphrase "${keyphrase}" appears in the first paragraph.`,
+    `Keyphrase "${keyphrase}"${secondaryKeywords ? ' or any secondary keywords' : ''} not found in the introduction.`,
     firstParagraph,
     keyphrase,
     env,
-    advancedOptions
+    advancedOptions,
+    introKeywordMatch.matchedKeyword
   );
   
   checks.push(keyphraseInIntroCheck);
@@ -821,15 +933,19 @@ async function analyzeSEOElements(
   const h1Headings = scrapedData.headings.filter(heading => heading.level === 1).map(h => h.text);
   const h1Text = h1Headings.length > 0 ? h1Headings[0] : '';
 
+  const h1KeywordMatch = checkKeywordMatch(h1Text, keyphrase, secondaryKeywords);
   const h1Check = await createSEOCheck(
     "Keyphrase in H1 Heading",
-    () => h1Text.toLowerCase().includes(normalizedKeyphrase),
-    `Great! The main H1 heading includes the keyphrase "${keyphrase}".`,
-    `Keyphrase "${keyphrase}" not found in H1: "${h1Text}"`,
+    () => h1KeywordMatch.found,
+    h1KeywordMatch.matchedKeyword ? 
+      `Great! The main H1 heading includes the keyword "${h1KeywordMatch.matchedKeyword}".` :
+      `Great! The main H1 heading includes the keyphrase "${keyphrase}".`,
+    `Keyphrase "${keyphrase}"${secondaryKeywords ? ' or any secondary keywords' : ''} not found in H1: "${h1Text}"`,
     h1Text,
     keyphrase,
     env,
-    advancedOptions
+    advancedOptions,
+    h1KeywordMatch.matchedKeyword
   );
 
   checks.push(h1Check);
@@ -837,15 +953,30 @@ async function analyzeSEOElements(
   // --- H2 Check ---
   const h2Headings = scrapedData.headings.filter(h => h.level === 2);
 
+  // Check if any H2 heading contains primary or secondary keywords
+  let h2Found = false;
+  let h2MatchedKeyword: string | undefined;
+  
+  if (h2Headings.length > 0) {
+    const allH2Text = h2Headings.map(h => h.text).join(' ');
+    const h2KeywordMatch = checkKeywordMatch(allH2Text, keyphrase, secondaryKeywords);
+    
+    h2Found = h2KeywordMatch.found;
+    h2MatchedKeyword = h2KeywordMatch.matchedKeyword;
+  }
+  
   const h2Check = await createSEOCheck(
     "Keyphrase in H2 Headings",
-    () => h2Headings.some(h => h.text.toLowerCase().includes(normalizedKeyphrase)),
-    `Good! The keyphrase "${keyphrase}" is found in at least one H2 heading.`,
-    `Keyphrase "${keyphrase}" not found in any H2 headings.`,
+    () => h2Found,
+    h2MatchedKeyword ? 
+      `Good! The keyword "${h2MatchedKeyword}" is found in at least one H2 heading.` :
+      `Good! The keyphrase "${keyphrase}" is found in at least one H2 heading.`,
+    `Keyphrase "${keyphrase}"${secondaryKeywords ? ' or any secondary keywords' : ''} not found in any H2 headings.`,
     h2Headings.map(h => h.text).join(', '),
     keyphrase,
     env,
-    advancedOptions
+    advancedOptions,
+    h2MatchedKeyword
   );
 
   checks.push(h2Check);
@@ -1151,13 +1282,15 @@ async function createSEOCheck(
   context: string | undefined,
   keyphrase: string,
   env: Env,
-  advancedOptions?: { pageType?: string; additionalContext?: string }
+  advancedOptions?: { pageType?: string; secondaryKeywords?: string },
+  matchedKeyword?: string
 ): Promise<SEOCheck> {
   const check: SEOCheck = {
     title,
     description: "",
     passed: false,
-    priority: analyzerCheckPriorities[title] || "medium"
+    priority: analyzerCheckPriorities[title] || "medium",
+    matchedKeyword: matchedKeyword
   };
   
   try {
