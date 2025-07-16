@@ -44,7 +44,7 @@ const analyzeSEOElements = vi.fn(async (scrapedData, keyphrase, url, isHomePage,
       model: "gpt-3.5-turbo",
       messages: [
         { role: "system", content: `System prompt for title check${advancedOptions?.pageType ? ` for ${advancedOptions.pageType}` : ''}` },
-        { role: "user", content: `Fix title for keyphrase "${keyphrase}"${advancedOptions?.pageType ? `\nPage Type: ${advancedOptions.pageType}` : ''}${advancedOptions?.additionalContext ? `\nAdditional Context: ${advancedOptions.additionalContext}` : ''}` }
+        { role: "user", content: `Fix title for keyphrase "${keyphrase}"${advancedOptions?.pageType ? `\nPage Type: ${advancedOptions.pageType}` : ''}${advancedOptions?.secondaryKeywords ? `\nAdditional Context: ${advancedOptions.secondaryKeywords}` : ''}` }
       ],
       max_tokens: 500,
       temperature: 0.5,
@@ -54,7 +54,7 @@ const analyzeSEOElements = vi.fn(async (scrapedData, keyphrase, url, isHomePage,
       model: "gpt-3.5-turbo",
       messages: [
         { role: "system", content: `System prompt for meta description${advancedOptions?.pageType ? ` for ${advancedOptions.pageType}` : ''}` },
-        { role: "user", content: `Fix meta description for keyphrase "${keyphrase}"${advancedOptions?.pageType ? `\nPage Type: ${advancedOptions.pageType}` : ''}${advancedOptions?.additionalContext ? `\nAdditional Context: ${advancedOptions.additionalContext}` : ''}` }
+        { role: "user", content: `Fix meta description for keyphrase "${keyphrase}"${advancedOptions?.pageType ? `\nPage Type: ${advancedOptions.pageType}` : ''}${advancedOptions?.secondaryKeywords ? `\nAdditional Context: ${advancedOptions.secondaryKeywords}` : ''}` }
       ],
       max_tokens: 500,
       temperature: 0.5,
@@ -152,7 +152,7 @@ describe('Advanced Options Integration', () => {
     it('should include page type in AI recommendations', async () => {
       const advancedOptions = {
         pageType: 'Homepage',
-        additionalContext: ''
+        secondaryKeywords: ''
       };
 
       await analyzeSEOElements(
@@ -182,7 +182,7 @@ describe('Advanced Options Integration', () => {
     it('should include additional context in AI recommendations', async () => {
       const advancedOptions = {
         pageType: 'Service page',
-        additionalContext: 'Web development services targeting small businesses'
+        secondaryKeywords: 'Web development services targeting small businesses'
       };
 
       await analyzeSEOElements(
@@ -230,7 +230,7 @@ describe('Advanced Options Integration', () => {
     it('should work with empty advanced options', async () => {
       const advancedOptions = {
         pageType: '',
-        additionalContext: ''
+        secondaryKeywords: ''
       };
 
       await analyzeSEOElements(
@@ -253,7 +253,7 @@ describe('Advanced Options Integration', () => {
     it('should tailor recommendations for homepage', async () => {
       const advancedOptions = {
         pageType: 'Homepage',
-        additionalContext: 'SaaS company targeting small businesses'
+        secondaryKeywords: 'SaaS company targeting small businesses'
       };
 
       await analyzeSEOElements(
@@ -282,7 +282,7 @@ describe('Advanced Options Integration', () => {
     it('should tailor recommendations for blog posts', async () => {
       const advancedOptions = {
         pageType: 'Blog post',
-        additionalContext: 'Technical tutorial for developers'
+        secondaryKeywords: 'Technical tutorial for developers'
       };
 
       await analyzeSEOElements(
@@ -311,7 +311,7 @@ describe('Advanced Options Integration', () => {
     it('should tailor recommendations for product pages', async () => {
       const advancedOptions = {
         pageType: 'Product page',
-        additionalContext: 'E-commerce selling outdoor gear to hiking enthusiasts'
+        secondaryKeywords: 'E-commerce selling outdoor gear to hiking enthusiasts'
       };
 
       await analyzeSEOElements(
@@ -342,7 +342,7 @@ describe('Advanced Options Integration', () => {
     it('should generate page-type-specific titles', async () => {
       const advancedOptions = {
         pageType: 'Service page',
-        additionalContext: 'Web development services'
+        secondaryKeywords: 'Web development services'
       };
 
       await analyzeSEOElements(
@@ -374,7 +374,7 @@ describe('Advanced Options Integration', () => {
     it('should generate context-aware meta descriptions', async () => {
       const advancedOptions = {
         pageType: 'Landing page',
-        additionalContext: 'Converting visitors to customers for SaaS product'
+        secondaryKeywords: 'Converting visitors to customers for SaaS product'
       };
 
       await analyzeSEOElements(
@@ -410,7 +410,7 @@ describe('Advanced Options Integration', () => {
 
       const advancedOptions = {
         pageType: 'Homepage',
-        additionalContext: 'Test context'
+        secondaryKeywords: 'Test context'
       };
 
       const result = await analyzeSEOElements(
@@ -433,7 +433,7 @@ describe('Advanced Options Integration', () => {
     it('should handle malformed advanced options', async () => {
       const malformedOptions = {
         pageType: null,
-        additionalContext: undefined
+        secondaryKeywords: undefined
       } as any;
 
       expect(async () => {
@@ -455,7 +455,7 @@ describe('Advanced Options Integration', () => {
     it('should enhance all relevant SEO checks with advanced options', async () => {
       const advancedOptions = {
         pageType: 'Service page',
-        additionalContext: 'Professional consulting services'
+        secondaryKeywords: 'Professional consulting services'
       };
 
       const result = await analyzeSEOElements(

@@ -41,17 +41,20 @@ app.get('/health', (c) => {
   return c.json({ status: 'ok' });
 });
 
+app.get('/test-keywords', (c) => {
+  const testResult = checkKeywordMatch("Expert Web Developer for Affordable Website Design Services | PMDS", "web developer", "services");
+  return c.json({ testResult });
+});
+
 app.post('/api/analyze', async (c) => {
   try {
     const body = await c.req.json();
-    console.log('[DEBUG Worker] Received request body:', JSON.stringify(body, null, 2));
-    
+      
     if (!validateAnalyzeRequest(body)) {
       return c.json({ error: 'Invalid request body' }, 400);
     }
     
     const { keyphrase, url, isHomePage = false, webflowPageData, pageAssets, advancedOptions } = body;
-    console.log('[DEBUG Worker] Extracted advancedOptions from body:', advancedOptions);
     
     const scrapedData = await scrapeWebPage(url, c.env as Env, keyphrase);
     
@@ -163,7 +166,7 @@ async function getAIRecommendation(
   keyphrase: string,
   env: any, 
   context?: string,
-  advancedOptions?: { pageType?: string; secondaryKeywords?: string; additionalContext?: string }
+  advancedOptions?: { pageType?: string; secondaryKeywords?: string }
 ): Promise<string | { introPhrase: string; copyableContent: string }> {
   try {    
     const openai = new OpenAI({
@@ -173,7 +176,7 @@ async function getAIRecommendation(
     const needsCopyableContent = shouldHaveCopyButton(checkType);
     
     // Build advanced context string if available - support both new and old property names
-    const secondaryKeywords = advancedOptions?.secondaryKeywords || advancedOptions?.additionalContext;
+    const secondaryKeywords = advancedOptions?.secondaryKeywords;
     let advancedContext = '';
     if (advancedOptions?.pageType || secondaryKeywords) {
       advancedContext = '\n\nAdvanced Context:';
@@ -207,13 +210,6 @@ async function getAIRecommendation(
          Current status: ${context || 'Not specified'}${advancedContext}
          Provide concise but actionable advice in a couple of sentences${advancedOptions?.pageType ? ` tailored for a ${advancedOptions.pageType.toLowerCase()}` : ''}.`;
 
-    // Debug logging to verify advanced options are being used
-    if (advancedOptions?.pageType || secondaryKeywords) {
-      console.log(`[SEO Analyzer] Using advanced options for ${checkType}:`, {
-        pageType: advancedOptions.pageType,
-        secondaryKeywords: secondaryKeywords?.substring(0, 100) + '...'
-      });
-    }
 
     const maxRetries = 2;
     let retries = 0;
@@ -467,49 +463,76 @@ async function scrapeWebPage(url: string, env: Env, keyphrase: string): Promise<
 }
 
 /**
- * Helper function to check if any keyword (primary or secondary) is found in content
+ * Helper function to check keywords in content with detailed results
  * @param content Content to search in
  * @param primaryKeyword Primary keyword
  * @param secondaryKeywords Comma-separated secondary keywords
- * @returns Object with match status and which keyword was found
+ * @returns Object with overall match status and detailed results for each keyword
  */
-function checkKeywordMatch(content: string, primaryKeyword: string, secondaryKeywords?: string): { found: boolean; matchedKeyword?: string } {
-  console.log('[DEBUG checkKeywordMatch] Input:', { content, primaryKeyword, secondaryKeywords });
+function checkKeywordMatch(content: string, primaryKeyword: string, secondaryKeywords?: string): { 
+  found: boolean; 
+  matchedKeyword?: string;
+  keywordResults: Array<{ keyword: string; passed: boolean; isPrimary: boolean }>;
+} {
+  const results: Array<{ keyword: string; passed: boolean; isPrimary: boolean }> = [];
   
   if (!content || !primaryKeyword) {
-    console.log('[DEBUG checkKeywordMatch] Missing content or primary keyword');
-    return { found: false };
+    return { found: false, keywordResults: [] };
   }
 
   const normalizedContent = content.toLowerCase();
-  const normalizedPrimary = primaryKeyword.toLowerCase();
-
-  console.log('[DEBUG checkKeywordMatch] Normalized content:', normalizedContent);
-  console.log('[DEBUG checkKeywordMatch] Normalized primary:', normalizedPrimary);
-
+  
   // Check primary keyword first
-  if (normalizedContent.includes(normalizedPrimary)) {
-    console.log('[DEBUG checkKeywordMatch] Primary keyword found');
-    return { found: true, matchedKeyword: primaryKeyword };
+  const normalizedPrimary = primaryKeyword.toLowerCase();
+  const primaryPassed = normalizedContent.includes(normalizedPrimary);
+  results.push({
+    keyword: primaryKeyword,
+    passed: primaryPassed,
+    isPrimary: true
+  });
+
+  // If primary passes, we're done (optimization)
+  if (primaryPassed) {
+    return { 
+      found: true, 
+      matchedKeyword: primaryKeyword,
+      keywordResults: results
+    };
   }
 
   // Check secondary keywords if provided
   if (secondaryKeywords) {
     const keywords = secondaryKeywords.split(',').map(k => k.trim()).filter(k => k.length > 0);
-    console.log('[DEBUG checkKeywordMatch] Secondary keywords array:', keywords);
     
     for (const keyword of keywords) {
       const normalizedKeyword = keyword.toLowerCase();
-      console.log('[DEBUG checkKeywordMatch] Checking keyword:', keyword, 'normalized:', normalizedKeyword);
-      if (normalizedContent.includes(normalizedKeyword)) {
-        console.log('[DEBUG checkKeywordMatch] Secondary keyword found:', keyword);
-        return { found: true, matchedKeyword: keyword };
+      const keywordPassed = normalizedContent.includes(normalizedKeyword);
+      results.push({
+        keyword: keyword,
+        passed: keywordPassed,
+        isPrimary: false
+      });
+
+      // If this secondary keyword passes, we found a match
+      if (keywordPassed && !results.some(r => r.passed)) {
+        return { 
+          found: true, 
+          matchedKeyword: keyword,
+          keywordResults: results
+        };
       }
     }
   }
 
-  console.log('[DEBUG checkKeywordMatch] No keywords found');
-  return { found: false };
+  // Check if any keyword passed
+  const anyPassed = results.some(r => r.passed);
+  const matchedKeyword = results.find(r => r.passed)?.keyword;
+
+  return { 
+    found: anyPassed, 
+    matchedKeyword,
+    keywordResults: results
+  };
 }
 
 /**
@@ -567,18 +590,13 @@ async function analyzeSEOElements(
   env: Env,
   webflowPageData?: WebflowPageData,
   pageAssets?: Array<{ url: string, alt: string, type: string, size?: number, mimeType?: string }>,
-  advancedOptions?: { pageType?: string; secondaryKeywords?: string; additionalContext?: string }
+  advancedOptions?: { pageType?: string; secondaryKeywords?: string }
 ): Promise<SEOAnalysisResult> {
   const checks: SEOCheck[] = [];
   const normalizedKeyphrase = keyphrase.toLowerCase().trim();
   
-  // Extract secondary keywords from advanced options - support both field names for backward compatibility
-  const secondaryKeywords = (advancedOptions?.secondaryKeywords || advancedOptions?.additionalContext)?.trim() || '';
-  
-  console.log('[DEBUG Worker] Received advancedOptions:', advancedOptions);
-  console.log('[DEBUG Worker] Extracted secondaryKeywords:', secondaryKeywords);
-  console.log('[DEBUG Worker] Primary keyphrase:', keyphrase);
-  
+  // Extract secondary keywords from advanced options
+  const secondaryKeywords = advancedOptions?.secondaryKeywords?.trim() || '';
   
   // Determine if we're using API data
   const useApiData = !!webflowPageData;
@@ -590,9 +608,7 @@ async function analyzeSEOElements(
   } else {
     pageTitle = scrapedData.title || '';
   }
-  console.log('[DEBUG Worker] About to check title:', pageTitle);
   const titleKeywordMatch = checkKeywordMatch(pageTitle, keyphrase, secondaryKeywords);
-  console.log('[DEBUG Worker] Title keyword match result:', titleKeywordMatch);
   const titleCheck = await createSEOCheck(
     "Keyphrase in Title",
     () => titleKeywordMatch.found,
@@ -938,16 +954,15 @@ async function analyzeSEOElements(
   const h2Headings = scrapedData.headings.filter(h => h.level === 2);
 
   // Check if any H2 heading contains primary or secondary keywords
-  let h2MatchedKeyword: string | undefined;
   let h2Found = false;
+  let h2MatchedKeyword: string | undefined;
   
-  for (const h2 of h2Headings) {
-    const h2KeywordMatch = checkKeywordMatch(h2.text, keyphrase, secondaryKeywords);
-    if (h2KeywordMatch.found) {
-      h2Found = true;
-      h2MatchedKeyword = h2KeywordMatch.matchedKeyword;
-      break;
-    }
+  if (h2Headings.length > 0) {
+    const allH2Text = h2Headings.map(h => h.text).join(' ');
+    const h2KeywordMatch = checkKeywordMatch(allH2Text, keyphrase, secondaryKeywords);
+    
+    h2Found = h2KeywordMatch.found;
+    h2MatchedKeyword = h2KeywordMatch.matchedKeyword;
   }
   
   const h2Check = await createSEOCheck(
@@ -1267,7 +1282,7 @@ async function createSEOCheck(
   context: string | undefined,
   keyphrase: string,
   env: Env,
-  advancedOptions?: { pageType?: string; secondaryKeywords?: string; additionalContext?: string },
+  advancedOptions?: { pageType?: string; secondaryKeywords?: string },
   matchedKeyword?: string
 ): Promise<SEOCheck> {
   const check: SEOCheck = {

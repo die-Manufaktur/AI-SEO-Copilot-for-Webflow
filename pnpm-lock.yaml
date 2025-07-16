@@ -105,8 +105,8 @@ importers:
         specifier: ^2.0.15
         version: 2.0.15
       '@webflow/webflow-cli':
-        specifier: ^1.8.13
-        version: 1.8.13(@babel/core@7.28.0)(@rspack/core@1.3.11)(@swc/core@1.12.11)(esbuild@0.25.6)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(typescript@5.8.3)
+        specifier: ^1.8.14
+        version: 1.8.14(@babel/core@7.28.0)(@rspack/core@1.3.11)(@swc/core@1.12.11)(esbuild@0.25.6)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(typescript@5.8.3)
       canvas-confetti:
         specifier: ^1.9.3
         version: 1.9.3
@@ -132,8 +132,8 @@ importers:
         specifier: ^8.6.0
         version: 8.6.0(react@19.1.0)
       framer-motion:
-        specifier: ^12.23.2
-        version: 12.23.2(@emotion/is-prop-valid@1.3.1)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+        specifier: ^12.23.3
+        version: 12.23.3(@emotion/is-prop-valid@1.3.1)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       hono:
         specifier: ^4.8.4
         version: 4.8.4
@@ -144,8 +144,8 @@ importers:
         specifier: ^1.0.2
         version: 1.0.2
       openai:
-        specifier: ^5.8.3
-        version: 5.8.3(ws@8.18.0)(zod@3.25.76)
+        specifier: ^5.8.4
+        version: 5.8.4(ws@8.18.0)(zod@3.25.76)
       react:
         specifier: ^19.1.0
         version: 19.1.0
@@ -181,11 +181,11 @@ importers:
         version: 3.25.76
     devDependencies:
       '@anthropic-ai/claude-code':
-        specifier: ^1.0.44
-        version: 1.0.44
+        specifier: ^1.0.48
+        version: 1.0.48
       '@cloudflare/vite-plugin':
-        specifier: ^1.9.2
-        version: 1.9.2(rollup@4.44.2)(vite@6.3.5(@types/node@24.0.12)(jiti@2.4.2)(lightningcss@1.30.1)(terser@5.43.1)(tsx@4.20.3))(workerd@1.20250709.0)(wrangler@4.24.1)
+        specifier: ^1.9.4
+        version: 1.9.4(rollup@4.44.2)(vite@6.3.5(@types/node@24.0.12)(jiti@2.4.2)(lightningcss@1.30.1)(terser@5.43.1)(tsx@4.20.3))(workerd@1.20250709.0)(wrangler@4.24.3)
       '@testing-library/dom':
         specifier: ^10.4.0
         version: 10.4.0
@@ -289,8 +289,8 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@24.0.12)(happy-dom@18.0.1)(jiti@2.4.2)(jsdom@26.1.0)(lightningcss@1.30.1)(terser@5.43.1)(tsx@4.20.3)
       wrangler:
-        specifier: ^4.24.1
-        version: 4.24.1
+        specifier: ^4.24.3
+        version: 4.24.3
 
 packages:
 
@@ -305,8 +305,8 @@ packages:
     resolution: {integrity: sha512-30iZtAPgz+LTIYoeivqYo853f02jBYSd5uGnGpkFV0M3xOt9aN73erkgYAmZU43x4VfqcnLxW9Kpg3R5LC4YYw==}
     engines: {node: '>=6.0.0'}
 
-  '@anthropic-ai/claude-code@1.0.44':
-    resolution: {integrity: sha512-GCX0KeMcyhLlfs/dLWlMiHShAMmjt8d7xcVUS53z7VnV6s3cIIrRPsKQ/xX/Q9rFm5dSVmRnzU88Ku28fb3QKQ==}
+  '@anthropic-ai/claude-code@1.0.48':
+    resolution: {integrity: sha512-h63VBAZZ6Pl/DlYW2PjbfUeicZ4r9VSl8dymD3d+1lZEHwCPgfMpu3g+30+FDMs79Xqc7qSDm6CRnMApxhbjqw==}
     engines: {node: '>=18.0.0'}
     hasBin: true
 
@@ -891,11 +891,11 @@ packages:
       workerd:
         optional: true
 
-  '@cloudflare/vite-plugin@1.9.2':
-    resolution: {integrity: sha512-9+ONmK7C9LKnToEbnfJDS4rajf7+ZmxwhBHrUSHaR7n26uIcWZq6VPoMDGtIxtNI0ZJKeoeaeGJJm/AWW5VHzg==}
+  '@cloudflare/vite-plugin@1.9.4':
+    resolution: {integrity: sha512-i1sMePamMZs/eR5ennHNICEFEtXWDCbt8j+mSE0EQuMFt0YrqqU9WSCZzUvISyYebnnLfnHZQpq3Y8y4uPz4RQ==}
     peerDependencies:
       vite: ^6.1.0 || ^7.0.0
-      wrangler: 4.24.1
+      wrangler: 4.24.3
 
   '@cloudflare/workerd-darwin-64@1.20250709.0':
     resolution: {integrity: sha512-VqwcvnbI8FNCP87ZWNHA3/sAC5U9wMbNnjBG0sHEYzM7B9RPHKYHdVKdBEWhzZXnkQYMK81IHm4CZsK16XxAuQ==}
@@ -2993,14 +2993,14 @@ packages:
   '@webassemblyjs/wast-printer@1.14.1':
     resolution: {integrity: sha512-kPSSXE6De1XOR820C90RIo2ogvZG+c3KiHzqUoO/F34Y2shGzesfqv7o57xrxovZJH/MetF5UjroJ/R/3isoiw==}
 
-  '@webflow/data-types@0.0.5':
-    resolution: {integrity: sha512-tNgOp/cvN0+/9m52kw3OuUS+OWjDiOl7DjVRQkS548NITBW9JHdtE6k2mU5Z2X6/ASVJHihI27CkAqZCeyAnYw==}
+  '@webflow/data-types@0.0.6':
+    resolution: {integrity: sha512-vi7PMd1CP5+5DfY3Wu80h/NLQ3UwHIh7+0nceQT9M3uOsYOT+sOYpSk265J1Hp6zQyD6DVcGs/g0r7jQ7HbtnQ==}
 
   '@webflow/designer-extension-typings@2.0.15':
     resolution: {integrity: sha512-NfDYo5CdkPHyYzP5by/7+oAoVaJfXfesPte5BmBUSGONYdFwOzNO3swguNOAU9Gz8SAvZSDdNxUGdpKPkj9j1Q==}
 
-  '@webflow/webflow-cli@1.8.13':
-    resolution: {integrity: sha512-I/XgAgT6kgX+xl21b44La1ng9LN7JwB9hJC5how247LbYUDf9JxV5WmI6mMX+nmtWWDWqPSX3vAHDGhT05re4w==}
+  '@webflow/webflow-cli@1.8.14':
+    resolution: {integrity: sha512-/SpRB/ltJ8ojAhDEvaKgPVRq/bHCsOHTlLbxuuezS2yy4KAMF05zB4EiDVwW5DxBOrrmIK4QdOAB73Ar/dO7NQ==}
     engines: {node: '>=18.16.0'}
     hasBin: true
 
@@ -3705,8 +3705,8 @@ packages:
   ee-first@1.1.1:
     resolution: {integrity: sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow==}
 
-  electron-to-chromium@1.5.181:
-    resolution: {integrity: sha512-+ISMj8OIQ+0qEeDj14Rt8WwcTOiqHyAB+5bnK1K7xNNLjBJ4hRCQfUkw8RWtcLbfBzDwc15ZnKH0c7SNOfwiyA==}
+  electron-to-chromium@1.5.182:
+    resolution: {integrity: sha512-Lv65Btwv9W4J9pyODI6EWpdnhfvrve/us5h1WspW8B2Fb0366REPtY3hX7ounk1CkV/TBjWCEvCBBbYbmV0qCA==}
 
   elliptic@6.6.1:
     resolution: {integrity: sha512-RaddvvMatK2LJHqFJ+YA4WysVN5Ita9E35botqIYspQ4TkRAlCicdzKOjlyv/1Za5RyTNn7di//eEV0uTAfe3g==}
@@ -3950,8 +3950,8 @@ packages:
   fraction.js@4.3.7:
     resolution: {integrity: sha512-ZsDfxO51wGAXREY55a7la9LScWpwv9RxIrYABrlvOFBlH/ShPnrtsXeuUIfXKKOVicNxQ+o8JTbJvjS4M89yew==}
 
-  framer-motion@12.23.2:
-    resolution: {integrity: sha512-mnBvkUWBjLzuggCOFhqTXln249PyOobLXBJ2Gs8RACCN0UKvYEMHJSKk2iWdVF1Yua5ZXSyZYVSYbl9eWJMVKg==}
+  framer-motion@12.23.3:
+    resolution: {integrity: sha512-llmLkf44zuIZOPSrE4bl4J0UTg6bav+rlKEfMRKgvDMXqBrUtMg6cspoQeRVK3nqRLxTmAJhfGXk39UDdZD7Kw==}
     peerDependencies:
       '@emotion/is-prop-valid': '*'
       react: ^18.0.0 || ^19.0.0
@@ -4815,8 +4815,8 @@ packages:
     resolution: {integrity: sha512-7x81NCL719oNbsq/3mh+hVrAWmFuEYUqrq/Iw3kUzH8ReypT9QQ0BLoJS7/G9k6N81XjW4qHWtjWwe/9eLy1EQ==}
     engines: {node: '>=12'}
 
-  openai@5.8.3:
-    resolution: {integrity: sha512-IdotKmquCnpouTRvF9xRXVhMx6K5Sc8zkD6Usf+so+NTQ+qiJ8bLSCd7LBb8b/Rof7uYltlSxJhNp+spphKI4Q==}
+  openai@5.8.4:
+    resolution: {integrity: sha512-aVzelCIODrYQ1pW4Kf4FfaVyIBSi/6jNszQ4KuolwmEa0UNgMicOfczSPWIT6LsY58R6fvPWknBUGSDxjzkrLQ==}
     hasBin: true
     peerDependencies:
       ws: ^8.18.0
@@ -5903,8 +5903,8 @@ packages:
     peerDependencies:
       react: '>=16.8.0'
 
-  wrangler@4.24.1:
-    resolution: {integrity: sha512-n7d5BQyOQU7WyEYMC3zNarWzsqWttsusP6qWz4rbbydmnWKSP1wLtsv0yKiyz/LYFumpolz48d5phHp04nR6uw==}
+  wrangler@4.24.3:
+    resolution: {integrity: sha512-stB1Wfs5NKlspsAzz8SBujBKsDqT5lpCyrL+vSUMy3uueEtI1A5qyORbKoJhIguEbwHfWS39mBsxzm6Vm1J2cg==}
     engines: {node: '>=18.0.0'}
     hasBin: true
     peerDependencies:
@@ -6021,7 +6021,7 @@ snapshots:
       '@jridgewell/gen-mapping': 0.3.12
       '@jridgewell/trace-mapping': 0.3.29
 
-  '@anthropic-ai/claude-code@1.0.44':
+  '@anthropic-ai/claude-code@1.0.48':
     optionalDependencies:
       '@img/sharp-darwin-arm64': 0.33.5
       '@img/sharp-darwin-x64': 0.33.5
@@ -6787,7 +6787,7 @@ snapshots:
     optionalDependencies:
       workerd: 1.20250709.0
 
-  '@cloudflare/vite-plugin@1.9.2(rollup@4.44.2)(vite@6.3.5(@types/node@24.0.12)(jiti@2.4.2)(lightningcss@1.30.1)(terser@5.43.1)(tsx@4.20.3))(workerd@1.20250709.0)(wrangler@4.24.1)':
+  '@cloudflare/vite-plugin@1.9.4(rollup@4.44.2)(vite@6.3.5(@types/node@24.0.12)(jiti@2.4.2)(lightningcss@1.30.1)(terser@5.43.1)(tsx@4.20.3))(workerd@1.20250709.0)(wrangler@4.24.3)':
     dependencies:
       '@cloudflare/unenv-preset': 2.3.3(unenv@2.0.0-rc.17)(workerd@1.20250709.0)
       '@mjackson/node-fetch-server': 0.6.1
@@ -6798,7 +6798,7 @@ snapshots:
       tinyglobby: 0.2.14
       unenv: 2.0.0-rc.17
       vite: 6.3.5(@types/node@24.0.12)(jiti@2.4.2)(lightningcss@1.30.1)(terser@5.43.1)(tsx@4.20.3)
-      wrangler: 4.24.1
+      wrangler: 4.24.3
       ws: 8.18.0
     transitivePeerDependencies:
       - bufferutil
@@ -8745,18 +8745,18 @@ snapshots:
       '@webassemblyjs/ast': 1.14.1
       '@xtuc/long': 4.2.2
 
-  '@webflow/data-types@0.0.5': {}
+  '@webflow/data-types@0.0.6': {}
 
   '@webflow/designer-extension-typings@2.0.15': {}
 
-  '@webflow/webflow-cli@1.8.13(@babel/core@7.28.0)(@rspack/core@1.3.11)(@swc/core@1.12.11)(esbuild@0.25.6)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(typescript@5.8.3)':
+  '@webflow/webflow-cli@1.8.14(@babel/core@7.28.0)(@rspack/core@1.3.11)(@swc/core@1.12.11)(esbuild@0.25.6)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(typescript@5.8.3)':
     dependencies:
       '@babel/preset-env': 7.28.0(@babel/core@7.28.0)
       '@babel/preset-react': 7.27.1(@babel/core@7.28.0)
       '@babel/preset-typescript': 7.27.1(@babel/core@7.28.0)
       '@dotenvx/dotenvx': 1.47.3
       '@module-federation/enhanced': 0.13.1(@rspack/core@1.3.11)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(typescript@5.8.3)(webpack@5.100.0(@swc/core@1.12.11)(esbuild@0.25.6))
-      '@webflow/data-types': 0.0.5
+      '@webflow/data-types': 0.0.6
       ajv: 8.17.1
       archiver: 5.3.2
       babel-loader: 10.0.0(@babel/core@7.28.0)(webpack@5.100.0(@swc/core@1.12.11)(esbuild@0.25.6))
@@ -8778,6 +8778,7 @@ snapshots:
       prettier: 2.8.8
       semver: 7.7.2
       serve-handler: 6.1.6
+      tar: 7.4.3
       unionfs: 4.5.4
       webflow-api: 3.1.3
       webpack: 5.100.0(@swc/core@1.12.11)(esbuild@0.25.6)
@@ -9071,7 +9072,7 @@ snapshots:
   browserslist@4.25.1:
     dependencies:
       caniuse-lite: 1.0.30001727
-      electron-to-chromium: 1.5.181
+      electron-to-chromium: 1.5.182
       node-releases: 2.0.19
       update-browserslist-db: 1.1.3(browserslist@4.25.1)
 
@@ -9560,7 +9561,7 @@ snapshots:
 
   ee-first@1.1.1: {}
 
-  electron-to-chromium@1.5.181: {}
+  electron-to-chromium@1.5.182: {}
 
   elliptic@6.6.1:
     dependencies:
@@ -9858,7 +9859,7 @@ snapshots:
 
   fraction.js@4.3.7: {}
 
-  framer-motion@12.23.2(@emotion/is-prop-valid@1.3.1)(react-dom@19.1.0(react@19.1.0))(react@19.1.0):
+  framer-motion@12.23.3(@emotion/is-prop-valid@1.3.1)(react-dom@19.1.0(react@19.1.0))(react@19.1.0):
     dependencies:
       motion-dom: 12.23.2
       motion-utils: 12.23.2
@@ -10703,7 +10704,7 @@ snapshots:
       is-docker: 2.2.1
       is-wsl: 2.2.0
 
-  openai@5.8.3(ws@8.18.0)(zod@3.25.76):
+  openai@5.8.4(ws@8.18.0)(zod@3.25.76):
     optionalDependencies:
       ws: 8.18.0
       zod: 3.25.76
@@ -11865,7 +11866,7 @@ snapshots:
       regexparam: 3.0.0
       use-sync-external-store: 1.5.0(react@19.1.0)
 
-  wrangler@4.24.1:
+  wrangler@4.24.3:
     dependencies:
       '@cloudflare/kv-asset-handler': 0.4.0
       '@cloudflare/unenv-preset': 2.3.3(unenv@2.0.0-rc.17)(workerd@1.20250709.0)

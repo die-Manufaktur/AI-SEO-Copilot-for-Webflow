@@ -15,8 +15,8 @@
     "kill-dev": "kill-dev-servers.bat"
   },
   "devDependencies": {
-    "@anthropic-ai/claude-code": "^1.0.44",
-    "@cloudflare/vite-plugin": "^1.9.2",
+    "@anthropic-ai/claude-code": "^1.0.48",
+    "@cloudflare/vite-plugin": "^1.9.4",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
@@ -51,7 +51,7 @@
     "vite-plugin-svgr": "^4.3.0",
     "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^3.2.4",
-    "wrangler": "^4.24.1"
+    "wrangler": "^4.24.3"
   },
   "dependencies": {
     "@emotion/is-prop-valid": "^1.3.1",
@@ -86,7 +86,7 @@
     "@tanstack/react-query": "^5.82.0",
     "@vitejs/plugin-react": "^4.6.0",
     "@webflow/designer-extension-typings": "^2.0.15",
-    "@webflow/webflow-cli": "^1.8.13",
+    "@webflow/webflow-cli": "^1.8.14",
     "canvas-confetti": "^1.9.3",
     "cheerio": "^1.1.0",
     "class-variance-authority": "^0.7.1",
@@ -95,11 +95,11 @@
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "embla-carousel-react": "^8.6.0",
-    "framer-motion": "^12.23.2",
+    "framer-motion": "^12.23.3",
     "hono": "^4.8.4",
     "input-otp": "^1.4.2",
     "net": "^1.0.2",
-    "openai": "^5.8.3",
+    "openai": "^5.8.4",
     "react": "^19.1.0",
     "react-day-picker": "^9.8.0",
     "react-dom": "^19.1.0",

@@ -151,6 +151,5 @@ export interface AnalyzeSEORequest {
   advancedOptions?: {
     pageType?: string;
     secondaryKeywords?: string; // Secondary keywords (comma-separated)
-    additionalContext?: string; // Deprecated: use secondaryKeywords instead
   };
 }

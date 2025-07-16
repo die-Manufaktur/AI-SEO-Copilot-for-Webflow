@@ -797,14 +797,6 @@ export default function Home() {
 
       const sanitizedKeywords = secondaryKeywords ? validateSecondaryKeywords(secondaryKeywords).sanitized : undefined;
       
-      console.log("[DEBUG] Advanced options check:", {
-        advancedOptionsEnabled,
-        pageType,
-        secondaryKeywords,
-        sanitizedKeywords,
-        willIncludeAdvancedOptions: !!(advancedOptionsEnabled && (pageType || secondaryKeywords))
-      });
-      
       const analysisData: AnalyzeSEORequest = {
         keyphrase: values.keyphrase,
         url,
@@ -819,8 +811,6 @@ export default function Home() {
           }
         })
       };
-
-      console.log("[DEBUG] Final analysis data:", analysisData);
       logger.info("[Home onSubmit] Sending data to API:", analysisData);
       mutation.mutate(analysisData);
 
@@ -1209,13 +1199,6 @@ export default function Home() {
                                     )}
                                   </motion.div>
                                   {check.title}
-                                  
-                                  {/* Show which keyword was matched */}
-                                  {check.passed && check.matchedKeyword && (
-                                    <span className="ml-2 text-xs px-2 py-0.5 bg-background4 text-greenText rounded-sm border border-greenText/20">
-                                      {check.matchedKeyword}
-                                    </span>
-                                  )}
 
                                   <TooltipProvider>
                                     <Tooltip>
@@ -1235,6 +1218,8 @@ export default function Home() {
                                     </Tooltip>
                                   </TooltipProvider>
                                 </motion.div>
+                                
+                                {/* Always show description - keyword results are no longer displayed */}
                                 <div className="text-sm text-muted-foreground text-break">
                                   <p className="inline">{check.description}</p>
                                   {!check.passed && (

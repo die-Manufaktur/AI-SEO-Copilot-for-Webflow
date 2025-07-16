@@ -6,7 +6,7 @@ import '@testing-library/jest-dom';
 // Mock the advanced options storage
 vi.mock('../utils/advancedOptionsStorage', () => ({
   saveAdvancedOptionsForPage: vi.fn(),
-  loadAdvancedOptionsForPage: vi.fn(() => ({ pageType: '', additionalContext: '' })),
+  loadAdvancedOptionsForPage: vi.fn(() => ({ pageType: '', secondaryKeywords: '' })),
   clearAllAdvancedOptions: vi.fn(),
   getAllStoredAdvancedOptions: vi.fn(() => ({}))
 }));
@@ -81,7 +81,7 @@ vi.mock('../hooks/use-toast', () => ({
 const TestAdvancedTab = () => {
   const [advancedOptionsEnabled, setAdvancedOptionsEnabled] = React.useState(false);
   const [pageType, setPageType] = React.useState('');
-  const [additionalContext, setAdditionalContext] = React.useState('');
+  const [secondaryKeywords, setSecondaryKeywords] = React.useState('');
   const [advancedOptionsSaveStatus, setAdvancedOptionsSaveStatus] = React.useState<'saved' | 'saving' | 'none'>('none');
 
   const PAGE_TYPES = [
@@ -123,7 +123,7 @@ const TestAdvancedTab = () => {
                 setAdvancedOptionsEnabled(!advancedOptionsEnabled);
                 if (advancedOptionsEnabled) {
                   setPageType('');
-                  setAdditionalContext('');
+                  setSecondaryKeywords('');
                   setAdvancedOptionsSaveStatus('none');
                 }
               }}
@@ -153,24 +153,24 @@ const TestAdvancedTab = () => {
               </select>
             </div>
 
-            {/* Additional Context Textarea */}
+            {/* Secondary Keywords Textarea */}
             <div className="space-y-2">
-              <label htmlFor="additional-context-textarea" className="text-sm font-medium">Additional Context</label>
+              <label htmlFor="secondary-keywords-textarea" className="text-sm font-medium">Secondary Keywords</label>
               <textarea
-                id="additional-context-textarea"
-                data-testid="additional-context-textarea"
-                value={additionalContext}
-                onChange={(e) => setAdditionalContext(e.target.value)}
-                placeholder="Provide additional context about your page or goal (e.g., target audience, business model, competitive landscape, etc.)"
+                id="secondary-keywords-textarea"
+                data-testid="secondary-keywords-textarea"
+                value={secondaryKeywords}
+                onChange={(e) => setSecondaryKeywords(e.target.value)}
+                placeholder="Enter comma-separated secondary keywords (e.g., affordable, budget-friendly, cost-effective)"
                 rows={4}
               />
               <p className="text-xs text-muted-foreground">
-                This information helps AI generate more targeted, relevant SEO recommendations
+                These keywords will be checked if the primary keyword is not found
               </p>
             </div>
 
             {/* Advanced Options Save Status */}
-            {(pageType || additionalContext || advancedOptionsSaveStatus === 'saving') && (
+            {(pageType || secondaryKeywords || advancedOptionsSaveStatus === 'saving') && (
               <div className="flex justify-end">
                 <span 
                   data-testid="save-status"

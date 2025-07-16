@@ -89,6 +89,16 @@ The app performs 18 different SEO checks:
 - Code minification analysis
 - Link analysis (internal/external)
 
+#### Secondary Keywords Feature
+The app supports secondary keywords functionality:
+- **Background Processing**: Checks primary keyword first, then secondary keywords if primary fails
+- **Pass-on-First-Match**: SEO checks pass as soon as any keyword (primary or secondary) is found
+- **UI Behavior**: Users see simple pass/fail results without individual keyword breakdowns
+- **Failure Messages**: Include "or any secondary keywords" to indicate broader keyword testing
+- **Input Format**: Comma-separated secondary keywords (e.g., "website design, development services")
+
+**Supported Checks**: Title, Meta Description, URL, Introduction, H1, H2 headings use secondary keywords
+
 ## Development Workflow
 
 ### File Structure
@@ -116,12 +126,36 @@ Create `.env` file with:
 OPENAI_API_KEY=your_openai_key
 USE_GPT_RECOMMENDATIONS=true
 VITE_WORKER_URL=http://localhost:8787
+VITE_FORCE_LOCAL_DEV=true
 ```
 
 Production secrets via Wrangler:
 ```bash
 npx wrangler secret put OPENAI_API_KEY
 ```
+
+### ⚠️ **CRITICAL: Local Development Configuration**
+
+**ISSUE**: The client app automatically routes API requests to production when it detects `window.webflow`, even in development.
+
+**SOLUTION**: Always ensure `.env` contains:
+```
+VITE_FORCE_LOCAL_DEV=true
+VITE_WORKER_URL=http://localhost:8787
+```
+
+**Symptoms of misconfiguration**:
+- No worker logs in Wrangler terminal during API calls
+- New worker features not appearing in client
+- API requests going to `seo-copilot-api-production.paul-130.workers.dev` instead of `localhost:8787`
+
+**To verify correct setup**:
+1. Check that `pnpm dev` shows worker running on `http://127.0.0.1:8787`
+2. Visit `http://localhost:8787/test-keywords` - should return JSON response
+3. Worker logs should appear in terminal when analyzing pages
+4. Browser Network tab should show requests to `localhost:8787/api/analyze`
+
+If worker logs are missing, check `.env` file and restart dev server.
 
 ## Testing
 

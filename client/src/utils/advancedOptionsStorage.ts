@@ -18,8 +18,7 @@ function sanitizeSecondaryKeywords(input: string): string {
 
 export interface AdvancedOptions {
   pageType: string;
-  secondaryKeywords?: string; // Renamed from additionalContext for clarity  
-  additionalContext?: string; // Deprecated: kept for backward compatibility
+  secondaryKeywords?: string;
 }
 
 interface PageAdvancedOptions {
@@ -35,15 +34,12 @@ export function saveAdvancedOptionsForPage(pageId: string, options: AdvancedOpti
     const pageOptions: PageAdvancedOptions = stored ? JSON.parse(stored) : {};
     
     const sanitizedPageType = options.pageType.trim();
-    // Support both new and old property names for backward compatibility
-    const contextToSanitize = options.secondaryKeywords || options.additionalContext || '';
-    const sanitizedContext = sanitizeSecondaryKeywords(contextToSanitize);
+    const sanitizedContext = sanitizeSecondaryKeywords(options.secondaryKeywords || '');
     
     if (sanitizedPageType || sanitizedContext) {
       pageOptions[pageId] = {
         pageType: sanitizedPageType,
-        secondaryKeywords: sanitizedContext,
-        additionalContext: sanitizedContext // Keep for backward compatibility
+        secondaryKeywords: sanitizedContext
       };
     } else {
       // Remove entry if both fields are empty
@@ -62,26 +58,22 @@ export function saveAdvancedOptionsForPage(pageId: string, options: AdvancedOpti
 export function loadAdvancedOptionsForPage(pageId: string): AdvancedOptions {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return { pageType: '', secondaryKeywords: '', additionalContext: '' };
+    if (!stored) return { pageType: '', secondaryKeywords: '' };
     
     const pageOptions: PageAdvancedOptions = JSON.parse(stored);
     const options = pageOptions[pageId];
     
     if (!options) {
-      return { pageType: '', secondaryKeywords: '', additionalContext: '' };
+      return { pageType: '', secondaryKeywords: '' };
     }
-    
-    // Handle backward compatibility: if only additionalContext exists, use it for secondaryKeywords
-    const secondaryKeywords = options.secondaryKeywords || options.additionalContext || '';
     
     return {
       pageType: options.pageType || '',
-      secondaryKeywords,
-      additionalContext: secondaryKeywords // Keep for backward compatibility
+      secondaryKeywords: options.secondaryKeywords || ''
     };
   } catch (error) {
     console.warn('Failed to load advanced options from localStorage:', error);
-    return { pageType: '', secondaryKeywords: '', additionalContext: '' };
+    return { pageType: '', secondaryKeywords: '' };
   }
 }
 

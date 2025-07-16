@@ -40,7 +40,7 @@ describe('advancedOptionsStorage', () => {
       const pageId = 'test-page';
       const options: AdvancedOptions = {
         pageType: 'Homepage',
-        additionalContext: 'Test context'
+        secondaryKeywords: 'Test context'
       };
 
       saveAdvancedOptionsForPage(pageId, options);
@@ -53,7 +53,7 @@ describe('advancedOptionsStorage', () => {
       const pageId = 'test-page';
       const options: AdvancedOptions = {
         pageType: '  Homepage  ',
-        additionalContext: '  Test context  '
+        secondaryKeywords: '  Test context  '
       };
 
       saveAdvancedOptionsForPage(pageId, options);
@@ -61,7 +61,7 @@ describe('advancedOptionsStorage', () => {
       const stored = JSON.parse(localStorageMock.getItem('webflow-seo-advanced-options') || '{}');
       expect(stored[pageId]).toEqual({
         pageType: 'Homepage',
-        additionalContext: 'Test context'
+        secondaryKeywords: 'Test context'
       });
     });
 
@@ -71,13 +71,13 @@ describe('advancedOptionsStorage', () => {
       // First save some options
       saveAdvancedOptionsForPage(pageId, {
         pageType: 'Homepage',
-        additionalContext: 'Test context'
+        secondaryKeywords: 'Test context'
       });
 
       // Then save empty options
       saveAdvancedOptionsForPage(pageId, {
         pageType: '',
-        additionalContext: ''
+        secondaryKeywords: ''
       });
 
       const stored = JSON.parse(localStorageMock.getItem('webflow-seo-advanced-options') || '{}');
@@ -96,7 +96,7 @@ describe('advancedOptionsStorage', () => {
       expect(() => {
         saveAdvancedOptionsForPage('test-page', {
           pageType: 'Homepage',
-          additionalContext: 'Test context'
+          secondaryKeywords: 'Test context'
         });
       }).not.toThrow();
 
@@ -113,21 +113,25 @@ describe('advancedOptionsStorage', () => {
       const pageId = 'test-page';
       const options: AdvancedOptions = {
         pageType: 'Blog post',
-        additionalContext: 'Technology blog'
+        secondaryKeywords: 'Technology blog'
       };
 
       saveAdvancedOptionsForPage(pageId, options);
       const loaded = loadAdvancedOptionsForPage(pageId);
 
-      expect(loaded).toEqual(options);
+      expect(loaded).toEqual({
+        pageType: 'Blog post',
+        secondaryKeywords: 'Technology blog'
+      });
     });
+
 
     it('should return empty options for non-existent page', () => {
       const loaded = loadAdvancedOptionsForPage('non-existent-page');
 
       expect(loaded).toEqual({
         pageType: '',
-        additionalContext: ''
+        secondaryKeywords: ''
       });
     });
 
@@ -136,7 +140,7 @@ describe('advancedOptionsStorage', () => {
 
       expect(loaded).toEqual({
         pageType: '',
-        additionalContext: ''
+        secondaryKeywords: ''
       });
     });
 
@@ -153,7 +157,7 @@ describe('advancedOptionsStorage', () => {
 
       expect(loaded).toEqual({
         pageType: '',
-        additionalContext: ''
+        secondaryKeywords: ''
       });
       expect(consoleSpy).toHaveBeenCalledWith('Failed to load advanced options from localStorage:', expect.any(Error));
       
@@ -168,11 +172,11 @@ describe('advancedOptionsStorage', () => {
       // Save some options first
       saveAdvancedOptionsForPage('page1', {
         pageType: 'Homepage',
-        additionalContext: 'Context 1'
+        secondaryKeywords: 'Context 1'
       });
       saveAdvancedOptionsForPage('page2', {
         pageType: 'Blog post',
-        additionalContext: 'Context 2'
+        secondaryKeywords: 'Context 2'
       });
 
       clearAllAdvancedOptions();
@@ -202,11 +206,11 @@ describe('advancedOptionsStorage', () => {
     it('should return all stored advanced options', () => {
       const options1: AdvancedOptions = {
         pageType: 'Homepage',
-        additionalContext: 'Context 1'
+        secondaryKeywords: 'Context 1'
       };
       const options2: AdvancedOptions = {
         pageType: 'Product page',
-        additionalContext: 'Context 2'
+        secondaryKeywords: 'Context 2'
       };
 
       saveAdvancedOptionsForPage('page1', options1);
@@ -249,15 +253,15 @@ describe('advancedOptionsStorage', () => {
     it('should handle multiple pages with different options', () => {
       const homepageOptions: AdvancedOptions = {
         pageType: 'Homepage',
-        additionalContext: 'Main landing page for SaaS product'
+        secondaryKeywords: 'Main landing page for SaaS product'
       };
       const blogOptions: AdvancedOptions = {
         pageType: 'Blog post',
-        additionalContext: 'Technical content for developers'
+        secondaryKeywords: 'Technical content for developers'
       };
       const productOptions: AdvancedOptions = {
         pageType: 'Product page',
-        additionalContext: 'E-commerce product for outdoor gear'
+        secondaryKeywords: 'E-commerce product for outdoor gear'
       };
 
       saveAdvancedOptionsForPage('homepage', homepageOptions);
@@ -273,11 +277,11 @@ describe('advancedOptionsStorage', () => {
       const pageId = 'test-page';
       const initialOptions: AdvancedOptions = {
         pageType: 'Homepage',
-        additionalContext: 'Initial context'
+        secondaryKeywords: 'Initial context'
       };
       const updatedOptions: AdvancedOptions = {
         pageType: 'Landing page',
-        additionalContext: 'Updated context with more details'
+        secondaryKeywords: 'Updated context with more details'
       };
 
       saveAdvancedOptionsForPage(pageId, initialOptions);
