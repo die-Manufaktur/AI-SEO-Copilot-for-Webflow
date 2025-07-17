@@ -535,6 +535,77 @@ function checkKeywordMatch(content: string, primaryKeyword: string, secondaryKey
   };
 }
 
+function checkUrlKeywordMatch(url: string, primaryKeyword: string, secondaryKeywords?: string): { 
+  found: boolean; 
+  matchedKeyword?: string;
+  keywordResults: Array<{ keyword: string; passed: boolean; isPrimary: boolean }>;
+} {
+  const results: Array<{ keyword: string; passed: boolean; isPrimary: boolean }> = [];
+  
+  if (!url || !primaryKeyword) {
+    return { found: false, keywordResults: [] };
+  }
+
+  // Normalize URL for comparison by removing protocol, domain, and converting separators
+  const normalizedUrl = url.toLowerCase()
+    .replace(/^https?:\/\//, '') // Remove protocol
+    .replace(/^[^/]*\//, '') // Remove domain
+    .replace(/[_-]/g, ' ') // Convert hyphens and underscores to spaces
+    .replace(/%20/g, ' '); // Convert URL-encoded spaces
+  
+  // Check primary keyword first
+  const normalizedPrimary = primaryKeyword.toLowerCase();
+  const primaryPassed = normalizedUrl.includes(normalizedPrimary);
+  results.push({
+    keyword: primaryKeyword,
+    passed: primaryPassed,
+    isPrimary: true
+  });
+
+  // If primary passes, we're done (optimization)
+  if (primaryPassed) {
+    return { 
+      found: true, 
+      matchedKeyword: primaryKeyword,
+      keywordResults: results
+    };
+  }
+
+  // Check secondary keywords if provided
+  if (secondaryKeywords) {
+    const keywords = secondaryKeywords.split(',').map(k => k.trim()).filter(k => k.length > 0);
+    
+    for (const keyword of keywords) {
+      const normalizedKeyword = keyword.toLowerCase();
+      const keywordPassed = normalizedUrl.includes(normalizedKeyword);
+      results.push({
+        keyword: keyword,
+        passed: keywordPassed,
+        isPrimary: false
+      });
+
+      // If this secondary keyword passes, we found a match
+      if (keywordPassed && !results.some(r => r.passed)) {
+        return { 
+          found: true, 
+          matchedKeyword: keyword,
+          keywordResults: results
+        };
+      }
+    }
+  }
+
+  // Check if any keyword passed
+  const anyPassed = results.some(r => r.passed);
+  const matchedKeyword = results.find(r => r.passed)?.keyword;
+
+  return { 
+    found: anyPassed, 
+    matchedKeyword,
+    keywordResults: results
+  };
+}
+
 /**
  * Calculate keyword density for primary and secondary keywords combined
  * @param content Content to analyze
@@ -655,10 +726,7 @@ async function analyzeSEOElements(
     ? webflowPageData.canonicalUrl
     : url;
   
-  // Normalize the URL for comparison
-  const normalizedUrl = canonicalUrl.toLowerCase().trim();
-  
-  const urlKeywordMatch = checkKeywordMatch(canonicalUrl, keyphrase, secondaryKeywords);
+  const urlKeywordMatch = checkUrlKeywordMatch(canonicalUrl, keyphrase, secondaryKeywords);
   const urlCheck = await createSEOCheck(
     "Keyphrase in URL",
     () => urlKeywordMatch.found,

@@ -6,7 +6,7 @@ Check here for security updates.
 
 | Version        | Supported          |
 | -------        | ------------------ |
-| v3.0.0         | :white_check_mark: |
+| v3.3.3         | :white_check_mark: |
 
 ## Reporting a Vulnerability
 

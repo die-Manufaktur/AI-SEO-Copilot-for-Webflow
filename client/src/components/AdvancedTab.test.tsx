@@ -218,7 +218,7 @@ describe('Advanced Tab Component', () => {
       expect(toggle).toHaveTextContent('On');
       expect(screen.getByTestId('advanced-options-container')).toBeInTheDocument();
       expect(screen.getByTestId('page-type-select')).toBeInTheDocument();
-      expect(screen.getByTestId('additional-context-textarea')).toBeInTheDocument();
+      expect(screen.getByTestId('secondary-keywords-textarea')).toBeInTheDocument();
     });
 
     it('should hide advanced options when toggled off', async () => {
@@ -246,7 +246,7 @@ describe('Advanced Tab Component', () => {
       // Toggle on and set values
       await user.click(toggle);
       const pageTypeSelect = screen.getByTestId('page-type-select');
-      const contextTextarea = screen.getByTestId('additional-context-textarea');
+      const contextTextarea = screen.getByTestId('secondary-keywords-textarea');
       
       await user.selectOptions(pageTypeSelect, 'Homepage');
       await user.type(contextTextarea, 'Test context');
@@ -258,7 +258,7 @@ describe('Advanced Tab Component', () => {
       await user.click(toggle);
       
       expect(screen.getByTestId('page-type-select')).toHaveValue('');
-      expect(screen.getByTestId('additional-context-textarea')).toHaveValue('');
+      expect(screen.getByTestId('secondary-keywords-textarea')).toHaveValue('');
     });
   });
 
@@ -329,7 +329,7 @@ describe('Advanced Tab Component', () => {
       
       expect(textarea).toHaveAttribute(
         'placeholder',
-        'Enter secondary keywords separated by commas (e.g., webflow expert, webflow specialist, cms developer)'
+        'Enter comma-separated secondary keywords (e.g., affordable, budget-friendly, cost-effective)'
       );
     });
 
@@ -340,7 +340,7 @@ describe('Advanced Tab Component', () => {
       // Toggle on
       await user.click(screen.getByTestId('advanced-toggle'));
       
-      expect(screen.getByText('Secondary keywords help your content rank for related terms. SEO checks will pass if either your main keyword or any secondary keyword is found.')).toBeInTheDocument();
+      expect(screen.getByText('These keywords will be checked if the primary keyword is not found')).toBeInTheDocument();
     });
   });
 
@@ -425,7 +425,7 @@ describe('Advanced Tab Component', () => {
       
       // 5. Verify values are set
       expect(screen.getByTestId('page-type-select')).toHaveValue('Service page');
-      expect(screen.getByTestId('additional-context-textarea')).toHaveValue('Web development services for small businesses');
+      expect(screen.getByTestId('secondary-keywords-textarea')).toHaveValue('Web development services for small businesses');
       expect(screen.getByTestId('save-status')).toHaveTextContent('Advanced options not saved');
       
       // 6. Toggle off (should clear values)
@@ -435,7 +435,7 @@ describe('Advanced Tab Component', () => {
       // 7. Toggle back on (values should be cleared)
       await user.click(screen.getByTestId('advanced-toggle'));
       expect(screen.getByTestId('page-type-select')).toHaveValue('');
-      expect(screen.getByTestId('additional-context-textarea')).toHaveValue('');
+      expect(screen.getByTestId('secondary-keywords-textarea')).toHaveValue('');
     });
   });
 });

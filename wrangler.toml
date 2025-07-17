@@ -1,4 +1,4 @@
-# Version: 2.3.3
+# Version: 3.3.3
 name = "seo-copilot-api"
 main = "./workers/index.ts"
 compatibility_date = "2024-09-23"
