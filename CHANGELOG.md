@@ -1,3 +1,9 @@
+## [3.3.11](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/compare/v3.3.10...v3.3.11) (2025-07-17)
+
+### Bug Fixes
+
+* **build:** yAML ([49779e7](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/49779e7bb126c696b3c6e552f22be015545bed20))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
