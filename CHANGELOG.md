@@ -1,3 +1,9 @@
+## [3.3.9](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/compare/v3.3.8...v3.3.9) (2025-07-17)
+
+### Bug Fixes
+
+* **build:** syntax error in auto-pr.yml ([20ecde7](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/20ecde79fd43dc30e2cda8f264a65487a4e85238))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
