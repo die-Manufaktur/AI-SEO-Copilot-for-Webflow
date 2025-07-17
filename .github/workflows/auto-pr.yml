@@ -35,12 +35,15 @@ jobs:
             
             gh pr create \
               --title "$COMMIT_MSG" \
-              --body "Auto-generated pull request from branch: $BRANCH_NAME
+              --body "$(cat <<EOF
+Auto-generated pull request from branch: $BRANCH_NAME
 
 ## Changes
 - $COMMIT_MSG
 
-🤖 This PR was automatically created when you pushed to $BRANCH_NAME" \
+🤖 This PR was automatically created when you pushed to $BRANCH_NAME
+EOF
+)" \
               --base main \
               --head "$BRANCH_NAME" \
               --assignee "${{ github.actor }}"

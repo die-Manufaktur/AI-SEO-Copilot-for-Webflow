@@ -101,6 +101,8 @@ The app supports secondary keywords functionality:
 
 ## Development Workflow
 
+NO EMOJIS!!!
+
 ### File Structure
 ```
 client/              # React frontend
