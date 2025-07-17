@@ -120,6 +120,23 @@ describe('Utils', () => {
     });
 
     it('handles multiple arguments', () => {
+      // Set up development environment like the other tests
+      const originalEnv = import.meta.env;
+      const originalNodeEnv = process.env.NODE_ENV;
+      
+      // Mock environment variables
+      vi.stubEnv('NODE_ENV', 'development');
+      Object.defineProperty(import.meta, 'env', {
+        value: {
+          ...originalEnv,
+          MODE: 'development',
+          PROD: false,
+          DEV: true
+        },
+        writable: true,
+        configurable: true
+      });
+      
       const consoleInfoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
       
       const logger = createLogger('test');
@@ -128,6 +145,14 @@ describe('Utils', () => {
       expect(consoleInfoSpy).toHaveBeenCalledWith('test:', 'message', { data: 'test' }, 42);
       
       consoleInfoSpy.mockRestore();
+      
+      // Restore original environment
+      vi.unstubAllEnvs();
+      Object.defineProperty(import.meta, 'env', {
+        value: originalEnv,
+        writable: true,
+        configurable: true
+      });
     });
   });
 

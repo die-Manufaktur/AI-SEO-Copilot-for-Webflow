@@ -190,7 +190,7 @@ export async function fetchOAuthToken(authCode: string): Promise<string> {
 export async function collectPageAssets(): Promise<Asset[]> {
   const assets: Asset[] = [];
   const processedUrls = new Set<string>();
-  const baseUrl = new URL(window.location.href);
+  const baseUrl = new URL(window.location.href || 'https://localhost');
   
   try {
     assetLogger.info('Starting comprehensive collection of page assets');
