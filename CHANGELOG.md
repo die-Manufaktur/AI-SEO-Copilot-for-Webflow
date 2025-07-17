@@ -1,3 +1,9 @@
+## [3.3.8](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/compare/v3.3.7...v3.3.8) (2025-07-17)
+
+### Bug Fixes
+
+* **build:** add GPG key for signed commits ([052f049](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/052f049731d35cab0852315b3703fcd511e4fcf8))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
