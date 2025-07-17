@@ -1,3 +1,9 @@
+## [3.3.7](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/compare/v3.3.6...v3.3.7) (2025-07-17)
+
+### Bug Fixes
+
+* **build:** patch auto-pr script by removing backticks ([a279b22](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/a279b2272eda1413fc94612b060fa9fbe6eee7a0))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
