@@ -1,3 +1,9 @@
+## [3.3.6](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/compare/v3.3.5...v3.3.6) (2025-07-17)
+
+### Bug Fixes
+
+* **build:** fix scope of GitHub release creation ([0cc57bb](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/0cc57bb88c55228ca64cfbd4eb6f49cd1c70d51a))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
