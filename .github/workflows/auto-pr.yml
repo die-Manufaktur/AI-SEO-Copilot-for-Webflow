@@ -1,0 +1,74 @@
+name: Auto Create Pull Request
+
+on:
+  push:
+    branches-ignore:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  create-pull-request:
+    name: Create Pull Request
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Pull Request
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+          
+          # Check if PR already exists
+          EXISTING_PR=$(gh pr list --head "$BRANCH_NAME" --base main --json number --jq '.[0].number')
+          
+          if [ "$EXISTING_PR" != "null" ] && [ -n "$EXISTING_PR" ]; then
+            echo "✅ Pull request already exists: #$EXISTING_PR"
+            gh pr view "$EXISTING_PR"
+          else
+            # Get the latest commit message for PR title
+            COMMIT_MSG=$(git log -1 --pretty=format:"%s")
+            
+            # Create the PR
+            PR_NUMBER=$(gh pr create \
+              --title "$COMMIT_MSG" \
+              --body "Auto-generated pull request from branch: \`$BRANCH_NAME\`
+
+## Changes
+- $COMMIT_MSG
+
+## Checklist
+- [ ] Code follows project style guidelines
+- [ ] Tests pass locally
+- [ ] Documentation updated if needed
+
+---
+🤖 This PR was automatically created when you pushed to \`$BRANCH_NAME\`" \
+              --base main \
+              --head "$BRANCH_NAME" \
+              --assignee "${{ github.actor }}" \
+              --output json | jq -r '.number')
+            
+            echo "✅ Created pull request #$PR_NUMBER"
+            echo "🔗 URL: https://github.com/${{ github.repository }}/pull/$PR_NUMBER"
+            
+            # Add to step summary
+            echo "## 🎉 Pull Request Created!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Branch:** \`$BRANCH_NAME\`" >> $GITHUB_STEP_SUMMARY
+            echo "**PR Number:** #$PR_NUMBER" >> $GITHUB_STEP_SUMMARY
+            echo "**Assignee:** @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Next Steps:" >> $GITHUB_STEP_SUMMARY
+            echo "1. Review the pull request" >> $GITHUB_STEP_SUMMARY
+            echo "2. Make any necessary changes" >> $GITHUB_STEP_SUMMARY
+            echo "3. Merge when ready" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "[**View Pull Request →**](https://github.com/${{ github.repository }}/pull/$PR_NUMBER)" >> $GITHUB_STEP_SUMMARY
+          fi
