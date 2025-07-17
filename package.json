@@ -18,7 +18,7 @@
     "release:dry": "semantic-release --dry-run",
     "version:update": "node scripts/update-versions.js",
     "changelog": "conventional-changelog -p conventionalcommits -r 2 -i CHANGELOG.md -s",
-    "commit": "git-cz"
+    "commit": "git-cz --sign"
   },
   "devDependencies": {
     "@anthropic-ai/claude-code": "^1.0.48",
