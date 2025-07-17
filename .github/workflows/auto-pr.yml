@@ -33,17 +33,16 @@ jobs:
           else
             COMMIT_MSG=$(git log -1 --pretty=format:"%s")
             
-            gh pr create \
-              --title "$COMMIT_MSG" \
-              --body "$(cat <<EOF
-Auto-generated pull request from branch: $BRANCH_NAME
+            PR_BODY="Auto-generated pull request from branch: $BRANCH_NAME
 
 ## Changes
 - $COMMIT_MSG
 
-🤖 This PR was automatically created when you pushed to $BRANCH_NAME
-EOF
-)" \
+🤖 This PR was automatically created when you pushed to $BRANCH_NAME"
+            
+            gh pr create \
+              --title "$COMMIT_MSG" \
+              --body "$PR_BODY" \
               --base main \
               --head "$BRANCH_NAME" \
               --assignee "${{ github.actor }}"
