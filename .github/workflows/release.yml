@@ -57,14 +57,8 @@ jobs:
             git checkout -b "$BRANCH_NAME"
             git push origin "$BRANCH_NAME"
             
-            gh pr create \
-              --title "chore(release): ${LATEST_TAG}" \
-              --body "Auto-generated version updates for release ${LATEST_TAG}" \
-              --base main \
-              --head "$BRANCH_NAME" \
-              --assignee "${{ github.actor }}"
-            
-            echo "✅ Created PR for version updates: ${LATEST_TAG}"
+            echo "✅ Pushed version updates to branch: ${BRANCH_NAME}"
+            echo "ℹ️ Auto-PR workflow will create the pull request"
           else
             echo "ℹ️ No version updates to commit"
           fi

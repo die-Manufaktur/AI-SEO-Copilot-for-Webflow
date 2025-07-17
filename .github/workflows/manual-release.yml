@@ -76,7 +76,7 @@ jobs:
             ${{ github.event.inputs.prerelease == 'true' && '--prerelease' || '' }} \
             bundle.zip
 
-      - name: Create Version Update PR
+      - name: Create Version Update Branch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -87,11 +87,5 @@ jobs:
           git checkout -b "$BRANCH_NAME"
           git push origin "$BRANCH_NAME"
           
-          gh pr create \
-            --title "chore(release): v${{ github.event.inputs.version }}" \
-            --body "Version updates for manual release v${{ github.event.inputs.version }}" \
-            --base main \
-            --head "$BRANCH_NAME" \
-            --assignee "${{ github.actor }}"
-          
-          echo "✅ Created PR for version updates: v${{ github.event.inputs.version }}"
+          echo "✅ Pushed version updates to branch: $BRANCH_NAME"
+          echo "ℹ️ Auto-PR workflow will create the pull request"
