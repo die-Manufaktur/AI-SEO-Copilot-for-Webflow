@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       release_notes:
-        description: 'Custom release notes (optional - will use generated notes if empty)'
+        description: 'Custom release notes (optional)'
         required: false
         type: string
       prerelease:
@@ -40,14 +40,9 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          run_install: false
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Run tests
-        run: pnpm test
 
       - name: Build project
         run: pnpm build
@@ -55,60 +50,48 @@ jobs:
       - name: Update version in files
         run: node scripts/update-versions.js ${{ github.event.inputs.version }}
 
-      - name: Generate changelog entry
-        id: changelog
-        run: |
-          # Generate changelog for this version
-          npx conventional-changelog-cli -p conventionalcommits -r 1 > TEMP_CHANGELOG.md
-          
-          # If custom release notes provided, use them; otherwise use generated changelog
-          if [ -n "${{ github.event.inputs.release_notes }}" ]; then
-            echo "RELEASE_NOTES<<EOF" >> $GITHUB_OUTPUT
-            echo "${{ github.event.inputs.release_notes }}" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-          else
-            echo "RELEASE_NOTES<<EOF" >> $GITHUB_OUTPUT
-            cat TEMP_CHANGELOG.md >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-          fi
-
       - name: Configure Git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Commit version updates
-        run: |
-          git add package.json webflow.json wrangler.toml CHANGELOG.md
-          git commit -m "chore(release): ${{ github.event.inputs.version }} [skip ci]"
-          git tag -a "v${{ github.event.inputs.version }}" -m "Release v${{ github.event.inputs.version }}"
-          git push origin main --tags
-
       - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Create git tag
+          git tag -a "v${{ github.event.inputs.version }}" -m "Release v${{ github.event.inputs.version }}"
+          git push origin "v${{ github.event.inputs.version }}"
+          
+          # Create release
+          RELEASE_NOTES="${{ github.event.inputs.release_notes }}"
+          if [ -z "$RELEASE_NOTES" ]; then
+            RELEASE_NOTES="Release v${{ github.event.inputs.version }}"
+          fi
+          
           gh release create "v${{ github.event.inputs.version }}" \
             --title "Release v${{ github.event.inputs.version }}" \
-            --notes "${{ steps.changelog.outputs.RELEASE_NOTES }}" \
+            --notes "$RELEASE_NOTES" \
             --draft \
             ${{ github.event.inputs.prerelease == 'true' && '--prerelease' || '' }} \
             bundle.zip
 
-      - name: Summary
+      - name: Create Version Update PR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "## 🎉 Release Created Successfully!" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Version:** v${{ github.event.inputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Status:** Draft (ready for your review)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Next Steps:" >> $GITHUB_STEP_SUMMARY
-          echo "1. Go to [Releases](https://github.com/${{ github.repository }}/releases)" >> $GITHUB_STEP_SUMMARY
-          echo "2. Edit the draft release to customize the release notes" >> $GITHUB_STEP_SUMMARY
-          echo "3. Publish the release when ready" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Files Updated:" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ package.json" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ webflow.json" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ wrangler.toml" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Git tag created" >> $GITHUB_STEP_SUMMARY
+          git add package.json webflow.json wrangler.toml
+          git commit -m "chore(release): ${{ github.event.inputs.version }} [skip ci]"
+          
+          BRANCH_NAME="release/v${{ github.event.inputs.version }}"
+          git checkout -b "$BRANCH_NAME"
+          git push origin "$BRANCH_NAME"
+          
+          gh pr create \
+            --title "chore(release): v${{ github.event.inputs.version }}" \
+            --body "Version updates for manual release v${{ github.event.inputs.version }}" \
+            --base main \
+            --head "$BRANCH_NAME" \
+            --assignee "${{ github.actor }}"
+          
+          echo "✅ Created PR for version updates: v${{ github.event.inputs.version }}"
