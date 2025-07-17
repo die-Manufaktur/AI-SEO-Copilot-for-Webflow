@@ -131,6 +131,45 @@ jobs:
             npx semantic-release --debug
           fi
 
+      - name: Commit Version Updates
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Check if there are any changes to commit
+          if [ -n "$(git status --porcelain)" ]; then
+            # Add the updated files
+            git add package.json webflow.json wrangler.toml CHANGELOG.md
+            
+            # Get the latest release tag to use in commit message
+            LATEST_TAG=$(git tag --sort=-version:refname | head -n1)
+            
+            # Commit the changes
+            git commit -m "chore(release): ${LATEST_TAG} [skip ci]"
+            
+            # Create a pull request with the version updates
+            BRANCH_NAME="release/${LATEST_TAG}"
+            git checkout -b "$BRANCH_NAME"
+            git push origin "$BRANCH_NAME"
+            
+            # Create PR
+            gh pr create \
+              --title "chore(release): ${LATEST_TAG}" \
+              --body "Auto-generated version updates for release ${LATEST_TAG}
+
+## Changes
+- Updated version numbers in package.json, webflow.json, and wrangler.toml
+- Updated CHANGELOG.md
+
+This PR contains the version updates that were created during the release process." \
+              --base main \
+              --head "$BRANCH_NAME" \
+              --assignee "${{ github.actor }}"
+            
+            echo "✅ Created PR for version updates: ${LATEST_TAG}"
+          else
+            echo "ℹ️ No version updates to commit"
+          fi
+
   # Additional job to publish releases (optional - you can also do this manually)
   publish-release:
     name: Publish Release
