@@ -1,9 +1,9 @@
 /// <reference types="vitest" />
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react-swc';
 import path from 'path';
 
-// Custom plugin to replace navigator.userAgent in production builds
+// Custom plugin to replace navigator.userAgent in production builds and check for localhost references
 const webflowCompatPlugin = () => ({
   name: 'webflow-compat',
   generateBundle(options, bundle) {
@@ -11,6 +11,17 @@ const webflowCompatPlugin = () => ({
       Object.keys(bundle).forEach(fileName => {
         const chunk = bundle[fileName];
         if (chunk.type === 'chunk' && chunk.code) {
+          // Check for localhost references before processing
+          if (chunk.code.includes('localhost')) {
+            console.warn(`⚠️  Found localhost reference in bundle chunk: ${fileName}`);
+            const lines = chunk.code.split('\n');
+            lines.forEach((line, index) => {
+              if (line.includes('localhost')) {
+                console.warn(`  Line ${index + 1}: ${line.slice(0, 100)}...`);
+              }
+            });
+          }
+          
           // Replace navigator.userAgent with a safe string
           chunk.code = chunk.code.replace(
             /navigator\.userAgent/g,
@@ -30,7 +41,10 @@ const webflowCompatPlugin = () => ({
 const __dirname = process.cwd();
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ command, mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  
+  return {
   plugins: [
     react(),
     webflowCompatPlugin(),
@@ -100,7 +114,7 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: process.env.VITE_WORKER_URL || 'http://127.0.0.1:8787', // Your worker backend
+        target: env.VITE_WORKER_URL || 'https://seo-copilot-api-production.paul-130.workers.dev', // Your worker backend
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '')
       }
@@ -134,4 +148,4 @@ export default defineConfig({
        '@': path.resolve(__dirname, './client/src'),
     }
   },
-});
+}});

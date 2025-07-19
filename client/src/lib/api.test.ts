@@ -91,8 +91,9 @@ describe('getApiBaseUrl function', () => {
   });
 
   it('returns production URL in production mode', () => {
-    // Mock import.meta.env.PROD as true
+    // Mock import.meta.env.PROD as true and set production worker URL
     vi.stubEnv('PROD', true);
+    vi.stubEnv('VITE_WORKER_URL', 'https://seo-copilot-api-production.paul-130.workers.dev');
     
     // Mock window.location to not be localhost for this test
     Object.defineProperty(window, 'location', {
@@ -238,7 +239,7 @@ describe('api.ts error handling', () => {
       const result = getApiUrl();
       
       expect(result).toBe('https://seo-copilot-api-production.paul-130.workers.dev');
-      expect(mockLogger.debug).toHaveBeenCalledWith('Using production API URL for Webflow Extension');
+      expect(mockLogger.debug).toHaveBeenCalledWith('Webflow detected in development - using production API URL');
     });
   });
 
