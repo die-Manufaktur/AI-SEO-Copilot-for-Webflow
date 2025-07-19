@@ -198,14 +198,25 @@ async function getAIRecommendation(
       : `You are an SEO expert providing actionable advice.
          Provide a concise recommendation for the SEO check "${checkType}".${advancedContext ? ' Consider the page type and additional context provided to make recommendations more relevant and specific.' : ''}`;
 
+    // Special handling for URL checks
     const userPrompt = needsCopyableContent
-      ? `Create a perfect ${checkType.toLowerCase()} for the keyphrase "${keyphrase}".
-         Current content: ${context || 'None'}${advancedContext}
-         Remember to:
-         - Keep optimal length for the content type (title: 50-60 chars, meta description: 120-155 chars, introduction: 2-3 sentences)
-         - Make it compelling and relevant${advancedOptions?.pageType ? ` for a ${advancedOptions.pageType.toLowerCase()}` : ''}
-         - For introductions, rewrite the existing content to naturally include the keyphrase while maintaining the original message
-         - ONLY return the final content with no explanations or formatting`
+      ? checkType === "Keyphrase in URL"
+        ? `Create an SEO-friendly URL slug for the keyphrase "${keyphrase}".
+           Current URL: ${context || 'None'}${advancedContext}
+           Requirements:
+           - Use lowercase letters only
+           - Separate words with hyphens
+           - Include the main keyphrase naturally
+           - Keep it concise and readable
+           - Example format: affordable-website-projects
+           Return ONLY the URL slug (no slashes) with no explanations or other text.`
+        : `Create a perfect ${checkType.toLowerCase()} for the keyphrase "${keyphrase}".
+           Current content: ${context || 'None'}${advancedContext}
+           Remember to:
+           - Keep optimal length for the content type (title: 50-60 chars, meta description: 120-155 chars, introduction: 2-3 sentences)
+           - Make it compelling and relevant${advancedOptions?.pageType ? ` for a ${advancedOptions.pageType.toLowerCase()}` : ''}
+           - For introductions, rewrite the existing content to naturally include the keyphrase while maintaining the original message
+           - ONLY return the final content with no explanations or formatting`
       : `Fix this SEO issue: "${checkType}" for keyphrase "${keyphrase}" if a keyphrase is appropriate for the check.
          Current status: ${context || 'Not specified'}${advancedContext}
          Provide concise but actionable advice in a couple of sentences${advancedOptions?.pageType ? ` tailored for a ${advancedOptions.pageType.toLowerCase()}` : ''}.`;

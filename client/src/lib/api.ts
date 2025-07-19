@@ -15,35 +15,27 @@ type Asset = {
 
 // Consolidated API URL determination function
 export const getApiUrl = () => {
-  // TEMPORARY: Force local development during testing
-  // TODO: Remove this hardcode when deploying to production
-  try {
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      return "http://localhost:8787";
-    }
-  } catch (error) {
-    logger.error('Error determining API URL:', error);
-    // Fall through to production URL
-  }
-  
-  // In production builds, only use production URLs
-  if (import.meta.env.PROD) {
-    return "https://seo-copilot-api-production.paul-130.workers.dev";
-  }
-  
-  // Development mode logic using environment variables
+  // Get environment variables (these are replaced at build time by Vite)
   const FORCE_LOCAL_DEV = import.meta.env.VITE_FORCE_LOCAL_DEV === "true";
-  const DEV_WORKER_URL = import.meta.env.VITE_WORKER_URL;
+  const WORKER_URL = import.meta.env.VITE_WORKER_URL;
   
+  // In production builds, always use the production URL from environment
+  if (import.meta.env.PROD) {
+    logger.debug("Production build - using configured worker URL:", WORKER_URL);
+    return WORKER_URL || "https://seo-copilot-api-production.paul-130.workers.dev";
+  }
+  
+  // Development mode logic
   try {
-    // When FORCE_LOCAL_DEV is enabled and dev URL is configured
-    if (FORCE_LOCAL_DEV && DEV_WORKER_URL) {
-      return DEV_WORKER_URL;
+    // When FORCE_LOCAL_DEV is enabled and dev URL is configured, use it regardless of webflow presence
+    if (FORCE_LOCAL_DEV && WORKER_URL) {
+      logger.debug("Force local dev enabled - using:", WORKER_URL);
+      return WORKER_URL;
     }
     
-    // Standard Webflow environment check
-    if (!!window.webflow) {
-      logger.debug("Using production API URL for Webflow Extension");
+    // Standard Webflow environment check (only in development)
+    if (typeof window !== 'undefined' && !!window.webflow) {
+      logger.debug("Webflow detected in development - using production API URL");
       return "https://seo-copilot-api-production.paul-130.workers.dev";
     }
   } catch (e) {
@@ -51,9 +43,9 @@ export const getApiUrl = () => {
   }
   
   // Development fallback - use configured URL if available
-  if (DEV_WORKER_URL) {
-    logger.debug("Using development Worker URL:", DEV_WORKER_URL);
-    return DEV_WORKER_URL;
+  if (WORKER_URL) {
+    logger.debug("Using development Worker URL:", WORKER_URL);
+    return WORKER_URL;
   }
   
   logger.debug("Falling back to production API URL");
@@ -190,7 +182,7 @@ export async function fetchOAuthToken(authCode: string): Promise<string> {
 export async function collectPageAssets(): Promise<Asset[]> {
   const assets: Asset[] = [];
   const processedUrls = new Set<string>();
-  const baseUrl = new URL(window.location.href || 'https://localhost');
+  const baseUrl = new URL(window.location.href || 'https://example.com');
   
   try {
     assetLogger.info('Starting comprehensive collection of page assets');

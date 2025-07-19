@@ -6,3 +6,7 @@ pnpm check
 # TODO: Fix network test mocking in the future
 echo "Running tests (some network-related tests may fail)..."
 pnpm test || echo "Tests completed with some expected network failures"
+
+# Run bundle validation to ensure no localhost references in production
+echo "Running bundle validation..."
+pnpm test:bundle
