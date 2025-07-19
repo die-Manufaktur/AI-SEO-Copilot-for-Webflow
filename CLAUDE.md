@@ -26,8 +26,10 @@ pnpm check          # TypeScript type checking
 ```
 
 ### Building & Deployment
-⚠️ **IMPORTANT**: Do not run build or deploy commands unless explicitly requested by the user.
-Focus on development work only.
+⚠️ **CRITICAL**: 
+- **NEVER deploy to production on your own** - Only the user deploys to production
+- Do not run build or deploy commands unless explicitly requested by the user
+- Focus on development work only
 
 ```bash
 pnpm build          # Build for production (creates bundle.zip) - USER ONLY
