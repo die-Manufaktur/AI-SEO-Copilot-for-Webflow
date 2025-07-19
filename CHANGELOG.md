@@ -1,3 +1,10 @@
+## [3.3.12](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/compare/v3.3.11...v3.3.12) (2025-07-19)
+
+### Bug Fixes
+
+* **build:** localhost crept back into the Webflow bundle ([#417](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/issues/417)) ([6a424c2](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/6a424c26543660f48136f7c9814976e80afab59f))
+* **build:** localhost crept back into the Webflow bundle, which is not allowed ([25e1f5a](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/25e1f5a3c1c77fa1e7feb4ca874bc11fb24a27d6)), closes [#416](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/issues/416)
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
