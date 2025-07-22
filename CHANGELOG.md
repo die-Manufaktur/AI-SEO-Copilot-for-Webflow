@@ -1,3 +1,10 @@
+## [3.3.14](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/compare/v3.3.13...v3.3.14) (2025-07-22)
+
+### Styles
+
+* **ui:** simplify Language in UI ([bc42f8e](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/bc42f8e2479ce5d0ba094b5e88ba9681f01aeb56)), closes [#380](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/issues/380) [#380](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/issues/380)
+* **ui:** simplify Language in UI ([#421](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/issues/421)) ([0b95ca7](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/0b95ca7c12aad7bc0253555dd94964e96c9bc5b1))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
