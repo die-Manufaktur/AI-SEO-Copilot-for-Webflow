@@ -893,7 +893,7 @@ export default function Home() {
                                    keywordSaveStatus === 'saving' ? 'var(--yellowText)' :
                                    'var(--redText)'
                           }}>
-                            {keywordSaveStatus === 'saved' ? 'Keyword saved for this page' :
+                            {keywordSaveStatus === 'saved' ? 'Keyword saved' :
                              keywordSaveStatus === 'saving' ? 'Saving...' :
                              'No keyword saved'}
                           </span>
@@ -1026,7 +1026,7 @@ export default function Home() {
                                        advancedOptionsSaveStatus === 'saving' ? 'var(--yellowText)' :
                                        'var(--redText)'
                               }}>
-                                {advancedOptionsSaveStatus === 'saved' ? 'Secondary keywords and page type saved for this page' :
+                                {advancedOptionsSaveStatus === 'saved' ? 'Secondary keywords and page type saved' :
                                  advancedOptionsSaveStatus === 'saving' ? 'Saving...' :
                                  'Secondary keywords and page type not saved'}
                               </span>

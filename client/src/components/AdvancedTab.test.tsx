@@ -176,7 +176,7 @@ const TestAdvancedTab = () => {
                   data-testid="save-status"
                   className="text-xs font-medium"
                 >
-                  {advancedOptionsSaveStatus === 'saved' ? 'Advanced options saved for this page' :
+                  {advancedOptionsSaveStatus === 'saved' ? 'Advanced options saved' :
                    advancedOptionsSaveStatus === 'saving' ? 'Saving...' :
                    'Advanced options not saved'}
                 </span>
