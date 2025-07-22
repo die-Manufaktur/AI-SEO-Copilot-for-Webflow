@@ -19,11 +19,19 @@ export const getApiUrl = () => {
   const FORCE_LOCAL_DEV = import.meta.env.VITE_FORCE_LOCAL_DEV === "true";
   const WORKER_URL = import.meta.env.VITE_WORKER_URL;
   
+  let hasWebflow = false;
+  try {
+    hasWebflow = typeof window !== 'undefined' && !!window.webflow;
+  } catch (e) {
+    // Ignore webflow access errors in debug logging
+    hasWebflow = false;
+  }
+  
   console.log("[DEBUG] getApiUrl() called with:", {
     FORCE_LOCAL_DEV,
     WORKER_URL,
     PROD: import.meta.env.PROD,
-    hasWebflow: typeof window !== 'undefined' && !!window.webflow
+    hasWebflow
   });
   
   // In production builds, always use the production URL from environment
@@ -44,11 +52,22 @@ export const getApiUrl = () => {
     }
     
     // Standard Webflow environment check (only in development when NOT forcing local)
-    if (!FORCE_LOCAL_DEV && typeof window !== 'undefined' && !!window.webflow) {
-      logger.debug("Webflow detected in development - using production API URL");
-      const prodUrl = "https://seo-copilot-api-production.paul-130.workers.dev";
-      console.log("[DEBUG] Webflow detected - returning:", prodUrl);
-      return prodUrl;
+    if (!FORCE_LOCAL_DEV && typeof window !== 'undefined') {
+      try {
+        if (!!window.webflow) {
+          logger.debug("Webflow detected in development - using production API URL");
+          const prodUrl = "https://seo-copilot-api-production.paul-130.workers.dev";
+          console.log("[DEBUG] Webflow detected - returning:", prodUrl);
+          return prodUrl;
+        }
+      } catch (webflowError) {
+        logger.error("Error accessing window.webflow:", webflowError);
+        // Fall through to production URL fallback
+        logger.debug("Falling back to production API URL");
+        const fallbackUrl = "https://seo-copilot-api-production.paul-130.workers.dev";
+        console.log("[DEBUG] Webflow access error fallback - returning:", fallbackUrl);
+        return fallbackUrl;
+      }
     }
   } catch (e) {
     logger.error("Error determining API URL:", e);
