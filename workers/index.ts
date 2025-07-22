@@ -204,12 +204,14 @@ async function getAIRecommendation(
         ? `Create an SEO-friendly URL slug for the keyphrase "${keyphrase}".
            Current URL: ${context || 'None'}${advancedContext}
            Requirements:
+           - Extract ONLY the page slug from the URL (the part after the last slash, excluding query parameters)
+           - Ignore protocol (http/https), domain name, and folder paths
            - Use lowercase letters only
            - Separate words with hyphens
            - Include the main keyphrase naturally
            - Keep it concise and readable
-           - Example format: affordable-website-projects
-           Return ONLY the URL slug (no slashes) with no explanations or other text.`
+           - Example: For URL "https://example.com/blog/posts/my-page", return only "my-page-with-keyphrase"
+           Return ONLY the page slug (no protocol, domain, folders, or slashes) with no explanations or other text.`
         : `Create a perfect ${checkType.toLowerCase()} for the keyphrase "${keyphrase}".
            Current content: ${context || 'None'}${advancedContext}
            Remember to:
