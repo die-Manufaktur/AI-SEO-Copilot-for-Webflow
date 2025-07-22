@@ -19,10 +19,19 @@ export const getApiUrl = () => {
   const FORCE_LOCAL_DEV = import.meta.env.VITE_FORCE_LOCAL_DEV === "true";
   const WORKER_URL = import.meta.env.VITE_WORKER_URL;
   
+  console.log("[DEBUG] getApiUrl() called with:", {
+    FORCE_LOCAL_DEV,
+    WORKER_URL,
+    PROD: import.meta.env.PROD,
+    hasWebflow: typeof window !== 'undefined' && !!window.webflow
+  });
+  
   // In production builds, always use the production URL from environment
   if (import.meta.env.PROD) {
     logger.debug("Production build - using configured worker URL:", WORKER_URL);
-    return WORKER_URL || "https://seo-copilot-api-production.paul-130.workers.dev";
+    const url = WORKER_URL || "https://seo-copilot-api-production.paul-130.workers.dev";
+    console.log("[DEBUG] Production mode - returning:", url);
+    return url;
   }
   
   // Development mode logic
@@ -30,13 +39,16 @@ export const getApiUrl = () => {
     // When FORCE_LOCAL_DEV is enabled and dev URL is configured, use it regardless of webflow presence
     if (FORCE_LOCAL_DEV && WORKER_URL) {
       logger.debug("Force local dev enabled - using:", WORKER_URL);
+      console.log("[DEBUG] Force local dev enabled - returning:", WORKER_URL);
       return WORKER_URL;
     }
     
-    // Standard Webflow environment check (only in development)
-    if (typeof window !== 'undefined' && !!window.webflow) {
+    // Standard Webflow environment check (only in development when NOT forcing local)
+    if (!FORCE_LOCAL_DEV && typeof window !== 'undefined' && !!window.webflow) {
       logger.debug("Webflow detected in development - using production API URL");
-      return "https://seo-copilot-api-production.paul-130.workers.dev";
+      const prodUrl = "https://seo-copilot-api-production.paul-130.workers.dev";
+      console.log("[DEBUG] Webflow detected - returning:", prodUrl);
+      return prodUrl;
     }
   } catch (e) {
     logger.error("Error determining API URL:", e);
@@ -45,11 +57,14 @@ export const getApiUrl = () => {
   // Development fallback - use configured URL if available
   if (WORKER_URL) {
     logger.debug("Using development Worker URL:", WORKER_URL);
+    console.log("[DEBUG] Development fallback - returning:", WORKER_URL);
     return WORKER_URL;
   }
   
   logger.debug("Falling back to production API URL");
-  return "https://seo-copilot-api-production.paul-130.workers.dev";
+  const fallbackUrl = "https://seo-copilot-api-production.paul-130.workers.dev";
+  console.log("[DEBUG] Final fallback - returning:", fallbackUrl);
+  return fallbackUrl;
 }
 
 // Deprecated - use getApiUrl() instead
