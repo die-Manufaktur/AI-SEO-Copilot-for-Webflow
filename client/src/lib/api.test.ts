@@ -183,6 +183,7 @@ describe('api.ts error handling', () => {
       // Mock production environment to ensure consistent behavior
       vi.stubEnv('PROD', false);
       vi.stubEnv('VITE_WORKER_URL', undefined);
+      vi.stubEnv('VITE_FORCE_LOCAL_DEV', undefined);
       
       // Set up localhost environment first so the webflow check happens
       Object.defineProperty(window, 'location', {
@@ -203,7 +204,7 @@ describe('api.ts error handling', () => {
 
       const result = getApiUrl();
       
-      expect(mockLogger.error).toHaveBeenCalledWith('Error determining API URL:', expect.any(Error));
+      expect(mockLogger.error).toHaveBeenCalledWith('Error accessing window.webflow:', expect.any(Error));
       expect(result).toBe('https://seo-copilot-api-production.paul-130.workers.dev'); // Should fall back to production
     });
 
@@ -222,6 +223,11 @@ describe('api.ts error handling', () => {
     });
 
     it('handles production environment correctly', () => {
+      // Set up environment variables for development mode (not forcing local)
+      vi.stubEnv('PROD', false);
+      vi.stubEnv('VITE_FORCE_LOCAL_DEV', undefined);
+      vi.stubEnv('VITE_WORKER_URL', undefined);
+
       // Set up production-like environment
       Object.defineProperty(window, 'location', {
         value: {
