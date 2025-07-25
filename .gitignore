@@ -46,8 +46,12 @@ pnpm-debug.log*
 .pnpm-debug.log*
 
 # Testing & Coverage
-/coverage
+coverage/
+**/coverage/
 .nyc_output
+*.lcov
+coverage-final.json
+clover.xml
 
 # OS Generated
 .DS_Store
@@ -74,6 +78,8 @@ workers-site/
 *.temp
 .tmp/
 temp/
+.wrangler/tmp/
+.wrangler/state/
 
 # Additional IDE
 .history/

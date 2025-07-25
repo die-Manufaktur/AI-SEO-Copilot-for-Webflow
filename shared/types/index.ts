@@ -137,6 +137,27 @@ export interface WebflowSiteInfo {
 }
 
 /**
+ * Schema recommendation for a specific page type
+ */
+export interface SchemaRecommendation {
+  name: string;
+  description: string;
+  documentationUrl: string;
+  googleSupport: 'yes' | 'no' | 'partial';
+  googleSupportNote?: string;
+  jsonLdCode: string;
+  isRequired: boolean; // true for main schemas, false for optional
+}
+
+/**
+ * Page type with associated schema recommendations
+ */
+export interface PageTypeSchema {
+  pageType: string;
+  schemas: SchemaRecommendation[];
+}
+
+/**
  * Request payload for the analyze endpoint
  */
 export interface AnalyzeSEORequest {

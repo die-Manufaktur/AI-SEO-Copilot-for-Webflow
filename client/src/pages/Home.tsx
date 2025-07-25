@@ -48,31 +48,13 @@ import { generatePageId, saveKeywordsForPage, loadKeywordsForPage } from '../uti
 import { saveAdvancedOptionsForPage, loadAdvancedOptionsForPage, type AdvancedOptions } from '../utils/advancedOptionsStorage';
 import sanitizeHtml from 'sanitize-html';
 import { sanitizeText } from '../../../shared/utils/stringUtils';
+import { getPageTypes, getSchemaRecommendations } from '../../../shared/utils/schemaRecommendations';
+import { SchemaDisplay } from '../components/ui/schema-display';
 
 const logger = createLogger("Home");
 
-// Page type options for the dropdown
-const PAGE_TYPES = [
-  'Homepage',
-  'Category page',
-  'Product page',
-  'Blog post',
-  'Landing page',
-  'Contact page',
-  'About page',
-  'FAQ page',
-  'Service page',
-  'Portfolio/project page',
-  'Testimonial page',
-  'Location page',
-  'Legal page',
-  'Event page',
-  'Press/News page',
-  'Job/career page',
-  'Thank you page',
-  'Pillar page',
-  'Cluster page'
-];
+// Page type options for the dropdown (exact 16 from feature spec)
+const PAGE_TYPES = getPageTypes();
 
 const formSchema = z.object({
   keyphrase: z.string().min(2, "Keyphrase must be at least 2 characters")
@@ -1035,6 +1017,14 @@ export default function Home() {
                         </motion.div>
                       )}
                     </AnimatePresence>
+                    
+                    {/* Schema Recommendations */}
+                    {pageType && (
+                      <SchemaDisplay 
+                        pageType={pageType}
+                        schemas={getSchemaRecommendations(pageType)}
+                      />
+                    )}
                   </div>
                   
                   <motion.div
