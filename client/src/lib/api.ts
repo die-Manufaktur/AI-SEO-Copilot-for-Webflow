@@ -1,17 +1,8 @@
-import type { SEOAnalysisResult, WebflowPageData, AnalyzeSEORequest } from "../../../shared/types";
+import type { SEOAnalysisResult, WebflowPageData, AnalyzeSEORequest, Asset } from "../../../shared/types";
 import { createLogger } from '../lib/utils';
 
 const logger = createLogger('[API]');
 const assetLogger = createLogger('[SEO Assets]');
-
-// Add this near the top of your file
-type Asset = {
-  url: string;
-  alt: string;
-  type: string;
-  size?: number;
-  source?: string;
-};
 
 // Consolidated API URL determination function
 export const getApiUrl = () => {

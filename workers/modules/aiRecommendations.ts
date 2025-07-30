@@ -1,22 +1,7 @@
 import OpenAI from 'openai';
 import { sanitizeText } from '../../shared/utils/stringUtils';
 import { shouldShowCopyButton } from '../../shared/utils/seoUtils';
-
-/**
- * Environment interface for AI module
- */
-export interface AIEnv {
-  USE_GPT_RECOMMENDATIONS?: string;
-  OPENAI_API_KEY?: string;
-}
-
-/**
- * Advanced options for AI recommendations
- */
-export interface AdvancedOptions {
-  pageType?: string;
-  secondaryKeywords?: string;
-}
+import { WorkerEnvironment, AdvancedOptions } from '../../shared/types/index';
 
 /**
  * Sanitize input specifically for AI prompts to prevent prompt injection
@@ -57,7 +42,7 @@ export function shouldHaveCopyButton(checkType: string): boolean {
 export async function getAIRecommendation(
   checkType: string,
   keyphrase: string,
-  env: AIEnv, 
+  env: WorkerEnvironment, 
   context?: string,
   advancedOptions?: AdvancedOptions
 ): Promise<string> {

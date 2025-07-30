@@ -514,7 +514,7 @@ export default function Home() {
         // Load saved advanced options for this page
         const savedAdvancedOptions = loadAdvancedOptionsForPage(pageId);
         if (savedAdvancedOptions.pageType || savedAdvancedOptions.secondaryKeywords) {
-          setPageType(savedAdvancedOptions.pageType);
+          setPageType(savedAdvancedOptions.pageType || '');
           setSecondaryKeywords(savedAdvancedOptions.secondaryKeywords || '');
           setAdvancedOptionsEnabled(true);
           setAdvancedOptionsSaveStatus('saved');
@@ -1018,13 +1018,6 @@ export default function Home() {
                       )}
                     </AnimatePresence>
                     
-                    {/* Schema Recommendations */}
-                    {pageType && (
-                      <SchemaDisplay 
-                        pageType={pageType}
-                        schemas={getSchemaRecommendations(pageType)}
-                      />
-                    )}
                   </div>
                   
                   <motion.div
@@ -1280,6 +1273,20 @@ export default function Home() {
                             )}
                           </motion.div>
                         ))}
+                        
+                        {/* Schema Recommendations for Technical SEO category */}
+                        {selectedCategory === 'Technical SEO' && pageType && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="mt-6 pt-2 border-t"
+                          >
+                            <SchemaDisplay 
+                              pageType={pageType}
+                              schemas={getSchemaRecommendations(pageType)}
+                            />
+                          </motion.div>
+                        )}
                       </motion.div>
                     </ScrollArea>
                   ) : (

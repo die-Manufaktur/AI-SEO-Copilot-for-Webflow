@@ -3,6 +3,10 @@
  */
 
 import { sanitizeText } from '../../../shared/utils/stringUtils';
+import { AdvancedOptions } from '../../../shared/types/index';
+
+// Re-export for local usage
+export type { AdvancedOptions };
 
 const STORAGE_KEY = 'webflow-seo-advanced-options';
 
@@ -16,11 +20,7 @@ function sanitizeSecondaryKeywords(input: string): string {
     .trim();
 }
 
-export interface AdvancedOptions {
-  pageType: string;
-  secondaryKeywords?: string;
-}
-
+// Client-specific storage interface
 interface PageAdvancedOptions {
   [pageId: string]: AdvancedOptions;
 }
@@ -33,7 +33,7 @@ export function saveAdvancedOptionsForPage(pageId: string, options: AdvancedOpti
     const stored = localStorage.getItem(STORAGE_KEY);
     const pageOptions: PageAdvancedOptions = stored ? JSON.parse(stored) : {};
     
-    const sanitizedPageType = options.pageType.trim();
+    const sanitizedPageType = options.pageType?.trim() || '';
     const sanitizedContext = sanitizeSecondaryKeywords(options.secondaryKeywords || '');
     
     if (sanitizedPageType || sanitizedContext) {
