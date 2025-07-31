@@ -48,7 +48,7 @@ import { generatePageId, saveKeywordsForPage, loadKeywordsForPage } from '../uti
 import { saveAdvancedOptionsForPage, loadAdvancedOptionsForPage, type AdvancedOptions } from '../utils/advancedOptionsStorage';
 import sanitizeHtml from 'sanitize-html';
 import { sanitizeText } from '../../../shared/utils/stringUtils';
-import { getPageTypes, getSchemaRecommendations } from '../../../shared/utils/schemaRecommendations';
+import { getPageTypes, getPopulatedSchemaRecommendations } from '../../../shared/utils/schemaRecommendations';
 import { SchemaDisplay } from '../components/ui/schema-display';
 
 const logger = createLogger("Home");
@@ -347,6 +347,9 @@ export default function Home() {
   const [secondaryKeywords, setSecondaryKeywords] = useState<string>('');
   const [secondaryKeywordsError, setSecondaryKeywordsError] = useState<string>('');
   const [advancedOptionsSaveStatus, setAdvancedOptionsSaveStatus] = useState<'saved' | 'saving' | 'none'>('none');
+  
+  // Store the analysis request data for schema population
+  const [analysisRequestData, setAnalysisRequestData] = useState<AnalyzeSEORequest | null>(null);
   
   const seoScore = results && results.checks && Array.isArray(results.checks) ? calculateSEOScore(results.checks) : 0;
   const scoreRating = getScoreRatingText(seoScore);
@@ -767,6 +770,7 @@ export default function Home() {
       
       const mappedSiteInfo = {
         ...siteInfo,
+        siteUrl: baseUrl, // Add the primary site URL
         domains: siteInfo.domains.map(domain => ({
           ...domain,
           id: domain.url,
@@ -794,6 +798,10 @@ export default function Home() {
         })
       };
       logger.info("[Home onSubmit] Sending data to API:", analysisData);
+      
+      // Store the analysis request data for schema population
+      setAnalysisRequestData(analysisData);
+      
       mutation.mutate(analysisData);
 
     } catch (error) {
@@ -1283,7 +1291,11 @@ export default function Home() {
                           >
                             <SchemaDisplay 
                               pageType={pageType}
-                              schemas={getSchemaRecommendations(pageType)}
+                              schemas={getPopulatedSchemaRecommendations(pageType, {
+                                siteInfo: analysisRequestData?.siteInfo,
+                                webflowPageData: analysisRequestData?.webflowPageData,
+                                url: analysisRequestData?.url
+                              })}
                             />
                           </motion.div>
                         )}

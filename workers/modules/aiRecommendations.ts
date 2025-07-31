@@ -1,27 +1,7 @@
 import OpenAI from 'openai';
-import { sanitizeText } from '../../shared/utils/stringUtils';
+import { sanitizeForAI, sanitizeText } from '../../shared/utils/stringUtils';
 import { shouldShowCopyButton } from '../../shared/utils/seoUtils';
 import { WorkerEnvironment, AdvancedOptions } from '../../shared/types/index';
-
-/**
- * Sanitize input specifically for AI prompts to prevent prompt injection
- */
-function sanitizeForAIPrompt(input: string): string {
-  if (!input || typeof input !== 'string') {
-    return '';
-  }
-
-  return sanitizeText(input)
-    // Remove prompt injection keywords (case insensitive)
-    .replace(/\b(ignore|forget|override|system|prompt|instruction|assistant|ai|model|openai|gpt|claude)\s*(previous|above|below|this|that|all|instructions?)\b/gi, '')
-    // Remove template/injection patterns
-    .replace(/[{}[\]]/g, '')
-    // Remove excessive punctuation that might be used for injection
-    .replace(/[!@#$%^&*()+=|\\:";'<>?,.\/]{3,}/g, '')
-    // Limit length for AI prompts
-    .substring(0, 1000)
-    .trim();
-}
 
 /**
  * Check if a specific SEO check type should have a copy button
@@ -66,7 +46,7 @@ export async function getAIRecommendation(
         advancedContext += `\n- Page Type: ${advancedOptions.pageType}`;
       }
       if (secondaryKeywords) {
-        const sanitizedContext = sanitizeForAIPrompt(secondaryKeywords);
+        const sanitizedContext = sanitizeForAI(secondaryKeywords);
         advancedContext += `\n- Secondary Keywords: ${sanitizedContext}`;
       }
     }

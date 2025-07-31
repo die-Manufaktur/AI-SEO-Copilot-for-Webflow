@@ -1,4 +1,5 @@
-import { PageTypeSchema, SchemaRecommendation } from '../types';
+import { PageTypeSchema, SchemaRecommendation, WebflowSiteInfo, WebflowPageData, ScrapedPageData } from '../types';
+import { populateSchemaWithSiteData } from './schemaPopulation';
 
 /**
  * Mapping of page types to their recommended schema markups
@@ -764,6 +765,24 @@ export const schemaRecommendations: PageTypeSchema[] = [
 export function getSchemaRecommendations(pageType: string): SchemaRecommendation[] {
   const pageSchema = schemaRecommendations.find(ps => ps.pageType === pageType);
   return pageSchema?.schemas || [];
+}
+
+interface SiteDataForSchema {
+  siteInfo?: WebflowSiteInfo;
+  webflowPageData?: WebflowPageData;
+  scrapedData?: ScrapedPageData;
+  url?: string;
+}
+
+/**
+ * Get schema recommendations for a specific page type with populated site data
+ */
+export function getPopulatedSchemaRecommendations(
+  pageType: string, 
+  siteData: SiteDataForSchema
+): SchemaRecommendation[] {
+  const schemas = getSchemaRecommendations(pageType);
+  return populateSchemaWithSiteData(schemas, siteData);
 }
 
 /**

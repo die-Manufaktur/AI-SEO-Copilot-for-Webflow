@@ -1,5 +1,6 @@
 import type { SEOAnalysisResult, WebflowPageData, AnalyzeSEORequest, Asset } from "../../../shared/types";
 import { createLogger } from '../lib/utils';
+import { formatBytes } from '../../../shared/utils/formatUtils';
 
 const logger = createLogger('[API]');
 const assetLogger = createLogger('[SEO Assets]');
@@ -409,18 +410,6 @@ async function getImageSize(imageUrl: string, baseUrl: URL): Promise<number | un
   }
 }
 
-/**
- * Format bytes to a human-readable string
- * @param bytes The number of bytes
- * @returns Formatted string (e.g. "1.5 KB")
- */
-function formatBytes(bytes?: number): string {
-  if (!bytes) return "Unknown size";
-
-  if (bytes < 1024) return bytes + " bytes";
-  else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
-  else return (bytes / 1048576).toFixed(1) + " MB";
-}
 
 // In the fetchFromAPI function
 export async function fetchFromAPI<T>(endpoint: string, data: any): Promise<T> {
