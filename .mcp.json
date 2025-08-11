@@ -3,10 +3,6 @@
     "webflow": {
       "command": "cmd",
       "args": ["/c", "npx", "mcp-remote", "https://mcp.webflow.com/sse"]
-    },
-    "github": {
-      "command": "cmd",
-      "args": ["/c", "npx", "mcp-github", "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"]
     }
   }
 }
