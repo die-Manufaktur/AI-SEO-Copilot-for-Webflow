@@ -1,89 +1,43 @@
-import type { SEOAnalysisResult, WebflowPageData, AnalyzeSEORequest } from "../../../shared/types";
+import type { SEOAnalysisResult, WebflowPageData, AnalyzeSEORequest, Asset } from "../../../shared/types";
 import { createLogger } from '../lib/utils';
+import { formatBytes } from '../../../shared/utils/formatUtils';
 
 const logger = createLogger('[API]');
 const assetLogger = createLogger('[SEO Assets]');
-
-// Add this near the top of your file
-type Asset = {
-  url: string;
-  alt: string;
-  type: string;
-  size?: number;
-  source?: string;
-};
 
 // Consolidated API URL determination function
 export const getApiUrl = () => {
   // Get environment variables (these are replaced at build time by Vite)
   const FORCE_LOCAL_DEV = import.meta.env.VITE_FORCE_LOCAL_DEV === "true";
   const WORKER_URL = import.meta.env.VITE_WORKER_URL;
-  
-  let hasWebflow = false;
-  try {
-    hasWebflow = typeof window !== 'undefined' && !!window.webflow;
-  } catch (e) {
-    // Ignore webflow access errors in debug logging
-    hasWebflow = false;
-  }
+  const MODE = import.meta.env.MODE; // 'development' or 'production'
   
   console.log("[DEBUG] getApiUrl() called with:", {
     FORCE_LOCAL_DEV,
     WORKER_URL,
-    PROD: import.meta.env.PROD,
-    hasWebflow
+    MODE,
+    PROD: import.meta.env.PROD
   });
   
-  // In production builds, always use the production URL from environment
-  if (import.meta.env.PROD) {
-    logger.debug("Production build - using configured worker URL:", WORKER_URL);
-    const url = WORKER_URL || "https://seo-copilot-api-production.paul-130.workers.dev";
-    console.log("[DEBUG] Production mode - returning:", url);
-    return url;
-  }
-  
-  // Development mode logic
-  try {
-    // When FORCE_LOCAL_DEV is enabled and dev URL is configured, use it regardless of webflow presence
-    if (FORCE_LOCAL_DEV && WORKER_URL) {
-      logger.debug("Force local dev enabled - using:", WORKER_URL);
-      console.log("[DEBUG] Force local dev enabled - returning:", WORKER_URL);
-      return WORKER_URL;
-    }
-    
-    // Standard Webflow environment check (only in development when NOT forcing local)
-    if (!FORCE_LOCAL_DEV && typeof window !== 'undefined') {
-      try {
-        if (!!window.webflow) {
-          logger.debug("Webflow detected in development - using production API URL");
-          const prodUrl = "https://seo-copilot-api-production.paul-130.workers.dev";
-          console.log("[DEBUG] Webflow detected - returning:", prodUrl);
-          return prodUrl;
-        }
-      } catch (webflowError) {
-        logger.error("Error accessing window.webflow:", webflowError);
-        // Fall through to production URL fallback
-        logger.debug("Falling back to production API URL");
-        const fallbackUrl = "https://seo-copilot-api-production.paul-130.workers.dev";
-        console.log("[DEBUG] Webflow access error fallback - returning:", fallbackUrl);
-        return fallbackUrl;
-      }
-    }
-  } catch (e) {
-    logger.error("Error determining API URL:", e);
-  }
-  
-  // Development fallback - use configured URL if available
-  if (WORKER_URL) {
-    logger.debug("Using development Worker URL:", WORKER_URL);
-    console.log("[DEBUG] Development fallback - returning:", WORKER_URL);
+  // RULE 1: If we're in development MODE (pnpm dev), ALWAYS use local worker
+  if (import.meta.env.MODE === 'development' && WORKER_URL) {
+    logger.debug("Development mode detected - using local worker:", WORKER_URL);
+    console.log("[DEBUG] Development mode - returning:", WORKER_URL);
     return WORKER_URL;
   }
   
-  logger.debug("Falling back to production API URL");
-  const fallbackUrl = "https://seo-copilot-api-production.paul-130.workers.dev";
-  console.log("[DEBUG] Final fallback - returning:", fallbackUrl);
-  return fallbackUrl;
+  // RULE 2: FORCE_LOCAL_DEV flag overrides everything else
+  if (FORCE_LOCAL_DEV && WORKER_URL) {
+    logger.debug("Force local dev enabled - using:", WORKER_URL);
+    console.log("[DEBUG] Force local dev enabled - returning:", WORKER_URL);
+    return WORKER_URL;
+  }
+  
+  // RULE 3: Production mode - use production worker
+  const productionUrl = "https://seo-copilot-api-production.paul-130.workers.dev";
+  console.log("[DEBUG] Production mode - returning:", productionUrl);
+  logger.debug("Using production API URL");
+  return productionUrl;
 }
 
 // Deprecated - use getApiUrl() instead
@@ -221,9 +175,16 @@ export async function collectPageAssets(): Promise<Asset[]> {
   try {
     assetLogger.info('Starting comprehensive collection of page assets');
     
-    // 1. Try to get images from Webflow page data first
-    try {
-      const pageData = await getWebflowPageData();
+    // Check if we're in a Webflow environment
+    const isWebflowEnvironment = typeof window !== 'undefined' && window.webflow;
+    if (!isWebflowEnvironment) {
+      assetLogger.info('Not in Webflow environment - using DOM-based asset collection only');
+    }
+    
+    // 1. Try to get images from Webflow page data first (only if in Webflow)
+    if (isWebflowEnvironment) {
+      try {
+        const pageData = await getWebflowPageData();
       if (pageData && pageData.ogImage) {
         assetLogger.info(`Found OG image: ${pageData.ogImage}`);
         const asset: Asset = {
@@ -243,8 +204,9 @@ export async function collectPageAssets(): Promise<Asset[]> {
         assets.push(asset);
         processedUrls.add(pageData.ogImage);
       }
-    } catch (error) {
-      assetLogger.error(`Error getting Webflow page data: ${error}`);
+      } catch (error) {
+        assetLogger.error(`Error getting Webflow page data: ${error}`);
+      }
     }
     
     // 2. Get all <img> elements (standard approach)
@@ -345,7 +307,12 @@ export async function collectPageAssets(): Promise<Asset[]> {
     // Log result summary
     assetLogger.info(`Final assets array length: ${assets ? assets.length : 0}`);
     if (!assets || assets.length === 0) {
-      assetLogger.warn('No assets were collected, something may be wrong');
+      const isWebflowEnvironment = typeof window !== 'undefined' && window.webflow;
+      if (isWebflowEnvironment) {
+        assetLogger.warn('No assets were collected from Webflow environment, something may be wrong');
+      } else {
+        assetLogger.info('No assets collected - expected behavior outside Webflow Designer environment');
+      }
     } else {
       assetLogger.info('First asset for verification:', assets[0]);
       if (assets[0] && assets[0].size) {
@@ -443,18 +410,6 @@ async function getImageSize(imageUrl: string, baseUrl: URL): Promise<number | un
   }
 }
 
-/**
- * Format bytes to a human-readable string
- * @param bytes The number of bytes
- * @returns Formatted string (e.g. "1.5 KB")
- */
-function formatBytes(bytes?: number): string {
-  if (!bytes) return "Unknown size";
-
-  if (bytes < 1024) return bytes + " bytes";
-  else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
-  else return (bytes / 1048576).toFixed(1) + " MB";
-}
 
 // In the fetchFromAPI function
 export async function fetchFromAPI<T>(endpoint: string, data: any): Promise<T> {

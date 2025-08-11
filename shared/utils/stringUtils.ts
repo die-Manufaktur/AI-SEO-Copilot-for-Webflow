@@ -55,3 +55,35 @@ export function sanitizeText(text: string): string {
   if (!text) return '';
   return ensureAscii(decodeHtmlEntities(text));
 }
+
+/**
+ * Sanitize input specifically for AI prompts to prevent prompt injection
+ */
+export function sanitizeForAI(input: string): string {
+  if (!input || typeof input !== 'string') {
+    return '';
+  }
+
+  return sanitizeText(input)
+    // Remove prompt injection keywords (case insensitive)
+    .replace(/\b(ignore|forget|override|system|prompt|instruction|assistant|ai|model|openai|gpt|claude)\s*(previous|above|below|this|that|all|instructions?)\b/gi, '')
+    // Remove template/injection patterns
+    .replace(/[{}[\]]/g, '')
+    // Remove excessive punctuation that might be used for injection
+    .replace(/[!@#$%^&*()+=|\\:";'<>?,.\/]{3,}/g, '')
+    // Limit length for AI prompts
+    .substring(0, 1000)
+    .trim();
+}
+
+/**
+ * Sanitize keywords for safe storage and processing
+ */
+export function sanitizeKeywords(input: string): string {
+  if (!input || typeof input !== 'string') return '';
+  
+  return sanitizeText(input)
+    .replace(/<[^>]*>/g, '') // Remove any HTML tags
+    .substring(0, 500) // Limit length
+    .trim();
+}

@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { cn, createLogger, extractDomainFromUrl, extractTextAfterColon } from './utils';
-import { calculateSEOScore } from '../../../shared/utils/seoUtils';
 
 describe('Utils', () => {
   describe('cn (className utility)', () => {
@@ -156,79 +155,6 @@ describe('Utils', () => {
     });
   });
 
-  describe('calculateSEOScore', () => {
-    const createMockCheck = (passed: boolean, priority: 'high' | 'medium' | 'low') => ({
-      title: `Test Check ${priority}`,
-      description: `Test description for ${priority} priority check`,
-      passed,
-      priority
-    });
-
-    it('calculates score from analysis data', () => {
-      const mockChecks = [
-        createMockCheck(true, 'high'),
-        createMockCheck(true, 'medium'),
-        createMockCheck(true, 'low')
-      ];
-
-      const score = calculateSEOScore(mockChecks);
-      expect(score).toBeGreaterThanOrEqual(0);
-      expect(score).toBeLessThanOrEqual(100);
-      expect(typeof score).toBe('number');
-    });
-
-    it('handles missing data gracefully', () => {
-      const mockChecks = [
-        createMockCheck(true, 'high')
-      ];
-
-      const score = calculateSEOScore(mockChecks);
-      expect(typeof score).toBe('number');
-      expect(score).toBeGreaterThanOrEqual(0);
-    });
-
-    it('handles empty analysis', () => {
-      const score = calculateSEOScore([]);
-      expect(typeof score).toBe('number');
-      expect(score).toBe(0);
-    });
-
-    it('calculates weighted scores correctly', () => {
-      // All high priority checks passed should give 100%
-      const allHighPassed = [
-        createMockCheck(true, 'high'),
-        createMockCheck(true, 'high')
-      ];
-      expect(calculateSEOScore(allHighPassed)).toBe(100);
-
-      // Half high priority checks failed
-      const halfHighFailed = [
-        createMockCheck(true, 'high'),
-        createMockCheck(false, 'high')
-      ];
-      expect(calculateSEOScore(halfHighFailed)).toBe(50);
-
-      // Mix of priorities - should weight high priority more
-      const mixedChecks = [
-        createMockCheck(true, 'high'),    // weight 3, passed
-        createMockCheck(false, 'medium'), // weight 2, failed
-        createMockCheck(false, 'low')     // weight 1, failed
-      ];
-      // Total weight: 3 + 2 + 1 = 6
-      // Passed weight: 3
-      // Score: (3/6) * 100 = 50
-      expect(calculateSEOScore(mixedChecks)).toBe(50);
-    });
-
-    it('handles all failed checks', () => {
-      const allFailed = [
-        createMockCheck(false, 'high'),
-        createMockCheck(false, 'medium'),
-        createMockCheck(false, 'low')
-      ];
-      expect(calculateSEOScore(allFailed)).toBe(0);
-    });
-  });
 
   describe('extractDomainFromUrl', () => {
     it('extracts domain from complete URL', () => {

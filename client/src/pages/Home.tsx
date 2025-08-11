@@ -48,31 +48,13 @@ import { generatePageId, saveKeywordsForPage, loadKeywordsForPage } from '../uti
 import { saveAdvancedOptionsForPage, loadAdvancedOptionsForPage, type AdvancedOptions } from '../utils/advancedOptionsStorage';
 import sanitizeHtml from 'sanitize-html';
 import { sanitizeText } from '../../../shared/utils/stringUtils';
+import { getPageTypes, getPopulatedSchemaRecommendations } from '../../../shared/utils/schemaRecommendations';
+import { SchemaDisplay } from '../components/ui/schema-display';
 
 const logger = createLogger("Home");
 
-// Page type options for the dropdown
-const PAGE_TYPES = [
-  'Homepage',
-  'Category page',
-  'Product page',
-  'Blog post',
-  'Landing page',
-  'Contact page',
-  'About page',
-  'FAQ page',
-  'Service page',
-  'Portfolio/project page',
-  'Testimonial page',
-  'Location page',
-  'Legal page',
-  'Event page',
-  'Press/News page',
-  'Job/career page',
-  'Thank you page',
-  'Pillar page',
-  'Cluster page'
-];
+// Page type options for the dropdown (exact 16 from feature spec)
+const PAGE_TYPES = getPageTypes();
 
 const formSchema = z.object({
   keyphrase: z.string().min(2, "Keyphrase must be at least 2 characters")
@@ -366,6 +348,9 @@ export default function Home() {
   const [secondaryKeywordsError, setSecondaryKeywordsError] = useState<string>('');
   const [advancedOptionsSaveStatus, setAdvancedOptionsSaveStatus] = useState<'saved' | 'saving' | 'none'>('none');
   
+  // Store the analysis request data for schema population
+  const [analysisRequestData, setAnalysisRequestData] = useState<AnalyzeSEORequest | null>(null);
+  
   const seoScore = results && results.checks && Array.isArray(results.checks) ? calculateSEOScore(results.checks) : 0;
   const scoreRating = getScoreRatingText(seoScore);
 
@@ -532,7 +517,7 @@ export default function Home() {
         // Load saved advanced options for this page
         const savedAdvancedOptions = loadAdvancedOptionsForPage(pageId);
         if (savedAdvancedOptions.pageType || savedAdvancedOptions.secondaryKeywords) {
-          setPageType(savedAdvancedOptions.pageType);
+          setPageType(savedAdvancedOptions.pageType || '');
           setSecondaryKeywords(savedAdvancedOptions.secondaryKeywords || '');
           setAdvancedOptionsEnabled(true);
           setAdvancedOptionsSaveStatus('saved');
@@ -785,6 +770,7 @@ export default function Home() {
       
       const mappedSiteInfo = {
         ...siteInfo,
+        siteUrl: baseUrl, // Add the primary site URL
         domains: siteInfo.domains.map(domain => ({
           ...domain,
           id: domain.url,
@@ -812,6 +798,10 @@ export default function Home() {
         })
       };
       logger.info("[Home onSubmit] Sending data to API:", analysisData);
+      
+      // Store the analysis request data for schema population
+      setAnalysisRequestData(analysisData);
+      
       mutation.mutate(analysisData);
 
     } catch (error) {
@@ -1035,6 +1025,7 @@ export default function Home() {
                         </motion.div>
                       )}
                     </AnimatePresence>
+                    
                   </div>
                   
                   <motion.div
@@ -1290,6 +1281,24 @@ export default function Home() {
                             )}
                           </motion.div>
                         ))}
+                        
+                        {/* Schema Recommendations for Technical SEO category */}
+                        {selectedCategory === 'Technical SEO' && pageType && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="mt-6 pt-2 border-t"
+                          >
+                            <SchemaDisplay 
+                              pageType={pageType}
+                              schemas={getPopulatedSchemaRecommendations(pageType, {
+                                siteInfo: analysisRequestData?.siteInfo,
+                                webflowPageData: analysisRequestData?.webflowPageData,
+                                url: analysisRequestData?.url
+                              })}
+                            />
+                          </motion.div>
+                        )}
                       </motion.div>
                     </ScrollArea>
                   ) : (

@@ -2,16 +2,22 @@
 
 ## ⚠️ IMPORTANT: Before Deployment
 
-### 1. Set Production API Key as Secret
+This project uses a **modular worker architecture** with separate components for SEO analysis, web scraping, AI recommendations, and validation. All modules are deployed together as a single Cloudflare Worker.
+
+### 1. Set Production Secrets
 ```bash
 # Set the OpenAI API key as a Cloudflare secret (more secure than environment variables)
 npx wrangler secret put OPENAI_API_KEY --env production
 # Enter your OpenAI API key when prompted
+
+# Optionally set GPT recommendations flag
+npx wrangler secret put USE_GPT_RECOMMENDATIONS --env production
+# Enter "true" to enable AI features
 ```
 
 ### 2. Deploy Worker to Cloudflare
 ```bash
-# Deploy the worker to production
+# Deploy the modular worker to production
 pnpm deploy:worker
 ```
 
@@ -40,9 +46,16 @@ pnpm build
 
 ## Build Process Summary
 
-1. `pnpm deploy:worker` → Deploys worker to Cloudflare
+1. `pnpm deploy:worker` → Deploys modular worker (all 4 components) to Cloudflare
 2. `pnpm build` → Creates client build + Webflow bundle
 3. Upload `bundle.zip` to Webflow
+
+### Worker Architecture
+The deployed worker includes:
+- **SEO Analysis Module**: Core SEO checking logic
+- **Web Scraper Module**: Page content extraction
+- **AI Recommendations Module**: OpenAI integration
+- **Validation Module**: Request sanitization and validation
 
 ## Troubleshooting
 
