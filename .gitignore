@@ -21,6 +21,7 @@ bundle.zip
 *.local
 .wrangler/
 .claude/
+.mcp.json
 
 # IDE & Editor
 .vscode/*
