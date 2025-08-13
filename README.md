@@ -33,13 +33,14 @@ An advanced SEO analysis tool that performs 18 comprehensive checks with AI-powe
 - Next-Gen Image Format Detection
 - Code Minification Check
 - Image File Size Optimization
+- **Intelligent Schema Recommendations**: AI-powered schema markup generation with dynamic site data population
 
 ## Local Development Setup
 
 1. Fork and clone the repository:
    ```bash
-   git clone https://github.com/PMDevSolutions/seo-copilot
-   cd seo-copilot
+   git clone https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow.git
+   cd AI-SEO-Copilot-for-Webflow
    ```
 
 2. Install dependencies using pnpm:
@@ -48,116 +49,140 @@ An advanced SEO analysis tool that performs 18 comprehensive checks with AI-powe
    ```
 
 3. Configure environment:
-   ```bash
-   cp .env.example .env
-   ```
-   Required environment variables:
+   Create a `.env` file in the root directory with the following variables:
+   
+   **Required for AI features:**
    - `OPENAI_API_KEY`: Your OpenAI API key for AI recommendations
    - `USE_GPT_RECOMMENDATIONS`: Set to "true" to enable AI features
-   - `ALLOWED_ORIGINS`: CORS origins (usually includes Webflow domains)
    
-   Optional development variables:
-   - `VITE_WORKER_URL`: Local worker URL (defaults to localhost:8787)
-   - `CLOUDFLARE_ENV`: Environment identifier
+   **Required for development:**
+   - `VITE_WORKER_URL`: Set to "http://localhost:8787" for local development
+   - `VITE_FORCE_LOCAL_DEV`: Set to "true" to ensure local development mode
 
 4. Start development server:
    ```bash
    pnpm dev
    ```
+   
+   This starts three services concurrently:
+   - **Vite dev server** on `http://localhost:5173` (React client)
+   - **Webflow extension server** on `http://localhost:1337` (Extension host)
+   - **Cloudflare Worker** on `http://localhost:8787` (API backend)
 
 5. Access the app:
-   - Development URL: `http://localhost:1337`
-   - Add this URL in Webflow Designer's Apps panel
+   - Add `http://localhost:1337` in Webflow Designer's Apps panel
    - Launch the extension from Webflow Designer
 
-## Directory Structure
+## Architecture
 
-Here is an overview over the most important directories and files:
+This project uses a **modular monorepo architecture** with three main components:
 
-`├──src/` — React application code<br>
-`├──public/` — Output folder for bundled React app (see note below)<br>
-`├──index.html` — The index file which will be used as an entry point by the bundler<br>
-`├──tsconfig.json` — A modified tsconfig which combines JSX support, Webflow types, and sensible React defaults.<br>
-`├──vite.config.ts` — Configuration for the bundler<br>
-`├──webflow.json` — Webflow App manifest<br>
-
-This template includes a suggested Prettier configuration in `.prettierrc` and uses pnpm by default.
-
-## Developing
-
-### Running a development server
-
+### Directory Structure
 ```
-pnpm dev
+├── client/                 # React frontend application
+│   ├── src/
+│   │   ├── components/     # React components
+│   │   ├── pages/         # Page components
+│   │   ├── hooks/         # Custom React hooks
+│   │   ├── lib/           # Client utilities
+│   │   └── utils/         # Client-specific utilities
+├── workers/               # Cloudflare Worker backend
+│   ├── modules/           # Modular worker components
+│   │   ├── seoAnalysis.ts    # SEO analysis logic
+│   │   ├── webScraper.ts     # Web scraping functionality
+│   │   ├── aiRecommendations.ts # OpenAI integration
+│   │   └── validation.ts     # Request validation
+│   └── index.ts           # Main worker entry point
+├── shared/                # Shared types and utilities
+│   ├── types/             # TypeScript type definitions
+│   └── utils/             # Shared utilities & intelligent schema population
+└── public/                # Built extension assets (generated)
 ```
 
-The above command uses the Concurrently package to run a few commands at the same time:
-- First it starts the Vite development server, with options to force rebuild dependencies and offer CORS for local development.
-- It then builds the bundle in the /public folder that enables the app to be run in Webflow.
-- We serve the Webflow extension.
-- Finally, the dev version of the Cloudflare Worker is deployed. This is on port 8787 by default, but you can change this in the package.json.
+### Key Components
 
-The default port to run the app on in Webflow is 1337, but you can change that as well.
+#### 1. **React Client App** (`client/`)
+- **Framework**: React 19 with TypeScript, Vite build system
+- **UI**: Tailwind CSS v4 + Radix UI components
+- **State Management**: React Query for server state
+- **Entry Point**: `client/src/main.tsx`
 
-You will need to create and populate the .env file in the root of the project. This should contain at least the following environment variables:
+#### 2. **Cloudflare Worker API** (`workers/`)
+- **Runtime**: Cloudflare Workers with Hono framework
+- **Architecture**: Modular design with focused components
+- **Purpose**: Web scraping, SEO analysis, OpenAI integration
+- **API Endpoints**:
+  - `POST /api/analyze` - Main SEO analysis endpoint
+  - `GET /health` - Health check
 
-- `USE_GPT_RECOMMENDATIONS`: Set to "true" to enable AI-powered recommendations
-- `ENABLED_GPT_CHECKS`: Comma-separated list of enabled checks from the following options:
-  - Keyphrase in Title
-  - Keyphrase in Meta Description
-  - Keyphrase in URL
-  - Content Length
-  - Keyphrase Density
-  - Keyphrase in Introduction
-  - Image Alt Attributes
-  - Internal Links
-  - Outbound Links
-  - Next-Gen Image Formats
-  - OG Image
-  - OG Title and Description
-  - Keyphrase in H1 Heading
-  - Keyphrase in H2 Headings
-  - Heading Hierarchy
-  - Code Minification
-  - Schema Markup
-- `OPENAI_API_KEY`: Your OpenAI API key for AI-powered recommendations
+#### 3. **Shared Types & Utils** (`shared/`)
+- **Types**: Centralized TypeScript interfaces
+- **Utils**: Shared utilities for string processing, SEO logic, and intelligent schema population
 
-## Deployment and Installation
+### Development Workflow
 
-Once you've been developing your app locally, preparing it for production is done in a few simple steps.
+The modular architecture enables:
+- **Independent development** of frontend and backend
+- **Type safety** across all boundaries
+- **Easy testing** with focused modules
+- **Scalable deployment** with separate services
 
-### Build
-1. First, run pnpm check and make sure you don't have any syntax errors in your Typescript.
-2. Delete the public folder and bundle.zip file in your project if either or both of them already exist.
-3. Secondly, just run pnpm build. That's it! If you don't see any errors, you should have a bundle.zip file that you can upload to update your app in Webflow.
+## Building for Production
 
-We won't go into all the details of setting up a Webflow app here, but you should read the following before beginning development: https://developers.webflow.com/
+⚠️ **Important**: Only deploy to production when explicitly requested by the project maintainer.
 
-### Setting up Environment Variables
-Once you've deployed, you'll need the production worker to have access to the correct environment variables. Make sure to run the following commands in your terminal:
+```bash
+# Build the extension bundle
+pnpm build
 
-`npx wrangler secret put OPENAI_API_KEY
-npx wrangler secret put WEBFLOW_CLIENT_SECRET
-npx wrangler secret put WEBFLOW_CLIENT_ID
-npx wrangler secret put WEBFLOW_REDIRECT_URI`
+# Deploy Cloudflare Worker (maintainer only)
+pnpm deploy:worker
+```
 
-Your app should be production-ready at this point. YOu can install it from the Marketplace like any other app, or follow these instructions:
+The build process creates a `bundle.zip` file ready for Webflow extension submission.
 
-## Installing in Webflow
+## Testing
 
-1. Open the Webflow Designer
-2. Go to Apps panel (keyboard shortcut: E)
-3. Search for "AI SEO Copilot"
-4. Click Install
-5. Configure your settings:
-      - Set your Webflow API credentials
+```bash
+pnpm test           # Run tests with coverage
+pnpm test:watch     # Run tests in watch mode
+pnpm test:ui        # Run tests with UI
+pnpm check          # TypeScript type checking
+```
 
-### Troubleshooting
-If you're stuck with something and you think it may be a bug, please submit a bug report on our Github repo: https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/issues. Be sure to search through the closed issues to make sure the issue you're seeing hasn't already been solved by someone else! We try to push updates as often as possible, but this is a FOSS product, and things can fall behind sometimes.
+## Environment Variables
 
-Complete documentation available at [AI SEO Copilot Docs](https://ai-seo-copilot.gitbook.io/ai-seo-copilot)
+### Development (.env)
+```env
+# AI Features
+OPENAI_API_KEY=your_openai_key
+USE_GPT_RECOMMENDATIONS=true
+
+# Development Setup
+VITE_WORKER_URL=http://localhost:8787
+VITE_FORCE_LOCAL_DEV=true
+```
+
+### Production (Wrangler Secrets)
+```bash
+npx wrangler secret put OPENAI_API_KEY
+npx wrangler secret put USE_GPT_RECOMMENDATIONS
+```
 
 ## Contributing
 
-Please see [CONTRIBUTING.md](.github/CONTRIBUTING.md) for guidelines.
-Feature requests: [FeatureBase](https://aiseocopilot.featurebase.app)
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## Support
+
+- **Issues**: [GitHub Issues](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/issues)
+- **Feature Requests**: [Feature Board](https://aiseocopilot.featurebase.app)
+- **Documentation**: [GitBook Documentation](https://ai-seo-copilot.gitbook.io/ai-seo-copilot)
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.

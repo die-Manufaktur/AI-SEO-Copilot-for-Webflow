@@ -1,12 +1,9 @@
 /**
  * Utility for persisting keywords per Webflow page
  */
+import { PageKeywords } from '../../../shared/types/index';
 
 const STORAGE_KEY = 'webflow-seo-keywords';
-
-interface PageKeywords {
-  [pageId: string]: string;
-}
 
 /**
  * Generate a unique page identifier from Webflow page data

@@ -179,33 +179,17 @@ describe('api.ts error handling', () => {
   });
 
   describe('getApiUrl error handling', () => {
-    it('handles window.webflow access errors gracefully', () => {
-      // Mock production environment to ensure consistent behavior
-      vi.stubEnv('PROD', false);
-      vi.stubEnv('VITE_WORKER_URL', undefined);
+    it('handles missing WORKER_URL in development mode', () => {
+      // Set up environment variables for development mode without WORKER_URL
+      vi.stubEnv('MODE', 'development');
+      vi.stubEnv('VITE_WORKER_URL', undefined); // Missing WORKER_URL
       vi.stubEnv('VITE_FORCE_LOCAL_DEV', undefined);
-      
-      // Set up localhost environment first so the webflow check happens
-      Object.defineProperty(window, 'location', {
-        value: {
-          hostname: 'webflow.com', // Set to webflow.com so it tries to access window.webflow
-          href: 'https://webflow.com/design/test-site'
-        },
-        writable: true,
-      });
-
-      // Mock window.webflow to throw an error when accessed
-      Object.defineProperty(global, 'webflow', {
-        get() {
-          throw new Error('Webflow API not available');
-        },
-        configurable: true,
-      });
 
       const result = getApiUrl();
       
-      expect(mockLogger.error).toHaveBeenCalledWith('Error accessing window.webflow:', expect.any(Error));
-      expect(result).toBe('https://seo-copilot-api-production.paul-130.workers.dev'); // Should fall back to production
+      // Should fall back to production when WORKER_URL is missing
+      expect(result).toBe('https://seo-copilot-api-production.paul-130.workers.dev');
+      expect(mockLogger.debug).toHaveBeenCalledWith('Using production API URL');
     });
 
     it('handles window.location access errors in local check', () => {
@@ -223,29 +207,15 @@ describe('api.ts error handling', () => {
     });
 
     it('handles production environment correctly', () => {
-      // Set up environment variables for development mode (not forcing local)
-      vi.stubEnv('PROD', false);
+      // Set up environment variables for production mode
+      vi.stubEnv('MODE', 'production');
       vi.stubEnv('VITE_FORCE_LOCAL_DEV', undefined);
       vi.stubEnv('VITE_WORKER_URL', undefined);
-
-      // Set up production-like environment
-      Object.defineProperty(window, 'location', {
-        value: {
-          hostname: 'webflow.com',
-          href: 'https://webflow.com/design/test-site'
-        },
-        writable: true,
-      });
-
-      Object.defineProperty(global, 'webflow', {
-        value: mockWebflow,
-        writable: true,
-      });
 
       const result = getApiUrl();
       
       expect(result).toBe('https://seo-copilot-api-production.paul-130.workers.dev');
-      expect(mockLogger.debug).toHaveBeenCalledWith('Webflow detected in development - using production API URL');
+      expect(mockLogger.debug).toHaveBeenCalledWith('Using production API URL');
     });
   });
 

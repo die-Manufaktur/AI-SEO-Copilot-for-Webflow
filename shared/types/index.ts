@@ -137,6 +137,63 @@ export interface WebflowSiteInfo {
 }
 
 /**
+ * Schema recommendation for a specific page type
+ */
+export interface SchemaRecommendation {
+  name: string;
+  description: string;
+  documentationUrl: string;
+  googleSupport: 'yes' | 'no' | 'partial';
+  googleSupportNote?: string;
+  jsonLdCode: string;
+  isRequired: boolean; // true for main schemas, false for optional
+}
+
+/**
+ * Page type with associated schema recommendations
+ */
+export interface PageTypeSchema {
+  pageType: string;
+  schemas: SchemaRecommendation[];
+}
+
+/**
+ * Worker environment configuration
+ */
+export interface WorkerEnvironment {
+  OPENAI_API_KEY: string;
+  USE_GPT_RECOMMENDATIONS?: string;
+  ALLOWED_ORIGINS?: string;
+}
+
+/**
+ * Advanced options for SEO analysis and AI recommendations
+ */
+export interface AdvancedOptions {
+  pageType?: string;
+  secondaryKeywords?: string; // Secondary keywords (comma-separated)
+}
+
+/**
+ * Asset interface for SEO analysis (images, etc.)
+ */
+export interface Asset {
+  url: string;
+  alt: string;
+  type: string;
+  size?: number;
+  mimeType?: string;
+  source?: string;
+}
+
+/**
+ * Page keywords storage interface
+ */
+export interface PageKeywords {
+  [pageId: string]: string;
+}
+
+/**
  * Request payload for the analyze endpoint
  */
 export interface AnalyzeSEORequest {
@@ -144,12 +201,9 @@ export interface AnalyzeSEORequest {
   url: string;
   isHomePage?: boolean;
   webflowPageData?: WebflowPageData;
-  pageAssets?: Array<{ url: string; alt: string; type: string; size?: number; mimeType?: string }>;
+  pageAssets?: Asset[];
   siteInfo?: WebflowSiteInfo;
   publishPath?: string;
   debug?: boolean;
-  advancedOptions?: {
-    pageType?: string;
-    secondaryKeywords?: string; // Secondary keywords (comma-separated)
-  };
+  advancedOptions?: AdvancedOptions;
 }
