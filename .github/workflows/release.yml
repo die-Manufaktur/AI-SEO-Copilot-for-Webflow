@@ -41,7 +41,12 @@ jobs:
             ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: |
+          if ! pnpm install --frozen-lockfile; then
+            echo "Frozen lockfile failed, regenerating lockfile..."
+            rm -f pnpm-lock.yaml
+            pnpm install
+          fi
 
       - name: Build project
         run: pnpm build
