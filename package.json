@@ -111,7 +111,7 @@
     "hono": "^4.8.12",
     "input-otp": "^1.4.2",
     "net": "^1.0.2",
-    "openai": "^5.11.0",
+    "openai": "^5.12.2",
     "react": "^19.1.1",
     "react-day-picker": "^9.8.1",
     "react-dom": "^19.1.1",
