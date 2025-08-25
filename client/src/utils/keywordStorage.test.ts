@@ -46,6 +46,18 @@ describe('keywordStorage', () => {
       expect(generatePageId('', false)).toBe('unknown-page');
       expect(generatePageId('/', false)).toBe('homepage');
     });
+
+    it('includes siteId prefix when provided', () => {
+      expect(generatePageId('/', true, 'site123')).toBe('site123::homepage');
+      expect(generatePageId('/about', false, 'site123')).toBe('site123::about');
+      expect(generatePageId(null, false, 'site123')).toBe('site123::unknown-page');
+    });
+
+    it('works without siteId for backward compatibility', () => {
+      expect(generatePageId('/', true, undefined)).toBe('homepage');
+      expect(generatePageId('/about', false, undefined)).toBe('about');
+      expect(generatePageId(null, false, undefined)).toBe('unknown-page');
+    });
   });
 
   describe('saveKeywordsForPage', () => {
