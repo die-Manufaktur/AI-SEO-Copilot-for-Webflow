@@ -165,7 +165,10 @@
           }
         ],
         "draft": true,
-        "prerelease": false
+        "prerelease": false,
+        "failComment": false,
+        "failTitle": false,
+        "releasedLabels": false
       }
     ]
   ]
