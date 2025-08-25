@@ -493,9 +493,150 @@ export async function analyzeSEOElements(
     priority: analyzerCheckPriorities["Keyphrase in H2 Headings"]
   });
 
-  // Add more basic checks here as needed...
-  // For now, I'll add placeholders for the remaining checks
-  
+  // Image Alt Attributes Check
+  const imageAltPassed = scrapedData.images.length === 0 || scrapedData.images.every(img => img.alt && img.alt.trim().length > 0);
+  const imageAltDescription = scrapedData.images.length === 0 
+    ? "No images found to check." 
+    : imageAltPassed 
+      ? `Good! All ${scrapedData.images.length} images have alt text.`
+      : `Some images are missing alt text. Found ${scrapedData.images.filter(img => !img.alt || img.alt.trim().length === 0).length} images without alt text out of ${scrapedData.images.length} total.`;
+  checks.push({
+    title: "Image Alt Attributes",
+    description: imageAltDescription,
+    passed: imageAltPassed,
+    priority: analyzerCheckPriorities["Image Alt Attributes"]
+  });
+
+  // Internal Links Check
+  const internalLinksPassed = scrapedData.internalLinks.length > 0;
+  checks.push({
+    title: "Internal Links",
+    description: internalLinksPassed 
+      ? `Great! Found ${scrapedData.internalLinks.length} internal link${scrapedData.internalLinks.length === 1 ? '' : 's'}.`
+      : "No internal links found. Consider adding links to other relevant pages on your site.",
+    passed: internalLinksPassed,
+    priority: analyzerCheckPriorities["Internal Links"]
+  });
+
+  // Outbound Links Check
+  const outboundLinksPassed = scrapedData.outboundLinks.length > 0;
+  checks.push({
+    title: "Outbound Links",
+    description: outboundLinksPassed 
+      ? `Good! Found ${scrapedData.outboundLinks.length} outbound link${scrapedData.outboundLinks.length === 1 ? '' : 's'}.`
+      : "No outbound links found. Consider adding links to authoritative external sources.",
+    passed: outboundLinksPassed,
+    priority: analyzerCheckPriorities["Outbound Links"]
+  });
+
+  // Next-Gen Image Formats Check
+  const nextGenImages = scrapedData.images.filter(img => {
+    const url = img.src.toLowerCase();
+    return url.includes('.webp') || url.includes('.avif') || url.includes('.heic');
+  });
+  const nextGenPassed = scrapedData.images.length === 0 || (nextGenImages.length / scrapedData.images.length) >= 0.5;
+  const nextGenDescription = scrapedData.images.length === 0
+    ? "No images found to check."
+    : nextGenPassed
+      ? `Nice! ${Math.round((nextGenImages.length / scrapedData.images.length) * 100)}% of your images use next-gen formats.`
+      : `Consider using next-gen image formats. Only ${nextGenImages.length} out of ${scrapedData.images.length} images use modern formats (WebP, AVIF, HEIC).`;
+  checks.push({
+    title: "Next-Gen Image Formats",
+    description: nextGenDescription,
+    passed: nextGenPassed,
+    priority: analyzerCheckPriorities["Next-Gen Image Formats"]
+  });
+
+  // OG Image Check
+  const ogImagePassed = Boolean(scrapedData.ogImage && scrapedData.ogImage.trim().length > 0);
+  checks.push({
+    title: "OG Image",
+    description: ogImagePassed 
+      ? "Excellent! An Open Graph image is set." 
+      : "No Open Graph image found. Recommended for social media sharing. Learn more",
+    passed: ogImagePassed,
+    priority: analyzerCheckPriorities["OG Image"]
+  });
+
+  // OG Title and Description Check  
+  const ogTitleExists = Boolean(scrapedData.title && scrapedData.title.trim().length > 0);
+  const ogDescExists = Boolean(scrapedData.metaDescription && scrapedData.metaDescription.trim().length > 0);
+  const ogTitleDescPassed = ogTitleExists && ogDescExists;
+  const ogTitleDescDescription = ogTitleDescPassed
+    ? "Perfect! Open Graph title and description are present."
+    : !ogTitleExists && !ogDescExists
+      ? "Missing both Open Graph title and description."
+      : !ogTitleExists
+        ? "Missing Open Graph title."
+        : "Missing Open Graph description.";
+  checks.push({
+    title: "OG Title and Description",
+    description: ogTitleDescDescription,
+    passed: ogTitleDescPassed,
+    priority: analyzerCheckPriorities["OG Title and Description"]
+  });
+
+  // Heading Hierarchy Check
+  const headingLevels = scrapedData.headings.map(h => h.level).sort((a, b) => a - b);
+  const hasH1 = headingLevels.includes(1);
+  const hasProperHierarchy = hasH1 && headingLevels.every((level, index) => {
+    if (index === 0) return true;
+    return level <= headingLevels[index - 1] + 1;
+  });
+  const hierarchyPassed = hasH1 && hasProperHierarchy;
+  const hierarchyDescription = !hasH1
+    ? "Missing H1 heading. Every page should have exactly one H1."
+    : !hasProperHierarchy
+      ? "Heading hierarchy has gaps. Headings should follow a logical order (H1, H2, H3, etc.)."
+      : "Excellent! Your heading structure follows a logical hierarchy.";
+  checks.push({
+    title: "Heading Hierarchy",
+    description: hierarchyDescription,
+    passed: hierarchyPassed,
+    priority: analyzerCheckPriorities["Heading Hierarchy"]
+  });
+
+  // Code Minification Check
+  const minificationResult = analyzeMinification(scrapedData.resources.js, scrapedData.resources.css);
+  checks.push({
+    title: "Code Minification",
+    description: minificationResult.passed
+      ? minificationResult.details.length > 0
+        ? `Good! ${minificationResult.details.join(', ')}.`
+        : "Good! JS and CSS files appear to be minified."
+      : `Consider minifying your code. ${minificationResult.details.join(', ')}.`,
+    passed: minificationResult.passed,
+    priority: analyzerCheckPriorities["Code Minification"]
+  });
+
+  // Schema Markup Check
+  const schemaMarkupPassed = scrapedData.schemaMarkup.hasSchema;
+  const schemaDescription = schemaMarkupPassed
+    ? `Great! Found ${scrapedData.schemaMarkup.schemaCount} schema markup${scrapedData.schemaMarkup.schemaCount === 1 ? '' : 's'} (${scrapedData.schemaMarkup.schemaTypes.join(', ')}).`
+    : "No schema markup detected. Consider adding structured data to help search engines understand your content.";
+  checks.push({
+    title: "Schema Markup",
+    description: schemaDescription,
+    passed: schemaMarkupPassed,
+    priority: analyzerCheckPriorities["Schema Markup"]
+  });
+
+  // Image File Size Check
+  const imageFileSizePassed = scrapedData.images.length === 0 || scrapedData.images.every(img => {
+    return !img.size || img.size <= 500000; // 500KB limit
+  });
+  const imageSizeDescription = scrapedData.images.length === 0
+    ? "No images found to check."
+    : imageFileSizePassed
+      ? "Great job! All your images are well-optimized, keeping your page loading times fast."
+      : `Some images are larger than recommended. Consider optimizing images over 500KB for better performance.`;
+  checks.push({
+    title: "Image File Size",
+    description: imageSizeDescription,
+    passed: imageFileSizePassed,
+    priority: analyzerCheckPriorities["Image File Size"]
+  });
+
   // Calculate final results
   const passedCount = checks.filter(check => check.passed).length;
   const failedCount = checks.length - passedCount;
