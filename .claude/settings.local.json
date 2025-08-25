@@ -1,5 +1,5 @@
 {
-  "permissions": { 
+  "permissions": {
     "allow": [
       "Bash(where pnpm)",
       "Bash(ls:*)",
@@ -74,7 +74,13 @@
       "mcp__github__search_repositories",
       "Bash(gh auth:*)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(gh workflow:*)"
+      "Bash(gh workflow:*)",
+      "mcp__serena__get_symbols_overview",
+      "mcp__serena__activate_project",
+      "mcp__serena__search_for_pattern",
+      "mcp__serena__list_dir",
+      "Bash(cat:*)",
+      "mcp__serena__execute_shell_command"
     ],
     "deny": []
   },

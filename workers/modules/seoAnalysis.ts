@@ -353,6 +353,53 @@ export function calculateSEOScore(checks: SEOCheck[]): number {
 }
 
 /**
+ * Creates an SEO check with enhanced logic from v3.3.14, including AI recommendations
+ */
+async function createSEOCheck(
+  title: string,
+  conditionFn: () => boolean,
+  successMessage: string,
+  failureMessage: string,
+  context: string,
+  keyphrase: string,
+  env: WorkerEnvironment,
+  advancedOptions?: AdvancedOptions,
+  matchedKeyword?: string
+): Promise<SEOCheck> {
+  const passed = conditionFn();
+  
+  const check: SEOCheck = {
+    title,
+    description: passed ? 
+      (matchedKeyword && matchedKeyword !== keyphrase ? 
+        successMessage.replace(keyphrase, matchedKeyword) : 
+        successMessage) : 
+      failureMessage,
+    passed,
+    priority: analyzerCheckPriorities[title] || 'medium'
+  };
+
+  // Add AI recommendation if check failed and AI is enabled
+  if (!passed && env.USE_GPT_RECOMMENDATIONS === 'true' && env.OPENAI_API_KEY) {
+    try {
+      const recommendation = await getAIRecommendation(
+        title,
+        keyphrase,
+        env,
+        context,
+        advancedOptions
+      );
+      check.recommendation = recommendation;
+    } catch (error) {
+      console.error(`[SEO Analysis] Error generating AI recommendation for ${title}:`, error);
+      // Don't fail the entire check if AI recommendation fails
+    }
+  }
+
+  return check;
+}
+
+/**
  * Main SEO analysis orchestration function
  */
 export async function analyzeSEOElements(
@@ -368,166 +415,246 @@ export async function analyzeSEOElements(
   const checks: SEOCheck[] = [];
   const secondaryKeywords = advancedOptions?.secondaryKeywords || '';
   
-  // Title Check
-  const titleResult = checkKeywordMatch(scrapedData.title, keyphrase, secondaryKeywords);
-  let titleCheck: SEOCheck = {
-    title: "Keyphrase in Title",
-    description: titleResult.found 
-      ? "Great! Your keyphrase appears in the title." 
-      : `Your title doesn't contain the keyphrase${secondaryKeywords ? ' or any secondary keywords' : ''}.`,
-    passed: titleResult.found,
-    priority: analyzerCheckPriorities["Keyphrase in Title"]
-  };
+  // Determine if we're using Webflow API data
+  const useApiData = !!webflowPageData;
   
-  // Add AI recommendation if check failed and AI is enabled
-  if (!titleCheck.passed && env.USE_GPT_RECOMMENDATIONS === 'true' && env.OPENAI_API_KEY) {
-    try {
-      titleCheck.recommendation = await getAIRecommendation(
-        "title",
-        keyphrase,
-        env,
-        scrapedData.title,
-        advancedOptions
-      );
-    } catch (error) {
-      console.error('Error generating AI recommendation for title:', error);
-    }
+  // --- Title Check with v3.3.14 enhanced logic ---
+  let pageTitle = '';
+  if (useApiData && webflowPageData?.title) {
+    pageTitle = webflowPageData.title;
+  } else {
+    pageTitle = scrapedData.title || '';
   }
+  const titleKeywordMatch = checkKeywordMatch(pageTitle, keyphrase, secondaryKeywords);
+  const titleCheck = await createSEOCheck(
+    "Keyphrase in Title",
+    () => titleKeywordMatch.found,
+    titleKeywordMatch.matchedKeyword ? 
+      `Great! Your title contains the keyword "${titleKeywordMatch.matchedKeyword}".` :
+      `Great! Your title contains the keyphrase "${keyphrase}".`,
+    `Your title does not contain the keyphrase "${keyphrase}"${secondaryKeywords ? ' or any secondary keywords' : ''}.`,
+    pageTitle,
+    keyphrase,
+    env,
+    advancedOptions,
+    titleKeywordMatch.matchedKeyword
+  );
   checks.push(titleCheck);
 
-  // Meta Description Check
-  const metaResult = checkKeywordMatch(scrapedData.metaDescription, keyphrase, secondaryKeywords);
-  let metaCheck: SEOCheck = {
-    title: "Keyphrase in Meta Description",
-    description: metaResult.found 
-      ? "Perfect! Your keyphrase appears in the meta description." 
-      : `Your meta description doesn't contain the keyphrase${secondaryKeywords ? ' or any secondary keywords' : ''}.`,
-    passed: metaResult.found,
-    priority: analyzerCheckPriorities["Keyphrase in Meta Description"]
+  // --- Meta Description Check with v3.3.14 enhanced logic ---
+  let metaDescription = '';
+  if (useApiData && webflowPageData?.metaDescription) {
+    metaDescription = webflowPageData.metaDescription;
+  } else {
+    metaDescription = scrapedData.metaDescription || '';
+  }
+  const metaDescKeywordMatch = checkKeywordMatch(metaDescription, keyphrase, secondaryKeywords);
+  const metaDescriptionCheck = await createSEOCheck(
+    "Keyphrase in Meta Description",
+    () => metaDescKeywordMatch.found,
+    metaDescKeywordMatch.matchedKeyword ? 
+      `Great! Your meta description contains the keyword "${metaDescKeywordMatch.matchedKeyword}".` :
+      `Great! Your meta description contains the keyphrase "${keyphrase}".`,
+    `Keyphrase "${keyphrase}"${secondaryKeywords ? ' or any secondary keywords' : ''} not found in meta description: "${metaDescription}"`,
+    metaDescription,
+    keyphrase,
+    env,
+    advancedOptions,
+    metaDescKeywordMatch.matchedKeyword
+  );
+  checks.push(metaDescriptionCheck);
+
+  // --- URL Check with v3.3.14 enhanced logic ---
+  let canonicalUrl = useApiData && webflowPageData?.canonicalUrl
+    ? webflowPageData.canonicalUrl
+    : url;
+  
+  const urlKeywordMatch = checkUrlKeywordMatch(canonicalUrl, keyphrase, secondaryKeywords);
+  const urlCheck = await createSEOCheck(
+    "Keyphrase in URL",
+    () => urlKeywordMatch.found,
+    urlKeywordMatch.matchedKeyword ? 
+      `Good job! The keyword "${urlKeywordMatch.matchedKeyword}" is present in the URL slug.` :
+      `Good job! The keyphrase "${keyphrase}" is present in the URL slug.`,
+    `The URL "${canonicalUrl}" does not contain the keyphrase "${keyphrase}"${secondaryKeywords ? ' or any secondary keywords' : ''}.`,
+    canonicalUrl,
+    keyphrase,
+    env,
+    advancedOptions,
+    urlKeywordMatch.matchedKeyword
+  );
+  checks.push(urlCheck);
+  
+  // --- Content Length Check with v3.3.14 enhanced logic ---
+  const contentWords = scrapedData.content.trim().split(/\s+/).filter(Boolean);
+  const wordCount = contentWords.length;
+  const minWordCount = isHomePage ? 300 : 600;
+
+  const contentLengthCheck = await createSEOCheck(
+    "Content Length",
+    () => wordCount >= minWordCount,
+    `Well done! Your content has ${wordCount} words, which meets the threshold of ${minWordCount} words ${isHomePage ? "(homepage)" : "(regular page)"}.`,
+    `Content length is ${wordCount} words, which is below the recommended minimum of ${minWordCount} words ${isHomePage ? "(homepage)" : "(regular page)"}.`,
+    scrapedData.content,
+    keyphrase,
+    env,
+    advancedOptions
+  );
+  checks.push(contentLengthCheck);
+
+  // --- Keyphrase Density Check with v3.3.14 enhanced logic ---
+  const keyphraseDensityCheck: SEOCheck = {
+    title: "Keyphrase Density",
+    description: "",
+    passed: false,
+    priority: analyzerCheckPriorities["Keyphrase Density"]
   };
   
-  if (!metaCheck.passed && env.USE_GPT_RECOMMENDATIONS === 'true' && env.OPENAI_API_KEY) {
-    try {
-      metaCheck.recommendation = await getAIRecommendation(
-        "meta_description",
-        keyphrase,
-        env,
-        scrapedData.metaDescription,
-        advancedOptions
-      );
-    } catch (error) {
-      console.error('Error generating AI recommendation for meta description:', error);
+  const density = calculateCombinedKeyphraseDensity(scrapedData.content, keyphrase, secondaryKeywords);
+  
+  const minDensity = 0.5;
+  const maxDensity = 2.5;
+  
+  keyphraseDensityCheck.passed = density >= minDensity && density <= maxDensity;
+  
+  if (keyphraseDensityCheck.passed) {
+    keyphraseDensityCheck.description = getSuccessMessage(keyphraseDensityCheck.title);
+  } else {
+    keyphraseDensityCheck.description = `Keyphrase density is ${density.toFixed(2)}%. `;
+    
+    if (density < minDensity) {
+      keyphraseDensityCheck.description += `Consider using the keyphrase more often to meet the minimum recommended density of ${minDensity}%.`;
+    }
+    
+    if (density > maxDensity) {
+      keyphraseDensityCheck.description += `Consider using the keyphrase less often to avoid keyword stuffing. Current density: ${density.toFixed(2)}%.`;
     }
   }
-  checks.push(metaCheck);
+  checks.push(keyphraseDensityCheck);
 
-  // URL Check
-  const urlResult = checkUrlKeywordMatch(url, keyphrase, secondaryKeywords);
-  checks.push({
-    title: "Keyphrase in URL",
-    description: urlResult.found 
-      ? "Excellent! Your keyphrase appears in the URL." 
-      : `Your URL doesn't contain the keyphrase${secondaryKeywords ? ' or any secondary keywords' : ''}.`,
-    passed: urlResult.found,
-    priority: analyzerCheckPriorities["Keyphrase in URL"]
-  });
+  // --- Keyphrase in Introduction Check with v3.3.14 enhanced logic ---
+  const firstParagraph = scrapedData.paragraphs[0] || '';
+  const introKeywordMatch = checkKeywordMatch(firstParagraph, keyphrase, secondaryKeywords);
+  const keyphraseInIntroCheck = await createSEOCheck(
+    "Keyphrase in Introduction",
+    () => introKeywordMatch.found,
+    introKeywordMatch.matchedKeyword ? 
+      `Nice! The keyword "${introKeywordMatch.matchedKeyword}" appears in the first paragraph.` :
+      `Nice! The keyphrase "${keyphrase}" appears in the first paragraph.`,
+    `Keyphrase "${keyphrase}"${secondaryKeywords ? ' or any secondary keywords' : ''} not found in the introduction.`,
+    firstParagraph,
+    keyphrase,
+    env,
+    advancedOptions,
+    introKeywordMatch.matchedKeyword
+  );
+  checks.push(keyphraseInIntroCheck);
 
-  // Content Length Check
-  const bodyText = scrapedData.paragraphs.join(' ');
-  const contentLength = bodyText.length;
-  const contentLengthPassed = contentLength >= 300;
-  checks.push({
-    title: "Content Length",
-    description: contentLengthPassed 
-      ? `Great! Your content has ${contentLength} characters, which is above the recommended minimum.`
-      : `Your content is ${contentLength} characters. Consider adding more content (recommended: 300+ characters).`,
-    passed: contentLengthPassed,
-    priority: analyzerCheckPriorities["Content Length"]
-  });
-
-  // Keyphrase Density Check  
-  const density = calculateCombinedKeyphraseDensity(bodyText, keyphrase, secondaryKeywords);
-  const densityPassed = density >= 0.5 && density <= 3.0;
-  checks.push({
-    title: "Keyphrase Density",
-    description: densityPassed 
-      ? `Perfect! Your keyphrase density is ${density.toFixed(1)}%, which is in the optimal range.`
-      : `Your keyphrase density is ${density.toFixed(1)}%. Aim for 0.5-3.0% for better SEO.`,
-    passed: densityPassed,
-    priority: analyzerCheckPriorities["Keyphrase Density"]
-  });
-
-  // Introduction Check
-  const introduction = bodyText.substring(0, 200);
-  const introResult = checkKeywordMatch(introduction, keyphrase, secondaryKeywords);
-  checks.push({
-    title: "Keyphrase in Introduction",
-    description: introResult.found 
-      ? "Excellent! Your keyphrase appears in the introduction." 
-      : `Your introduction doesn't contain the keyphrase${secondaryKeywords ? ' or any secondary keywords' : ''}.`,
-    passed: introResult.found,
-    priority: analyzerCheckPriorities["Keyphrase in Introduction"]
-  });
-
-  // H1 Check
+  // --- Keyphrase in H1 Heading Check with v3.3.14 enhanced logic ---
   const h1Text = scrapedData.headings.find(h => h.level === 1)?.text || '';
-  const h1Result = checkKeywordMatch(h1Text, keyphrase, secondaryKeywords);
-  checks.push({
-    title: "Keyphrase in H1 Heading",
-    description: h1Result.found 
-      ? "Great! Your keyphrase appears in the H1 heading." 
-      : `Your H1 heading doesn't contain the keyphrase${secondaryKeywords ? ' or any secondary keywords' : ''}.`,
-    passed: h1Result.found,
-    priority: analyzerCheckPriorities["Keyphrase in H1 Heading"]
-  });
+  const h1KeywordMatch = checkKeywordMatch(h1Text, keyphrase, secondaryKeywords);
+  const h1Check = await createSEOCheck(
+    "Keyphrase in H1 Heading",
+    () => h1KeywordMatch.found,
+    h1KeywordMatch.matchedKeyword ? 
+      `Great! The main H1 heading includes the keyword "${h1KeywordMatch.matchedKeyword}".` :
+      `Great! The main H1 heading includes the keyphrase "${keyphrase}".`,
+    `The H1 heading "${h1Text}" does not contain the keyphrase "${keyphrase}"${secondaryKeywords ? ' or any secondary keywords' : ''}.`,
+    h1Text,
+    keyphrase,
+    env,
+    advancedOptions,
+    h1KeywordMatch.matchedKeyword
+  );
+  checks.push(h1Check);
 
-  // H2 Check
+  // --- Keyphrase in H2 Headings Check with v3.3.14 enhanced logic ---
   const h2Text = scrapedData.headings.filter(h => h.level === 2).map(h => h.text).join(' ');
-  const h2Result = checkKeywordMatch(h2Text, keyphrase, secondaryKeywords);
-  checks.push({
-    title: "Keyphrase in H2 Headings",
-    description: h2Result.found 
-      ? "Perfect! Your keyphrase appears in H2 headings." 
-      : `Your H2 headings don't contain the keyphrase${secondaryKeywords ? ' or any secondary keywords' : ''}.`,
-    passed: h2Result.found,
-    priority: analyzerCheckPriorities["Keyphrase in H2 Headings"]
-  });
+  const h2KeywordMatch = checkKeywordMatch(h2Text, keyphrase, secondaryKeywords);
+  const h2Check = await createSEOCheck(
+    "Keyphrase in H2 Headings",
+    () => h2KeywordMatch.found,
+    h2KeywordMatch.matchedKeyword ? 
+      `Good! The keyword "${h2KeywordMatch.matchedKeyword}" is found in at least one H2 heading.` :
+      `Good! The keyphrase "${keyphrase}" is found in at least one H2 heading.`,
+    `H2 headings do not contain the keyphrase "${keyphrase}"${secondaryKeywords ? ' or any secondary keywords' : ''}.`,
+    h2Text,
+    keyphrase,
+    env,
+    advancedOptions,
+    h2KeywordMatch.matchedKeyword
+  );
+  checks.push(h2Check);
 
-  // Image Alt Attributes Check
-  const imageAltPassed = scrapedData.images.length === 0 || scrapedData.images.every(img => img.alt && img.alt.trim().length > 0);
-  const imageAltDescription = scrapedData.images.length === 0 
-    ? "No images found to check." 
-    : imageAltPassed 
-      ? `Good! All ${scrapedData.images.length} images have alt text.`
-      : `Some images are missing alt text. Found ${scrapedData.images.filter(img => !img.alt || img.alt.trim().length === 0).length} images without alt text out of ${scrapedData.images.length} total.`;
-  checks.push({
+  // --- Image Alt Attributes Check with v3.3.14 enhanced logic ---
+  const imageAltCheck: SEOCheck = {
     title: "Image Alt Attributes",
-    description: imageAltDescription,
-    passed: imageAltPassed,
+    description: "",
+    passed: false,
     priority: analyzerCheckPriorities["Image Alt Attributes"]
-  });
+  };
+  
+  const imagesWithoutAlt = scrapedData.images.filter(img => !img.alt || img.alt.trim().length === 0);
+  imageAltCheck.passed = imagesWithoutAlt.length === 0;
+  
+  if (imageAltCheck.passed) {
+    imageAltCheck.description = getSuccessMessage(imageAltCheck.title);
+  } else {
+    imageAltCheck.description = `Found ${imagesWithoutAlt.length} image(s) without alt attributes.`;
+    
+    try {
+      if (env.USE_GPT_RECOMMENDATIONS === 'true' && env.OPENAI_API_KEY) {
+        const imageAltResult = await getAIRecommendation(
+          imageAltCheck.title,
+          keyphrase,
+          env,
+          `${imagesWithoutAlt.length} image(s) found without alt attributes.`,
+          advancedOptions
+        );
+        imageAltCheck.recommendation = imageAltResult;
+      }
+    } catch (error) {
+      console.error("[SEO Analysis] Error getting AI recommendation for image alt attributes:", error);
+    }
+  }
+  checks.push(imageAltCheck);
+  
+  if (!imageAltCheck.passed) {
+    imageAltCheck.imageData = imagesWithoutAlt.map(img => ({
+      url: img.src,
+      name: img.src.split('/').pop() || 'unknown',
+      shortName: shortenFileName(img.src.split('/').pop() || 'unknown', 10),
+      size: img.size ? Math.round(img.size / 1024) : 0,
+      mimeType: 'Unknown',
+      alt: img.alt || ''
+    }));
+  }
 
-  // Internal Links Check
-  const internalLinksPassed = scrapedData.internalLinks.length > 0;
-  checks.push({
-    title: "Internal Links",
-    description: internalLinksPassed 
-      ? `Great! Found ${scrapedData.internalLinks.length} internal link${scrapedData.internalLinks.length === 1 ? '' : 's'}.`
-      : "No internal links found. Consider adding links to other relevant pages on your site.",
-    passed: internalLinksPassed,
-    priority: analyzerCheckPriorities["Internal Links"]
-  });
-
-  // Outbound Links Check
-  const outboundLinksPassed = scrapedData.outboundLinks.length > 0;
-  checks.push({
-    title: "Outbound Links",
-    description: outboundLinksPassed 
-      ? `Good! Found ${scrapedData.outboundLinks.length} outbound link${scrapedData.outboundLinks.length === 1 ? '' : 's'}.`
-      : "No outbound links found. Consider adding links to authoritative external sources.",
-    passed: outboundLinksPassed,
-    priority: analyzerCheckPriorities["Outbound Links"]
-  });
+  // --- Internal Links Check with v3.3.14 enhanced logic ---
+  const internalLinksCheck = await createSEOCheck(
+    "Internal Links",
+    () => scrapedData.internalLinks.length > 0,
+    `Great! You have internal links on the page.`,
+    `No internal links found on the page.`,
+    scrapedData.internalLinks.join(', '),
+    keyphrase,
+    env,
+    advancedOptions
+  );
+  checks.push(internalLinksCheck);
+  
+  // --- Outbound Links Check with v3.3.14 enhanced logic ---
+  const outboundLinksCheck = await createSEOCheck(
+    "Outbound Links",
+    () => scrapedData.outboundLinks.length > 0,
+    `Good! Outbound links are present.`,
+    `No outbound links found on the page.`,
+    scrapedData.outboundLinks.join(', '),
+    keyphrase,
+    env,
+    advancedOptions
+  );
+  checks.push(outboundLinksCheck);
 
   // Next-Gen Image Formats Check
   const nextGenImages = scrapedData.images.filter(img => {
