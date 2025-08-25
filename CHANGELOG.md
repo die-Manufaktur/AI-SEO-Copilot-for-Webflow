@@ -1,3 +1,10 @@
+## [4.1.1](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/compare/v4.1.0...v4.1.1) (2025-08-25)
+
+### Bug Fixes
+
+* **build:** build ([74c5e25](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/74c5e2595170d6dd01129ca00816524b0d7c1aec))
+* **build:** build ([#463](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/issues/463)) ([c0c4180](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/c0c4180f249a7d0a89ee00e07816322557335b69))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
