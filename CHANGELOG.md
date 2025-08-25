@@ -1,3 +1,11 @@
+## [4.1.3](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/compare/v4.1.2...v4.1.3) (2025-08-25)
+
+### Bug Fixes
+
+* **api:** claude deleted a critical piece of code, so I restored it ([c5135be](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/c5135be0609bdf40f5579a868befa0970398f149))
+* implement missing OG Image and other SEO checks ([bdb8ea8](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/bdb8ea8da50a9a75ade0a264df3dc14c0c94e248)), closes [#432](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/issues/432)
+* implement missing OG Image and other SEO checks ([#464](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/issues/464)) ([65e15ec](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/65e15ecd3093a607a9a210cb9f718089383b8249))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
