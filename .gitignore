@@ -20,14 +20,10 @@ bundle.zip
 .prod.vars
 *.local
 .wrangler/
-.claude/
-.mcp.json
 kill-dev-servers.bat
 
 # Claude Code
 CLAUDE.local.md
-CLAUDE.md
-deploy.md
 
 # IDE & Editor
 .vscode/*
