@@ -4,6 +4,14 @@
       "command": "cmd",
       "args": ["/c", "npx", "mcp-remote", "https://mcp.webflow.com/sse"]
     },
+    "Context7": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@upstash/context7-mcp"]
+    },
+    "serena": {
+      "command": "docker",
+      "args": ["run", "--rm", "-i", "--network", "host", "-v", "C:/Users/Paul Mulligan/PMDS/Projects:/workspaces/projects", "ghcr.io/oraios/serena:latest", "serena", "start-mcp-server", "--transport", "stdio"]
+    },
     "github": {
       "command": "cmd",
       "args": ["/c", "npx", "mcp-github", "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"]

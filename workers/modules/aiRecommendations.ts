@@ -60,7 +60,7 @@ export async function getAIRecommendation(
       : `You are an SEO expert providing actionable advice.
          Provide a concise recommendation for the SEO check "${checkType}".${advancedContext ? ' Consider the page type and additional context provided to make recommendations more relevant and specific.' : ''}`;
 
-    // Special handling for URL checks
+    // Special handling for URL checks with enhanced logic from v3.3.14
     const userPrompt = needsCopyableContent
       ? checkType === "Keyphrase in URL"
         ? `Create an SEO-friendly URL slug for the keyphrase "${keyphrase}".
