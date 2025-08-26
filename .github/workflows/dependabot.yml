@@ -19,6 +19,8 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
+        with:
+          version: latest
 
       - name: Clear pnpm cache for fresh dependency resolution
         run: pnpm store prune
