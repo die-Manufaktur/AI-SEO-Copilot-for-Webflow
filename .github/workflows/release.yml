@@ -59,7 +59,26 @@ jobs:
       - name: Create Draft Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx semantic-release --debug
+        run: |
+          # Retry semantic-release up to 3 times with backoff for 502 errors
+          for i in {1..3}; do
+            echo "Attempt $i: Running semantic-release..."
+            if npx semantic-release --debug; then
+              echo "✅ Semantic release completed successfully"
+              break
+            else
+              exit_code=$?
+              echo "❌ Semantic release failed (exit code: $exit_code)"
+              
+              if [ $i -lt 3 ]; then
+                echo "⏳ Waiting 30 seconds before retry..."
+                sleep 30
+              else
+                echo "💥 All retries exhausted, failing workflow"
+                exit $exit_code
+              fi
+            fi
+          done
 
       - name: Commit Version Updates
         env:

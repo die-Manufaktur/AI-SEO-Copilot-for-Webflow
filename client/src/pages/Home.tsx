@@ -501,8 +501,9 @@ export default function Home() {
         const page = await window.webflow.getCurrentPage();
         const publishPath = await page.getPublishPath();
         const isHomepage = await page.isHomepage();
+        const siteInfo = await window.webflow.getSiteInfo();
         
-        const pageId = generatePageId(publishPath, isHomepage);
+        const pageId = generatePageId(publishPath, isHomepage, siteInfo?.siteId);
         setCurrentPageId(pageId);
         
         // Load saved keywords for this page
