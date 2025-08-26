@@ -7,18 +7,22 @@ const STORAGE_KEY = 'webflow-seo-keywords';
 
 /**
  * Generate a unique page identifier from Webflow page data
+ * Now includes siteId to prevent cross-site data contamination
  */
-export function generatePageId(publishPath: string | null, isHomepage: boolean): string {
+export function generatePageId(publishPath: string | null, isHomepage: boolean, siteId?: string): string {
+  const sitePrefix = siteId ? `${siteId}::` : '';
+  
   if (isHomepage) {
-    return 'homepage';
+    return `${sitePrefix}homepage`;
   }
   
   if (!publishPath) {
-    return 'unknown-page';
+    return `${sitePrefix}unknown-page`;
   }
   
   // Clean the publish path to create a consistent ID
-  return publishPath.replace(/^\/+|\/+$/g, '') || 'homepage';
+  const cleanPath = publishPath.replace(/^\/+|\/+$/g, '') || 'homepage';
+  return `${sitePrefix}${cleanPath}`;
 }
 
 /**
