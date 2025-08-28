@@ -187,13 +187,18 @@ describe('api.ts error handling', () => {
 
       const result = getApiUrl();
       
-      // Should fall back to production when WORKER_URL is missing
-      expect(result).toBe('https://seo-copilot-api-production.paul-130.workers.dev');
-      expect(mockLogger.debug).toHaveBeenCalledWith('Using production API URL');
+      // Should fall back to localhost:8787 when WORKER_URL is missing in development mode
+      expect(result).toBe('http://localhost:8787');
+      expect(mockLogger.debug).toHaveBeenCalledWith('Development mode detected - using local worker:', 'http://localhost:8787');
     });
 
     it('handles window.location access errors in local check', () => {
-      // Mock window.location to throw an error
+      // Set up development environment
+      vi.stubEnv('MODE', 'development');
+      vi.stubEnv('VITE_WORKER_URL', undefined);
+      vi.stubEnv('VITE_FORCE_LOCAL_DEV', undefined);
+      
+      // Mock window.location to throw an error (though getApiUrl doesn't actually use it)
       Object.defineProperty(window, 'location', {
         get() {
           throw new Error('Location access denied');
@@ -203,7 +208,8 @@ describe('api.ts error handling', () => {
 
       const result = getApiUrl();
       
-      expect(result).toBe('https://seo-copilot-api-production.paul-130.workers.dev'); // Should fall back to production
+      // In development mode, should still return localhost regardless of window.location errors
+      expect(result).toBe('http://localhost:8787');
     });
 
     it('handles production environment correctly', () => {

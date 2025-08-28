@@ -40,7 +40,6 @@ import styled from 'styled-components';
 import Footer from "../components/Footer";
 import { createLogger } from "./../lib/utils";
 import React from 'react';
-import { calculateSEOScore } from '../../../shared/utils/seoUtils';
 import { ImageSizeDisplay } from "../components/ImageSizeDisplay";
 import { copyTextToClipboard } from "../utils/clipboard";
 import { shouldShowCopyButton } from '../../../shared/utils/seoUtils';
@@ -351,7 +350,7 @@ export default function Home() {
   // Store the analysis request data for schema population
   const [analysisRequestData, setAnalysisRequestData] = useState<AnalyzeSEORequest | null>(null);
   
-  const seoScore = results && results.checks && Array.isArray(results.checks) ? calculateSEOScore(results.checks) : 0;
+  const seoScore = results?.score ?? 0;
   const scoreRating = getScoreRatingText(seoScore);
 
   const copyToClipboard = async (text: string): Promise<boolean> => {
@@ -636,8 +635,9 @@ export default function Home() {
           if (wasFailed) {
             modifiedData.passedChecks = (modifiedData.passedChecks ?? 0) + 1;
             modifiedData.failedChecks = Math.max(0, (modifiedData.failedChecks ?? 0) - 1);
-            // Recalculate score based on the modified checks
-            modifiedData.score = calculateSEOScore(newChecks);
+            // Update score to simple percentage calculation to match backend
+            const passedCount = newChecks.filter(check => check.passed).length;
+            modifiedData.score = Math.round((passedCount / newChecks.length) * 100);
           }
 
           // Assign the modified checks array back to the data
@@ -682,6 +682,7 @@ export default function Home() {
       }
     }
   });
+
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     // Save keywords for current page
@@ -747,9 +748,11 @@ export default function Home() {
         setIsHomePage(await currentPage.isHomepage());
 
         rawPageData = {
-          title: "",
-          metaDescription: "",
+          title: (await currentPage.getTitle()) ?? "",
+          metaDescription: (await currentPage.getDescription()) ?? "",
           openGraphImage: (await currentPage.getOpenGraphImage()) ?? '',
+          ogTitle: (await currentPage.getOpenGraphTitle()) ?? '',
+          ogDescription: (await currentPage.getOpenGraphDescription()) ?? '',
           usesTitleAsOpenGraphTitle: await currentPage.usesTitleAsOpenGraphTitle(),
           usesDescriptionAsOpenGraphDescription: await currentPage.usesDescriptionAsOpenGraphDescription()
         };
@@ -1061,7 +1064,12 @@ export default function Home() {
                         } : null;
                         
                         if (mockPerfectResult) {
-                          setResults(mockPerfectResult);
+                          // Calculate the score to be 100%
+                          const perfectResult = {
+                            ...mockPerfectResult,
+                            score: 100
+                          };
+                          setResults(perfectResult);
                           
                           confetti({
                             particleCount: 200,
@@ -1075,7 +1083,7 @@ export default function Home() {
                             duration: 3000,
                           });
                           
-                          setShowedPerfectScoreMessage(true);
+                          // Don't set showedPerfectScoreMessage to true here - let the useEffect handle it
                         } else {
                           toast({
                             title: "Test Failed",

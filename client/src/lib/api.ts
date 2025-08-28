@@ -12,30 +12,41 @@ export const getApiUrl = () => {
   const WORKER_URL = import.meta.env.VITE_WORKER_URL;
   const MODE = import.meta.env.MODE; // 'development' or 'production'
   
-  console.log("[DEBUG] getApiUrl() called with:", {
-    FORCE_LOCAL_DEV,
-    WORKER_URL,
-    MODE,
-    PROD: import.meta.env.PROD
-  });
+  // Debug logging only in development
+  if (import.meta.env.MODE === 'development') {
+    console.log("[DEBUG] getApiUrl() called with:", {
+      FORCE_LOCAL_DEV,
+      WORKER_URL,
+      MODE,
+      PROD: import.meta.env.PROD
+    });
+  }
   
   // RULE 1: If we're in development MODE (pnpm dev), ALWAYS use local worker
-  if (import.meta.env.MODE === 'development' && WORKER_URL) {
-    logger.debug("Development mode detected - using local worker:", WORKER_URL);
-    console.log("[DEBUG] Development mode - returning:", WORKER_URL);
-    return WORKER_URL;
+  if (import.meta.env.MODE === 'development') {
+    const localUrl = WORKER_URL || 'http://localhost:8787'; // Fallback to default local worker URL
+    logger.debug("Development mode detected - using local worker:", localUrl);
+    if (import.meta.env.MODE === 'development') {
+      console.log("[DEBUG] Development mode - returning:", localUrl);
+    }
+    return localUrl;
   }
   
   // RULE 2: FORCE_LOCAL_DEV flag overrides everything else
-  if (FORCE_LOCAL_DEV && WORKER_URL) {
-    logger.debug("Force local dev enabled - using:", WORKER_URL);
-    console.log("[DEBUG] Force local dev enabled - returning:", WORKER_URL);
-    return WORKER_URL;
+  if (FORCE_LOCAL_DEV) {
+    const localUrl = WORKER_URL || 'http://localhost:8787'; // Fallback to default local worker URL
+    logger.debug("Force local dev enabled - using:", localUrl);
+    if (import.meta.env.MODE === 'development') {
+      console.log("[DEBUG] Force local dev enabled - returning:", localUrl);
+    }
+    return localUrl;
   }
   
   // RULE 3: Production mode - use production worker
   const productionUrl = "https://seo-copilot-api-production.paul-130.workers.dev";
-  console.log("[DEBUG] Production mode - returning:", productionUrl);
+  if (import.meta.env.MODE === 'development') {
+    console.log("[DEBUG] Production mode - returning:", productionUrl);
+  }
   logger.debug("Using production API URL");
   return productionUrl;
 }
@@ -185,25 +196,25 @@ export async function collectPageAssets(): Promise<Asset[]> {
     if (isWebflowEnvironment) {
       try {
         const pageData = await getWebflowPageData();
-      if (pageData && pageData.ogImage) {
-        assetLogger.info(`Found OG image: ${pageData.ogImage}`);
-        const asset: Asset = {
-          url: pageData.ogImage,
-          alt: 'OG Image',
-          type: 'image',
-          source: 'webflow-meta'
-        };
-        
-        // Try to get size but don't block if it fails
-        const size = await getImageSize(pageData.ogImage, baseUrl);
-        if (size) {
-          asset.size = size;
-          assetLogger.info(`OG image size: ${formatBytes(size)}`);
+        if (pageData && pageData.openGraphImage) {
+          assetLogger.info(`Found OG image: ${pageData.openGraphImage}`);
+          const asset: Asset = {
+            url: pageData.openGraphImage,
+            alt: 'OG Image',
+            type: 'image',
+            source: 'webflow-meta'
+          };
+          
+          // Try to get size but don't block if it fails
+          const size = await getImageSize(pageData.openGraphImage, baseUrl);
+          if (size) {
+            asset.size = size;
+            assetLogger.info(`OG image size: ${formatBytes(size)}`);
+          }
+          
+          assets.push(asset);
+          processedUrls.add(pageData.openGraphImage);
         }
-        
-        assets.push(asset);
-        processedUrls.add(pageData.ogImage);
-      }
       } catch (error) {
         assetLogger.error(`Error getting Webflow page data: ${error}`);
       }
@@ -309,7 +320,7 @@ export async function collectPageAssets(): Promise<Asset[]> {
     if (!assets || assets.length === 0) {
       const isWebflowEnvironment = typeof window !== 'undefined' && window.webflow;
       if (isWebflowEnvironment) {
-        assetLogger.warn('No assets were collected from Webflow environment, something may be wrong');
+        assetLogger.info('No assets were collected from Webflow environment. This may be expected for pages with no images.');
       } else {
         assetLogger.info('No assets collected - expected behavior outside Webflow Designer environment');
       }
@@ -337,8 +348,20 @@ async function getWebflowPageData() {
   
   try {
     const currentPage = await window.webflow.getCurrentPage();
+    
+    // Add timeout to prevent hanging on Webflow API calls
+    const getOgImage = () => {
+      return Promise.race([
+        currentPage.getOpenGraphImage(),
+        new Promise<string>((_, reject) => 
+          setTimeout(() => reject(new Error('Webflow API timeout')), 3000)
+        )
+      ]);
+    };
+    
+    const openGraphImage = await getOgImage();
     return {
-      ogImage: await currentPage.getOpenGraphImage()
+      openGraphImage: openGraphImage || ''
     };
   } catch (error) {
     assetLogger.error(`Error in getWebflowPageData: ${error}`);

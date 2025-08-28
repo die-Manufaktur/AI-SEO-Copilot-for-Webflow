@@ -81,7 +81,8 @@
       "mcp__serena__list_dir",
       "Bash(cat:*)",
       "mcp__serena__execute_shell_command",
-      "mcp__serena__find_file"
+      "mcp__serena__find_file",
+      "mcp__serena__read_file"
     ],
     "deny": []
   },

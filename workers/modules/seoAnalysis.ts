@@ -674,8 +674,16 @@ export async function analyzeSEOElements(
     priority: analyzerCheckPriorities["Next-Gen Image Formats"]
   });
 
-  // OG Image Check
-  const ogImagePassed = Boolean(scrapedData.ogImage && scrapedData.ogImage.trim().length > 0);
+  // OG Image Check - check both scraped data and Webflow API data
+  let ogImageUrl = '';
+  if (useApiData && webflowPageData) {
+    ogImageUrl = webflowPageData.openGraphImage || webflowPageData.ogImage || '';
+  }
+  if (!ogImageUrl) {
+    ogImageUrl = scrapedData.ogImage;
+  }
+  
+  const ogImagePassed = Boolean(ogImageUrl && ogImageUrl.trim().length > 0);
   checks.push({
     title: "OG Image",
     description: ogImagePassed 
@@ -685,9 +693,34 @@ export async function analyzeSEOElements(
     priority: analyzerCheckPriorities["OG Image"]
   });
 
-  // OG Title and Description Check  
-  const ogTitleExists = Boolean(scrapedData.title && scrapedData.title.trim().length > 0);
-  const ogDescExists = Boolean(scrapedData.metaDescription && scrapedData.metaDescription.trim().length > 0);
+  // OG Title and Description Check - check both scraped data and Webflow API data
+  let ogTitleText = '';
+  let ogDescText = '';
+  
+  if (useApiData && webflowPageData) {
+    // First check if explicit OG title/description are set
+    ogTitleText = webflowPageData.ogTitle || '';
+    ogDescText = webflowPageData.ogDescription || '';
+    
+    // If no specific OG title/description set, check if using page title/description as OG
+    if (!ogTitleText && webflowPageData.usesTitleAsOpenGraphTitle) {
+      ogTitleText = webflowPageData.title || '';
+    }
+    if (!ogDescText && webflowPageData.usesDescriptionAsOpenGraphDescription) {
+      ogDescText = webflowPageData.metaDescription || '';
+    }
+  }
+  
+  // Fallback to scraped data if no API data
+  if (!ogTitleText) {
+    ogTitleText = scrapedData.title;
+  }
+  if (!ogDescText) {
+    ogDescText = scrapedData.metaDescription;
+  }
+  
+  const ogTitleExists = Boolean(ogTitleText && ogTitleText.trim().length > 0);
+  const ogDescExists = Boolean(ogDescText && ogDescText.trim().length > 0);
   const ogTitleDescPassed = ogTitleExists && ogDescExists;
   const ogTitleDescDescription = ogTitleDescPassed
     ? "Perfect! Open Graph title and description are present."

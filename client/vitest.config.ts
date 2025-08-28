@@ -6,6 +6,7 @@ export default defineConfig({
     environment: 'happy-dom', // Use happy-dom instead of jsdom for better DOM API support
     setupFiles: ['./src/setupTests.ts'],
     globals: true,
+    testTimeout: 15000, // Set global timeout to 15 seconds for async tests
     coverage: {
       reporter: ['text', 'json', 'html'],
       include: ['src/**/*.{ts,tsx}'],

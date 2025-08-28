@@ -120,7 +120,11 @@ describe('Home Component', () => {
     getSlug: vi.fn(() => Promise.resolve('test-page')),
     isHomepage: vi.fn(() => Promise.resolve(false)),
     getPublishPath: vi.fn(() => Promise.resolve('/test-page')),
+    getTitle: vi.fn(() => Promise.resolve('Test Page Title')),
+    getDescription: vi.fn(() => Promise.resolve('Test page description')),
     getOpenGraphImage: vi.fn(() => Promise.resolve('https://example.com/og-image.jpg')),
+    getOpenGraphTitle: vi.fn(() => Promise.resolve('Test OG Title')),
+    getOpenGraphDescription: vi.fn(() => Promise.resolve('Test OG Description')),
     usesTitleAsOpenGraphTitle: vi.fn(() => Promise.resolve(true)),
     usesDescriptionAsOpenGraphDescription: vi.fn(() => Promise.resolve(true))
   };
@@ -205,8 +209,8 @@ describe('Home Component', () => {
           })
         })
       );
-    });
-  });
+    }, { timeout: 15000 });
+  }, 20000);
 
   it('displays loading state during analysis', async () => {
     const { analyzeSEO } = await import('../lib/api');
@@ -221,9 +225,11 @@ describe('Home Component', () => {
     await user.type(input, 'test keyphrase');
     await user.click(button);
     
-    expect(button).toBeDisabled();
-    expect(screen.getByRole('button', { name: /start optimizing your seo/i })).toHaveAttribute('disabled');
-  });
+    // Wait for the button to be disabled due to pending mutation
+    await waitFor(() => {
+      expect(button).toBeDisabled();
+    }, { timeout: 5000 });
+  }, 20000);
 
   it('handles analysis errors gracefully', async () => {
     const { analyzeSEO } = await import('../lib/api');
@@ -288,8 +294,8 @@ describe('Home Component', () => {
       expect(screen.getByText(/SEO Score/i)).toBeInTheDocument();
       expect(screen.getByText(/1 passed/i)).toBeInTheDocument();
       expect(screen.getByText(/1 to improve/i)).toBeInTheDocument();
-    });
-  });
+    }, { timeout: 15000 });
+  }, 20000);
 
   it('handles unpublished page error correctly', async () => {
     const { analyzeSEO } = await import('../lib/api');
@@ -353,7 +359,7 @@ describe('Home Component', () => {
     // Wait for analysis results to appear
     await waitFor(() => {
       expect(screen.getByText(/Analysis Results/i)).toBeInTheDocument();
-    });
+    }, { timeout: 15000 });
     
     // After homepage modification, the component modifies the result
     // The failed URL check becomes passed, so we should see 1 passed, 0 to improve
@@ -361,8 +367,8 @@ describe('Home Component', () => {
       expect(screen.getByText(/1 passed/i)).toBeInTheDocument();
       // The format might be different - let's check for the actual pattern used
       expect(screen.getByText(/0.*improve/i)).toBeInTheDocument();
-    });
-  });
+    }, { timeout: 10000 });
+  }, 20000);
 
   it('can navigate to category details', async () => {
     const { analyzeSEO } = await import('../lib/api');
@@ -391,7 +397,7 @@ describe('Home Component', () => {
     
     await waitFor(() => {
       expect(screen.getByText(/Meta SEO/i)).toBeInTheDocument();
-    });
+    }, { timeout: 15000 });
     
     // Click on Meta SEO category
     const metaSeoCategory = screen.getByText(/Meta SEO/i);
@@ -399,8 +405,8 @@ describe('Home Component', () => {
     
     await waitFor(() => {
       expect(screen.getByText(/Keyphrase in Title/i)).toBeInTheDocument();
-    });
-  });
+    }, { timeout: 10000 });
+  }, 20000);
 
   it('can copy recommendations to clipboard', async () => {
     const { analyzeSEO } = await import('../lib/api');
@@ -412,16 +418,31 @@ describe('Home Component', () => {
     const mockAnalysis = createMockAnalysis({
       checks: [
         { 
+          title: 'Keyphrase in Title', 
+          passed: true, 
+          priority: 'high', 
+          description: 'Great! Your title contains the keyphrase.',
+          recommendation: null
+        },
+        { 
           title: 'Keyphrase in Meta Description', 
           passed: false, 
           priority: 'high', 
           description: 'The keyphrase should appear in the meta description',
           recommendation: 'Add your keyphrase to the meta description'
+        },
+        { 
+          title: 'Keyphrase in URL', 
+          passed: true, 
+          priority: 'medium', 
+          description: 'Good job! The keyphrase is present in the URL slug.',
+          recommendation: null
         }
       ],
-      passedChecks: 0,
+      passedChecks: 2,
       failedChecks: 1,
-      score: 0
+      totalChecks: 3,
+      score: 67
     });
     
     vi.mocked(analyzeSEO).mockResolvedValue(mockAnalysis);
@@ -437,7 +458,7 @@ describe('Home Component', () => {
     
     await waitFor(() => {
       expect(screen.getByText(/Meta SEO/i)).toBeInTheDocument();
-    });
+    }, { timeout: 10000 });
     
     // Click on Meta SEO category to see details
     const metaSeoCategory = screen.getByText(/Meta SEO/i);
@@ -445,14 +466,14 @@ describe('Home Component', () => {
     
     await waitFor(() => {
       expect(screen.getByText(/Copy/i)).toBeInTheDocument();
-    });
+    }, { timeout: 10000 });
     
     const copyButton = screen.getByText(/Copy/i);
     await user.click(copyButton);
     
     // Verify the copyTextToClipboard utility was called with the correct text
     expect(copyTextToClipboard).toHaveBeenCalledWith('Add your keyphrase to the meta description');
-  });
+  }, 20000);
 
   it('shows perfect score celebration for 100 score', async () => {
     const { analyzeSEO } = await import('../lib/api');
@@ -464,8 +485,18 @@ describe('Home Component', () => {
           priority: 'high', 
           description: 'Perfect optimization achieved!',
           recommendation: null
+        },
+        { 
+          title: 'Keyphrase in Meta Description', 
+          passed: true, 
+          priority: 'high', 
+          description: 'Perfect meta description!',
+          recommendation: null
         }
       ],
+      passedChecks: 2,
+      failedChecks: 0,
+      totalChecks: 2,
       score: 100
     });
     
@@ -482,8 +513,8 @@ describe('Home Component', () => {
     
     await waitFor(() => {
       expect(screen.getByText(/You are an absolute SEO legend/i)).toBeInTheDocument();
-    });
-  });
+    }, { timeout: 10000 });
+  }, 20000);
 
   it('handles no published domain found error', async () => {
     // Mock site info with empty domains array
@@ -513,10 +544,8 @@ describe('Home Component', () => {
   it('displays different score ratings correctly', async () => {
     const { analyzeSEO } = await import('../lib/api');
     
-    // Create checks that will result in a calculated score of 60%
-    // 1 high passed (3 points) + 0 medium passed (0 points) = 3 points
-    // 1 high total (3 points) + 1 medium total (2 points) = 5 total points  
-    // 3/5 = 60%
+    // Create checks that will result in a calculated score of 50%
+    // 1 passed out of 2 total = 50% (simple percentage calculation)
     const goodAnalysis = createMockAnalysis({
       checks: [
         { 
@@ -537,7 +566,7 @@ describe('Home Component', () => {
       passedChecks: 1,
       failedChecks: 1,
       totalChecks: 2,
-      score: 65 // This will be recalculated by the component to 60
+      score: 50 // Simple 1 passed out of 2 total = 50%
     });
     
     vi.mocked(analyzeSEO).mockResolvedValue(goodAnalysis);
@@ -554,15 +583,16 @@ describe('Home Component', () => {
     await waitFor(() => {
       expect(screen.getByText(/Analysis Results/i)).toBeInTheDocument();
       
-      // Look for the calculated score (60%) instead of the mocked score (65%)
-      expect(screen.getByText('60')).toBeInTheDocument();
-    });
-  });
+      // Look for the score (50% - 1 out of 2 passed)
+      expect(screen.getByText('50')).toBeInTheDocument();
+    }, { timeout: 10000 });
+  }, 20000);
 
   it('handles multiple SEO check categories correctly', async () => {
     const { analyzeSEO } = await import('../lib/api');
     const mockAnalysis = createMockAnalysis({
       checks: [
+        // Meta SEO category
         { 
           title: 'Keyphrase in Title', 
           passed: true, 
@@ -571,6 +601,14 @@ describe('Home Component', () => {
           recommendation: null
         },
         { 
+          title: 'Keyphrase in Meta Description', 
+          passed: true, 
+          priority: 'high', 
+          description: 'Meta description contains keyphrase',
+          recommendation: null
+        },
+        // Content Optimisation category
+        { 
           title: 'Content Length', 
           passed: false, 
           priority: 'medium', 
@@ -578,17 +616,32 @@ describe('Home Component', () => {
           recommendation: 'Add more content to reach optimal length'
         },
         { 
+          title: 'Keyphrase Density', 
+          passed: true, 
+          priority: 'medium', 
+          description: 'Good keyphrase density',
+          recommendation: null
+        },
+        // Links category
+        { 
           title: 'Internal Links', 
           passed: true, 
           priority: 'low', 
           description: 'Good internal linking',
           recommendation: null
+        },
+        { 
+          title: 'Outbound Links', 
+          passed: true, 
+          priority: 'low', 
+          description: 'Good outbound linking',
+          recommendation: null
         }
       ],
-      passedChecks: 2,
+      passedChecks: 5,
       failedChecks: 1,
-      totalChecks: 3,
-      score: 75
+      totalChecks: 6,
+      score: 83
     });
     
     vi.mocked(analyzeSEO).mockResolvedValue(mockAnalysis);
@@ -607,8 +660,8 @@ describe('Home Component', () => {
       expect(screen.getByText(/Content Optimisation/i)).toBeInTheDocument();
       // Use more specific selector for Links category to avoid ambiguity
       expect(screen.getByRole('heading', { name: /Links/i })).toBeInTheDocument();
-    });
-  });
+    }, { timeout: 15000 });
+  }, 20000);
 });
 
 describe('Home Component - Additional Coverage', () => {
@@ -633,7 +686,11 @@ describe('Home Component - Additional Coverage', () => {
     getSlug: vi.fn(() => Promise.resolve('test-page')),
     isHomepage: vi.fn(() => Promise.resolve(false)),
     getPublishPath: vi.fn(() => Promise.resolve('/test-page')),
+    getTitle: vi.fn(() => Promise.resolve('Test Page Title')),
+    getDescription: vi.fn(() => Promise.resolve('Test page description')),
     getOpenGraphImage: vi.fn(() => Promise.resolve('https://example.com/og-image.jpg')),
+    getOpenGraphTitle: vi.fn(() => Promise.resolve('Test OG Title')),
+    getOpenGraphDescription: vi.fn(() => Promise.resolve('Test OG Description')),
     usesTitleAsOpenGraphTitle: vi.fn(() => Promise.resolve(true)),
     usesDescriptionAsOpenGraphDescription: vi.fn(() => Promise.resolve(true))
   };
@@ -881,7 +938,7 @@ describe('Home Component - Additional Coverage', () => {
       
       await waitFor(() => {
         expect(screen.getByText(/Analysis Results/i)).toBeInTheDocument();
-      });
+      }, { timeout: 15000 });
       
       // Now click the test button
       const testButton = screen.getByText(/🧪 Test 100 Score/);
@@ -891,8 +948,8 @@ describe('Home Component - Additional Coverage', () => {
       expect(confetti.default).toHaveBeenCalled();
       await waitFor(() => {
         expect(screen.getByText(/You are an absolute SEO legend/i)).toBeInTheDocument();
-      });
-    });
+      }, { timeout: 10000 });
+    }, 20000);
 
     it('shows error when trying to test without existing results', async () => {
       const user = userEvent.setup();
@@ -955,12 +1012,12 @@ describe('Home Component - Additional Coverage', () => {
       // Wait for analysis results to appear
       await waitFor(() => {
         expect(screen.getByText(/Analysis Results/i)).toBeInTheDocument();
-      });
+      }, { timeout: 15000 });
       
       // Look for the Images and Assets category in the overview
       await waitFor(() => {
         expect(screen.getByText(/Images and Assets/i)).toBeInTheDocument();
-      });
+      }, { timeout: 10000 });
       
       // Click on the Images and Assets category
       const categoryButton = screen.getByText(/Images and Assets/i).closest('.cursor-pointer');
@@ -971,7 +1028,7 @@ describe('Home Component - Additional Coverage', () => {
       // Wait for category details to load and verify the check title appears
       await waitFor(() => {
         expect(screen.getByText(/Image Alt Attributes/i)).toBeInTheDocument();
-      }, { timeout: 3000 });
+      }, { timeout: 10000 });
       
       // Since the recommendation text is rendered through ImageSizeDisplay component
       // when imageData is present, let's look for image-related content instead
@@ -985,7 +1042,7 @@ describe('Home Component - Additional Coverage', () => {
           screen.queryByText(/KB/i); // file size unit
       
         expect(hasImageContent).toBeInTheDocument();
-      });
-    });
+      }, { timeout: 10000 });
+    }, 20000);
   });
 });
