@@ -82,7 +82,12 @@
       "Bash(cat:*)",
       "mcp__serena__execute_shell_command",
       "mcp__serena__find_file",
-      "mcp__serena__read_file"
+      "mcp__serena__read_file",
+      "Bash(/c/Users/Paul Mulligan/AppData/Local/pnpm/pnpm check)",
+      "Bash(./node_modules/.bin/tsc:*)",
+      "Bash(./node_modules/.bin/vitest:*)",
+      "Bash(./node_modules/.bin/vite:*)",
+      "Bash(cmd /c:*)"
     ],
     "deny": []
   },

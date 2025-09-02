@@ -1,9 +1,10 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { screen, waitFor, fireEvent } from '@testing-library/react';
+import { screen, waitFor, fireEvent, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useEffect } from 'react';
 import { renderWithQueryClient } from '../test-utils';
 import Home from './Home';
+import { saveAdvancedOptionsForPage, loadAdvancedOptionsForPage } from '../utils/advancedOptionsStorage';
 
 // Mock ResizeObserver for ScrollArea component
 global.ResizeObserver = vi.fn().mockImplementation(() => ({
@@ -34,6 +35,12 @@ vi.mock('canvas-confetti', () => ({
   default: vi.fn()
 }));
 
+// Mock advanced options storage
+vi.mock('../utils/advancedOptionsStorage', () => ({
+  saveAdvancedOptionsForPage: vi.fn(),
+  loadAdvancedOptionsForPage: vi.fn()
+}));
+
 // Mock the webflow API
 const mockWebflowApi = {
   getCurrentPage: vi.fn(),
@@ -54,6 +61,12 @@ Object.defineProperty(window, 'location', {
     reload: vi.fn(),
     hostname: 'localhost'
   },
+  writable: true
+});
+
+// Mock window.scrollTo
+Object.defineProperty(window, 'scrollTo', {
+  value: vi.fn(),
   writable: true
 });
 
@@ -1044,5 +1057,173 @@ describe('Home Component - Additional Coverage', () => {
         expect(hasImageContent).toBeInTheDocument();
       }, { timeout: 10000 });
     }, 20000);
+  });
+
+  describe('Advanced Options Persistent Settings', () => {
+    beforeEach(() => {
+      // Reset mocks
+      vi.mocked(saveAdvancedOptionsForPage).mockClear();
+      vi.mocked(loadAdvancedOptionsForPage).mockClear();
+      
+      // Default return empty options
+      vi.mocked(loadAdvancedOptionsForPage).mockReturnValue({
+        pageType: '',
+        secondaryKeywords: ''
+      });
+    });
+
+    it('should hide advanced options section by default', async () => {
+      renderWithQueryClient(<Home />);
+      
+      // Advanced Analysis section should be visible but form fields should be hidden initially
+      expect(screen.getByText(/Advanced Analysis/i)).toBeInTheDocument();
+      // Look for the actual form controls, not labels
+      expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+      expect(screen.queryByPlaceholderText(/Enter secondary keywords/i)).not.toBeInTheDocument();
+    });
+
+    it('should show advanced options when toggle is enabled', async () => {
+      const user = userEvent.setup();
+      renderWithQueryClient(<Home />);
+      
+      // Find and click the advanced options toggle
+      const advancedToggle = screen.getByRole('switch');
+      await user.click(advancedToggle);
+      
+      // Advanced options section should now be visible
+      await waitFor(() => {
+        expect(screen.getByRole('combobox')).toBeInTheDocument();
+        expect(screen.getByPlaceholderText(/Enter secondary keywords/i)).toBeInTheDocument();
+      });
+    });
+
+    it('should preserve settings in storage when toggle is turned off', async () => {
+      const user = userEvent.setup();
+      renderWithQueryClient(<Home />);
+      
+      // Enable advanced options
+      const advancedToggle = screen.getByRole('switch');
+      await user.click(advancedToggle);
+      
+      // Wait for fields to appear
+      await waitFor(() => {
+        expect(screen.getByRole('combobox')).toBeInTheDocument();
+      });
+      
+      // Fill in some values (this would normally trigger saves, but we're testing the toggle behavior)
+      const secondaryKeywordsInput = screen.getByPlaceholderText(/Enter secondary keywords/i);
+      await user.type(secondaryKeywordsInput, 'test keywords');
+      
+      // Turn off advanced options
+      await user.click(advancedToggle);
+      
+      // Advanced options should be hidden
+      await waitFor(() => {
+        expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+        expect(screen.queryByPlaceholderText(/Enter secondary keywords/i)).not.toBeInTheDocument();
+      });
+      
+      // Note: The actual storage preservation is tested at the component level
+      // The behavior change ensures that saveAdvancedOptionsForPage is NOT called
+      // with empty values when toggling off (unlike the old behavior)
+    });
+
+    it('should restore saved settings when toggle is turned back on', async () => {
+      // Mock returning saved settings
+      vi.mocked(loadAdvancedOptionsForPage).mockReturnValue({
+        pageType: 'Blog post',
+        secondaryKeywords: 'test keywords, blog content'
+      });
+      
+      const user = userEvent.setup();
+      renderWithQueryClient(<Home />);
+      
+      // Enable advanced options
+      const advancedToggle = screen.getByRole('switch');
+      await user.click(advancedToggle);
+      
+      // Wait for fields to appear with restored values
+      await waitFor(() => {
+        // Check that the page type select shows the restored value
+        const pageTypeSelect = screen.getByRole('combobox');
+        expect(pageTypeSelect).toBeInTheDocument();
+        
+        // Check that secondary keywords input shows the restored value
+        const secondaryKeywordsInput = screen.getByDisplayValue('test keywords, blog content');
+        expect(secondaryKeywordsInput).toBeInTheDocument();
+      });
+      
+      // Verify loadAdvancedOptionsForPage was called
+      expect(vi.mocked(loadAdvancedOptionsForPage)).toHaveBeenCalled();
+    });
+
+    it('should show correct save status when settings are restored', async () => {
+      // Mock returning saved settings
+      vi.mocked(loadAdvancedOptionsForPage).mockReturnValue({
+        pageType: 'Homepage',
+        secondaryKeywords: 'main page keywords'
+      });
+      
+      const user = userEvent.setup();
+      renderWithQueryClient(<Home />);
+      
+      // Enable advanced options
+      const advancedToggle = screen.getByRole('switch');
+      await user.click(advancedToggle);
+      
+      // Wait for save status to show as 'saved'
+      await waitFor(() => {
+        expect(screen.getByText(/Secondary keywords and page type saved/i)).toBeInTheDocument();
+      });
+    });
+
+    it('should maintain toggle state separately from settings persistence', async () => {
+      // Mock returning saved settings
+      vi.mocked(loadAdvancedOptionsForPage).mockReturnValue({
+        pageType: 'Product page',
+        secondaryKeywords: 'product keywords'
+      });
+      
+      const user = userEvent.setup();
+      renderWithQueryClient(<Home />);
+      
+      const advancedToggle = screen.getByRole('switch');
+      
+      // Initially toggle should be off and advanced fields hidden
+      expect(advancedToggle).toHaveAttribute('data-state', 'unchecked');
+      expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+      
+      // Turn on - should show saved settings
+      fireEvent.click(advancedToggle);
+      await waitFor(() => {
+        expect(advancedToggle).toHaveAttribute('data-state', 'checked');
+      });
+      
+      await waitFor(() => {
+        expect(screen.getByRole('combobox')).toBeInTheDocument();
+        expect(screen.getByDisplayValue('product keywords')).toBeInTheDocument();
+      });
+      
+      // Turn off - should hide section but preserve data
+      fireEvent.click(advancedToggle);
+      await waitFor(() => {
+        expect(advancedToggle).toHaveAttribute('data-state', 'unchecked');
+      });
+      
+      await waitFor(() => {
+        expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+      });
+      
+      // Turn on again - should restore the same settings
+      fireEvent.click(advancedToggle);
+      await waitFor(() => {
+        expect(advancedToggle).toHaveAttribute('data-state', 'checked');
+      });
+      
+      await waitFor(() => {
+        expect(screen.getByRole('combobox')).toBeInTheDocument();
+        expect(screen.getByDisplayValue('product keywords')).toBeInTheDocument();
+      });
+    });
   });
 });

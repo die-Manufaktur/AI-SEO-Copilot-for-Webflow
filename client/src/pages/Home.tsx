@@ -924,14 +924,20 @@ export default function Home() {
                           checked={advancedOptionsEnabled}
                           onCheckedChange={(checked) => {
                             setAdvancedOptionsEnabled(checked);
-                            // Clear advanced options when toggled off
                             if (!checked) {
+                              // When turning off, only clear UI state but preserve stored settings
                               setPageType('');
                               setSecondaryKeywords('');
                               setAdvancedOptionsSaveStatus('none');
-                              // Also clear saved options from storage
+                            } else {
+                              // When turning on, restore saved settings
                               if (currentPageId) {
-                                saveAdvancedOptionsForPage(currentPageId, { pageType: '', secondaryKeywords: '' });
+                                const savedAdvancedOptions = loadAdvancedOptionsForPage(currentPageId);
+                                if (savedAdvancedOptions.pageType || savedAdvancedOptions.secondaryKeywords) {
+                                  setPageType(savedAdvancedOptions.pageType || '');
+                                  setSecondaryKeywords(savedAdvancedOptions.secondaryKeywords || '');
+                                  setAdvancedOptionsSaveStatus('saved');
+                                }
                               }
                             }
                           }}

@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced test coverage for secondary keywords functionality
 
 ### Fixed
+- Advanced options settings now persist when toggling the advanced tab off and on (#453)
 - Page Type Input focus border issue in Chrome
 - Test compatibility with secondary keywords feature
 - Production console logging issues
