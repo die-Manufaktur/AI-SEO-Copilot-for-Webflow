@@ -24,6 +24,7 @@ kill-dev-servers.bat
 
 # Claude Code
 CLAUDE.local.md
+.claude/agents/*
 
 # IDE & Editor
 .vscode/*
