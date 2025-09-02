@@ -1,3 +1,10 @@
+## [4.2.0](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/compare/v4.1.5...v4.2.0) (2025-09-02)
+
+### Features
+
+* **api:** advanced settings persist forever ([9961c2e](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/9961c2e35a64dd9b12747c01291ccda496aebf38))
+* **api:** advanced settings persist forever ([#473](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/issues/473)) ([54501e8](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/54501e8b3be129eabfebe8b18cda8c9f22bb8843))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
