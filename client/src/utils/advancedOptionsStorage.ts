@@ -25,14 +25,16 @@ export function saveAdvancedOptionsForPage(pageId: string, options: AdvancedOpti
     
     const sanitizedPageType = options.pageType?.trim() || '';
     const sanitizedContext = sanitizeKeywords(options.secondaryKeywords || '');
+    const sanitizedLanguageCode = options.languageCode?.trim() || '';
     
-    if (sanitizedPageType || sanitizedContext) {
+    if (sanitizedPageType || sanitizedContext || sanitizedLanguageCode) {
       pageOptions[pageId] = {
         pageType: sanitizedPageType,
-        secondaryKeywords: sanitizedContext
+        secondaryKeywords: sanitizedContext,
+        languageCode: sanitizedLanguageCode
       };
     } else {
-      // Remove entry if both fields are empty
+      // Remove entry if all fields are empty
       delete pageOptions[pageId];
     }
     
@@ -48,22 +50,23 @@ export function saveAdvancedOptionsForPage(pageId: string, options: AdvancedOpti
 export function loadAdvancedOptionsForPage(pageId: string): AdvancedOptions {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return { pageType: '', secondaryKeywords: '' };
+    if (!stored) return { pageType: '', secondaryKeywords: '', languageCode: '' };
     
     const pageOptions: PageAdvancedOptions = JSON.parse(stored);
     const options = pageOptions[pageId];
     
     if (!options) {
-      return { pageType: '', secondaryKeywords: '' };
+      return { pageType: '', secondaryKeywords: '', languageCode: '' };
     }
     
     return {
       pageType: options.pageType || '',
-      secondaryKeywords: options.secondaryKeywords || ''
+      secondaryKeywords: options.secondaryKeywords || '',
+      languageCode: options.languageCode || ''
     };
   } catch (error) {
     console.warn('Failed to load advanced options from localStorage:', error);
-    return { pageType: '', secondaryKeywords: '' };
+    return { pageType: '', secondaryKeywords: '', languageCode: '' };
   }
 }
 

@@ -1092,7 +1092,8 @@ describe('Home Component - Additional Coverage', () => {
       
       // Advanced options section should now be visible
       await waitFor(() => {
-        expect(screen.getByRole('combobox')).toBeInTheDocument();
+        const comboboxes = screen.getAllByRole('combobox');
+        expect(comboboxes).toHaveLength(2); // page type + language selector
         expect(screen.getByPlaceholderText(/Enter secondary keywords/i)).toBeInTheDocument();
       });
     });
@@ -1107,7 +1108,8 @@ describe('Home Component - Additional Coverage', () => {
       
       // Wait for fields to appear
       await waitFor(() => {
-        expect(screen.getByRole('combobox')).toBeInTheDocument();
+        const comboboxes = screen.getAllByRole('combobox');
+        expect(comboboxes).toHaveLength(2); // page type + language selector
       });
       
       // Fill in some values (this would normally trigger saves, but we're testing the toggle behavior)
@@ -1145,8 +1147,9 @@ describe('Home Component - Additional Coverage', () => {
       // Wait for fields to appear with restored values
       await waitFor(() => {
         // Check that the page type select shows the restored value
-        const pageTypeSelect = screen.getByRole('combobox');
-        expect(pageTypeSelect).toBeInTheDocument();
+        const pageTypeSelects = screen.getAllByRole('combobox');
+        expect(pageTypeSelects).toHaveLength(2); // page type + language selector
+        expect(pageTypeSelects[0]).toBeInTheDocument(); // page type selector
         
         // Check that secondary keywords input shows the restored value
         const secondaryKeywordsInput = screen.getByDisplayValue('test keywords, blog content');
@@ -1200,7 +1203,8 @@ describe('Home Component - Additional Coverage', () => {
       });
       
       await waitFor(() => {
-        expect(screen.getByRole('combobox')).toBeInTheDocument();
+        const comboboxes = screen.getAllByRole('combobox');
+        expect(comboboxes).toHaveLength(2); // page type + language selector
         expect(screen.getByDisplayValue('product keywords')).toBeInTheDocument();
       });
       
@@ -1221,7 +1225,8 @@ describe('Home Component - Additional Coverage', () => {
       });
       
       await waitFor(() => {
-        expect(screen.getByRole('combobox')).toBeInTheDocument();
+        const comboboxes = screen.getAllByRole('combobox');
+        expect(comboboxes).toHaveLength(2); // page type + language selector
         expect(screen.getByDisplayValue('product keywords')).toBeInTheDocument();
       });
     });

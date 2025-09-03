@@ -172,6 +172,7 @@ export interface WorkerEnvironment {
 export interface AdvancedOptions {
   pageType?: string;
   secondaryKeywords?: string; // Secondary keywords (comma-separated)
+  languageCode?: string; // Selected language for AI recommendations
 }
 
 /**
@@ -207,3 +208,6 @@ export interface AnalyzeSEORequest {
   debug?: boolean;
   advancedOptions?: AdvancedOptions;
 }
+
+// Language types for multilingual SEO suggestions
+export * from './language';

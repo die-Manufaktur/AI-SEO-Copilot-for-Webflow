@@ -48,6 +48,9 @@ import { saveAdvancedOptionsForPage, loadAdvancedOptionsForPage, type AdvancedOp
 import sanitizeHtml from 'sanitize-html';
 import { sanitizeText } from '../../../shared/utils/stringUtils';
 import { getPageTypes, getPopulatedSchemaRecommendations } from '../../../shared/utils/schemaRecommendations';
+import { LanguageSelector } from '../components/ui/language-selector';
+import { getDefaultLanguage, getLanguageByCode, type Language } from '../../../shared/types/language';
+import { loadLanguageForSite, saveLanguageForSite } from '../utils/languageStorage';
 import { SchemaDisplay } from '../components/ui/schema-display';
 
 const logger = createLogger("Home");
@@ -62,7 +65,7 @@ const formSchema = z.object({
 // Secondary keywords validation
 const MAX_KEYWORDS_LENGTH = 500;
 const MAX_KEYWORDS_COUNT = 10;
-const validateSecondaryKeywords = (input: string): { isValid: boolean; message?: string; sanitized: string } => {
+const validateSecondaryKeywords = (input: string, languageCode?: string): { isValid: boolean; message?: string; sanitized: string } => {
   if (!input) return { isValid: true, sanitized: '' };
   
   // Check for excessive length
@@ -122,7 +125,7 @@ const validateSecondaryKeywords = (input: string): { isValid: boolean; message?:
   }
 
   // Apply additional text sanitization and return cleaned keywords
-  const finalSanitized = keywords.map(k => sanitizeText(k).trim()).filter(k => k.length > 0).join(', ');
+  const finalSanitized = keywords.map(k => sanitizeText(k, languageCode).trim()).filter(k => k.length > 0).join(', ');
 
   return { isValid: true, sanitized: finalSanitized };
 };
@@ -338,6 +341,7 @@ export default function Home() {
   const [_urls, setUrls] = useState<string[]>([]);
   const [showedPerfectScoreMessage, setShowedPerfectScoreMessage] = useState<boolean>(false);
   const [currentPageId, setCurrentPageId] = useState<string>('');
+  const [currentSiteId, setCurrentSiteId] = useState<string>('');
   const [keywordSaveStatus, setKeywordSaveStatus] = useState<'saved' | 'saving' | 'none'>('none');
   
   // Advanced options state
@@ -345,6 +349,7 @@ export default function Home() {
   const [pageType, setPageType] = useState<string>('');
   const [secondaryKeywords, setSecondaryKeywords] = useState<string>('');
   const [secondaryKeywordsError, setSecondaryKeywordsError] = useState<string>('');
+  const [selectedLanguage, setSelectedLanguage] = useState<Language>(getDefaultLanguage());
   const [advancedOptionsSaveStatus, setAdvancedOptionsSaveStatus] = useState<'saved' | 'saving' | 'none'>('none');
   
   // Store the analysis request data for schema population
@@ -504,6 +509,18 @@ export default function Home() {
         
         const pageId = generatePageId(publishPath, isHomepage, siteInfo?.siteId);
         setCurrentPageId(pageId);
+        setCurrentSiteId(siteInfo?.siteId || '');
+        
+        // Load site-specific language preference
+        if (siteInfo?.siteId) {
+          try {
+            const siteLanguage = loadLanguageForSite(siteInfo.siteId);
+            setSelectedLanguage(siteLanguage);
+          } catch (error) {
+            console.warn('Failed to load site language preference:', error);
+            setSelectedLanguage(getDefaultLanguage());
+          }
+        }
         
         // Load saved keywords for this page
         const savedKeywords = loadKeywordsForPage(pageId);
@@ -516,9 +533,17 @@ export default function Home() {
         
         // Load saved advanced options for this page
         const savedAdvancedOptions = loadAdvancedOptionsForPage(pageId);
-        if (savedAdvancedOptions.pageType || savedAdvancedOptions.secondaryKeywords) {
+        if (savedAdvancedOptions.pageType || savedAdvancedOptions.secondaryKeywords || savedAdvancedOptions.languageCode) {
           setPageType(savedAdvancedOptions.pageType || '');
           setSecondaryKeywords(savedAdvancedOptions.secondaryKeywords || '');
+          
+          // For backward compatibility, also check languageCode in advanced options
+          // but prefer site-wide language setting
+          if (savedAdvancedOptions.languageCode && !siteInfo?.siteId) {
+            const language = getLanguageByCode(savedAdvancedOptions.languageCode) || getDefaultLanguage();
+            setSelectedLanguage(language);
+          }
+          
           setAdvancedOptionsEnabled(true);
           setAdvancedOptionsSaveStatus('saved');
         } else {
@@ -693,10 +718,14 @@ export default function Home() {
     }
     
     // Save advanced options for current page
-    if (currentPageId && advancedOptionsEnabled && (pageType || secondaryKeywords)) {
+    if (currentPageId && advancedOptionsEnabled && (pageType || secondaryKeywords || selectedLanguage.code !== getDefaultLanguage().code)) {
       setAdvancedOptionsSaveStatus('saving');
-      const sanitizedContext = secondaryKeywords ? validateSecondaryKeywords(secondaryKeywords).sanitized : '';
-      saveAdvancedOptionsForPage(currentPageId, { pageType, secondaryKeywords: sanitizedContext });
+      const sanitizedContext = secondaryKeywords ? validateSecondaryKeywords(secondaryKeywords, selectedLanguage.code).sanitized : '';
+      saveAdvancedOptionsForPage(currentPageId, { 
+        pageType, 
+        secondaryKeywords: sanitizedContext,
+        languageCode: selectedLanguage.code 
+      });
       setAdvancedOptionsSaveStatus('saved');
     }
     
@@ -785,7 +814,7 @@ export default function Home() {
         }))
       };
 
-      const sanitizedKeywords = secondaryKeywords ? validateSecondaryKeywords(secondaryKeywords).sanitized : undefined;
+      const sanitizedKeywords = secondaryKeywords ? validateSecondaryKeywords(secondaryKeywords, selectedLanguage.code).sanitized : undefined;
       
       const analysisData: AnalyzeSEORequest = {
         keyphrase: values.keyphrase,
@@ -794,10 +823,11 @@ export default function Home() {
         siteInfo: mappedSiteInfo,
         publishPath,
         webflowPageData: pageDataForApi as WebflowPageData,
-        ...(advancedOptionsEnabled && (pageType || secondaryKeywords) && {
+        ...(advancedOptionsEnabled && (pageType || secondaryKeywords || selectedLanguage.code !== getDefaultLanguage().code) && {
           advancedOptions: {
             pageType: pageType || undefined,
-            secondaryKeywords: sanitizedKeywords
+            secondaryKeywords: sanitizedKeywords,
+            languageCode: selectedLanguage.code
           }
         })
       };
@@ -928,14 +958,19 @@ export default function Home() {
                               // When turning off, only clear UI state but preserve stored settings
                               setPageType('');
                               setSecondaryKeywords('');
+                              setSelectedLanguage(getDefaultLanguage());
                               setAdvancedOptionsSaveStatus('none');
                             } else {
                               // When turning on, restore saved settings
                               if (currentPageId) {
                                 const savedAdvancedOptions = loadAdvancedOptionsForPage(currentPageId);
-                                if (savedAdvancedOptions.pageType || savedAdvancedOptions.secondaryKeywords) {
+                                if (savedAdvancedOptions.pageType || savedAdvancedOptions.secondaryKeywords || savedAdvancedOptions.languageCode) {
                                   setPageType(savedAdvancedOptions.pageType || '');
                                   setSecondaryKeywords(savedAdvancedOptions.secondaryKeywords || '');
+                                  const savedLanguage = savedAdvancedOptions.languageCode 
+                                    ? getLanguageByCode(savedAdvancedOptions.languageCode) || getDefaultLanguage()
+                                    : getDefaultLanguage();
+                                  setSelectedLanguage(savedLanguage);
                                   setAdvancedOptionsSaveStatus('saved');
                                 }
                               }
@@ -976,6 +1011,36 @@ export default function Home() {
                             </Select>
                           </div>
 
+                          {/* Language Selector */}
+                          <LanguageSelector
+                            label="Generate AI suggestions in"
+                            selectedLanguage={selectedLanguage}
+                            onLanguageChange={(language) => {
+                              try {
+                                setSelectedLanguage(language);
+                                
+                                // Save language preference to site-wide storage
+                                if (currentSiteId) {
+                                  saveLanguageForSite(currentSiteId, language.code);
+                                } else {
+                                  console.warn('No site ID available for saving language preference');
+                                }
+                                
+                                setAdvancedOptionsSaveStatus('none'); // Mark as unsaved when changed
+                              } catch (error) {
+                                console.warn('Failed to save language preference:', error);
+                                toast({
+                                  variant: "destructive",
+                                  title: "Language Setting Error",
+                                  description: "Failed to save language preference. Please try again."
+                                });
+                                // Revert to previous language on error
+                                setSelectedLanguage(getDefaultLanguage());
+                              }
+                            }}
+                            className="space-y-2"
+                          />
+
                           {/* Secondary Keywords Input */}
                           <div className="space-y-2">
                             <label className="text-sm font-medium">
@@ -991,7 +1056,7 @@ export default function Home() {
                                 setSecondaryKeywords(input);
                                 
                                 // Only validate and show errors, don't sanitize during typing
-                                const validation = validateSecondaryKeywords(input);
+                                const validation = validateSecondaryKeywords(input, selectedLanguage.code);
                                 if (!validation.isValid) {
                                   setSecondaryKeywordsError(validation.message || 'Invalid input detected');
                                 } else {
