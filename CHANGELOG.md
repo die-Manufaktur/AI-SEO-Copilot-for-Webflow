@@ -1,3 +1,10 @@
+## [4.3.0](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/compare/v4.2.0...v4.3.0) (2025-09-03)
+
+### Features
+
+* **api:** implement multi-language support for AI recommendations ([54c8cda](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/54c8cda9f0e0bca138a343508d4cd963613240e2)), closes [#393](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/issues/393)
+* **api:** implement multi-language support for AI recommendations ([#474](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/issues/474)) ([7a79a22](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/7a79a22ac5bb5a27c25d0725b4f27d92b2b5e4cb))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
