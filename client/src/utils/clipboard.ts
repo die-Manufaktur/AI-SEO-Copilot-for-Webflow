@@ -4,8 +4,9 @@ import { sanitizeText } from '../../../shared/utils/stringUtils';
  * Multi-strategy clipboard utility with fallbacks
  */
 export const copyTextToClipboard = async (text: string): Promise<boolean> => {
-  // Clean and sanitize the text using shared utility
-  const sanitizedText = typeof text === 'string' ? sanitizeText(text) : '';
+  // Clean and sanitize the text using shared utility, preserving Unicode for multilingual content
+  // Since we don't have language context here, we'll be conservative and preserve Unicode
+  const sanitizedText = typeof text === 'string' ? sanitizeText(text, 'preserve-unicode') : '';
 
   // Strategy 1: Try the modern Clipboard API (with permissions)
   try {

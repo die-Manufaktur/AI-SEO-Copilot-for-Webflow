@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import { sanitizeForAI, sanitizeText } from '../../shared/utils/stringUtils';
 import { shouldShowCopyButton } from '../../shared/utils/seoUtils';
 import { WorkerEnvironment, AdvancedOptions } from '../../shared/types/index';
+import { getLanguageByCode, DEFAULT_LANGUAGE_CODE } from '../../shared/types/language';
 
 /**
  * Check if a specific SEO check type should have a copy button
@@ -39,6 +40,9 @@ export async function getAIRecommendation(
     
     // Build advanced context string if available
     const secondaryKeywords = advancedOptions?.secondaryKeywords;
+    const languageCode = advancedOptions?.languageCode || DEFAULT_LANGUAGE_CODE;
+    const language = getLanguageByCode(languageCode);
+    
     let advancedContext = '';
     if (advancedOptions?.pageType || secondaryKeywords) {
       advancedContext = '\n\nAdvanced Context:';
@@ -46,9 +50,15 @@ export async function getAIRecommendation(
         advancedContext += `\n- Page Type: ${advancedOptions.pageType}`;
       }
       if (secondaryKeywords) {
-        const sanitizedContext = sanitizeForAI(secondaryKeywords);
+        const sanitizedContext = sanitizeForAI(secondaryKeywords, languageCode);
         advancedContext += `\n- Secondary Keywords: ${sanitizedContext}`;
       }
+    }
+    
+    // Build language instruction if not default language
+    let languageInstruction = '';
+    if (languageCode !== DEFAULT_LANGUAGE_CODE && language) {
+      languageInstruction = `\n\nIMPORTANT: Generate all content in ${language.name} (${language.nativeName}). Provide recommendations entirely in this language.`;
     }
     
     const systemPrompt = needsCopyableContent 
@@ -56,9 +66,9 @@ export async function getAIRecommendation(
          Create a single, concise, and optimized ${checkType.toLowerCase()} that naturally incorporates the keyphrase.
          Return ONLY the final content with no additional explanation, quotes, or formatting.
          The content must be directly usable by copying and pasting.
-         Focus on being specific, clear, and immediately usable.${advancedContext ? ' Consider the page type and additional context provided to make recommendations more relevant and specific.' : ''}`
+         Focus on being specific, clear, and immediately usable.${advancedContext ? ' Consider the page type and additional context provided to make recommendations more relevant and specific.' : ''}${languageInstruction}`
       : `You are an SEO expert providing actionable advice.
-         Provide a concise recommendation for the SEO check "${checkType}".${advancedContext ? ' Consider the page type and additional context provided to make recommendations more relevant and specific.' : ''}`;
+         Provide a concise recommendation for the SEO check "${checkType}".${advancedContext ? ' Consider the page type and additional context provided to make recommendations more relevant and specific.' : ''}${languageInstruction}`;
 
     // Special handling for URL checks with enhanced logic from v3.3.14
     const userPrompt = needsCopyableContent
@@ -99,10 +109,50 @@ export async function getAIRecommendation(
       throw new Error("No recommendation received from OpenAI");
     }
 
-    const recommendation = sanitizeText(response.choices[0].message.content.trim());
+    const recommendation = sanitizeText(response.choices[0].message.content.trim(), languageCode);
+    
+    // Basic validation for language-specific content
+    if (languageCode !== DEFAULT_LANGUAGE_CODE && language) {
+      // Simple heuristic: if non-English language was requested but response seems to be in English,
+      // add a note about fallback
+      const englishWords = ['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by'];
+      const wordCount = recommendation.toLowerCase().split(/\s+/).length;
+      const englishWordCount = englishWords.filter(word => 
+        recommendation.toLowerCase().includes(` ${word} `) || 
+        recommendation.toLowerCase().startsWith(`${word} `) ||
+        recommendation.toLowerCase().endsWith(` ${word}`)
+      ).length;
+      
+      // If more than 30% of words are common English words and it's a non-English request
+      if (wordCount > 5 && (englishWordCount / wordCount) > 0.3 && languageCode !== 'en') {
+        console.warn(`AI may have responded in English instead of requested language: ${language.name}`);
+      }
+    }
+    
     return recommendation;
   } catch (error) {
     console.error(`[AI Recommendations] Error generating AI recommendation:`, error);
+    
+    // Provide language-specific fallback message if possible
+    const requestedLanguageCode = advancedOptions?.languageCode || DEFAULT_LANGUAGE_CODE;
+    const requestedLanguage = getLanguageByCode(requestedLanguageCode);
+    
+    if (requestedLanguageCode !== DEFAULT_LANGUAGE_CODE && requestedLanguage) {
+      const fallbackMessages: Record<string, string> = {
+        'fr': 'Impossible de générer une recommandation pour le moment. Veuillez réessayer.',
+        'de': 'Kann derzeit keine Empfehlung generieren. Bitte versuchen Sie es erneut.',
+        'es': 'No se puede generar una recomendación en este momento. Por favor, inténtelo de nuevo.',
+        'it': 'Impossibile generare un consiglio al momento. Si prega di riprovare.',
+        'ja': '現在おすすめを生成できません。もう一度お試しください。',
+        'pt': 'Não é possível gerar uma recomendação neste momento. Tente novamente.',
+        'nl': 'Kan momenteel geen aanbeveling genereren. Probeer het opnieuw.',
+        'pl': 'Nie można wygenerować rekomendacji w tym momencie. Spróbuj ponownie.'
+      };
+      
+      const fallbackMessage = fallbackMessages[requestedLanguageCode] || 'Unable to generate recommendation at this time. Please try again.';
+      throw new Error(`Failed to get AI recommendation for ${checkType}: ${fallbackMessage}`);
+    }
+    
     throw new Error(`Failed to get AI recommendation for ${checkType}: ${error instanceof Error ? error.message : String(error)}`);
   }
 }

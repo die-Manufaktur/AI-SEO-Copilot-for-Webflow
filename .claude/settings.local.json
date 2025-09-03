@@ -87,7 +87,8 @@
       "Bash(./node_modules/.bin/tsc:*)",
       "Bash(./node_modules/.bin/vitest:*)",
       "Bash(./node_modules/.bin/vite:*)",
-      "Bash(cmd /c:*)"
+      "Bash(cmd /c:*)",
+      "Bash(npx tsx:*)"
     ],
     "deny": []
   },
