@@ -2,7 +2,8 @@ import * as React from "react";
 import { 
   SUPPORTED_LANGUAGES, 
   Language, 
-  getDefaultLanguage 
+  getDefaultLanguage,
+  detectSiteLanguage 
 } from "../../../../shared/types/language";
 import {
   Select,
@@ -29,6 +30,9 @@ export function LanguageSelector({
   disabled = false,
   label = "Language"
 }: LanguageSelectorProps) {
+  // Get the detected site language code to show as default
+  const detectedLanguageCode = React.useMemo(() => detectSiteLanguage(), []);
+
   const handleValueChange = (languageCode: string) => {
     const language = SUPPORTED_LANGUAGES.find(lang => lang.code === languageCode);
     if (language) {
@@ -60,25 +64,31 @@ export function LanguageSelector({
           </SelectValue>
         </SelectTrigger>
         <SelectContent className="bg-background border border-input shadow-md">
-          {SUPPORTED_LANGUAGES.map((language) => (
-            <SelectItem 
-              key={language.code} 
-              value={language.code}
-              className="cursor-pointer focus:bg-accent focus:text-accent-foreground data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide w-8">{language.code}</span>
-                <div className="flex flex-col">
-                  <span>{language.nativeName}</span>
-                  {language.name !== language.nativeName && (
-                    <span className="text-xs text-muted-foreground">
-                      {language.name}
+          {SUPPORTED_LANGUAGES.map((language) => {
+            const isDetectedDefault = language.code === detectedLanguageCode;
+            return (
+              <SelectItem 
+                key={language.code} 
+                value={language.code}
+                className="cursor-pointer focus:bg-accent focus:text-accent-foreground data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide w-8">{language.code}</span>
+                  <div className="flex flex-col">
+                    <span>
+                      {language.nativeName}
+                      {isDetectedDefault && <span className="text-muted-foreground"> (default)</span>}
                     </span>
-                  )}
+                    {language.name !== language.nativeName && (
+                      <span className="text-xs text-muted-foreground">
+                        {language.name}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </SelectItem>
-          ))}
+              </SelectItem>
+            );
+          })}
         </SelectContent>
       </Select>
     </div>

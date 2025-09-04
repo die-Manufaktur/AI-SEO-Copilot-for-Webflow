@@ -6,7 +6,8 @@ import {
   Language, 
   getDefaultLanguage, 
   getLanguageByCode, 
-  isLanguageSupported 
+  isLanguageSupported,
+  detectSiteLanguage 
 } from '../../../shared/types/language';
 
 const STORAGE_KEY = 'webflow-seo-language-preferences';
@@ -43,12 +44,16 @@ export function saveLanguageForSite(siteId: string, languageCode: string): void 
 export function loadLanguageForSite(siteId: string): Language {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return getDefaultLanguage();
+    if (!stored) {
+      // No stored preferences, use detected site language as default
+      return getDefaultLanguage();
+    }
     
     const siteLanguages: SiteLanguagePreferences = JSON.parse(stored);
     const languageCode = siteLanguages[siteId];
     
     if (!languageCode) {
+      // No preference for this site, use detected site language as default
       return getDefaultLanguage();
     }
     

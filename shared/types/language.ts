@@ -32,10 +32,35 @@ export const getLanguageByCode = (code: string): Language | undefined => {
 };
 
 /**
- * Get default language
+ * Detect site language from various sources
+ */
+export const detectSiteLanguage = (): string => {
+  // Try to get language from document lang attribute
+  if (typeof document !== 'undefined' && document.documentElement.lang) {
+    const docLang = document.documentElement.lang.toLowerCase().split('-')[0];
+    if (isLanguageSupported(docLang)) {
+      return docLang;
+    }
+  }
+  
+  // Try to get language from browser navigator
+  if (typeof navigator !== 'undefined' && navigator.language) {
+    const browserLang = navigator.language.toLowerCase().split('-')[0];
+    if (isLanguageSupported(browserLang)) {
+      return browserLang;
+    }
+  }
+  
+  // Fallback to default
+  return DEFAULT_LANGUAGE_CODE;
+};
+
+/**
+ * Get default language (now detects site language)
  */
 export const getDefaultLanguage = (): Language => {
-  return SUPPORTED_LANGUAGES.find(lang => lang.code === DEFAULT_LANGUAGE_CODE) || SUPPORTED_LANGUAGES[0];
+  const detectedCode = detectSiteLanguage();
+  return SUPPORTED_LANGUAGES.find(lang => lang.code === detectedCode) || SUPPORTED_LANGUAGES[0];
 };
 
 /**
