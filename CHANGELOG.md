@@ -1,3 +1,10 @@
+## [4.4.0](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/compare/v4.3.0...v4.4.0) (2025-09-04)
+
+### Features
+
+* **api:** scope default language to site and indicate default in UI ([0c9c20e](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/0c9c20e36d95ddb9363aa14fe89749bbe9188f5f))
+* **api:** scope default language to site and indicate default in UI ([#475](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/issues/475)) ([d938140](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/d938140e2dfc36964a42c4fa17486aca5677b772))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
