@@ -1,6 +1,6 @@
 # AI SEO Copilot for Webflow
 
-An advanced SEO analysis tool that performs 18 comprehensive checks with AI-powered recommendations for Webflow sites.
+An advanced SEO analysis tool that performs 18 comprehensive checks with AI-powered recommendations for Webflow sites. Features multilingual AI recommendations in 9 languages with automatic site language detection.
 
 ## Quick Links
 - [Full Documentation](https://ai-seo-copilot.gitbook.io/ai-seo-copilot)
@@ -11,6 +11,7 @@ An advanced SEO analysis tool that performs 18 comprehensive checks with AI-powe
 
 - **🔍 Comprehensive SEO Analysis**: 18 different SEO checks covering all critical aspects
 - **🤖 AI-Powered Recommendations**: OpenAI-powered suggestions for improvements
+- **🌐 Multilingual Support**: AI recommendations in 9 languages with automatic site language detection
 - **💾 Keyword Persistence**: Automatically saves keywords per page for seamless workflow
 - **📊 Visual Progress Tracking**: Real-time SEO score calculation and progress indicators
 - **🎯 Page-Specific Analysis**: Tailored analysis for homepage vs. other pages
@@ -34,6 +35,35 @@ An advanced SEO analysis tool that performs 18 comprehensive checks with AI-powe
 - Code Minification Check
 - Image File Size Optimization
 - **Intelligent Schema Recommendations**: AI-powered schema markup generation with dynamic site data population
+
+## Multilingual AI Recommendations
+
+The extension provides AI-powered SEO recommendations in **9 languages** with intelligent site language detection:
+
+### Supported Languages
+- 🇺🇸 **English** - English
+- 🇫🇷 **French** - Français
+- 🇩🇪 **German** - Deutsch
+- 🇪🇸 **Spanish** - Español
+- 🇮🇹 **Italian** - Italiano
+- 🇯🇵 **Japanese** - 日本語
+- 🇵🇹 **Portuguese** - Português
+- 🇳🇱 **Dutch** - Nederlands
+- 🇵🇱 **Polish** - Polski
+
+### Smart Language Detection
+- **Automatic Detection**: Detects your site's language from the `<html lang="...">` attribute
+- **Browser Fallback**: Uses browser language settings if no site language is detected
+- **Visual Indicator**: Shows which language is detected as the site default in the dropdown
+- **Site-Specific Memory**: Remembers your language choice for each Webflow site
+- **Manual Override**: Choose any language regardless of automatic detection
+
+### How It Works
+1. When you first use the extension on a site, it automatically detects the site's language
+2. AI recommendations appear in the detected language by default
+3. You can change the language anytime using the dropdown selector
+4. Your language preference is saved per site and remembered for future sessions
+5. The dropdown clearly shows which language is the detected default with "(default)" indicator
 
 ## Local Development Setup
 
@@ -86,15 +116,18 @@ This project uses a **modular monorepo architecture** with three main components
 │   │   ├── hooks/         # Custom React hooks
 │   │   ├── lib/           # Client utilities
 │   │   └── utils/         # Client-specific utilities
+│   │       └── languageStorage.ts # Site-specific language preferences
 ├── workers/               # Cloudflare Worker backend
 │   ├── modules/           # Modular worker components
 │   │   ├── seoAnalysis.ts    # SEO analysis logic
 │   │   ├── webScraper.ts     # Web scraping functionality
-│   │   ├── aiRecommendations.ts # OpenAI integration
+│   │   ├── aiRecommendations.ts # Multilingual OpenAI integration
 │   │   └── validation.ts     # Request validation
 │   └── index.ts           # Main worker entry point
 ├── shared/                # Shared types and utilities
 │   ├── types/             # TypeScript type definitions
+│   │   ├── language.ts    # Multilingual support & language detection
+│   │   └── index.ts       # Main type definitions
 │   └── utils/             # Shared utilities & intelligent schema population
 └── public/                # Built extension assets (generated)
 ```

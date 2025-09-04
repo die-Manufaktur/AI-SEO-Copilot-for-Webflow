@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Multilingual AI Recommendations**: Support for AI-powered SEO recommendations in 9 languages
+- **Automatic Site Language Detection**: Detects site language from HTML lang attribute and browser settings
+- **Site-Specific Language Preferences**: Language choices are remembered per Webflow site
+- **Language Selector UI**: Dropdown with visual indicators showing detected default language
 - Comprehensive semantic versioning automation system
 - Automated draft releases with customizable release notes
 - Conventional commits validation and enforcement
@@ -16,6 +20,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub Actions workflows for manual and automated releases
 - Pre-commit hooks for testing and type checking
 - Comprehensive documentation for versioning workflow
+
+#### Supported Languages for AI Recommendations
+- English (en) - English 🇺🇸
+- French (fr) - Français 🇫🇷
+- German (de) - Deutsch 🇩🇪
+- Spanish (es) - Español 🇪🇸
+- Italian (it) - Italiano 🇮🇹
+- Japanese (ja) - 日本語 🇯🇵
+- Portuguese (pt) - Português 🇵🇹
+- Dutch (nl) - Nederlands 🇳🇱
+- Polish (pl) - Polski 🇵🇱
 
 ### Changed
 - Updated project version to 2.3.3

@@ -64,6 +64,34 @@ This is a **Webflow Designer Extension** for SEO analysis with a **modular monor
 
 ### Key Business Logic
 - **SEO Analysis**: 18 different SEO checks (title tags, meta descriptions, content structure, etc.)
-- **AI Recommendations**: OpenAI-powered suggestions for improvements
+- **AI Recommendations**: OpenAI-powered suggestions for improvements in multiple languages
 - **Schema Generation**: Intelligent schema markup recommendations based on page type
 - **Keyword Persistence**: Automatically saves keywords per page for workflow continuity
+- **Multilingual Support**: AI recommendations available in 9 languages with automatic site language detection
+
+### Multilingual Features
+The extension supports AI-generated SEO recommendations in multiple languages:
+
+#### Supported Languages
+- **English** (en) - English 🇺🇸
+- **French** (fr) - Français 🇫🇷  
+- **German** (de) - Deutsch 🇩🇪
+- **Spanish** (es) - Español 🇪🇸
+- **Italian** (it) - Italiano 🇮🇹
+- **Japanese** (ja) - 日本語 🇯🇵
+- **Portuguese** (pt) - Português 🇵🇹
+- **Dutch** (nl) - Nederlands 🇳🇱
+- **Polish** (pl) - Polski 🇵🇱
+
+#### Language Detection & Selection
+- **Automatic Detection**: Detects site language from `<html lang="...">` attribute or browser settings
+- **Site-Specific Preferences**: Language preferences are saved per Webflow site
+- **Default Indicator**: Language dropdown shows which language is detected as site default
+- **Manual Override**: Users can choose any supported language regardless of detection
+- **Persistent Settings**: Language choices are remembered across sessions per site
+
+#### Implementation Files
+- `shared/types/language.ts` - Language definitions and detection logic
+- `client/src/components/ui/language-selector.tsx` - Language selection component
+- `client/src/utils/languageStorage.ts` - Site-specific language preference storage
+- `workers/modules/aiRecommendations.ts` - Multilingual AI recommendation generation
