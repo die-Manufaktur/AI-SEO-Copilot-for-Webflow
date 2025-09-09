@@ -52,6 +52,7 @@ import { LanguageSelector } from '../components/ui/language-selector';
 import { getDefaultLanguage, getLanguageByCode, type Language } from '../../../shared/types/language';
 import { loadLanguageForSite, saveLanguageForSite } from '../utils/languageStorage';
 import { SchemaDisplay } from '../components/ui/schema-display';
+import { EditableRecommendation } from '../components/ui/editable-recommendation';
 
 const logger = createLogger("Home");
 
@@ -1306,34 +1307,6 @@ export default function Home() {
                                   )}
                                 </div>
                               </div>
-                              {!check.passed && check.recommendation && shouldShowCopyButton(check.title) && (
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <motion.div
-                                        whileHover={{ scale: 1.1 }}
-                                        whileTap={{ scale: 0.9 }}
-                                        className="ml-4"
-                                      >
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          className="flex items-center gap-2"
-                                          onClick={async () => {
-                                            await copyToClipboard(check.recommendation || '');
-                                          }}
-                                        >
-                                          <Copy className="h-4 w-4" />
-                                          Copy
-                                        </Button>
-                                      </motion.div>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>Copy recommendation to clipboard</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              )}
                             </div>
                             {!check.passed && check.recommendation && (
                               <motion.div
@@ -1353,8 +1326,15 @@ export default function Home() {
                                       className="mt-2"
                                     />
                                   </>
+                                ) : shouldShowCopyButton(check.title) ? (
+                                  // Use editable recommendation for AI-generated recommendations
+                                  <EditableRecommendation
+                                    recommendation={check.recommendation || ''}
+                                    onCopy={copyToClipboard}
+                                    disabled={mutation.isPending}
+                                  />
                                 ) : (
-                                  // Keep current rendering for all other checks
+                                  // Keep current rendering for checks that don't support copying
                                   check.recommendation
                                 )}
                               </motion.div>
