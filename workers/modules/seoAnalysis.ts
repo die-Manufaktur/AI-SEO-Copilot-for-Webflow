@@ -349,7 +349,7 @@ export function analyzeMinification(jsFiles: any[], cssFiles: any[]): {
  */
 export function calculateSEOScore(checks: SEOCheck[]): number {
   const passedChecks = checks.filter(check => check.passed);
-  return (passedChecks.length / checks.length) * 100;
+  return Math.round((passedChecks.length / checks.length) * 100);
 }
 
 /**
