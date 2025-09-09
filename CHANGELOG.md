@@ -1,3 +1,10 @@
+## [4.5.0](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/compare/v4.4.0...v4.5.0) (2025-09-09)
+
+### Features
+
+* **ui:** make AI recommendation editable ([4c1c8fc](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/4c1c8fccd85bfbb89865af8c4e56662294f80c79)), closes [#454](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/issues/454)
+* **ui:** make AI recommendation editable ([#485](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/issues/485)) ([798343e](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/798343ebf58532703e9b8819d8190233fb1e3649))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
