@@ -1,3 +1,10 @@
+## [4.6.2](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/compare/v4.6.1...v4.6.2) (2025-09-09)
+
+### Code Refactoring
+
+* **security:** beef up string escaping in the middleware ([5ce904b](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/5ce904b20e67cdd3f7ee619d81994273a57b887a))
+* **security:** beef up string escaping in the middleware ([#489](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/issues/489)) ([ae4054f](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/ae4054f1ef4e29616c27dcb298826f30cb6ddb30))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
