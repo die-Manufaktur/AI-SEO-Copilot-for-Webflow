@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sanitizeKeywords } from './stringUtils';
+import { sanitizeKeywords, decodeHtmlEntities } from './stringUtils';
 
 describe('sanitizeKeywords - Security Tests', () => {
   describe('HTML injection prevention', () => {
@@ -125,6 +125,66 @@ describe('sanitizeKeywords - Security Tests', () => {
       const input = '<' + 'script>'.repeat(100);
       const result = sanitizeKeywords(input);
       expect(result).not.toContain('<script>');
+    });
+  });
+});
+
+describe('decodeHtmlEntities - Security Tests', () => {
+  describe('double-escaping prevention', () => {
+    it('should handle &amp; replacement last to prevent double-unescaping', () => {
+      // This tests the security fix: &amp; must be decoded last
+      expect(decodeHtmlEntities('&amp;lt;script&amp;gt;')).toBe('&lt;script&gt;');
+      expect(decodeHtmlEntities('&amp;quot;test&amp;quot;')).toBe('&quot;test&quot;');
+      expect(decodeHtmlEntities('&amp;amp;')).toBe('&amp;');
+    });
+
+    it('should prevent creation of new entities during decoding', () => {
+      // These inputs would create valid entities if &amp; was decoded first
+      expect(decodeHtmlEntities('&amp;lt;')).toBe('&lt;');
+      expect(decodeHtmlEntities('&amp;gt;')).toBe('&gt;');
+      expect(decodeHtmlEntities('&amp;quot;')).toBe('&quot;');
+      expect(decodeHtmlEntities('&amp;#39;')).toBe('&#39;');
+    });
+
+    it('should handle complex mixed entity patterns', () => {
+      const input = '&amp;lt;div class=&amp;quot;test&amp;quot;&amp;gt;content&amp;lt;/div&amp;gt;';
+      const expected = '&lt;div class=&quot;test&quot;&gt;content&lt;/div&gt;';
+      expect(decodeHtmlEntities(input)).toBe(expected);
+    });
+  });
+
+  describe('standard HTML entity decoding', () => {
+    it('should decode common HTML entities correctly', () => {
+      expect(decodeHtmlEntities('&lt;script&gt;')).toBe('<script>');
+      expect(decodeHtmlEntities('&quot;hello&quot;')).toBe('"hello"');
+      expect(decodeHtmlEntities('&#39;test&#39;')).toBe("'test'");
+      expect(decodeHtmlEntities('&#x2F;path&#x3D;value')).toBe('/path=value');
+    });
+
+    it('should handle mixed entities in single string', () => {
+      const input = '&lt;div class=&quot;test&quot;&gt;Hello &#39;world&#39;&lt;/div&gt;';
+      const expected = '<div class="test">Hello \'world\'</div>';
+      expect(decodeHtmlEntities(input)).toBe(expected);
+    });
+
+    it('should handle strings without entities unchanged', () => {
+      expect(decodeHtmlEntities('normal text')).toBe('normal text');
+      expect(decodeHtmlEntities('text with spaces')).toBe('text with spaces');
+      expect(decodeHtmlEntities('')).toBe('');
+    });
+  });
+
+  describe('edge cases', () => {
+    it('should handle partial or malformed entities', () => {
+      expect(decodeHtmlEntities('&amp without semicolon')).toBe('& without semicolon');
+      expect(decodeHtmlEntities('&invalid;entity')).toBe('&invalid;entity');
+      expect(decodeHtmlEntities('&amp;&amp;&amp;')).toBe('&&&');
+    });
+
+    it('should handle empty and null inputs', () => {
+      expect(decodeHtmlEntities('')).toBe('');
+      expect(() => decodeHtmlEntities(null as any)).not.toThrow();
+      expect(() => decodeHtmlEntities(undefined as any)).not.toThrow();
     });
   });
 });

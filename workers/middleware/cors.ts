@@ -28,6 +28,7 @@ export function corsMiddleware(options?: {
         if (pattern.includes('*')) {
           // Convert wildcard pattern to regex
           const regexPattern = pattern
+            .replace(/\\/g, '\\\\') // Escape backslashes first
             .replace(/\./g, '\\.')  // Escape dots
             .replace(/\*/g, '.*');  // Convert * to regex .*
           
