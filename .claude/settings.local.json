@@ -102,7 +102,8 @@
       "mcp__github__list_code_scanning_alerts",
       "Bash(where bash)",
       "WebFetch(domain:dev.to)",
-      "mcp__serena__check_onboarding_performed"
+      "mcp__serena__check_onboarding_performed",
+      "mcp__filesystem__search_files"
     ],
     "deny": []
   },
