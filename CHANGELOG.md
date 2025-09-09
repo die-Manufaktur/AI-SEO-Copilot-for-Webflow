@@ -1,3 +1,10 @@
+## [4.6.0](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/compare/v4.5.1...v4.6.0) (2025-09-09)
+
+### Features
+
+* **api:** implement multi-agent orchestration ([0bad0a9](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/0bad0a940bd896d6e37c6879a6f629d4beea6220))
+* **api:** implement multi-agent orchestration ([#487](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/issues/487)) ([f9ef3ed](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/f9ef3edbc828e5a8827a65965a3d6b36bcd3876e))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
