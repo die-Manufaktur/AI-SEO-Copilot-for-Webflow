@@ -1,3 +1,10 @@
+## [4.6.1](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/compare/v4.6.0...v4.6.1) (2025-09-09)
+
+### Code Refactoring
+
+* **security:** correctly handle ampersands in the api ([c0e7c57](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/c0e7c570c76f2c4c0ca52e3ac5c3247f88d161e0))
+* **security:** correctly handle ampersands in the api ([#488](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/issues/488)) ([b87a454](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/b87a454f7dd1a40ebb77d93722d8203424cca402))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
