@@ -131,8 +131,22 @@ export function sanitizeForAI(input: string, languageCode?: string): string {
 export function sanitizeKeywords(input: string, languageCode?: string): string {
   if (!input || typeof input !== 'string') return '';
   
-  return sanitizeText(input, languageCode)
-    .replace(/<[^>]*>/g, '') // Remove any HTML tags
+  let sanitized = sanitizeText(input, languageCode);
+  
+  // Iterative HTML tag removal to prevent bypass attempts
+  // This handles cases like <<script>alert()</script> or <scr<script>ipt>
+  let previousLength: number;
+  do {
+    previousLength = sanitized.length;
+    // Remove HTML tags
+    sanitized = sanitized.replace(/<[^>]*>/g, '');
+    // Remove any remaining HTML entities that could form tags
+    sanitized = sanitized.replace(/&lt;[^&]*&gt;/gi, '');
+    // Remove partial HTML entities and malformed tags
+    sanitized = sanitized.replace(/&[#a-zA-Z0-9]+;?/g, '');
+  } while (sanitized.length !== previousLength && sanitized.includes('<'));
+  
+  return sanitized
     .substring(0, 500) // Limit length
     .trim();
 }
