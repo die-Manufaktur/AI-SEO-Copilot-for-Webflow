@@ -16,10 +16,10 @@ export function decodeHtmlEntities(html: string): string {
       .replace(/&gt;/g, '>')
       .replace(/&quot;/g, '"')
       .replace(/&#39;/g, "'")
-      .replace(/&amp;/g, '&')
       // Add other common entities as needed
       .replace(/&#x2F;/g, '/')
-      .replace(/&#x3D;/g, '=');
+      .replace(/&#x3D;/g, '=')
+      .replace(/&amp;/g, '&'); // Must be last to prevent double-unescaping
   }
 }
 
