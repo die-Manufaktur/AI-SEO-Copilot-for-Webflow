@@ -478,10 +478,11 @@ describe('Home Component', () => {
     await user.click(metaSeoCategory);
     
     await waitFor(() => {
-      expect(screen.getByText(/Copy/i)).toBeInTheDocument();
+      expect(screen.getByText('Add your keyphrase to the meta description')).toBeInTheDocument();
     }, { timeout: 10000 });
     
-    const copyButton = screen.getByText(/Copy/i);
+    // Find the copy button within the recommendation section (now part of EditableRecommendation)
+    const copyButton = screen.getByRole('button', { name: /copy recommendation to clipboard/i });
     await user.click(copyButton);
     
     // Verify the copyTextToClipboard utility was called with the correct text
