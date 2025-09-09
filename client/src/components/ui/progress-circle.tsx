@@ -63,7 +63,7 @@ export function ProgressCircle({
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
           <span className="text-3xl font-bold" style={{ color: scoreColor }}>
-            {value}
+            {Math.round(value)}
           </span>
           <span className="text-xs text-muted-foreground mt-1">{scoreText}</span>
         </div>

@@ -65,6 +65,7 @@ This is a **Webflow Designer Extension** for SEO analysis with a **modular monor
 ### Key Business Logic
 - **SEO Analysis**: 18 different SEO checks (title tags, meta descriptions, content structure, etc.)
 - **AI Recommendations**: OpenAI-powered suggestions for improvements in multiple languages
+- **Editable Recommendations**: Users can edit AI-generated recommendations inline before copying
 - **Schema Generation**: Intelligent schema markup recommendations based on page type
 - **Keyword Persistence**: Automatically saves keywords per page for workflow continuity
 - **Multilingual Support**: AI recommendations available in 9 languages with automatic site language detection
@@ -95,3 +96,4 @@ The extension supports AI-generated SEO recommendations in multiple languages:
 - `client/src/components/ui/language-selector.tsx` - Language selection component
 - `client/src/utils/languageStorage.ts` - Site-specific language preference storage
 - `workers/modules/aiRecommendations.ts` - Multilingual AI recommendation generation
+- `client/src/components/ui/editable-recommendation.tsx` - Inline editable recommendation component

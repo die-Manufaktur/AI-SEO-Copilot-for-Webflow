@@ -88,14 +88,24 @@
       "Bash(./node_modules/.bin/vitest:*)",
       "Bash(./node_modules/.bin/vite:*)",
       "Bash(cmd /c:*)",
-      "Bash(npx tsx:*)"
+      "Bash(npx tsx:*)",
+      "Bash(echo:*)",
+      "mcp__filesystem__read_file",
+      "Bash(npx figma-dev-mode-mcp:*)",
+      "Bash(npx figma-developer-mcp:*)",
+      "mcp__filesystem__list_allowed_directories",
+      "Bash(dir:*)",
+      "mcp__webflow__webflow_guide_tool",
+      "Bash(./node_modules/.bin/eslint:*)"
     ],
     "deny": []
   },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "webflow",
     "github",
     "Context7",
-    "serena"
+    "serena",
+    "filesystem"
   ]
 }
