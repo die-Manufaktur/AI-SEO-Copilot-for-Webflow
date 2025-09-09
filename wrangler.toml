@@ -1,4 +1,4 @@
-# Version: 3.3.4
+# Version: 4.5.1
 name = "seo-copilot-api"
 main = "./workers/index.ts"
 compatibility_date = "2024-09-23"
@@ -20,4 +20,5 @@ head_sampling_rate = 1 # Logs 100% of requests
 [env.production]
 name = "seo-copilot-api-production"
 vars = { USE_GPT_RECOMMENDATIONS = "true", ALLOWED_ORIGINS = "https://webflow.com,https://*.webflow-ext.com,https://*.webflow.io,http://localhost:1337,http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:1337"}
+
 
