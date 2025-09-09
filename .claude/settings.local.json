@@ -96,7 +96,11 @@
       "mcp__filesystem__list_allowed_directories",
       "Bash(dir:*)",
       "mcp__webflow__webflow_guide_tool",
-      "Bash(./node_modules/.bin/eslint:*)"
+      "Bash(./node_modules/.bin/eslint:*)",
+      "mcp__github__get_code_scanning_alert",
+      "mcp__github__search_issues",
+      "mcp__github__list_code_scanning_alerts",
+      "Bash(where bash)"
     ],
     "deny": []
   },
