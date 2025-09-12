@@ -490,16 +490,14 @@ export async function analyzeSEOElements(
   const wordCount = contentWords.length;
   const minWordCount = isHomePage ? 300 : 600;
 
-  const contentLengthCheck = await createSEOCheck(
-    "Content Length",
-    () => wordCount >= minWordCount,
-    `Well done! Your content has ${wordCount} words, which meets the threshold of ${minWordCount} words ${isHomePage ? "(homepage)" : "(regular page)"}.`,
-    `Content length is ${wordCount} words, which is below the recommended minimum of ${minWordCount} words ${isHomePage ? "(homepage)" : "(regular page)"}.`,
-    scrapedData.content,
-    keyphrase,
-    env,
-    advancedOptions
-  );
+  const contentLengthCheck: SEOCheck = {
+    title: "Content Length",
+    description: wordCount >= minWordCount
+      ? `Well done! Your content has ${wordCount} words, which meets the threshold of ${minWordCount} words ${isHomePage ? "(homepage)" : "(regular page)"}.`
+      : `Content length is ${wordCount} words, which is below the recommended minimum of ${minWordCount} words ${isHomePage ? "(homepage)" : "(regular page)"}.`,
+    passed: wordCount >= minWordCount,
+    priority: analyzerCheckPriorities["Content Length"] || 'high'
+  };
   checks.push(contentLengthCheck);
 
   // --- Keyphrase Density Check with v3.3.14 enhanced logic ---
