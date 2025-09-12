@@ -103,7 +103,8 @@
       "Bash(where bash)",
       "WebFetch(domain:dev.to)",
       "mcp__serena__check_onboarding_performed",
-      "mcp__filesystem__search_files"
+      "mcp__filesystem__search_files",
+      "mcp__github__create_issue"
     ],
     "deny": []
   },
