@@ -1,3 +1,13 @@
+## [4.6.3](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/compare/v4.6.2...v4.6.3) (2025-09-12)
+
+### Bug Fixes
+
+* **api:** remove AI Rec from Content Length Check ([4993343](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/4993343b5e1cd899dca84439f8e79eb5b3d58ca1))
+
+### Code Refactoring
+
+* remove AI recommendations from content length check ([6f67c9b](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/6f67c9b8dc5cab177c29b92bb8b8a77d4a27912c))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
