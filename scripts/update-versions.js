@@ -40,6 +40,14 @@ const filesToUpdate = [
     }
   },
   {
+    file: 'client/manifest.json',
+    update: (content) => {
+      const manifest = JSON.parse(content);
+      manifest.version = version;
+      return JSON.stringify(manifest, null, 2);
+    }
+  },
+  {
     file: 'wrangler.toml',
     update: (content) => {
       // Add version comment to wrangler.toml for reference
