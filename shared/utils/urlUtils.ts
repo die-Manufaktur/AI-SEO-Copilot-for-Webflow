@@ -9,12 +9,12 @@
  */
 export function extractDomainFromUrl(url: string): string {
   try {
-    // Add protocol if missing
-    const urlWithProtocol = url.startsWith("http")
+    // Add protocol if missing (but preserve existing protocols like ftp://)
+    const urlWithProtocol = url.match(/^[a-zA-Z]+:\/\//)
       ? url
       : `https://${url}`;
     const urlObj = new URL(urlWithProtocol);
-    return urlObj.hostname;
+    return urlObj.host; // Changed from hostname to host to include port
   } catch (e) {
     console.warn("Invalid URL:", url);
     return "";
