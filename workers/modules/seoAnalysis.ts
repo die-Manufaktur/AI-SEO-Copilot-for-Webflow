@@ -348,6 +348,7 @@ export function analyzeMinification(jsFiles: any[], cssFiles: any[]): {
  * Check if SEO analysis needs to be regenerated
  */
 export function calculateSEOScore(checks: SEOCheck[]): number {
+  if (checks.length === 0) return 0;
   const passedChecks = checks.filter(check => check.passed);
   return Math.round((passedChecks.length / checks.length) * 100);
 }
