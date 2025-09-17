@@ -146,6 +146,25 @@ export default defineConfig(({ command, mode }) => {
     // Alias relative to project root
     alias: {
        '@': path.resolve(__dirname, './client/src'),
+    },
+    // Coverage configuration
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      include: [
+        'client/src/**/*.{ts,tsx}',
+        'workers/**/*.{ts,tsx}',
+        'shared/**/*.{ts,tsx}'
+      ],
+      exclude: [
+        '**/*.test.{ts,tsx}',
+        '**/*.d.ts',
+        '**/test-utils.tsx',
+        '**/setupTests.ts',
+        '**/vite-env.d.ts',
+        'client/src/main.tsx',
+        'client/src/index.css'
+      ]
     }
   },
 }});
