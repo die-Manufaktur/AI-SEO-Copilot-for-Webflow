@@ -104,7 +104,20 @@
       "WebFetch(domain:dev.to)",
       "mcp__serena__check_onboarding_performed",
       "mcp__filesystem__search_files",
-      "mcp__github__create_issue"
+      "mcp__github__create_issue",
+      "Bash(npm --version)",
+      "Bash(npx vitest:*)",
+      "mcp__serena__replace_regex",
+      "Bash(npm run test:*)",
+      "mcp__filesystem__list_directory",
+      "mcp__filesystem__write_file",
+      "mcp__filesystem__directory_tree",
+      "mcp__filesystem__get_file_info",
+      "mcp__serena__find_symbol",
+      "Bash(npx:*)",
+      "Bash(cmd.exe /c \"cd /d \"\"C:\\Users\\Paul Mulligan\\PMDS\\Projects\\AI-SEO-Copilot-for-Webflow\"\" && pnpm check\")",
+      "Bash(cmd.exe /c \"cd /d \"\"C:\\Users\\Paul Mulligan\\PMDS\\Projects\\AI-SEO-Copilot-for-Webflow\"\" && npx tsc --noEmit\")",
+      "Bash(cmd.exe /c \"cd /d \"\"C:\\Users\\Paul Mulligan\\PMDS\\Projects\\AI-SEO-Copilot-for-Webflow\"\" && pnpm run check\")"
     ],
     "deny": []
   },

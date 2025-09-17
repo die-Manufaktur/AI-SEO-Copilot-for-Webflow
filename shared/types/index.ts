@@ -211,6 +211,3 @@ export interface AnalyzeSEORequest {
 
 // Language types for multilingual SEO suggestions
 export * from './language';
-
-// Multi-agent orchestration types
-export * from './agents';
