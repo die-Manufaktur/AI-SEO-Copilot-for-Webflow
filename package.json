@@ -119,7 +119,7 @@
     "sanitize-html": "^2.17.0",
     "styled-components": "^6.1.19",
     "tailwind-merge": "^3.3.1",
-    "undici": "^7.15.0",
+    "undici": "^7.16.0",
     "vaul": "^1.1.2",
     "wouter": "^3.7.1",
     "zod": "^4.1.8"
