@@ -76,7 +76,7 @@
   },
   "dependencies": {
     "@emotion/is-prop-valid": "^1.4.0",
-    "@hookform/resolvers": "^5.2.1",
+    "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-aspect-ratio": "^1.1.7",
     "@radix-ui/react-avatar": "^1.1.10",
@@ -108,7 +108,7 @@
     "dotenv": "^17.2.2",
     "embla-carousel-react": "^8.6.0",
     "framer-motion": "^12.23.12",
-    "hono": "^4.9.6",
+    "hono": "^4.9.7",
     "input-otp": "^1.4.2",
     "net": "^1.0.2",
     "openai": "^5.19.1",
@@ -119,10 +119,10 @@
     "sanitize-html": "^2.17.0",
     "styled-components": "^6.1.19",
     "tailwind-merge": "^3.3.1",
-    "undici": "^7.15.0",
+    "undici": "^7.16.0",
     "vaul": "^1.1.2",
     "wouter": "^3.7.1",
-    "zod": "^4.1.5"
+    "zod": "^4.1.8"
   },
   "packageManager": "pnpm@10.14.0",
   "workspaces": [
