@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sanitizeKeywords, decodeHtmlEntities } from './stringUtils';
+import { sanitizeKeywords, decodeHtmlEntities, ensureAscii, sanitizeText } from './stringUtils';
 
 describe('sanitizeKeywords - Security Tests', () => {
   describe('HTML injection prevention', () => {
@@ -186,5 +186,130 @@ describe('decodeHtmlEntities - Security Tests', () => {
       expect(() => decodeHtmlEntities(null as any)).not.toThrow();
       expect(() => decodeHtmlEntities(undefined as any)).not.toThrow();
     });
+  });
+});
+
+describe('ensureAscii', () => {
+  it('should replace smart quotes with straight quotes', () => {
+    expect(ensureAscii('\u2018Hello World\u2019')).toBe("'Hello World'");
+    expect(ensureAscii('\u201CTesting quotes\u201D')).toBe('"Testing quotes"');
+  });
+
+  it('should replace dashes with hyphens', () => {
+    expect(ensureAscii('En–dash and Em—dash')).toBe('En-dash and Em-dash');
+  });
+
+  it('should replace ellipsis with three periods', () => {
+    expect(ensureAscii('Loading…')).toBe('Loading...');
+  });
+
+  it('should replace non-breaking spaces with regular spaces', () => {
+    expect(ensureAscii('Text\u00A0with\u00A0NBSP')).toBe('Text with NBSP');
+  });
+
+  it('should replace bullets with asterisks', () => {
+    expect(ensureAscii('• Bullet point')).toBe('* Bullet point');
+    expect(ensureAscii('‣ Another bullet')).toBe('* Another bullet');
+    expect(ensureAscii('⁃ Third bullet')).toBe('* Third bullet');
+  });
+
+  it('should remove zero-width spaces and control characters', () => {
+    expect(ensureAscii('Text\u200Bwith\u200Czero\u200Dwidth')).toBe('Textwithzerowidth');
+    expect(ensureAscii('Soft\u00ADhyphen')).toBe('Softhyphen');
+  });
+
+  it('should remove non-ASCII characters', () => {
+    expect(ensureAscii('Café')).toBe('Caf');
+    expect(ensureAscii('naïve')).toBe('nave');
+    expect(ensureAscii('résumé')).toBe('rsum');
+  });
+
+  it('should handle empty and null inputs', () => {
+    expect(ensureAscii('')).toBe('');
+    expect(ensureAscii(null as any)).toBe('');
+    expect(ensureAscii(undefined as any)).toBe('');
+  });
+
+  it('should handle mixed Unicode characters', () => {
+    expect(ensureAscii('Test • "smart quotes" – em—dash … ellipsis')).toBe('Test * "smart quotes" - em-dash ... ellipsis');
+  });
+});
+
+describe('sanitizeText', () => {
+  it('should decode HTML entities and apply ASCII conversion by default', () => {
+    const input = '&lt;div&gt;"Smart quotes" – dash&lt;/div&gt;';
+    const expected = '<div>"Smart quotes" - dash</div>';
+    expect(sanitizeText(input)).toBe(expected);
+  });
+
+  it('should preserve Unicode for Japanese language', () => {
+    const input = 'こんにちは世界';
+    expect(sanitizeText(input, 'ja')).toBe('こんにちは世界');
+  });
+
+  it('should preserve Unicode for Chinese language', () => {
+    const input = '你好世界';
+    expect(sanitizeText(input, 'zh')).toBe('你好世界');
+  });
+
+  it('should preserve Unicode for Korean language', () => {
+    const input = '안녕하세요';
+    expect(sanitizeText(input, 'ko')).toBe('안녕하세요');
+  });
+
+  it('should preserve Unicode for Russian language', () => {
+    const input = 'Привет мир';
+    expect(sanitizeText(input, 'ru')).toBe('Привет мир');
+  });
+
+  it('should preserve Unicode for Arabic language', () => {
+    const input = 'مرحبا بالعالم';
+    expect(sanitizeText(input, 'ar')).toBe('مرحبا بالعالم');
+  });
+
+  it('should preserve Unicode with special preserve flag', () => {
+    const input = 'Mixed 中文 and English';
+    expect(sanitizeText(input, 'preserve-unicode')).toBe('Mixed 中文 and English');
+  });
+
+  it('should apply ASCII conversion for English', () => {
+    const input = '"Smart quotes" and café';
+    expect(sanitizeText(input, 'en')).toBe('"Smart quotes" and caf');
+  });
+
+  it('should apply ASCII conversion for unsupported languages', () => {
+    const input = '"Smart quotes" and café';
+    expect(sanitizeText(input, 'es')).toBe('"Smart quotes" and caf');
+  });
+
+  it('should remove control characters but preserve Unicode', () => {
+    const input = 'こんにちは\u0000\u0008\u000B\u000C\u000E世界';
+    expect(sanitizeText(input, 'ja')).toBe('こんにちは世界');
+  });
+
+  it('should remove zero-width spaces for Unicode languages', () => {
+    const input = 'こんにちは\u200B\u200C\u200D世界';
+    expect(sanitizeText(input, 'ja')).toBe('こんにちは世界');
+  });
+
+  it('should handle empty string', () => {
+    expect(sanitizeText('')).toBe('');
+    expect(sanitizeText('', 'ja')).toBe('');
+  });
+
+  it('should handle null and undefined inputs', () => {
+    expect(sanitizeText(null as any)).toBe('');
+    expect(sanitizeText(undefined as any)).toBe('');
+  });
+
+  it('should handle mixed HTML entities and Unicode', () => {
+    const input = '&lt;div&gt;こんにちは&lt;/div&gt;';
+    expect(sanitizeText(input, 'ja')).toBe('<div>こんにちは</div>');
+    expect(sanitizeText(input, 'en')).toBe('<div></div>');
+  });
+
+  it('should replace smart quotes in Unicode-preserving mode', () => {
+    const input = '\u2018日本語\u2019 and \u201CEnglish\u201D';
+    expect(sanitizeText(input, 'ja')).toBe("'日本語' and \"English\"");
   });
 });
