@@ -117,7 +117,11 @@
       "Bash(npx:*)",
       "Bash(cmd.exe /c \"cd /d \"\"C:\\Users\\Paul Mulligan\\PMDS\\Projects\\AI-SEO-Copilot-for-Webflow\"\" && pnpm check\")",
       "Bash(cmd.exe /c \"cd /d \"\"C:\\Users\\Paul Mulligan\\PMDS\\Projects\\AI-SEO-Copilot-for-Webflow\"\" && npx tsc --noEmit\")",
-      "Bash(cmd.exe /c \"cd /d \"\"C:\\Users\\Paul Mulligan\\PMDS\\Projects\\AI-SEO-Copilot-for-Webflow\"\" && pnpm run check\")"
+      "Bash(cmd.exe /c \"cd /d \"\"C:\\Users\\Paul Mulligan\\PMDS\\Projects\\AI-SEO-Copilot-for-Webflow\"\" && pnpm run check\")",
+      "WebFetch(domain:docs.webflow.com)",
+      "mcp__serena__create_text_file",
+      "Bash(cmd.exe /c \"cd \"\"C:/Users/Paul Mulligan/PMDS/Projects/AI-SEO-Copilot-for-Webflow\"\" && pnpm check\")",
+      "Bash(sed:*)"
     ],
     "deny": []
   },

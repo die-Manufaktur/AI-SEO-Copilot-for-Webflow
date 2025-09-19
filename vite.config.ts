@@ -147,10 +147,10 @@ export default defineConfig(({ command, mode }) => {
     alias: {
        '@': path.resolve(__dirname, './client/src'),
     },
-    // Coverage configuration
+    // Coverage configuration - Enhanced for TDD
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html'],
+      reporter: ['text', 'json', 'html', 'lcov'],
       include: [
         'client/src/**/*.{ts,tsx}',
         'workers/**/*.{ts,tsx}',
@@ -163,7 +163,49 @@ export default defineConfig(({ command, mode }) => {
         '**/setupTests.ts',
         '**/vite-env.d.ts',
         'client/src/main.tsx',
-        'client/src/index.css'
+        'client/src/index.css',
+        'client/src/__tests__/**',
+        'workers/__tests__/**'
+      ],
+      // TDD Coverage thresholds
+      thresholds: {
+        global: {
+          branches: 85,
+          functions: 95,
+          lines: 95,
+          statements: 95
+        },
+        // Specific thresholds for critical modules
+        'client/src/lib/webflowAuth.ts': {
+          branches: 95,
+          functions: 100,
+          lines: 95,
+          statements: 95
+        },
+        'client/src/lib/webflowDataApi.ts': {
+          branches: 95,
+          functions: 100,
+          lines: 95,
+          statements: 95
+        }
+      }
+    },
+    // Enhanced test reporting for TDD
+    reporters: ['default', 'junit', 'html'],
+    outputFile: {
+      junit: 'test-results/junit.xml',
+      html: 'test-results/index.html'
+    },
+    // Test performance optimization
+    testTimeout: 10000,
+    hookTimeout: 10000,
+    // Watch mode configuration for TDD
+    watch: {
+      ignore: [
+        '**/node_modules/**',
+        '**/dist/**',
+        '**/public/**',
+        '**/test-results/**'
       ]
     }
   },

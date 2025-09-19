@@ -4,6 +4,7 @@
   "version": "4.6.3",
   "schema_version": "2.0.0",
   "apiVersion": "2",
+  "extensionType": "hybrid",
   "web_accessible_resources": [
     {
       "resources": [
@@ -20,7 +21,27 @@
     "designer:siteInfo:read": "Needed to access information about your site",
     "hostPattern_WebflowSite": true,
     "site:read": true,
-    "externalApi:https://seo-copilot-api-production.paul-130.workers.dev": "Needed to connect to SEO analysis service"
+    "webflowDataApi:sites:read": "Needed to read site information for SEO analysis",
+    "webflowDataApi:sites:write": "Needed to modify site settings and SEO metadata",
+    "webflowDataApi:pages:read": "Needed to read page content for SEO analysis",
+    "webflowDataApi:pages:write": "Needed to update page content with SEO improvements",
+    "webflowDataApi:cms:read": "Needed to read CMS collections and items for analysis",
+    "webflowDataApi:cms:write": "Needed to update CMS items with SEO optimizations",
+    "oauth:authorize": "Needed to authenticate with Webflow for data access",
+    "externalApi:http://localhost:8787": "Needed to connect to development API service",
+    "externalApi:https://seo-copilot-api-production.paul-130.workers.dev": "Needed to connect to production API service"
+  },
+  "oauth": {
+    "redirectUri": "https://webflow.com/oauth/authorize",
+    "callbackPath": "/oauth/callback",
+    "scopes": [
+      "sites:read",
+      "sites:write", 
+      "pages:read",
+      "pages:write",
+      "cms:read",
+      "cms:write"
+    ]
   },
   "config_pages": [
     {

@@ -4,6 +4,7 @@ import { AnalyzeSEORequest, WorkerEnvironment } from '../shared/types/index';
 import { validateAnalyzeRequest } from './modules/validation';
 import { scrapeWebPage } from './modules/webScraper';
 import { analyzeSEOElements, checkKeywordMatch } from './modules/seoAnalysis';
+import { oauthProxy } from './modules/oauthProxy';
 
 const app = new Hono();
 
@@ -12,6 +13,11 @@ app.use('*', corsMiddleware());
 app.get('/health', (c) => {
   return c.json({ status: 'ok' });
 });
+
+// OAuth proxy endpoints
+app.post('/oauth/token', oauthProxy.exchangeToken);
+app.post('/oauth/refresh', oauthProxy.refreshToken);
+app.get('/oauth/user', oauthProxy.getUserInfo);
 
 app.get('/test-keywords', (c) => {
   const testResult = checkKeywordMatch("Expert Web Developer for Affordable Website Design Services | PMDS", "web developer", "services");
