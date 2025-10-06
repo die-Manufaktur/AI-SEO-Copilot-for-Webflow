@@ -114,7 +114,7 @@
     "openai": "^5.19.1",
     "react": "^19.1.1",
     "react-day-picker": "^9.10.0",
-    "react-dom": "^19.1.1",
+    "react-dom": "^19.2.0",
     "react-resizable-panels": "^3.0.6",
     "sanitize-html": "^2.17.0",
     "styled-components": "^6.1.19",
