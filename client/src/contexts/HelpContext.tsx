@@ -294,6 +294,28 @@ export const HelpProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (savedAnalytics) {
       setAnalytics(JSON.parse(savedAnalytics));
     }
+
+    // Load current tutorial progress
+    const savedTutorialProgress = localStorage.getItem('seo-copilot-tutorial-progress');
+    if (savedTutorialProgress) {
+      try {
+        const progress = JSON.parse(savedTutorialProgress);
+        setCurrentTutorial(progress);
+      } catch (error) {
+        console.error('Failed to parse tutorial progress:', error);
+        localStorage.removeItem('seo-copilot-tutorial-progress');
+      }
+    }
+  }, []);
+
+  // Cleanup MutationObserver on unmount
+  useEffect(() => {
+    return () => {
+      if (mutationObserverRef.current) {
+        mutationObserverRef.current.disconnect();
+        mutationObserverRef.current = null;
+      }
+    };
   }, []);
 
   const toggleHelp = useCallback((enabled: boolean) => {
@@ -313,7 +335,11 @@ export const HelpProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const lowerQuery = query.toLowerCase();
     
     // Track search query
-    trackEvent('help_search', { query });
+    setAnalytics(prev => ({
+      ...prev,
+      searchQueries: [...prev.searchQueries, query],
+      lastViewedAt: Date.now()
+    }));
 
     // Search in title and content
     const results = HELP_ARTICLES.filter(article => 
@@ -374,20 +400,32 @@ export const HelpProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const completeTutorial = useCallback(() => {
     if (currentTutorial) {
-      const completed = [...completedTutorials, currentTutorial.id];
-      setCompletedTutorials(completed);
-      localStorage.setItem('seo-copilot-completed-tutorials', JSON.stringify(completed));
+      setCompletedTutorials(prevCompleted => {
+        const completed = [...prevCompleted, currentTutorial.id];
+        localStorage.setItem('seo-copilot-completed-tutorials', JSON.stringify(completed));
+        return completed;
+      });
       
-      // Track completion
-      trackEvent('tutorial_completed', {
-        tutorialId: currentTutorial.id,
-        duration: Date.now() - currentTutorial.startedAt
+      // Track completion directly in analytics
+      setAnalytics(prevAnalytics => {
+        const updatedAnalytics = {
+          ...prevAnalytics,
+          tutorialsCompleted: [...prevAnalytics.tutorialsCompleted, currentTutorial.id],
+          lastViewedAt: Date.now(),
+          effectiveness: {
+            ...prevAnalytics.effectiveness,
+            tutorialCompletionRate: (prevAnalytics.tutorialsCompleted.length + 1) / TUTORIALS.length
+          }
+        };
+        
+        localStorage.setItem('seo-copilot-help-analytics', JSON.stringify(updatedAnalytics));
+        return updatedAnalytics;
       });
       
       setCurrentTutorial(null);
       localStorage.removeItem('seo-copilot-tutorial-progress');
     }
-  }, [currentTutorial, completedTutorials]);
+  }, [currentTutorial]);
 
   const getCurrentTutorial = useCallback(() => currentTutorial, [currentTutorial]);
 
@@ -455,17 +493,35 @@ export const HelpProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const enableAutoDetection = useCallback(() => {
     if (!mutationObserverRef.current) {
       mutationObserverRef.current = new MutationObserver((mutations) => {
+        const elementsToRegister: Element[] = [];
+        
         mutations.forEach((mutation) => {
           mutation.addedNodes.forEach((node) => {
             if (node instanceof Element) {
               const helpTargets = node.querySelectorAll('[data-help-id]');
-              helpTargets.forEach(registerHelpTarget);
+              helpTargets.forEach(element => elementsToRegister.push(element));
               if (node.hasAttribute('data-help-id')) {
-                registerHelpTarget(node);
+                elementsToRegister.push(node);
               }
             }
           });
         });
+        
+        // Process all elements and update state immediately
+        if (elementsToRegister.length > 0) {
+          const helpIds = elementsToRegister
+            .map(el => el.getAttribute('data-help-id'))
+            .filter(Boolean) as string[];
+          
+          if (helpIds.length > 0) {
+            // Use functional update to ensure state is updated correctly
+            setActiveHelpTargets(prev => {
+              const next = new Set(prev);
+              helpIds.forEach(id => next.add(id));
+              return next;
+            });
+          }
+        }
       });
 
       mutationObserverRef.current.observe(document.body, {
@@ -473,7 +529,7 @@ export const HelpProvider: React.FC<{ children: React.ReactNode }> = ({ children
         subtree: true
       });
     }
-  }, [registerHelpTarget]);
+  }, []);
 
   const disableAutoDetection = useCallback(() => {
     if (mutationObserverRef.current) {

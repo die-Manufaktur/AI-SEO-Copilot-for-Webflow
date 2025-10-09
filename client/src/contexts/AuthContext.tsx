@@ -3,7 +3,7 @@
  * GREEN Phase: Minimal implementation to make tests pass
  */
 
-import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { WebflowAuth } from '../lib/webflowAuth';
 import type { WebflowOAuthToken, WebflowUser } from '../types/webflow-data-api';
 
@@ -35,6 +35,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 interface AuthProviderProps {
   children: React.ReactNode;
+  webflowAuth?: WebflowAuth; // For testing
 }
 
 const WEBFLOW_CONFIG = {
@@ -52,13 +53,24 @@ const WEBFLOW_CONFIG = {
 
 const WORKER_BASE_URL = import.meta.env.VITE_WORKER_URL || 'http://localhost:8787';
 
-export function AuthProvider({ children }: AuthProviderProps) {
+export function AuthProvider({ children, webflowAuth: providedWebflowAuth }: AuthProviderProps) {
   const [status, setStatus] = useState<AuthStatus>(AuthStatus.LOADING);
   const [user, setUser] = useState<WebflowUser | null>(null);
   const [token, setToken] = useState<WebflowOAuthToken | null>(null);
 
-  // Initialize WebflowAuth instance
-  const webflowAuth = useMemo(() => new WebflowAuth(WEBFLOW_CONFIG), []);
+  // Use refs for stable function dependencies
+  const tokenRef = useRef<WebflowOAuthToken | null>(null);
+
+  // Update ref when token changes
+  useEffect(() => {
+    tokenRef.current = token;
+  }, [token]);
+
+  // Initialize WebflowAuth instance (use provided one for testing)
+  const webflowAuth = useMemo(() => 
+    providedWebflowAuth || new WebflowAuth(WEBFLOW_CONFIG), 
+    [providedWebflowAuth]
+  );
 
   // Fetch user info from Webflow API
   const fetchUserInfo = useCallback(async (authToken: WebflowOAuthToken, retries = 2): Promise<WebflowUser | null> => {
@@ -95,9 +107,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       setStatus(AuthStatus.LOADING);
       
+      // For Designer Extensions running within a logged-in Webflow Designer window,
+      // authentication through OAuth may not be required since the extension 
+      // can use Designer Extension APIs directly. However, we still check for
+      // stored OAuth tokens for backwards compatibility.
       const validToken = await webflowAuth.getValidToken();
       
       if (!validToken) {
+        // No stored OAuth token - this is expected for Designer Extensions
+        // that use Designer APIs directly rather than Data API
+        console.log('[AuthContext] No OAuth token found - Designer Extension will use Designer APIs directly');
         setStatus(AuthStatus.UNAUTHENTICATED);
         setUser(null);
         setToken(null);
@@ -106,7 +125,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       setToken(validToken);
 
-      // Fetch user info
+      // Fetch user info if we have a token
       try {
         const userInfo = await fetchUserInfo(validToken);
         setUser(userInfo);
@@ -146,13 +165,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setToken(null);
   }, [webflowAuth]);
 
-  // Check permissions
+  // Check permissions - use ref for stable reference
   const hasPermission = useCallback((permission: string | string[]): boolean => {
-    if (!token) {
+    if (!tokenRef.current) {
       return false;
     }
-    return webflowAuth.hasScope(token, permission);
-  }, [token, webflowAuth]);
+    return webflowAuth.hasScope(tokenRef.current, permission);
+  }, [webflowAuth]);
 
   // Refresh authentication
   const refreshAuth = useCallback(async () => {

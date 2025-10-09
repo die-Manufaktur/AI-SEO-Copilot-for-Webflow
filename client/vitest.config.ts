@@ -3,10 +3,13 @@ import path from 'path';
 
 export default defineConfig({
   test: {
-    environment: 'happy-dom', // Use happy-dom instead of jsdom for better DOM API support
+    environment: 'jsdom', // Use jsdom for better compatibility with testing-library
     setupFiles: ['./src/setupTests.ts'],
     globals: true,
     testTimeout: 15000, // Set global timeout to 15 seconds for async tests
+    env: {
+      NODE_ENV: 'test'
+    },
     coverage: {
       reporter: ['text', 'json', 'html'],
       include: ['src/**/*.{ts,tsx}'],

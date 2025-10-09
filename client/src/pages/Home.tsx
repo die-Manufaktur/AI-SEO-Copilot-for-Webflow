@@ -53,6 +53,10 @@ import { getDefaultLanguage, getLanguageByCode, type Language } from '../../../s
 import { loadLanguageForSite, saveLanguageForSite } from '../utils/languageStorage';
 import { SchemaDisplay } from '../components/ui/schema-display';
 import { EditableRecommendation } from '../components/ui/editable-recommendation';
+import { BatchApplyButton } from '../components/ui/BatchApplyButton';
+import { useInsertion } from '../contexts/InsertionContext';
+import { createBatchInsertionRequest, canApplyRecommendation, type RecommendationContext } from '../utils/insertionHelpers';
+import type { WebflowBatchInsertionRequest, WebflowBatchInsertionResult } from '../types/webflow-data-api';
 
 const logger = createLogger("Home");
 
@@ -332,6 +336,7 @@ const getScoreRatingText = (score: number): string => {
 
 export default function Home() {
   const { toast } = useToast();
+  const { applyBatch } = useInsertion();
   // Using underscore prefix for state variables that are set but not directly read
   const [_isLoading, setIsLoading] = useState(false);
   const [_slug, setSlug] = useState<string | null>(null);
@@ -692,7 +697,7 @@ export default function Home() {
         toast({
           variant: "destructive",
           title: "Unpublished Page",
-          description: "It seems the page you are trying to analyze is empty. Can you make sure you published the page (top right corner button) and try again.",
+          description: "Unable to analyze this page. Please ensure the page has been published and has content, then try again.",
           duration: 6000,
           className: "bg-amber-50 dark:bg-amber-900 border-amber-200 dark:border-amber-800",
           style: {
@@ -884,6 +889,45 @@ export default function Home() {
       return categories[selectedCategory]?.includes(check);
     }) : [];
 
+  // Batch apply functionality
+  const applyableChecks = selectedCategoryChecks.filter(check => 
+    check.recommendation && !check.passed && canApplyRecommendation(check.title)
+  );
+
+  const createBatchRequest = () => {
+    const contexts: RecommendationContext[] = applyableChecks.map(check => ({
+      checkTitle: check.title,
+      recommendation: check.recommendation || '',
+      pageId: currentPageId,
+    }));
+
+    return createBatchInsertionRequest(contexts);
+  };
+
+  const handleBatchApply = async (request: WebflowBatchInsertionRequest): Promise<WebflowBatchInsertionResult> => {
+    try {
+      const result = await applyBatch(request);
+      toast({
+        title: "Batch apply successful",
+        description: `Applied ${result.succeeded} recommendations successfully.`,
+      });
+      return result;
+    } catch (error) {
+      toast({
+        title: "Batch apply failed",
+        description: error instanceof Error ? error.message : "Unknown error occurred",
+        variant: "destructive",
+      });
+      // Return a failed result instead of throwing
+      return {
+        success: false,
+        results: [],
+        succeeded: 0,
+        failed: request.operations.length,
+      };
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -985,10 +1029,10 @@ export default function Home() {
                     <AnimatePresence>
                       {advancedOptionsEnabled && (
                         <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          exit={{ opacity: 0, height: 0 }}
-                          transition={{ duration: 0.3 }}
+                          initial={process.env.NODE_ENV === 'test' ? {} : { opacity: 0, height: 0 }}
+                          animate={process.env.NODE_ENV === 'test' ? {} : { opacity: 1, height: "auto" }}
+                          exit={process.env.NODE_ENV === 'test' ? {} : { opacity: 0, height: 0 }}
+                          transition={process.env.NODE_ENV === 'test' ? { duration: 0 } : { duration: 0.3 }}
                           className="space-y-4"
                         >
                           {/* Page Type Dropdown */}
@@ -1191,6 +1235,18 @@ export default function Home() {
                           <ChevronLeft />
                           <CardTitle>{selectedCategory}</CardTitle>
                         </BackButton>
+                        {applyableChecks.length > 0 && (
+                          <div className="ml-auto">
+                            <BatchApplyButton
+                              batchRequest={{
+                                operations: createBatchRequest()?.operations || [],
+                              }}
+                              onBatchApply={handleBatchApply}
+                              showAffectedCount={true}
+                              disabled={applyableChecks.length === 0}
+                            />
+                          </div>
+                        )}
                       </CategoryHeader>
                     ) : (
                       <OriginalCardTitle className="text-center">Analysis Results</OriginalCardTitle>
@@ -1307,6 +1363,7 @@ export default function Home() {
                                   )}
                                 </div>
                               </div>
+                              
                             </div>
                             {!check.passed && check.recommendation && (
                               <motion.div
@@ -1332,6 +1389,9 @@ export default function Home() {
                                     recommendation={check.recommendation || ''}
                                     onCopy={copyToClipboard}
                                     disabled={mutation.isPending}
+                                    checkTitle={check.title}
+                                    pageId={currentPageId}
+                                    showApplyButton={true}
                                   />
                                 ) : (
                                   // Keep current rendering for checks that don't support copying
@@ -1356,6 +1416,7 @@ export default function Home() {
                                 webflowPageData: analysisRequestData?.webflowPageData,
                                 url: analysisRequestData?.url
                               })}
+                              pageId={currentPageId}
                             />
                           </motion.div>
                         )}

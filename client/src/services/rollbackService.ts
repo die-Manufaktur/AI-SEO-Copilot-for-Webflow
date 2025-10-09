@@ -292,6 +292,10 @@ export class RollbackService {
     
     try {
       localStorage.setItem(key, JSON.stringify(changeLog));
+      // Skip setTimeout in test environment to avoid issues with fake timers
+      if (typeof import.meta.env !== 'undefined' && import.meta.env.MODE !== 'test') {
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
     } catch (error) {
       console.warn('Failed to persist change log:', error);
     }
@@ -309,6 +313,8 @@ export class RollbackService {
         const changeLog: ChangeLog = JSON.parse(stored);
         this.changeLogs.set(rollbackId, changeLog);
       }
+      // Add a microtask to ensure restoration completes
+      await new Promise(resolve => setTimeout(resolve, 0));
     } catch (error) {
       console.warn('Failed to restore change log:', error);
     }

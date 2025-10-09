@@ -4,6 +4,8 @@ import { Toaster } from "./components/ui/toaster";
 import { queryClient } from "./lib/queryClient";
 import Home from "./pages/Home";
 import WebflowAppWrapper from "./components/WebflowAppWrapper";
+import { AuthProvider } from "./contexts/AuthContext";
+import { InsertionProvider } from "./contexts/InsertionContext";
 
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -61,9 +63,13 @@ export default function App() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <WebflowAppWrapper>
-          <Home />
-        </WebflowAppWrapper>
+        <AuthProvider>
+          <InsertionProvider>
+            <WebflowAppWrapper>
+              <Home />
+            </WebflowAppWrapper>
+          </InsertionProvider>
+        </AuthProvider>
         <Toaster />
       </QueryClientProvider>
     </ErrorBoundary>

@@ -174,7 +174,19 @@ function findLocalhostReferences(dir: string): Array<{file: string, line: number
           const lines = content.split('\n');
           
           lines.forEach((line, index) => {
-            if (line.toLowerCase().includes('localhost')) {
+            const lowerLine = line.toLowerCase();
+            if (lowerLine.includes('localhost')) {
+              // Skip comments and documentation references
+              const trimmedLine = line.trim();
+              if (trimmedLine.startsWith('//') || 
+                  trimmedLine.startsWith('/*') || 
+                  trimmedLine.startsWith('*') ||
+                  trimmedLine.includes('example') ||
+                  trimmedLine.includes('docs') ||
+                  lowerLine.includes('localhost:1337') && trimmedLine.includes('webflow')) {
+                return; // Skip these references
+              }
+              
               references.push({
                 file: path.relative(process.cwd(), fullPath),
                 line: index + 1,

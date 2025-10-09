@@ -1,16 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Use vi.hoisted to ensure mockLogger is available during mock hoisting
-const mockLogger = vi.hoisted(() => ({
+// Mock the createLogger utility to always return the same mock logger
+const mockLogger = {
   debug: vi.fn(),
   info: vi.fn(),
   warn: vi.fn(),
   error: vi.fn(),
-}));
+};
 
-// Mock the createLogger utility to always return the same mock logger
+const createLoggerSpy = vi.fn(() => mockLogger);
+
 vi.mock('./utils', () => ({
-  createLogger: vi.fn(() => mockLogger),
+  createLogger: createLoggerSpy,
 }));
 
 import { getPageSlug } from './get-page-slug';
@@ -155,6 +156,6 @@ describe('getPageSlug', () => {
   it('uses correct logger namespace', () => {
     // The logger is created when the module is imported, not when the function is called
     // Since we import the module at the top of this test file, createLogger should have been called
-    expect(createLogger).toHaveBeenCalledWith('PageSlug');
+    expect(createLoggerSpy).toHaveBeenCalledWith('PageSlug');
   });
 });

@@ -12,21 +12,29 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from './tooltip';
+import { ApplyButton } from './ApplyButton';
+import { useInsertion } from '../../contexts/InsertionContext';
+import { createInsertionRequest, type RecommendationContext } from '../../utils/insertionHelpers';
 
 interface SchemaDisplayProps {
   pageType: string;
   schemas: SchemaRecommendation[];
+  pageId?: string;
 }
 
 interface SchemaBlockProps {
   schema: SchemaRecommendation;
   isEnabled: boolean;
   onToggle: (enabled: boolean) => void;
+  pageId?: string;
 }
 
-const SchemaBlock: React.FC<SchemaBlockProps> = ({ schema, isEnabled, onToggle }) => {
+const SchemaBlock: React.FC<SchemaBlockProps> = ({ schema, isEnabled, onToggle, pageId }) => {
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
+  
+  // Insertion context for apply functionality
+  const { applyInsertion, isLoading, error } = useInsertion();
   
   const copySchemaToClipboard = async (text: string): Promise<boolean> => {
     // For schema code, we need to bypass sanitization that strips JSON formatting
@@ -109,6 +117,25 @@ ${schema.jsonLdCode}
     }
   };
 
+  const handleApply = async (request: any) => {
+    if (!pageId) {
+      throw new Error('Page ID is required for schema insertion');
+    }
+
+    const insertionRequest = createInsertionRequest({
+      checkTitle: 'Schema Markup',
+      recommendation: schema.jsonLdCode,
+      pageId,
+    });
+    
+    if (!insertionRequest) {
+      throw new Error('Unable to create insertion request');
+    }
+    
+    return await applyInsertion(insertionRequest);
+  };
+
+
   const getGoogleSupportBadge = () => {
     const baseClasses = "px-2 py-1 text-xs font-medium rounded-full";
     
@@ -170,39 +197,56 @@ ${schema.jsonLdCode}
         <div className="mt-3">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-medium" style={{ color: 'var(--text1)' }}>JSON-LD Code:</span>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <motion.div
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                  >
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="flex items-center gap-2"
-                      onClick={handleCopy}
+            <div className="flex items-center gap-2">
+              {pageId && (
+                <ApplyButton
+                  insertionRequest={createInsertionRequest({
+                    checkTitle: 'Schema Markup',
+                    recommendation: schema.jsonLdCode,
+                    pageId,
+                  }) || { type: 'custom_code', value: schema.jsonLdCode, location: 'head' }}
+                  onApply={handleApply}
+                  loading={isLoading}
+                  error={error || undefined}
+                  disabled={false}
+                  label="Apply"
+                  ariaLabel={`Apply ${schema.name} schema to page head`}
+                />
+              )}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <motion.div
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
                     >
-                      {copied ? (
-                        <>
-                          <Check className="h-4 w-4" />
-                          Copied
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-4 w-4" />
-                          Copy
-                        </>
-                      )}
-                    </Button>
-                  </motion.div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Copy schema code to clipboard</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-2"
+                        onClick={handleCopy}
+                      >
+                        {copied ? (
+                          <>
+                            <Check className="h-4 w-4" />
+                            Copied
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-4 w-4" />
+                            Copy
+                          </>
+                        )}
+                      </Button>
+                    </motion.div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Copy schema code to clipboard</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
           </div>
           <pre 
             className="p-3 rounded text-xs overflow-x-auto font-mono"
@@ -218,7 +262,7 @@ ${schema.jsonLdCode}
   );
 };
 
-export const SchemaDisplay: React.FC<SchemaDisplayProps> = ({ pageType, schemas }) => {
+export const SchemaDisplay: React.FC<SchemaDisplayProps> = ({ pageType, schemas, pageId }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [enabledOptionalSchemas, setEnabledOptionalSchemas] = useState<Set<string>>(new Set());
 
@@ -271,6 +315,7 @@ export const SchemaDisplay: React.FC<SchemaDisplayProps> = ({ pageType, schemas 
                       schema={schema}
                       isEnabled={true}
                       onToggle={() => {}} // Required schemas are always enabled
+                      pageId={pageId}
                     />
                   ))}
                 </div>
@@ -288,6 +333,7 @@ export const SchemaDisplay: React.FC<SchemaDisplayProps> = ({ pageType, schemas 
                       schema={schema}
                       isEnabled={enabledOptionalSchemas.has(schema.name)}
                       onToggle={(enabled) => toggleOptionalSchema(schema.name, enabled)}
+                      pageId={pageId}
                     />
                   ))}
                 </div>

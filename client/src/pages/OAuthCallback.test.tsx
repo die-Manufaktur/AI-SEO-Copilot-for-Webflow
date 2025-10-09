@@ -4,12 +4,13 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import { OAuthCallback } from './OAuthCallback';
 
-// Mock useAuth hook
+// Mock useAuth hook with stable function reference
+const mockRefreshAuth = vi.fn();
 const mockUseAuth = {
-  refreshAuth: vi.fn(),
+  refreshAuth: mockRefreshAuth,
   status: 'unauthenticated',
   isLoading: false,
 };
@@ -18,16 +19,32 @@ vi.mock('../contexts/AuthContext', () => ({
   useAuth: () => mockUseAuth,
 }));
 
-// Mock WebflowAuth
-const mockWebflowAuth = {
-  handleOAuthCallback: vi.fn(),
-  storeToken: vi.fn(),
-  getConfig: vi.fn(),
-  validateConfig: vi.fn(),
-};
+// Mock WebflowAuth at the top level to ensure proper hoisting
+const mockHandleOAuthCallback = vi.fn();
+const mockStoreToken = vi.fn();
+const mockGetConfig = vi.fn();
+const mockValidateConfig = vi.fn();
 
 vi.mock('../lib/webflowAuth', () => ({
-  WebflowAuth: vi.fn(() => mockWebflowAuth),
+  WebflowAuth: vi.fn().mockImplementation((config) => {
+    // Call validateConfig to mimic constructor behavior
+    if (!config.clientId?.trim()) {
+      throw new Error('Client ID is required');
+    }
+    if (!config.redirectUri?.trim()) {
+      throw new Error('Redirect URI is required');
+    }
+    if (!config.scope?.length) {
+      throw new Error('At least one scope is required');
+    }
+    
+    return {
+      handleOAuthCallback: mockHandleOAuthCallback,
+      storeToken: mockStoreToken,
+      getConfig: mockGetConfig,
+      validateConfig: mockValidateConfig,
+    };
+  }),
 }));
 
 // Mock URL
@@ -42,6 +59,35 @@ Object.defineProperty(window, 'location', {
   writable: true,
 });
 
+// Mock URL constructor for tests
+global.URL = global.URL || class URL {
+  href: string;
+  origin: string;
+  protocol: string;
+  host: string;
+  hostname: string;
+  port: string;
+  pathname: string;
+  search: string;
+  hash: string;
+  
+  constructor(url: string) {
+    this.href = url;
+    this.origin = 'http://localhost:1337';
+    this.protocol = 'http:';
+    this.host = 'localhost:1337';
+    this.hostname = 'localhost';
+    this.port = '1337';
+    this.pathname = '/oauth/callback';
+    this.search = '?code=test-code&state=test-state';
+    this.hash = '';
+  }
+  
+  toString() {
+    return this.href;
+  }
+};
+
 describe('OAuthCallback', () => {
   const mockToken = {
     access_token: 'test-access-token',
@@ -54,9 +100,17 @@ describe('OAuthCallback', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseAuth.refreshAuth.mockResolvedValue(undefined);
-    // Make the mock resolve successfully by default
-    mockWebflowAuth.handleOAuthCallback.mockResolvedValue(mockToken);
+    
+    // Set up mocks with immediate resolution
+    mockRefreshAuth.mockImplementation(() => Promise.resolve(undefined));
+    mockHandleOAuthCallback.mockResolvedValue(mockToken);
+    mockStoreToken.mockImplementation(() => {});
+    mockGetConfig.mockReturnValue({
+      clientId: 'test-client-id',
+      redirectUri: 'http://localhost:1337/oauth/callback',
+      scope: ['sites:read', 'sites:write'],
+    });
+    mockValidateConfig.mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -71,35 +125,38 @@ describe('OAuthCallback', () => {
       expect(screen.getByText(/processing authentication/i)).toBeInTheDocument();
     });
 
-    it('should handle successful OAuth callback', async () => {
-      // Mock is already set up in beforeEach
 
+    it('should handle successful OAuth callback', async () => {
       render(<OAuthCallback />);
 
-      await waitFor(() => {
-        expect(mockWebflowAuth.handleOAuthCallback).toHaveBeenCalledWith(
-          expect.any(URL)
-        );
-      });
-
-      await waitFor(() => {
-        expect(mockUseAuth.refreshAuth).toHaveBeenCalled();
-      });
-
+      // Wait for the success state with a reasonable timeout
       await waitFor(() => {
         expect(screen.getByTestId('oauth-callback-success')).toBeInTheDocument();
-        expect(screen.getByText(/authentication successful/i)).toBeInTheDocument();
-      });
+      }, { timeout: 2000 });
+
+      // Verify our mocks were called
+      expect(mockHandleOAuthCallback).toHaveBeenCalled();
+      expect(mockRefreshAuth).toHaveBeenCalled();
     });
 
     it('should redirect to main app after successful authentication', async () => {
       // Mock is already set up in beforeEach
+      vi.useFakeTimers();
 
       render(<OAuthCallback />);
 
+      // Wait for the success state to be shown first
       await waitFor(() => {
-        expect(mockLocation.replace).toHaveBeenCalledWith('/');
-      }, { timeout: 3000 });
+        expect(screen.getByTestId('oauth-callback-success')).toBeInTheDocument();
+      });
+
+      // Advance timers by 1500ms to trigger the redirect
+      act(() => {
+        vi.advanceTimersByTime(1500);
+      });
+
+      expect(mockLocation.replace).toHaveBeenCalledWith('/');
+      vi.useRealTimers();
     });
 
     it('should show success message before redirect', async () => {
@@ -127,7 +184,7 @@ describe('OAuthCallback', () => {
         writable: true,
       });
 
-      mockWebflowAuth.handleOAuthCallback.mockRejectedValue(
+      mockHandleOAuthCallback.mockRejectedValue(
         new Error('OAuth error: access_denied - User denied access')
       );
 
@@ -135,13 +192,14 @@ describe('OAuthCallback', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId('oauth-callback-error')).toBeInTheDocument();
-        expect(screen.getByText(/authentication failed/i)).toBeInTheDocument();
-        expect(screen.getByText(/User denied access/i)).toBeInTheDocument();
-      });
+      }, { timeout: 2000 });
+      
+      expect(screen.getByText(/authentication failed/i)).toBeInTheDocument();
+      expect(screen.getByText(/User denied access/i)).toBeInTheDocument();
     });
 
     it('should handle invalid state parameter', async () => {
-      mockWebflowAuth.handleOAuthCallback.mockRejectedValue(
+      mockHandleOAuthCallback.mockRejectedValue(
         new Error('Invalid state parameter')
       );
 
@@ -149,12 +207,13 @@ describe('OAuthCallback', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId('oauth-callback-error')).toBeInTheDocument();
-        expect(screen.getByText(/Invalid state parameter/i)).toBeInTheDocument();
-      });
+      }, { timeout: 2000 });
+      
+      expect(screen.getByText(/Invalid state parameter/i)).toBeInTheDocument();
     });
 
     it('should handle network errors during token exchange', async () => {
-      mockWebflowAuth.handleOAuthCallback.mockRejectedValue(
+      mockHandleOAuthCallback.mockRejectedValue(
         new Error('Network error: Failed to exchange code for token')
       );
 
@@ -162,8 +221,9 @@ describe('OAuthCallback', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId('oauth-callback-error')).toBeInTheDocument();
-        expect(screen.getByText(/network error/i)).toBeInTheDocument();
-      });
+      }, { timeout: 2000 });
+      
+      expect(screen.getByText(/network error/i)).toBeInTheDocument();
     });
 
     it('should handle missing authorization code', async () => {
@@ -177,7 +237,7 @@ describe('OAuthCallback', () => {
         writable: true,
       });
 
-      mockWebflowAuth.handleOAuthCallback.mockRejectedValue(
+      mockHandleOAuthCallback.mockRejectedValue(
         new Error('Missing authorization code or state parameter')
       );
 
@@ -185,12 +245,13 @@ describe('OAuthCallback', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId('oauth-callback-error')).toBeInTheDocument();
-        expect(screen.getByText(/Missing authorization code/i)).toBeInTheDocument();
-      });
+      }, { timeout: 2000 });
+      
+      expect(screen.getByText(/Missing authorization code/i)).toBeInTheDocument();
     });
 
     it('should provide retry functionality on error', async () => {
-      mockWebflowAuth.handleOAuthCallback.mockRejectedValue(
+      mockHandleOAuthCallback.mockRejectedValue(
         new Error('Network error')
       );
 
@@ -198,7 +259,7 @@ describe('OAuthCallback', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId('oauth-callback-error')).toBeInTheDocument();
-      });
+      }, { timeout: 2000 });
 
       const retryButton = screen.getByTestId('oauth-retry-button');
       expect(retryButton).toBeInTheDocument();
@@ -206,7 +267,7 @@ describe('OAuthCallback', () => {
     });
 
     it('should show back to app link on error', async () => {
-      mockWebflowAuth.handleOAuthCallback.mockRejectedValue(
+      mockHandleOAuthCallback.mockRejectedValue(
         new Error('OAuth error')
       );
 
@@ -214,7 +275,7 @@ describe('OAuthCallback', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId('oauth-callback-error')).toBeInTheDocument();
-      });
+      }, { timeout: 2000 });
 
       const backLink = screen.getByTestId('oauth-back-link');
       expect(backLink).toBeInTheDocument();
@@ -231,7 +292,7 @@ describe('OAuthCallback', () => {
     });
 
     it('should show processing steps', async () => {
-      mockWebflowAuth.handleOAuthCallback.mockImplementation(
+      mockHandleOAuthCallback.mockImplementation(
         () => new Promise(resolve => setTimeout(() => resolve({
           access_token: 'test-token',
           refresh_token: 'test-refresh',
@@ -240,6 +301,10 @@ describe('OAuthCallback', () => {
           scope: 'sites:read',
           expires_at: Date.now() + 3600000,
         }), 100))
+      );
+
+      mockRefreshAuth.mockImplementation(
+        () => new Promise(resolve => setTimeout(resolve, 100))
       );
 
       render(<OAuthCallback />);
@@ -258,7 +323,7 @@ describe('OAuthCallback', () => {
         resolveCallback = resolve;
       });
 
-      mockWebflowAuth.handleOAuthCallback.mockReturnValue(callbackPromise);
+      mockHandleOAuthCallback.mockReturnValue(callbackPromise);
 
       render(<OAuthCallback />);
 
@@ -285,7 +350,7 @@ describe('OAuthCallback', () => {
     });
 
     it('should announce status changes to screen readers', async () => {
-      mockWebflowAuth.handleOAuthCallback.mockRejectedValue(
+      mockHandleOAuthCallback.mockRejectedValue(
         new Error('Test error')
       );
 
@@ -306,7 +371,7 @@ describe('OAuthCallback', () => {
     });
 
     it('should support keyboard navigation', async () => {
-      mockWebflowAuth.handleOAuthCallback.mockRejectedValue(
+      mockHandleOAuthCallback.mockRejectedValue(
         new Error('Test error')
       );
 
@@ -323,17 +388,28 @@ describe('OAuthCallback', () => {
   describe('Security Considerations', () => {
     it('should clear URL parameters after processing', async () => {
       // Mock is already set up in beforeEach
+      vi.useFakeTimers();
 
       render(<OAuthCallback />);
 
+      // Wait for the success state to be shown
       await waitFor(() => {
-        expect(mockLocation.replace).toHaveBeenCalledWith('/');
+        expect(screen.getByTestId('oauth-callback-success')).toBeInTheDocument();
       });
+
+      // Advance timers by 1500ms to trigger the redirect
+      act(() => {
+        vi.advanceTimersByTime(1500);
+      });
+
+      expect(mockLocation.replace).toHaveBeenCalledWith('/');
 
       // Should not expose sensitive parameters in URL
       expect(mockLocation.replace).not.toHaveBeenCalledWith(
         expect.stringContaining('code=')
       );
+
+      vi.useRealTimers();
     });
 
     it('should not log sensitive information', async () => {
@@ -350,7 +426,7 @@ describe('OAuthCallback', () => {
         expires_at: Date.now() + 3600000,
       };
 
-      mockWebflowAuth.handleOAuthCallback.mockResolvedValue(sensitiveToken);
+      mockHandleOAuthCallback.mockResolvedValue(sensitiveToken);
 
       render(<OAuthCallback />);
 

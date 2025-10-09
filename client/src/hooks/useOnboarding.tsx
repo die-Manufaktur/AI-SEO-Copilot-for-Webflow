@@ -83,21 +83,21 @@ export const useOnboarding = (options: UseOnboardingOptions = {}) => {
   }, [state]);
 
   const completeStep = useCallback((stepIndex: number) => {
-    if (stepIndex !== state.currentStep) {
-      return; // Can only complete current step
-    }
-
-    const endTime = Date.now();
-    const startTime = state.stepTimestamps[stepIndex]?.start || endTime;
-    const timeSpent = endTime - startTime;
-
-    // Track analytics
-    trackEvent?.('onboarding_step_completed', {
-      step: stepIndex,
-      timeSpent
-    });
-
     setState(prev => {
+      if (stepIndex !== prev.currentStep) {
+        return prev; // Can only complete current step
+      }
+
+      const endTime = Date.now();
+      const startTime = prev.stepTimestamps[stepIndex]?.start || endTime;
+      const timeSpent = endTime - startTime;
+
+      // Track analytics
+      trackEvent?.('onboarding_step_completed', {
+        step: stepIndex,
+        timeSpent
+      });
+
       const newCompletedSteps = [...prev.completedSteps, stepIndex];
       const nextStep = stepIndex + 1;
       const isLastStep = nextStep >= ONBOARDING_STEPS.length;
@@ -132,7 +132,7 @@ export const useOnboarding = (options: UseOnboardingOptions = {}) => {
         }
       };
     });
-  }, [state.currentStep, state.stepTimestamps, trackEvent]);
+  }, [trackEvent]);
 
   const goToPreviousStep = useCallback(() => {
     setState(prev => ({
@@ -164,28 +164,32 @@ export const useOnboarding = (options: UseOnboardingOptions = {}) => {
   }, []);
 
   const skipOnboarding = useCallback(() => {
-    trackEvent?.('onboarding_skipped', {
-      atStep: state.currentStep
-    });
+    setState(prev => {
+      trackEvent?.('onboarding_skipped', {
+        atStep: prev.currentStep
+      });
 
-    setState({
-      currentStep: ONBOARDING_STEPS.length,
-      isComplete: true,
-      hasSeenOnboarding: true,
-      completedSteps: [],
-      stepTimestamps: {}
+      return {
+        currentStep: ONBOARDING_STEPS.length,
+        isComplete: true,
+        hasSeenOnboarding: true,
+        completedSteps: [],
+        stepTimestamps: {}
+      };
     });
-  }, [state.currentStep, trackEvent]);
+  }, [trackEvent]);
 
   const resetOnboarding = useCallback(() => {
-    trackEvent?.('onboarding_reset', {});
+    setState(prev => {
+      trackEvent?.('onboarding_reset', {});
 
-    setState({
-      currentStep: 0,
-      isComplete: false,
-      hasSeenOnboarding: false,
-      completedSteps: [],
-      stepTimestamps: { 0: { start: Date.now() } }
+      return {
+        currentStep: 0,
+        isComplete: false,
+        hasSeenOnboarding: false,
+        completedSteps: [],
+        stepTimestamps: { 0: { start: Date.now() } }
+      };
     });
   }, [trackEvent]);
 

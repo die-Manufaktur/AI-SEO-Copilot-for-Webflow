@@ -165,7 +165,7 @@ export class WebflowDataAPI {
    * Generic HTTP methods for direct API access (primarily for testing)
    */
   async get<T = any>(endpoint: string, options?: RequestOptions): Promise<T> {
-    return this.httpClient.get<T>(endpoint, options);
+    return this.httpClient.get<T>(endpoint, undefined, options);
   }
 
   async post<T = any>(endpoint: string, data?: any, options?: RequestOptions): Promise<T> {

@@ -154,7 +154,8 @@ export class HttpClient {
         
         return this.rateLimitManager.handleRateLimit(
           () => this.executeRequest<T>(url, options, retryCount + 1),
-          retryCount
+          retryCount,
+          rateLimitError
         );
       }
 

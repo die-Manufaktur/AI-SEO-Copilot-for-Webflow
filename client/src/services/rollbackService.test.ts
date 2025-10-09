@@ -20,11 +20,36 @@ const mockWebflowInsertion = {
 
 describe('Enhanced Rollback Service', () => {
   let rollbackService: RollbackService;
+  
+  // Create a working localStorage mock for this test suite
+  const localStorageData: Record<string, string> = {};
+  const mockLocalStorage = {
+    getItem: vi.fn((key: string) => localStorageData[key] || null),
+    setItem: vi.fn((key: string, value: string) => {
+      localStorageData[key] = value;
+    }),
+    removeItem: vi.fn((key: string) => {
+      delete localStorageData[key];
+    }),
+    clear: vi.fn(() => {
+      Object.keys(localStorageData).forEach(key => delete localStorageData[key]);
+    }),
+    length: 0,
+    key: vi.fn(),
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
-    // Clear localStorage to ensure clean state
-    localStorage.clear();
+    
+    // Clear the mock localStorage data
+    Object.keys(localStorageData).forEach(key => delete localStorageData[key]);
+    
+    // Replace localStorage with our working mock
+    Object.defineProperty(global, 'localStorage', {
+      value: mockLocalStorage,
+      writable: true,
+    });
+    
     rollbackService = new RollbackService();
   });
 
@@ -332,6 +357,10 @@ describe('Enhanced Rollback Service', () => {
       rollbackService.trackChangeLog('rollback_persist', changeLog);
       await rollbackService.persistChangeLog('rollback_persist');
 
+      // Verify localStorage has the data
+      const storedData = localStorage.getItem('webflow_rollback_rollback_persist');
+      expect(storedData).toBeTruthy();
+
       // Create new instance and restore
       const newService = new RollbackService();
       await newService.restoreChangeLog('rollback_persist');
@@ -345,7 +374,7 @@ describe('Enhanced Rollback Service', () => {
     it('should cleanup old change logs automatically', () => {
       const oldLog = {
         rollbackId: 'rollback_old',
-        timestamp: Date.now() - 48 * 60 * 60 * 1000, // 48 hours ago
+        timestamp: Date.now() - 49 * 60 * 60 * 1000, // 49 hours ago (older than 48h threshold)
         totalChanges: 1,
         changes: [],
         status: 'completed' as const,

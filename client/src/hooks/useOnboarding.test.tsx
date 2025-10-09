@@ -273,18 +273,27 @@ describe('useOnboarding', () => {
       expect(stepInfo).toBeNull();
     });
 
-    it('should track time spent on steps', () => {
-      const { result } = renderHook(() => useOnboarding());
+    it('should track time spent on steps', async () => {
+      vi.useFakeTimers();
       
-      const startTime = Date.now();
-      
-      act(() => {
-        result.current.completeStep(0);
-      });
-      
-      const timeSpent = result.current.getTimeSpentOnStep(0);
-      expect(timeSpent).toBeGreaterThan(0);
-      expect(timeSpent).toBeLessThan(1000); // Should be quick in tests
+      try {
+        const { result } = renderHook(() => useOnboarding());
+        
+        // Fast-forward time a bit to ensure different timestamps
+        act(() => {
+          vi.advanceTimersByTime(100);
+        });
+        
+        act(() => {
+          result.current.completeStep(0);
+        });
+        
+        const timeSpent = result.current.getTimeSpentOnStep(0);
+        expect(timeSpent).toBeGreaterThan(0);
+        expect(timeSpent).toBeLessThan(1000); // Should be quick in tests
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
@@ -322,9 +331,21 @@ describe('useOnboarding', () => {
       
       act(() => {
         result.current.completeStep(0);
+      });
+      
+      act(() => {
         result.current.completeStep(1);
+      });
+      
+      act(() => {
         result.current.completeStep(2);
+      });
+      
+      act(() => {
         result.current.completeStep(3);
+      });
+      
+      act(() => {
         result.current.completeStep(4);
       });
       

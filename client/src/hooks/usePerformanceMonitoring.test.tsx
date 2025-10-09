@@ -9,6 +9,7 @@ import {
   withPerformanceTracking,
   type UsePerformanceMonitoringOptions 
 } from './usePerformanceMonitoring';
+import { performanceMonitor } from '../services/performanceMonitor';
 
 // Mock the performance monitor service
 vi.mock('../services/performanceMonitor', () => ({
@@ -32,7 +33,7 @@ vi.mock('../services/performanceMonitor', () => ({
         operationsPerSession: 0,
       },
     })),
-    getAlerts: vi.fn(() => []),
+    getAlerts: vi.fn().mockReturnValue([]),
     getOptimizationSuggestions: vi.fn(() => []),
     trackApiCall: vi.fn(),
     trackComponentRender: vi.fn(),
@@ -69,7 +70,6 @@ describe('usePerformanceMonitoring Hook', () => {
 
     it('should start monitoring when startMonitoring is called', () => {
       const { result } = renderHook(() => usePerformanceMonitoring());
-      const { performanceMonitor } = require('../services/performanceMonitor');
 
       act(() => {
         result.current.startMonitoring();
@@ -81,7 +81,6 @@ describe('usePerformanceMonitoring Hook', () => {
 
     it('should stop monitoring when stopMonitoring is called', () => {
       const { result } = renderHook(() => usePerformanceMonitoring());
-      const { performanceMonitor } = require('../services/performanceMonitor');
 
       act(() => {
         result.current.startMonitoring();
@@ -94,7 +93,6 @@ describe('usePerformanceMonitoring Hook', () => {
 
     it('should track API calls when enabled', () => {
       const { result } = renderHook(() => usePerformanceMonitoring({ trackApiCalls: true }));
-      const { performanceMonitor } = require('../services/performanceMonitor');
 
       act(() => {
         result.current.trackApiCall('/api/test', 100, true);
@@ -105,7 +103,6 @@ describe('usePerformanceMonitoring Hook', () => {
 
     it('should not track API calls when disabled', () => {
       const { result } = renderHook(() => usePerformanceMonitoring({ trackApiCalls: false }));
-      const { performanceMonitor } = require('../services/performanceMonitor');
 
       act(() => {
         result.current.trackApiCall('/api/test', 100, true);
@@ -116,7 +113,6 @@ describe('usePerformanceMonitoring Hook', () => {
 
     it('should track component renders when enabled', () => {
       const { result } = renderHook(() => usePerformanceMonitoring({ trackComponentRenders: true }));
-      const { performanceMonitor } = require('../services/performanceMonitor');
 
       act(() => {
         result.current.trackRender('TestComponent', 50);
@@ -127,7 +123,6 @@ describe('usePerformanceMonitoring Hook', () => {
 
     it('should update metrics periodically when monitoring', () => {
       const { result } = renderHook(() => usePerformanceMonitoring());
-      const { performanceMonitor } = require('../services/performanceMonitor');
 
       act(() => {
         result.current.startMonitoring();
@@ -145,18 +140,22 @@ describe('usePerformanceMonitoring Hook', () => {
 
     it('should filter alerts based on threshold', () => {
       const mockAlerts = [
-        { severity: 'low', type: 'test', message: 'Low alert', threshold: 100, currentValue: 150, timestamp: Date.now() },
-        { severity: 'medium', type: 'test', message: 'Medium alert', threshold: 100, currentValue: 200, timestamp: Date.now() },
-        { severity: 'high', type: 'test', message: 'High alert', threshold: 100, currentValue: 300, timestamp: Date.now() },
+        { severity: 'low' as const, type: 'response_time' as const, message: 'Low alert', threshold: 100, currentValue: 150, timestamp: Date.now() },
+        { severity: 'medium' as const, type: 'error_rate' as const, message: 'Medium alert', threshold: 100, currentValue: 200, timestamp: Date.now() },
+        { severity: 'high' as const, type: 'rate_limit' as const, message: 'High alert', threshold: 100, currentValue: 300, timestamp: Date.now() },
       ];
 
-      const { performanceMonitor } = require('../services/performanceMonitor');
-      performanceMonitor.getAlerts.mockReturnValue(mockAlerts);
+      // Set up the mock to return the alerts
+      vi.mocked(performanceMonitor.getAlerts).mockReturnValue(mockAlerts);
 
       const { result } = renderHook(() => usePerformanceMonitoring({ alertThreshold: 'high' }));
 
       act(() => {
         result.current.startMonitoring();
+      });
+
+      // Advance time to trigger the interval and wait for state update
+      act(() => {
         vi.advanceTimersByTime(5000);
       });
 
@@ -169,7 +168,6 @@ describe('usePerformanceMonitoring Hook', () => {
   describe('useRenderPerformance', () => {
     it('should track render performance for a component', () => {
       const { result } = renderHook(() => useRenderPerformance('TestComponent'));
-      const { performanceMonitor } = require('../services/performanceMonitor');
 
       expect(typeof result.current.trackRender).toBe('function');
 
@@ -184,7 +182,6 @@ describe('usePerformanceMonitoring Hook', () => {
   describe('useApiPerformance', () => {
     it('should track successful API calls', async () => {
       const { result } = renderHook(() => useApiPerformance());
-      const { performanceMonitor } = require('../services/performanceMonitor');
 
       const mockApiCall = vi.fn().mockResolvedValue('success');
 
@@ -203,7 +200,6 @@ describe('usePerformanceMonitoring Hook', () => {
 
     it('should track failed API calls', async () => {
       const { result } = renderHook(() => useApiPerformance());
-      const { performanceMonitor } = require('../services/performanceMonitor');
 
       const mockApiCall = vi.fn().mockRejectedValue(new Error('API Error'));
 
@@ -226,7 +222,6 @@ describe('usePerformanceMonitoring Hook', () => {
   describe('useInteractionPerformance', () => {
     it('should track user interaction performance', async () => {
       const { result } = renderHook(() => useInteractionPerformance());
-      const { performanceMonitor } = require('../services/performanceMonitor');
 
       const mockHandler = vi.fn();
       const trackedHandler = result.current.trackInteraction('button-click', mockHandler);

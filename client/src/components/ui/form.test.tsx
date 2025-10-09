@@ -611,8 +611,10 @@ describe('Form Components', () => {
       });
       
       // Fix email, check that error clears
-      await user.clear(screen.getByPlaceholderText('Enter email'));
-      await user.type(screen.getByPlaceholderText('Enter email'), 'valid@example.com');
+      const emailInput = screen.getByPlaceholderText('Enter email');
+      await user.click(emailInput);
+      await user.keyboard('{Control>}a{/Control}'); // Select all
+      await user.type(emailInput, 'valid@example.com');
       await user.type(screen.getByPlaceholderText('Enter username'), 'validuser');
       
       await waitFor(() => {

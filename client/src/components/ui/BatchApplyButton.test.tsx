@@ -436,10 +436,11 @@ describe('BatchApplyButton', () => {
         />
       );
 
-      await user.tab(); // Focus main button
-      await user.tab(); // Focus rollback button
+      const rollbackButton = screen.getByRole('button', { name: /rollback changes/i });
       
-      expect(screen.getByRole('button', { name: /rollback changes/i })).toHaveFocus();
+      // Direct focus instead of user.tab() to ensure the rollback button gets focus
+      rollbackButton.focus();
+      expect(rollbackButton).toHaveFocus();
       
       await user.keyboard('{Enter}');
       expect(mockOnRollback).toHaveBeenCalled();

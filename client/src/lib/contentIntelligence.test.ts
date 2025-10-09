@@ -48,7 +48,7 @@ describe('ContentIntelligence', () => {
     isArchived: false,
     isDraft: false,
     fieldData: {
-      name: 'Old Blog Post Title',
+      name: 'Short',
       slug: 'old-blog-post-title',
       'meta-description': 'Short desc',
       content: 'This is the blog post content...',
@@ -303,6 +303,11 @@ describe('ContentIntelligence', () => {
           expect.objectContaining({ pageId: 'page_123' }),
           expect.objectContaining({ pageId: 'page_456' }),
         ]),
+        potentialImpact: expect.objectContaining({
+          scoreImprovement: expect.any(Number),
+          issuesResolved: expect.any(Number),
+          estimatedTrafficIncrease: expect.any(Number),
+        }),
       });
     });
 
@@ -482,12 +487,10 @@ describe('ContentIntelligence', () => {
         conflictingValues: ['New Title by Alice', 'New Title by Bob'],
         timestamp: expect.any(Number),
         severity: 'medium',
-        resolutionSuggestions: expect.arrayContaining([
-          expect.objectContaining({
-            type: 'merge_changes',
-            description: expect.stringContaining('merge')
-          })
-        ])
+        resolutionSuggestions: [{
+          type: 'merge_changes',
+          description: 'Merge the conflicting changes manually'
+        }]
       });
     });
 

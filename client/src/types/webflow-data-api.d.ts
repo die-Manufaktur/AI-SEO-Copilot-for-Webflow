@@ -43,7 +43,6 @@ export interface WebflowSite {
   name: string;
   shortName: string;
   lastPublished?: string;
-  previewUrl: string;
   timezone: string;
   database: string;
   customDomains?: WebflowCustomDomain[];
@@ -221,12 +220,16 @@ export interface WebflowDataApiConfig {
 
 // Insertion Types (for apply functionality)
 export interface WebflowInsertionRequest {
-  type: 'page_title' | 'meta_description' | 'page_seo' | 'cms_field';
+  type: 'page_title' | 'meta_description' | 'page_seo' | 'page_slug' | 'cms_field' | 'custom_code';
+  // Note: h1_heading, h2_heading, and introduction types are disabled due to 
+  // Webflow Designer API limitations (issue #504)
   pageId?: string;
   cmsItemId?: string;
   fieldId?: string;
   value: any;
-  preview?: boolean;
+  location?: 'head' | 'body_end'; // For custom_code type
+  elementIndex?: number; // For heading elements (e.g., first H2 = 0)
+  selector?: string; // CSS selector for element targeting
 }
 
 export interface WebflowInsertionResult {

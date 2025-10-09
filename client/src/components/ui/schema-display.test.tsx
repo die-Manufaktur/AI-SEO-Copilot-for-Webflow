@@ -1,14 +1,23 @@
+import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SchemaDisplay } from './schema-display';
 import { SchemaRecommendation } from '../../../../shared/types';
+import { InsertionProvider } from '../../contexts/InsertionContext';
 
-// Mock clipboard API as a spy
+// Mock clipboard API as a spy - more comprehensive to prevent Selection Range errors
 const mockWriteText = vi.fn().mockResolvedValue(undefined);
+const mockReadText = vi.fn().mockResolvedValue('');
+const mockWrite = vi.fn().mockResolvedValue(undefined);
+const mockRead = vi.fn().mockResolvedValue([]);
+
 Object.assign(navigator, {
   clipboard: {
     writeText: mockWriteText,
+    readText: mockReadText,
+    write: mockWrite,
+    read: mockRead,
   },
 });
 
@@ -68,6 +77,15 @@ const mockPartialSupportSchema: SchemaRecommendation = {
   isRequired: true
 };
 
+// Test wrapper with context providers
+const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  return (
+    <InsertionProvider>
+      {children}
+    </InsertionProvider>
+  );
+};
+
 describe('SchemaDisplay', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -77,17 +95,21 @@ describe('SchemaDisplay', () => {
 
   it('should render nothing when no schemas provided', () => {
     const { container } = render(
-      <SchemaDisplay pageType="Homepage" schemas={[]} />
+      <TestWrapper>
+        <SchemaDisplay pageType="Homepage" schemas={[]} />
+      </TestWrapper>
     );
     expect(container.firstChild).toBeNull();
   });
 
   it('should render collapsed by default', () => {
     render(
-      <SchemaDisplay 
+      <TestWrapper>
+        <SchemaDisplay 
         pageType="Homepage" 
         schemas={[mockRequiredSchema]} 
       />
+      </TestWrapper>
     );
 
     expect(screen.getByText('Schema Recommendations')).toBeInTheDocument();
@@ -101,13 +123,15 @@ describe('SchemaDisplay', () => {
     const user = userEvent.setup();
     
     render(
-      <SchemaDisplay 
+      <TestWrapper>
+        <SchemaDisplay 
         pageType="Homepage" 
         schemas={[mockRequiredSchema]} 
       />
+      </TestWrapper>
     );
 
-    await user.click(screen.getByText('Schema Recommendations'));
+    fireEvent.click(screen.getByText('Schema Recommendations').closest('[data-state]') || screen.getByText('Schema Recommendations'));
     
     expect(screen.getByText('WebSite')).toBeInTheDocument();
     expect(screen.getByText('Helps Google understand your site structure')).toBeInTheDocument();
@@ -117,13 +141,15 @@ describe('SchemaDisplay', () => {
     const user = userEvent.setup();
     
     render(
-      <SchemaDisplay 
+      <TestWrapper>
+        <SchemaDisplay 
         pageType="Category page" 
         schemas={[mockPartialSupportSchema]} 
       />
+      </TestWrapper>
     );
 
-    await user.click(screen.getByText('Schema Recommendations'));
+    fireEvent.click(screen.getByText('Schema Recommendations').closest('[data-state]') || screen.getByText('Schema Recommendations'));
     
     expect(screen.getByText('Partial Google Support')).toBeInTheDocument();
   });
@@ -132,13 +158,15 @@ describe('SchemaDisplay', () => {
     const user = userEvent.setup();
     
     render(
-      <SchemaDisplay 
+      <TestWrapper>
+        <SchemaDisplay 
         pageType="Homepage" 
         schemas={[mockRequiredSchema]} 
       />
+      </TestWrapper>
     );
 
-    await user.click(screen.getByText('Schema Recommendations'));
+    fireEvent.click(screen.getByText('Schema Recommendations').closest('[data-state]') || screen.getByText('Schema Recommendations'));
     
     expect(screen.getByText('Required Schemas')).toBeInTheDocument();
     expect(screen.getByText('WebSite')).toBeInTheDocument();
@@ -148,13 +176,15 @@ describe('SchemaDisplay', () => {
     const user = userEvent.setup();
     
     render(
-      <SchemaDisplay 
+      <TestWrapper>
+        <SchemaDisplay 
         pageType="Product page" 
         schemas={[mockRequiredSchema, mockOptionalSchema]} 
       />
+      </TestWrapper>
     );
 
-    await user.click(screen.getByText('Schema Recommendations'));
+    fireEvent.click(screen.getByText('Schema Recommendations').closest('[data-state]') || screen.getByText('Schema Recommendations'));
     
     expect(screen.getByText('Optional Schemas')).toBeInTheDocument();
     expect(screen.getByText('FAQPage')).toBeInTheDocument();
@@ -167,13 +197,15 @@ describe('SchemaDisplay', () => {
     const user = userEvent.setup();
     
     render(
-      <SchemaDisplay 
+      <TestWrapper>
+        <SchemaDisplay 
         pageType="Product page" 
         schemas={[mockOptionalSchema]} 
       />
+      </TestWrapper>
     );
 
-    await user.click(screen.getByText('Schema Recommendations'));
+    fireEvent.click(screen.getByText('Schema Recommendations').closest('[data-state]') || screen.getByText('Schema Recommendations'));
     
     // Initially, code should not be visible
     expect(screen.queryByText('JSON-LD Code:')).not.toBeInTheDocument();
@@ -190,13 +222,15 @@ describe('SchemaDisplay', () => {
     const user = userEvent.setup();
     
     render(
-      <SchemaDisplay 
+      <TestWrapper>
+        <SchemaDisplay 
         pageType="Homepage" 
         schemas={[mockRequiredSchema]} 
       />
+      </TestWrapper>
     );
 
-    await user.click(screen.getByText('Schema Recommendations'));
+    fireEvent.click(screen.getByText('Schema Recommendations').closest('[data-state]') || screen.getByText('Schema Recommendations'));
     
     const copyButton = screen.getByRole('button', { name: /copy/i });
     await user.click(copyButton);
@@ -217,13 +251,15 @@ describe('SchemaDisplay', () => {
     const user = userEvent.setup();
     
     render(
-      <SchemaDisplay 
+      <TestWrapper>
+        <SchemaDisplay 
         pageType="Homepage" 
         schemas={[mockRequiredSchema]} 
       />
+      </TestWrapper>
     );
 
-    await user.click(screen.getByText('Schema Recommendations'));
+    fireEvent.click(screen.getByText('Schema Recommendations').closest('[data-state]') || screen.getByText('Schema Recommendations'));
     
     const copyButton = screen.getByRole('button', { name: /copy/i });
     await user.hover(copyButton);
@@ -239,13 +275,15 @@ describe('SchemaDisplay', () => {
     const user = userEvent.setup();
     
     render(
-      <SchemaDisplay 
+      <TestWrapper>
+        <SchemaDisplay 
         pageType="Homepage" 
         schemas={[mockRequiredSchema]} 
       />
+      </TestWrapper>
     );
 
-    await user.click(screen.getByText('Schema Recommendations'));
+    fireEvent.click(screen.getByText('Schema Recommendations').closest('[data-state]') || screen.getByText('Schema Recommendations'));
     
     const copyButton = screen.getByRole('button', { name: /copy/i });
     await user.click(copyButton);
@@ -262,13 +300,15 @@ describe('SchemaDisplay', () => {
     const user = userEvent.setup();
     
     render(
-      <SchemaDisplay 
+      <TestWrapper>
+        <SchemaDisplay 
         pageType="Homepage" 
         schemas={[mockRequiredSchema]} 
       />
+      </TestWrapper>
     );
 
-    await user.click(screen.getByText('Schema Recommendations'));
+    fireEvent.click(screen.getByText('Schema Recommendations').closest('[data-state]') || screen.getByText('Schema Recommendations'));
     
     const copyButton = screen.getByRole('button', { name: /copy/i });
     await user.click(copyButton);
@@ -285,13 +325,15 @@ describe('SchemaDisplay', () => {
     const user = userEvent.setup();
     
     render(
-      <SchemaDisplay 
+      <TestWrapper>
+        <SchemaDisplay 
         pageType="Homepage" 
         schemas={[mockRequiredSchema]} 
       />
+      </TestWrapper>
     );
 
-    await user.click(screen.getByText('Schema Recommendations'));
+    fireEvent.click(screen.getByText('Schema Recommendations').closest('[data-state]') || screen.getByText('Schema Recommendations'));
     
     const docLink = screen.getByRole('link', { name: /view documentation/i });
     expect(docLink).toHaveAttribute('href', mockRequiredSchema.documentationUrl);
@@ -303,13 +345,15 @@ describe('SchemaDisplay', () => {
     const user = userEvent.setup();
     
     render(
-      <SchemaDisplay 
+      <TestWrapper>
+        <SchemaDisplay 
         pageType="Category page" 
         schemas={[mockPartialSupportSchema]} 
       />
+      </TestWrapper>
     );
 
-    await user.click(screen.getByText('Schema Recommendations'));
+    fireEvent.click(screen.getByText('Schema Recommendations').closest('[data-state]') || screen.getByText('Schema Recommendations'));
     
     expect(screen.getByText('Note: Used in carousel with rich-result items')).toBeInTheDocument();
   });
@@ -318,13 +362,15 @@ describe('SchemaDisplay', () => {
     const user = userEvent.setup();
     
     render(
-      <SchemaDisplay 
+      <TestWrapper>
+        <SchemaDisplay 
         pageType="Homepage" 
         schemas={[mockRequiredSchema]} 
       />
+      </TestWrapper>
     );
 
-    await user.click(screen.getByText('Schema Recommendations'));
+    fireEvent.click(screen.getByText('Schema Recommendations').closest('[data-state]') || screen.getByText('Schema Recommendations'));
     
     // Use a function matcher to handle text broken across elements
     expect(screen.getByText((content, node) => {
@@ -341,13 +387,15 @@ describe('SchemaDisplay', () => {
     const user = userEvent.setup();
     
     render(
-      <SchemaDisplay 
+      <TestWrapper>
+        <SchemaDisplay 
         pageType="Homepage" 
         schemas={[mockRequiredSchema]} 
       />
+      </TestWrapper>
     );
 
-    await user.click(screen.getByText('Schema Recommendations'));
+    fireEvent.click(screen.getByText('Schema Recommendations').closest('[data-state]') || screen.getByText('Schema Recommendations'));
     
     expect(screen.getByText(/Copy the JSON-LD code and paste it/)).toBeInTheDocument();
     expect(screen.getByText(/Replace placeholder values/)).toBeInTheDocument();
@@ -357,15 +405,17 @@ describe('SchemaDisplay', () => {
     const user = userEvent.setup();
     
     render(
-      <SchemaDisplay 
+      <TestWrapper>
+        <SchemaDisplay 
         pageType="Product page" 
         schemas={[mockRequiredSchema, mockOptionalSchema]} 
       />
+      </TestWrapper>
     );
 
     expect(screen.getByText('(2 available)')).toBeInTheDocument();
     
-    await user.click(screen.getByText('Schema Recommendations'));
+    fireEvent.click(screen.getByText('Schema Recommendations').closest('[data-state]') || screen.getByText('Schema Recommendations'));
     
     expect(screen.getByText('Required Schemas')).toBeInTheDocument();
     expect(screen.getByText('Optional Schemas')).toBeInTheDocument();

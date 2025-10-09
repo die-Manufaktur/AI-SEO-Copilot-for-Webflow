@@ -3,7 +3,7 @@
  * GREEN Phase: Minimal implementation to make tests pass
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { WebflowAuth } from '../lib/webflowAuth';
 
@@ -29,19 +29,28 @@ const WEBFLOW_CONFIG = {
 
 export function OAuthCallback(): React.ReactElement {
   const { refreshAuth } = useAuth();
+  const refreshAuthRef = useRef(refreshAuth);
+  
+  // Update the ref when refreshAuth changes
+  useEffect(() => {
+    refreshAuthRef.current = refreshAuth;
+  }, [refreshAuth]);
+  
   const [state, setState] = useState<OAuthCallbackState>({
     status: 'loading',
     message: 'Processing authentication...',
     step: 'Verifying authorization code...',
   });
 
-  const handleOAuthCallback = async () => {
-    try {
-      setState(prev => ({
-        ...prev,
-        step: 'Verifying authorization code...',
-      }));
 
+  const handleRetry = async () => {
+    setState({
+      status: 'loading',
+      message: 'Processing authentication...',
+      step: 'Verifying authorization code...',
+    });
+    
+    try {
       const webflowAuth = new WebflowAuth(WEBFLOW_CONFIG);
       const currentUrl = new URL(window.location.href);
       
@@ -54,7 +63,7 @@ export function OAuthCallback(): React.ReactElement {
       }));
 
       // Refresh auth context to load user data
-      await refreshAuth();
+      await refreshAuthRef.current();
 
       setState({
         status: 'success',
@@ -79,17 +88,68 @@ export function OAuthCallback(): React.ReactElement {
     }
   };
 
-  const handleRetry = () => {
-    setState({
-      status: 'loading',
-      message: 'Processing authentication...',
-      step: 'Verifying authorization code...',
-    });
-    handleOAuthCallback();
-  };
-
   useEffect(() => {
-    handleOAuthCallback();
+    let isMounted = true;
+    
+    const processOAuthCallback = async () => {
+      if (!isMounted) return;
+      
+      try {
+        setState(prev => ({
+          ...prev,
+          step: 'Verifying authorization code...',
+        }));
+
+        const webflowAuth = new WebflowAuth(WEBFLOW_CONFIG);
+        const currentUrl = new URL(window.location.href);
+        
+        // Handle OAuth callback
+        await webflowAuth.handleOAuthCallback(currentUrl);
+
+        if (!isMounted) return;
+
+        setState(prev => ({
+          ...prev,
+          step: 'Fetching user information...',
+        }));
+
+        // Refresh auth context to load user data
+        await refreshAuthRef.current();
+
+        if (!isMounted) return;
+
+        setState({
+          status: 'success',
+          message: 'Authentication successful!',
+          step: 'Redirecting to application...',
+        });
+
+        // Redirect to main app after brief delay
+        setTimeout(() => {
+          if (isMounted) {
+            window.location.replace('/');
+          }
+        }, 1500);
+
+      } catch (error) {
+        if (!isMounted) return;
+        
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        
+        setState({
+          status: 'error',
+          message: 'Authentication failed',
+          error: errorMessage,
+          step: '',
+        });
+      }
+    };
+    
+    processOAuthCallback();
+    
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   return (

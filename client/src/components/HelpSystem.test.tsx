@@ -13,15 +13,48 @@ vi.mock('../contexts/HelpContext', () => ({
 describe('HelpSystem', () => {
   const mockToggleHelp = vi.fn();
   const mockGetHelp = vi.fn();
+  const mockGetHelpByCategory = vi.fn();
   const mockSearchHelp = vi.fn();
+  const mockStartTutorial = vi.fn();
+  const mockNextTutorialStep = vi.fn();
+  const mockPreviousTutorialStep = vi.fn();
+  const mockCompleteTutorial = vi.fn();
+  const mockGetCurrentTutorial = vi.fn();
+  const mockIsTutorialCompleted = vi.fn();
+  const mockTrackEvent = vi.fn();
+  const mockEnableAutoDetection = vi.fn();
+  const mockRegisterHelpTarget = vi.fn();
+  const mockUnregisterHelpTarget = vi.fn();
+  const mockGetActiveHelpTargets = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
+    
+    // Set up default mock return values
+    mockGetHelp.mockReturnValue(null);
+    mockGetHelpByCategory.mockReturnValue([]);
+    mockSearchHelp.mockResolvedValue([]);
+    mockGetCurrentTutorial.mockReturnValue(null);
+    mockIsTutorialCompleted.mockReturnValue(false);
+    mockGetActiveHelpTargets.mockReturnValue([]);
+    
     (useHelp as any).mockReturnValue({
       isHelpEnabled: true,
       toggleHelp: mockToggleHelp,
       getHelp: mockGetHelp,
-      searchHelp: mockSearchHelp
+      getHelpByCategory: mockGetHelpByCategory,
+      searchHelp: mockSearchHelp,
+      startTutorial: mockStartTutorial,
+      nextTutorialStep: mockNextTutorialStep,
+      previousTutorialStep: mockPreviousTutorialStep,
+      completeTutorial: mockCompleteTutorial,
+      getCurrentTutorial: mockGetCurrentTutorial,
+      isTutorialCompleted: mockIsTutorialCompleted,
+      trackEvent: mockTrackEvent,
+      enableAutoDetection: mockEnableAutoDetection,
+      registerHelpTarget: mockRegisterHelpTarget,
+      unregisterHelpTarget: mockUnregisterHelpTarget,
+      getActiveHelpTargets: mockGetActiveHelpTargets
     });
   });
 
@@ -228,7 +261,19 @@ describe('HelpSystem', () => {
         isHelpEnabled: false,
         toggleHelp: mockToggleHelp,
         getHelp: mockGetHelp,
-        searchHelp: mockSearchHelp
+        getHelpByCategory: mockGetHelpByCategory,
+        searchHelp: mockSearchHelp,
+        startTutorial: mockStartTutorial,
+        nextTutorialStep: mockNextTutorialStep,
+        previousTutorialStep: mockPreviousTutorialStep,
+        completeTutorial: mockCompleteTutorial,
+        getCurrentTutorial: mockGetCurrentTutorial,
+        isTutorialCompleted: mockIsTutorialCompleted,
+        trackEvent: mockTrackEvent,
+        enableAutoDetection: mockEnableAutoDetection,
+        registerHelpTarget: mockRegisterHelpTarget,
+        unregisterHelpTarget: mockUnregisterHelpTarget,
+        getActiveHelpTargets: mockGetActiveHelpTargets
       });
 
       const { container } = render(
@@ -249,13 +294,24 @@ describe('HelpSystem', () => {
 
   describe('Help Analytics', () => {
     it('should track help article views', async () => {
-      const mockTrackEvent = vi.fn();
+      const localMockTrackEvent = vi.fn();
       (useHelp as any).mockReturnValue({
         isHelpEnabled: true,
         toggleHelp: mockToggleHelp,
         getHelp: mockGetHelp,
+        getHelpByCategory: mockGetHelpByCategory,
         searchHelp: mockSearchHelp,
-        trackEvent: mockTrackEvent
+        startTutorial: mockStartTutorial,
+        nextTutorialStep: mockNextTutorialStep,
+        previousTutorialStep: mockPreviousTutorialStep,
+        completeTutorial: mockCompleteTutorial,
+        getCurrentTutorial: mockGetCurrentTutorial,
+        isTutorialCompleted: mockIsTutorialCompleted,
+        trackEvent: localMockTrackEvent,
+        enableAutoDetection: mockEnableAutoDetection,
+        registerHelpTarget: mockRegisterHelpTarget,
+        unregisterHelpTarget: mockUnregisterHelpTarget,
+        getActiveHelpTargets: mockGetActiveHelpTargets
       });
 
       mockGetHelp.mockReturnValue([
@@ -267,7 +323,7 @@ describe('HelpSystem', () => {
       await userEvent.click(screen.getByText('SEO Optimization'));
       await userEvent.click(screen.getByText('What is SEO?'));
       
-      expect(mockTrackEvent).toHaveBeenCalledWith('help_article_viewed', {
+      expect(localMockTrackEvent).toHaveBeenCalledWith('help_article_viewed', {
         articleId: '1',
         title: 'What is SEO?',
         category: 'seo'
@@ -275,13 +331,24 @@ describe('HelpSystem', () => {
     });
 
     it('should track search queries', async () => {
-      const mockTrackEvent = vi.fn();
+      const localMockTrackEvent = vi.fn();
       (useHelp as any).mockReturnValue({
         isHelpEnabled: true,
         toggleHelp: mockToggleHelp,
         getHelp: mockGetHelp,
+        getHelpByCategory: mockGetHelpByCategory,
         searchHelp: mockSearchHelp,
-        trackEvent: mockTrackEvent
+        startTutorial: mockStartTutorial,
+        nextTutorialStep: mockNextTutorialStep,
+        previousTutorialStep: mockPreviousTutorialStep,
+        completeTutorial: mockCompleteTutorial,
+        getCurrentTutorial: mockGetCurrentTutorial,
+        isTutorialCompleted: mockIsTutorialCompleted,
+        trackEvent: localMockTrackEvent,
+        enableAutoDetection: mockEnableAutoDetection,
+        registerHelpTarget: mockRegisterHelpTarget,
+        unregisterHelpTarget: mockUnregisterHelpTarget,
+        getActiveHelpTargets: mockGetActiveHelpTargets
       });
 
       render(<HelpSystem />);
@@ -291,7 +358,7 @@ describe('HelpSystem', () => {
       await userEvent.type(searchInput, 'SEO optimization');
       
       await waitFor(() => {
-        expect(mockTrackEvent).toHaveBeenCalledWith('help_search', {
+        expect(localMockTrackEvent).toHaveBeenCalledWith('help_search', {
           query: 'SEO optimization'
         });
       });

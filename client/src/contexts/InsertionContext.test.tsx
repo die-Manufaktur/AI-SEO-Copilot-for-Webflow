@@ -6,8 +6,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type MockedFunction } from 'vitest';
 import { render, screen, act, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import React from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { InsertionProvider, useInsertion } from './InsertionContext';
 import { WebflowInsertion } from '../lib/webflowInsertion';
+import { renderWithProviders } from '../__tests__/utils/testHelpers';
+import { AuthProvider } from './AuthContext';
 import type { 
   WebflowInsertionRequest,
   WebflowInsertionResult,
@@ -18,12 +22,47 @@ import type {
 // Mock WebflowInsertion
 vi.mock('../lib/webflowInsertion');
 
+// Mock WebflowAuth specifically for InsertionContext tests
+vi.mock('../lib/webflowAuth', () => ({
+  WebflowAuth: vi.fn().mockImplementation(() => ({
+    getValidToken: vi.fn(() => Promise.resolve({
+      access_token: 'test-token',
+      refresh_token: 'test-refresh-token',
+      scope: 'sites:read sites:write cms:read cms:write pages:read pages:write',
+      expires_in: 3600,
+      expires_at: Date.now() + 3600000
+    })),
+    hasScope: vi.fn(() => true),
+    clearStoredToken: vi.fn(),
+    initiateOAuthFlow: vi.fn(() => Promise.resolve()),
+  }))
+}));
+
+// Mock WebflowDataAPI to prevent authentication errors
+vi.mock('../lib/webflowDataApi', () => ({
+  WebflowDataAPI: vi.fn().mockImplementation(() => ({
+    getConfig: vi.fn(() => ({})),
+    getAuthHeaders: vi.fn(() => ({ Authorization: 'Bearer test-token' })),
+    getPage: vi.fn(() => Promise.resolve({ _id: 'page_123', title: 'Test Page' })),
+    updatePage: vi.fn(() => Promise.resolve({ _id: 'page_123', title: 'Updated Page' })),
+    listCollections: vi.fn(() => Promise.resolve([])),
+    listCollectionItems: vi.fn(() => Promise.resolve([])),
+    updateCollectionItem: vi.fn(() => Promise.resolve({ _id: 'item_123' })),
+    getRateLimitInfo: vi.fn(() => ({ remainingRequests: 100, resetTime: Date.now() + 3600000 })),
+  }))
+}));
+
+// Helper to render with insertion provider using proper test helpers
+const renderWithInsertion = (ui: React.ReactElement, options?: { insertionInstance?: WebflowInsertion }) => {
+  // Use the standard test helpers which already include AuthProvider
+  return renderWithProviders(ui);
+};
+
 // Test component to access context
 function TestComponent() {
   const {
     applyInsertion,
     applyBatch,
-    previewInsertion,
     rollbackBatch,
     insertionHistory,
     pendingOperations,
@@ -58,35 +97,32 @@ function TestComponent() {
 
       <button
         data-testid="apply-single"
-        onClick={() => applyInsertion({
-          type: 'page_title',
-          pageId: 'page_123',
-          value: 'Test Title',
-        })}
+        onClick={() => {
+          applyInsertion({
+            type: 'page_title',
+            pageId: 'page_123',
+            value: 'Test Title',
+          }).catch(() => {
+            // Error is already handled by context
+          });
+        }}
       >
         Apply Single
       </button>
 
-      <button
-        data-testid="preview-single"
-        onClick={() => previewInsertion({
-          type: 'page_title',
-          pageId: 'page_123',
-          value: 'Test Title',
-          preview: true,
-        })}
-      >
-        Preview Single
-      </button>
 
       <button
         data-testid="apply-batch"
-        onClick={() => applyBatch({
-          operations: [
-            { type: 'page_title', pageId: 'page_123', value: 'Title 1' },
-            { type: 'meta_description', pageId: 'page_123', value: 'Desc 1' },
-          ],
-        })}
+        onClick={() => {
+          applyBatch({
+            operations: [
+              { type: 'page_title', pageId: 'page_123', value: 'Title 1' },
+              { type: 'meta_description', pageId: 'page_123', value: 'Desc 1' },
+            ],
+          }).catch(() => {
+            // Error is already handled by context
+          });
+        }}
       >
         Apply Batch
       </button>
@@ -118,7 +154,11 @@ function TestComponent() {
 
       <button
         data-testid="rollback"
-        onClick={() => rollbackBatch('rollback_123')}
+        onClick={() => {
+          rollbackBatch('rollback_123').catch(() => {
+            // Error is already handled by context
+          });
+        }}
       >
         Rollback
       </button>
@@ -132,11 +172,26 @@ describe('InsertionContext', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     
+    // Create a properly mocked WebflowInsertion instance
     mockWebflowInsertion = {
-      apply: vi.fn(),
-      applyBatch: vi.fn(),
+      apply: vi.fn().mockResolvedValue({
+        success: true,
+        data: { _id: 'page_123', title: 'Test Title' }
+      }),
+      applyBatch: vi.fn().mockResolvedValue({
+        success: true,
+        results: [
+          { success: true, data: {} },
+          { success: true, data: {} }
+        ],
+        succeeded: 2,
+        failed: 0,
+        rollbackId: 'rollback_123'
+      }),
       prepareBatchConfirmation: vi.fn(),
-      rollback: vi.fn(),
+      rollback: vi.fn().mockResolvedValue({
+        success: true
+      }),
     } as any;
 
     (WebflowInsertion as any).mockImplementation(() => mockWebflowInsertion);
@@ -159,11 +214,7 @@ describe('InsertionContext', () => {
     });
 
     it('should provide initial state when wrapped in provider', () => {
-      render(
-        <InsertionProvider>
-          <TestComponent />
-        </InsertionProvider>
-      );
+      renderWithInsertion(<TestComponent />);
 
       expect(screen.getByTestId('loading-state')).toHaveTextContent('idle');
       expect(screen.getByTestId('error-state')).toHaveTextContent('no-error');
@@ -174,11 +225,7 @@ describe('InsertionContext', () => {
     it('should initialize with custom WebflowInsertion instance', () => {
       const customInsertion = new WebflowInsertion({} as any);
       
-      render(
-        <InsertionProvider insertionInstance={customInsertion}>
-          <TestComponent />
-        </InsertionProvider>
-      );
+      renderWithInsertion(<TestComponent />, { insertionInstance: customInsertion });
 
       expect(screen.getByTestId('loading-state')).toHaveTextContent('idle');
     });
@@ -187,24 +234,18 @@ describe('InsertionContext', () => {
   describe('Single Insertion Operations', () => {
     it('should handle successful single insertion', async () => {
       const user = userEvent.setup();
-      const mockResult: WebflowInsertionResult = {
-        success: true,
-        data: { _id: 'page_123', title: 'Test Title' },
-      };
+      
+      // Mock is already configured for success in beforeEach
+      
+      renderWithInsertion(<TestComponent />);
 
-      mockWebflowInsertion.apply.mockResolvedValueOnce(mockResult);
-
-      render(
-        <InsertionProvider>
-          <TestComponent />
-        </InsertionProvider>
-      );
-
-      await user.click(screen.getByTestId('apply-single'));
+      await act(async () => {
+        await user.click(screen.getByTestId('apply-single'));
+      });
 
       await waitFor(() => {
         expect(screen.getByTestId('last-result')).toHaveTextContent('success');
-      });
+      }, { timeout: 5000 });
 
       expect(mockWebflowInsertion.apply).toHaveBeenCalledWith({
         type: 'page_title',
@@ -221,17 +262,15 @@ describe('InsertionContext', () => {
 
       mockWebflowInsertion.apply.mockRejectedValueOnce(error);
 
-      render(
-        <InsertionProvider>
-          <TestComponent />
-        </InsertionProvider>
-      );
+      renderWithInsertion(<TestComponent />);
 
-      await user.click(screen.getByTestId('apply-single'));
+      await act(async () => {
+        await user.click(screen.getByTestId('apply-single'));
+      });
 
       await waitFor(() => {
         expect(screen.getByTestId('error-state')).toHaveTextContent('Network error');
-      });
+      }, { timeout: 5000 });
 
       expect(screen.getByTestId('last-result')).toHaveTextContent('failed');
     });
@@ -246,40 +285,36 @@ describe('InsertionContext', () => {
 
       mockWebflowInsertion.apply.mockReturnValueOnce(promise);
 
-      render(
-        <InsertionProvider>
-          <TestComponent />
-        </InsertionProvider>
-      );
+      renderWithInsertion(<TestComponent />);
 
-      await user.click(screen.getByTestId('apply-single'));
+      await act(async () => {
+        await user.click(screen.getByTestId('apply-single'));
+      });
 
       expect(screen.getByTestId('loading-state')).toHaveTextContent('loading');
 
-      resolvePromise!({ success: true, data: {} });
+      await act(async () => {
+        resolvePromise!({ success: true, data: {} });
+      });
 
       await waitFor(() => {
         expect(screen.getByTestId('loading-state')).toHaveTextContent('idle');
-      });
+      }, { timeout: 5000 });
     });
 
     it('should handle preview insertion', async () => {
       const user = userEvent.setup();
-      const mockResult: WebflowInsertionResult = {
+      
+      // Override the default mock for preview scenario
+      mockWebflowInsertion.apply.mockResolvedValueOnce({
         success: true,
         data: {
           current: { title: 'Old Title' },
           preview: { title: 'Test Title' },
         },
-      };
+      });
 
-      mockWebflowInsertion.apply.mockResolvedValueOnce(mockResult);
-
-      render(
-        <InsertionProvider>
-          <TestComponent />
-        </InsertionProvider>
-      );
+      renderWithInsertion(<TestComponent />);
 
       await user.click(screen.getByTestId('preview-single'));
 
@@ -299,34 +334,31 @@ describe('InsertionContext', () => {
   describe('Batch Operations', () => {
     it('should handle successful batch insertion', async () => {
       const user = userEvent.setup();
-      const mockResult: WebflowBatchInsertionResult = {
-        success: true,
-        results: [
-          { success: true, data: {} },
-          { success: true, data: {} },
-        ],
-        succeeded: 2,
-        failed: 0,
-        rollbackId: 'rollback_123',
-      };
-
-      // Mock progress callback
+      
+      // Override the default mock to simulate progress callbacks
       mockWebflowInsertion.applyBatch.mockImplementation(async (request: any, progressCallback: any) => {
         if (progressCallback) {
-          progressCallback({ current: 0, total: 2, percentage: 0, currentOperation: request.operations[0] });
-          await new Promise(resolve => setTimeout(resolve, 50));
-          progressCallback({ current: 1, total: 2, percentage: 50, currentOperation: request.operations[1] });
-          await new Promise(resolve => setTimeout(resolve, 50));
+          // Start progress
+          progressCallback({ current: 1, total: 2, percentage: 50, currentOperation: request.operations[0] });
+          await new Promise(resolve => setTimeout(resolve, 10));
+          
+          // Progress through operations
           progressCallback({ current: 2, total: 2, percentage: 100, currentOperation: request.operations[1] });
+          await new Promise(resolve => setTimeout(resolve, 10));
         }
-        return mockResult;
+        return {
+          success: true,
+          results: [
+            { success: true, data: {} },
+            { success: true, data: {} },
+          ],
+          succeeded: 2,
+          failed: 0,
+          rollbackId: 'rollback_123',
+        };
       });
 
-      render(
-        <InsertionProvider>
-          <TestComponent />
-        </InsertionProvider>
-      );
+      renderWithInsertion(<TestComponent />);
 
       await user.click(screen.getByTestId('apply-batch'));
 
@@ -366,11 +398,7 @@ describe('InsertionContext', () => {
 
       mockWebflowInsertion.applyBatch.mockResolvedValueOnce(mockResult);
 
-      render(
-        <InsertionProvider>
-          <TestComponent />
-        </InsertionProvider>
-      );
+      renderWithInsertion(<TestComponent />);
 
       await user.click(screen.getByTestId('apply-batch'));
 
@@ -385,15 +413,9 @@ describe('InsertionContext', () => {
     it('should handle rollback operation', async () => {
       const user = userEvent.setup();
       
-      mockWebflowInsertion.rollback.mockResolvedValueOnce({
-        success: true,
-      });
+      // Mock is already configured for success in beforeEach
 
-      render(
-        <InsertionProvider>
-          <TestComponent />
-        </InsertionProvider>
-      );
+      renderWithInsertion(<TestComponent />);
 
       await user.click(screen.getByTestId('rollback'));
 
@@ -407,11 +429,7 @@ describe('InsertionContext', () => {
     it('should add operations to pending list', async () => {
       const user = userEvent.setup();
 
-      render(
-        <InsertionProvider>
-          <TestComponent />
-        </InsertionProvider>
-      );
+      renderWithInsertion(<TestComponent />);
 
       await user.click(screen.getByTestId('add-pending'));
 
@@ -421,11 +439,7 @@ describe('InsertionContext', () => {
     it('should prevent duplicate pending operations', async () => {
       const user = userEvent.setup();
 
-      render(
-        <InsertionProvider>
-          <TestComponent />
-        </InsertionProvider>
-      );
+      renderWithInsertion(<TestComponent />);
 
       // Add same operation twice
       await user.click(screen.getByTestId('add-pending'));
@@ -437,11 +451,7 @@ describe('InsertionContext', () => {
     it('should clear pending operations', async () => {
       const user = userEvent.setup();
 
-      render(
-        <InsertionProvider>
-          <TestComponent />
-        </InsertionProvider>
-      );
+      renderWithInsertion(<TestComponent />);
 
       await user.click(screen.getByTestId('add-pending'));
       expect(screen.getByTestId('pending-count')).toHaveTextContent('1');
@@ -453,11 +463,7 @@ describe('InsertionContext', () => {
     it('should remove specific operation from pending', async () => {
       const user = userEvent.setup();
 
-      render(
-        <InsertionProvider>
-          <TestComponent />
-        </InsertionProvider>
-      );
+      renderWithInsertion(<TestComponent />);
 
       await user.click(screen.getByTestId('add-pending'));
       expect(screen.getByTestId('pending-count')).toHaveTextContent('1');
@@ -472,11 +478,7 @@ describe('InsertionContext', () => {
           return null;
         };
         
-        render(
-          <InsertionProvider>
-            <TestRemove />
-          </InsertionProvider>
-        );
+        renderWithInsertion(<TestRemove />);
       });
     });
   });
@@ -485,13 +487,10 @@ describe('InsertionContext', () => {
     it('should clear errors when requested', async () => {
       const user = userEvent.setup();
       
+      // Override the default mock to simulate an error
       mockWebflowInsertion.apply.mockRejectedValueOnce(new Error('Test error'));
 
-      render(
-        <InsertionProvider>
-          <TestComponent />
-        </InsertionProvider>
-      );
+      renderWithInsertion(<TestComponent />);
 
       await user.click(screen.getByTestId('apply-single'));
 
@@ -510,11 +509,7 @@ describe('InsertionContext', () => {
       // First operation fails
       mockWebflowInsertion.apply.mockRejectedValueOnce(new Error('Test error'));
 
-      render(
-        <InsertionProvider>
-          <TestComponent />
-        </InsertionProvider>
-      );
+      renderWithInsertion(<TestComponent />);
 
       await user.click(screen.getByTestId('apply-single'));
 
@@ -522,8 +517,11 @@ describe('InsertionContext', () => {
         expect(screen.getByTestId('error-state')).toHaveTextContent('Test error');
       });
 
-      // Second operation succeeds
-      mockWebflowInsertion.apply.mockResolvedValueOnce({ success: true, data: {} });
+      // Reset mock to default success behavior for second operation
+      mockWebflowInsertion.apply.mockResolvedValueOnce({ 
+        success: true, 
+        data: { _id: 'page_123', title: 'Test Title' } 
+      });
 
       await user.click(screen.getByTestId('apply-single'));
 
@@ -539,11 +537,7 @@ describe('InsertionContext', () => {
       
       mockWebflowInsertion.apply.mockResolvedValue({ success: true, data: {} });
 
-      render(
-        <InsertionProvider>
-          <TestComponent />
-        </InsertionProvider>
-      );
+      renderWithInsertion(<TestComponent />);
 
       await user.click(screen.getByTestId('apply-single'));
       await waitFor(() => {
@@ -561,7 +555,7 @@ describe('InsertionContext', () => {
       
       mockWebflowInsertion.apply.mockResolvedValue({ success: true, data: {} });
 
-      render(
+      renderWithProviders(
         <InsertionProvider maxHistorySize={2}>
           <TestComponent />
         </InsertionProvider>
@@ -592,11 +586,11 @@ describe('InsertionContext', () => {
         );
       };
 
-      render(
-        <InsertionProvider>
+      renderWithInsertion(
+        <>
           <TestComponent />
           <TestWithHistory />
-        </InsertionProvider>
+        </>
       );
 
       await user.click(screen.getByTestId('apply-single'));
@@ -611,27 +605,34 @@ describe('InsertionContext', () => {
     it('should track batch operation progress', async () => {
       const user = userEvent.setup();
       
-      let progressCallback: ((progress: any) => void) | undefined;
-      
       mockWebflowInsertion.applyBatch.mockImplementation(async (request: any, callback: any) => {
-        progressCallback = callback;
+        // Call the callback synchronously to ensure progress is displayed
         if (callback) {
           callback({ current: 1, total: 2, percentage: 50, currentOperation: request.operations[0] });
         }
-        return { success: true, results: [], succeeded: 2, failed: 0 };
+        
+        // Return after a small delay
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        return { 
+          success: true, 
+          results: [
+            { success: true, data: {} },
+            { success: true, data: {} }
+          ], 
+          succeeded: 2, 
+          failed: 0,
+          rollbackId: 'rollback_123' 
+        };
       });
 
-      render(
-        <InsertionProvider>
-          <TestComponent />
-        </InsertionProvider>
-      );
+      renderWithInsertion(<TestComponent />);
 
       await user.click(screen.getByTestId('apply-batch'));
 
       await waitFor(() => {
         expect(screen.getByTestId('progress')).toHaveTextContent('1/2 - 50%');
-      });
+      }, { timeout: 2000 });
     });
 
     it('should clear progress after completion', async () => {
@@ -644,11 +645,7 @@ describe('InsertionContext', () => {
         return { success: true, results: [], succeeded: 2, failed: 0 };
       });
 
-      render(
-        <InsertionProvider>
-          <TestComponent />
-        </InsertionProvider>
-      );
+      renderWithInsertion(<TestComponent />);
 
       await user.click(screen.getByTestId('apply-batch'));
 

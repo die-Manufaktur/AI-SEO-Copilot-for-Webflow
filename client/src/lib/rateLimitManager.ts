@@ -77,15 +77,16 @@ export class RateLimitManager {
    */
   async handleRateLimit<T>(
     requestFn: () => Promise<T>,
-    retryCount: number = 0
+    retryCount: number = 0,
+    originalError?: Error
   ): Promise<T> {
     switch (this.config.strategy) {
       case 'throw':
-        throw new Error('Rate limit exceeded');
+        throw originalError || new Error('Rate limit exceeded');
 
       case 'retry':
         if (retryCount >= this.config.maxRetries) {
-          throw new Error('Rate limit exceeded - max retries reached');
+          throw originalError || new Error('Rate limit exceeded - max retries reached');
         }
         
         const delay = this.getRetryDelay(retryCount);

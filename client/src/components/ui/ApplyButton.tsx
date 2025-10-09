@@ -8,11 +8,11 @@ import type {
   WebflowInsertionRequest, 
   WebflowInsertionResult 
 } from '../../types/webflow-data-api';
+// Removed authentication imports since app runs within Designer context
 
 export interface ApplyButtonProps {
   insertionRequest: WebflowInsertionRequest;
   onApply: (request: WebflowInsertionRequest) => Promise<WebflowInsertionResult> | void;
-  onPreview?: (request: WebflowInsertionRequest) => Promise<WebflowInsertionResult> | void;
   onError?: (error: Error) => void;
   label?: string;
   ariaLabel?: string;
@@ -20,9 +20,6 @@ export interface ApplyButtonProps {
   success?: boolean;
   error?: string;
   disabled?: boolean;
-  showPreview?: boolean;
-  previewLoading?: boolean;
-  previewResult?: WebflowInsertionResult;
   requiresConfirmation?: boolean;
   confirmationMessage?: string;
   successTimeout?: number;
@@ -61,86 +58,11 @@ function ConfirmationDialog({ isOpen, message, onConfirm, onCancel }: Confirmati
   );
 }
 
-function PreviewResult({ result }: { result: WebflowInsertionResult }) {
-  if (!result.success || !result.data) return null;
 
-  const { current, preview } = result.data as any;
-
-  return (
-    <div data-testid="preview-result" className="mt-2 p-3 bg-gray-50 rounded-md text-sm">
-      <div className="mb-2">
-        <span className="font-medium text-gray-700">Current: </span>
-        <span className="text-gray-600">{current?.title || current?.description || 'Current value'}</span>
-      </div>
-      <div>
-        <span className="font-medium text-gray-700">Preview: </span>
-        <span className="text-gray-900">{preview?.title || preview?.description || 'Preview value'}</span>
-      </div>
-    </div>
-  );
-}
-
-function getInsertionIcon(type: string) {
-  const iconClass = "w-4 h-4";
-  
-  switch (type) {
-    case 'page_title':
-      return (
-        <svg data-testid="apply-page-title-icon" className={iconClass} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-        </svg>
-      );
-    case 'meta_description':
-      return (
-        <svg data-testid="apply-meta-description-icon" className={iconClass} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-        </svg>
-      );
-    case 'cms_field':
-      return (
-        <svg data-testid="apply-cms-field-icon" className={iconClass} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-        </svg>
-      );
-    default:
-      return (
-        <svg className={iconClass} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-        </svg>
-      );
-  }
-}
-
-function LoadingSpinner({ testId }: { testId: string }) {
-  return (
-    <div
-      data-testid={testId}
-      className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"
-      aria-hidden="true"
-    />
-  );
-}
-
-function SuccessIcon() {
-  return (
-    <svg data-testid="apply-success-icon" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-    </svg>
-  );
-}
-
-function ErrorIcon() {
-  return (
-    <svg data-testid="apply-error-icon" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-    </svg>
-  );
-}
 
 export function ApplyButton({
   insertionRequest,
   onApply,
-  onPreview,
   onError,
   label = 'Apply',
   ariaLabel,
@@ -148,9 +70,6 @@ export function ApplyButton({
   success = false,
   error,
   disabled = false,
-  showPreview = false,
-  previewLoading = false,
-  previewResult,
   requiresConfirmation = false,
   confirmationMessage = 'Are you sure you want to apply this change?',
   successTimeout = 3000,
@@ -164,16 +83,16 @@ export function ApplyButton({
     if (success) {
       setInternalSuccess(true);
       setShowSuccessAnimation(true);
-    } else if (successTimeout === 0) {
-      // Only reset immediately if no timeout is configured
+    } else {
+      // Reset internal state when success prop becomes false
       setInternalSuccess(false);
       setShowSuccessAnimation(false);
     }
-  }, [success, successTimeout]);
+  }, [success]);
 
   // Handle auto-reset timeout
   useEffect(() => {
-    if (internalSuccess && successTimeout > 0) {
+    if (success && successTimeout > 0) {
       const timer = setTimeout(() => {
         setInternalSuccess(false);
         setShowSuccessAnimation(false);
@@ -181,11 +100,11 @@ export function ApplyButton({
       
       return () => clearTimeout(timer);
     }
-  }, [internalSuccess, successTimeout]);
+  }, [success, successTimeout]);
 
-  const isDisabled = disabled || loading || previewLoading;
+  const isDisabled = disabled || loading;
   const hasError = Boolean(error);
-  // If successTimeout is provided, use internal state; otherwise use external success prop
+  // Use internal state for display when timeout is configured
   const isSuccess = successTimeout > 0 ? internalSuccess : success;
 
   const getButtonClass = () => {
@@ -210,8 +129,7 @@ export function ApplyButton({
     if (loading) {
       return (
         <>
-          <LoadingSpinner testId="apply-loading-spinner" />
-          <span className="ml-2">Applying...</span>
+          <span>Applying...</span>
         </>
       );
     }
@@ -219,8 +137,7 @@ export function ApplyButton({
     if (hasError) {
       return (
         <>
-          <ErrorIcon />
-          <span className="ml-2">Error</span>
+          <span>Error</span>
         </>
       );
     }
@@ -228,16 +145,14 @@ export function ApplyButton({
     if (isSuccess) {
       return (
         <>
-          <SuccessIcon />
-          <span className="ml-2">Applied</span>
+          <span>Applied</span>
         </>
       );
     }
     
     return (
       <>
-        {getInsertionIcon(insertionRequest.type)}
-        <span className="ml-2">{label}</span>
+        <span>{label}</span>
       </>
     );
   };
@@ -269,59 +184,19 @@ export function ApplyButton({
     setShowConfirmation(false);
   };
 
-  const handlePreview = async () => {
-    if (!onPreview) return;
-    
-    const previewRequest = {
-      ...insertionRequest,
-      preview: true,
-    };
-    
-    try {
-      await onPreview(previewRequest);
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error(String(err));
-      onError?.(error);
-    }
-  };
 
   return (
     <div className="relative">
-      <div className="flex space-x-2">
-        {showPreview && (
-          <button
-            onClick={handlePreview}
-            disabled={previewLoading || loading}
-            className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {previewLoading ? (
-              <>
-                <LoadingSpinner testId="preview-loading-spinner" />
-                <span className="ml-2">Previewing...</span>
-              </>
-            ) : (
-              <>
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                </svg>
-                <span className="ml-2">Preview</span>
-              </>
-            )}
-          </button>
-        )}
-        
-        <button
-          onClick={handleApplyClick}
-          disabled={isDisabled}
-          className={getButtonClass()}
-          aria-label={ariaLabel}
-          aria-busy={loading}
-          aria-disabled={isDisabled}
-        >
-          {getButtonContent()}
-        </button>
-      </div>
+      <button
+        onClick={handleApplyClick}
+        disabled={isDisabled}
+        className={getButtonClass()}
+        aria-label={ariaLabel}
+        aria-busy={loading}
+        aria-disabled={isDisabled}
+      >
+        {getButtonContent()}
+      </button>
 
       {showSuccessAnimation && (
         <div data-testid="success-animation" className="absolute top-0 left-0 w-full h-full pointer-events-none">
@@ -340,9 +215,6 @@ export function ApplyButton({
         </div>
       )}
 
-      {previewResult && (
-        <PreviewResult result={previewResult} />
-      )}
 
       <ConfirmationDialog
         isOpen={showConfirmation}

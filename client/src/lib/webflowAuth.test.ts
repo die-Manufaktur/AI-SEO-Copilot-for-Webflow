@@ -5,7 +5,11 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { WebflowAuth } from './webflowAuth';
+import { disableMSWForTest } from '../__tests__/utils/testHelpers';
 import type { WebflowOAuthConfig, WebflowOAuthToken } from '../types/webflow-data-api';
+
+// Disable MSW for this test file since we need direct fetch mocking
+disableMSWForTest();
 
 // Mock localStorage
 const mockLocalStorage = {
@@ -28,13 +32,14 @@ Object.defineProperty(window, 'crypto', {
   value: {
     randomUUID: () => 'test-uuid-123',
     getRandomValues: (arr: Uint8Array) => {
+      // Fill with deterministic values for testing
       for (let i = 0; i < arr.length; i++) {
-        arr[i] = Math.floor(Math.random() * 256);
+        arr[i] = i % 256;
       }
       return arr;
     },
     subtle: {
-      digest: vi.fn().mockResolvedValue(new ArrayBuffer(32)),
+      digest: vi.fn().mockResolvedValue(new Uint8Array(32).buffer),
     },
   },
 });
@@ -145,7 +150,9 @@ describe('WebflowAuth', () => {
       expect(authUrl).toContain('https://webflow.com/oauth/authorize');
       expect(authUrl).toContain(`client_id=${mockConfig.clientId}`);
       expect(authUrl).toContain(`redirect_uri=${encodeURIComponent(mockConfig.redirectUri)}`);
-      expect(authUrl).toContain(`scope=${encodeURIComponent(mockConfig.scope.join(' '))}`);
+      // URLSearchParams automatically encodes spaces as '+' 
+      const expectedScope = encodeURIComponent(mockConfig.scope.join(' ')).replace(/%20/g, '+');
+      expect(authUrl).toContain(`scope=${expectedScope}`);
       expect(authUrl).toContain(`state=${state}`);
       expect(authUrl).toContain(`code_challenge=${codeChallenge}`);
       expect(authUrl).toContain('code_challenge_method=S256');
@@ -180,8 +187,8 @@ describe('WebflowAuth', () => {
       const state = 'test-state';
       
       mockLocalStorage.getItem
-        .mockReturnValueOnce(codeVerifier) // code verifier
-        .mockReturnValueOnce(state); // state
+        .mockReturnValueOnce(state) // state validation comes first
+        .mockReturnValueOnce(codeVerifier); // code verifier
       
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -209,7 +216,9 @@ describe('WebflowAuth', () => {
       const invalidState = 'invalid-state';
       const storedState = 'valid-state';
       
-      mockLocalStorage.getItem.mockReturnValue(storedState);
+      mockLocalStorage.getItem
+        .mockReturnValueOnce(storedState) // For state validation
+        .mockReturnValueOnce('test-code-verifier'); // For code verifier
       
       await expect(
         webflowAuth.exchangeCodeForToken(authCode, invalidState)
@@ -220,7 +229,9 @@ describe('WebflowAuth', () => {
       const authCode = 'test-auth-code';
       const state = 'test-state';
       
-      mockLocalStorage.getItem.mockReturnValue(state);
+      mockLocalStorage.getItem
+        .mockReturnValueOnce(state) // state validation
+        .mockReturnValueOnce('test-code-verifier'); // code verifier
       
       mockFetch.mockResolvedValueOnce({
         ok: false,
@@ -239,7 +250,9 @@ describe('WebflowAuth', () => {
       const authCode = 'test-auth-code';
       const state = 'test-state';
       
-      mockLocalStorage.getItem.mockReturnValue(state);
+      mockLocalStorage.getItem
+        .mockReturnValueOnce(state) // state validation
+        .mockReturnValueOnce('test-code-verifier'); // code verifier
       
       const now = Date.now();
       vi.spyOn(Date, 'now').mockReturnValue(now);

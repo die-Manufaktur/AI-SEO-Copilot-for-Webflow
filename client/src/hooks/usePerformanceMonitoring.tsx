@@ -52,12 +52,16 @@ export function usePerformanceMonitoring(
     if (isMonitoring) {
       updateInterval.current = window.setInterval(() => {
         setMetrics(performanceMonitor.getMetrics());
-        setAlerts(performanceMonitor.getAlerts().filter(alert => 
-          alertThreshold === 'low' || 
-          (alertThreshold === 'medium' && alert.severity !== 'low') ||
-          (alertThreshold === 'high' && (alert.severity === 'high' || alert.severity === 'critical'))
-        ));
-        setSuggestions(performanceMonitor.getOptimizationSuggestions());
+        const allAlerts = performanceMonitor.getAlerts() || [];
+        const filteredAlerts = allAlerts.filter(alert => {
+          if (!alert || !alert.severity) return false;
+          if (alertThreshold === 'low') return true;
+          if (alertThreshold === 'medium') return alert.severity !== 'low';
+          if (alertThreshold === 'high') return alert.severity === 'high' || alert.severity === 'critical';
+          return true;
+        });
+        setAlerts(filteredAlerts);
+        setSuggestions(performanceMonitor.getOptimizationSuggestions() || []);
       }, 5000); // Update every 5 seconds
     }
 

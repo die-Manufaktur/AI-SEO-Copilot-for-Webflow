@@ -121,7 +121,20 @@
       "WebFetch(domain:docs.webflow.com)",
       "mcp__serena__create_text_file",
       "Bash(cmd.exe /c \"cd \"\"C:/Users/Paul Mulligan/PMDS/Projects/AI-SEO-Copilot-for-Webflow\"\" && pnpm check\")",
-      "Bash(sed:*)"
+      "Bash(sed:*)",
+      "Bash(npm run check:*)",
+      "Bash(/c/Users/Paul Mulligan/AppData/Local/pnpm/pnpm test client/src/lib/contentIntelligence.test.ts)",
+      "Bash(/c/Users/Paul Mulligan/AppData/Local/pnpm/pnpm test -- ApplyButton)",
+      "Bash(npm --prefix \"C:\\Users\\Paul Mulligan\\PMDS\\Projects\\AI-SEO-Copilot-for-Webflow\" test -- ApplyButton)",
+      "Bash(npm --prefix \"C:\\Users\\Paul Mulligan\\PMDS\\Projects\\AI-SEO-Copilot-for-Webflow\" test -- editable-recommendation)",
+      "Bash(npm --prefix \"C:\\Users\\Paul Mulligan\\PMDS\\Projects\\AI-SEO-Copilot-for-Webflow\" test -- schema-display)",
+      "Bash(SHELL=/usr/bin/bash pnpm test)",
+      "Bash(cmd.exe /c \"pnpm test --run\")",
+      "Bash(timeout 30s npx vitest run client/src/pages/OAuthCallback.test.tsx --reporter=verbose)",
+      "Bash(timeout 20s npx vitest run client/src/pages/OAuthCallback.test.tsx -t \"should handle successful OAuth callback\")",
+      "Bash(timeout 30s npx vitest run client/src/pages/OAuthCallback.test.tsx -t \"should show loading state initially|should handle successful OAuth callback\")",
+      "WebFetch(domain:developers.webflow.com)",
+      "Bash(/c/Users/Paul Mulligan/AppData/Local/pnpm/pnpm test client/src/components/ui/ApplyButton.test.tsx)"
     ],
     "deny": []
   },

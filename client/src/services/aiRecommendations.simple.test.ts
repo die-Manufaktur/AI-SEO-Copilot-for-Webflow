@@ -5,15 +5,22 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { generateRecommendations } from './aiRecommendations';
+import { disableMSWForTest } from '../__tests__/utils/testHelpers';
 import type { AIRecommendationRequest } from './aiRecommendations';
 
-// Mock fetch
+// Disable MSW for this test file since we need direct fetch mocking
+disableMSWForTest();
+
+// Mock fetch using vi.stubGlobal
 const mockFetch = vi.fn();
-global.fetch = mockFetch;
+vi.stubGlobal('fetch', mockFetch);
 
 describe('AI Recommendations Service (Simple)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    
+    // Reset fetch mock
+    mockFetch.mockReset();
     
     // Set up environment variables - mock both window.env and process.env
     vi.stubEnv('VITE_WORKER_URL', 'http://localhost:8787');
@@ -35,14 +42,14 @@ describe('AI Recommendations Service (Simple)', () => {
   });
 
   afterEach(() => {
-    vi.unstubAllEnvs();
-    
     // Clean up process.env
     delete process.env.USE_GPT_RECOMMENDATIONS;
     delete process.env.VITE_WORKER_URL;
     
     // Clean up window.env
     delete (window as any).env;
+    
+    vi.unstubAllEnvs();
   });
 
   it('should generate AI recommendations successfully', async () => {
@@ -74,7 +81,6 @@ describe('AI Recommendations Service (Simple)', () => {
 
     const result = await generateRecommendations(request);
 
-    expect(result).toEqual(mockResponse);
     expect(mockFetch).toHaveBeenCalledWith(
       'http://localhost:8787/api/ai-recommendations',
       expect.objectContaining({
@@ -83,9 +89,14 @@ describe('AI Recommendations Service (Simple)', () => {
         body: JSON.stringify(request),
       })
     );
+    expect(result).toEqual(mockResponse);
   });
 
   it('should handle disabled AI recommendations', async () => {
+    // Temporarily override environment for this test
+    const originalEnv = { ...process.env };
+    const originalWindowEnv = (window as any).env;
+    
     vi.unstubAllEnvs();
     vi.stubEnv('USE_GPT_RECOMMENDATIONS', 'false');
     
@@ -101,6 +112,25 @@ describe('AI Recommendations Service (Simple)', () => {
     await expect(generateRecommendations(request)).rejects.toThrow(
       'AI recommendations are disabled'
     );
+
+    // Restore environment for subsequent tests
+    Object.assign(process.env, originalEnv);
+    (window as any).env = originalWindowEnv;
+    
+    // Re-setup the environment stubs
+    vi.stubEnv('VITE_WORKER_URL', 'http://localhost:8787');
+    vi.stubEnv('USE_GPT_RECOMMENDATIONS', 'true');
+    process.env.USE_GPT_RECOMMENDATIONS = 'true';
+    process.env.VITE_WORKER_URL = 'http://localhost:8787';
+    
+    Object.defineProperty(window, 'env', {
+      value: {
+        USE_GPT_RECOMMENDATIONS: 'true',
+        VITE_WORKER_URL: 'http://localhost:8787'
+      },
+      writable: true,
+      configurable: true
+    });
   });
 
   it('should validate required content', async () => {

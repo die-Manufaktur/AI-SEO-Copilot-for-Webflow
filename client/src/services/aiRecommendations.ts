@@ -122,8 +122,9 @@ export async function generateRecommendations(
           return generateFallbackRecommendations(request);
         }
 
-        // If it's a rate limit error, don't wrap it
-        if (lastError.message.includes('Rate limit exceeded')) {
+        // If it's a rate limit error or API error, don't wrap it
+        if (lastError.message.includes('Rate limit exceeded') || 
+            lastError.message.includes('AI recommendations API error')) {
           throw lastError;
         }
 

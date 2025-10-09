@@ -9,24 +9,55 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "./tooltip";
+import { ApplyButton } from "./ApplyButton";
+import { useInsertion } from "../../contexts/InsertionContext";
+import { createInsertionRequest, canApplyRecommendation, getApplyDescription, type RecommendationContext } from "../../utils/insertionHelpers";
 
 interface EditableRecommendationProps {
   recommendation: string;
   onCopy: (text: string) => Promise<boolean>;
   className?: string;
   disabled?: boolean;
+  // Props for apply functionality
+  checkTitle?: string;
+  pageId?: string;
+  cmsItemId?: string;
+  fieldId?: string;
+  showApplyButton?: boolean;
+  showOnlyApplyButton?: boolean; // When true, only show the apply button without text content
 }
 
 export function EditableRecommendation({
   recommendation,
   onCopy,
   className = "",
-  disabled = false
+  disabled = false,
+  checkTitle,
+  pageId,
+  cmsItemId,
+  fieldId,
+  showApplyButton = true,
+  showOnlyApplyButton = false
 }: EditableRecommendationProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedText, setEditedText] = useState(recommendation);
   const [tempText, setTempText] = useState(recommendation);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  
+  // Insertion context for apply functionality
+  const { applyInsertion, isLoading, error } = useInsertion();
+  
+  // Determine if apply button should be shown
+  const canApply = showApplyButton && checkTitle && canApplyRecommendation(checkTitle);
+  
+  // Create insertion request context
+  const insertionContext: RecommendationContext = {
+    checkTitle: checkTitle || '',
+    recommendation: editedText,
+    pageId,
+    cmsItemId,
+    fieldId,
+  };
 
   // Update local state when recommendation changes
   useEffect(() => {
@@ -114,6 +145,20 @@ export function EditableRecommendation({
     }
   };
 
+  const handleApply = async (request: any) => {
+    const insertionRequest = createInsertionRequest({
+      ...insertionContext,
+      recommendation: editedText,
+    });
+    
+    if (!insertionRequest) {
+      throw new Error('Unable to create insertion request');
+    }
+    
+    return await applyInsertion(insertionRequest);
+  };
+
+
   if (isEditing) {
     return (
       <div className={`space-y-3 ${className}`}>
@@ -132,38 +177,89 @@ export function EditableRecommendation({
             Ctrl+Enter to save, Esc to cancel
           </div>
         </div>
-        <div className="flex items-center justify-end gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleCancel}
-            disabled={disabled}
-            className="flex items-center gap-2"
-          >
-            <X className="h-3 w-3" />
-            Cancel
-          </Button>
-          <Button
-            variant="default"
-            size="sm"
-            onClick={handleSave}
-            disabled={disabled || !tempText.trim()}
-            className="flex items-center gap-2"
-          >
-            <Check className="h-3 w-3" />
-            Save
-          </Button>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            {canApply && (
+              <ApplyButton
+                insertionRequest={createInsertionRequest({
+                  ...insertionContext,
+                  recommendation: tempText,
+                }) || { type: 'page_title', value: tempText }}
+                onApply={handleApply}
+                loading={isLoading}
+                error={error || undefined}
+                disabled={disabled || !tempText.trim()}
+                label={getApplyDescription(checkTitle || '')}
+              />
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCancel}
+              disabled={disabled}
+              className="flex items-center gap-2"
+            >
+              <X className="h-3 w-3" />
+              Cancel
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleSave}
+              disabled={disabled || !tempText.trim()}
+              className="flex items-center gap-2"
+            >
+              <Check className="h-3 w-3" />
+              Save
+            </Button>
+          </div>
         </div>
+      </div>
+    );
+  }
+
+  // If showOnlyApplyButton is true, only render the Apply button
+  if (showOnlyApplyButton && canApply) {
+    return (
+      <div className={className}>
+        <ApplyButton
+          insertionRequest={createInsertionRequest(insertionContext) || { type: 'page_title', value: editedText }}
+          onApply={handleApply}
+          loading={isLoading}
+          error={error || undefined}
+          disabled={disabled}
+          label="Apply"
+          ariaLabel={getApplyDescription(checkTitle || '')}
+        />
       </div>
     );
   }
 
   return (
     <div className={`group relative ${className}`}>
-      <div className="pr-20 cursor-pointer hover:bg-background2/50 -m-1 p-1 rounded transition-colors" onClick={handleEdit}>
+      <div 
+        className={`${canApply ? "pr-32" : "pr-20"} cursor-pointer hover:bg-background2/50 -m-1 p-1 rounded transition-colors`} 
+        onClick={handleEdit}
+      >
         {editedText}
       </div>
-      <div className="absolute top-0 right-0 flex items-start gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="absolute top-0 right-0 flex items-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        {canApply && (
+          <div className="flex items-center">
+            <ApplyButton
+              insertionRequest={createInsertionRequest(insertionContext) || { type: 'page_title', value: editedText }}
+              onApply={handleApply}
+              loading={isLoading}
+              error={error || undefined}
+              disabled={disabled}
+              label="Apply"
+              ariaLabel={getApplyDescription(checkTitle || '')}
+            />
+          </div>
+        )}
+        
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { HelpProvider, useHelp } from './HelpContext';
 import React from 'react';
 
@@ -156,6 +156,9 @@ describe('HelpContext', () => {
       
       act(() => {
         result.current.startTutorial('getting-started');
+      });
+      
+      act(() => {
         result.current.nextTutorialStep();
       });
       
@@ -163,16 +166,21 @@ describe('HelpContext', () => {
       expect(tutorial?.currentStep).toBe(1);
     });
 
-    it('should complete tutorial', () => {
+    it('should complete tutorial', async () => {
       const { result } = renderHook(() => useHelp(), { wrapper });
       
       act(() => {
         result.current.startTutorial('getting-started');
+      });
+      
+      act(() => {
         result.current.completeTutorial();
       });
       
-      expect(result.current.getCurrentTutorial()).toBeNull();
-      expect(result.current.isTutorialCompleted('getting-started')).toBe(true);
+      await waitFor(() => {
+        expect(result.current.getCurrentTutorial()).toBeNull();
+        expect(result.current.isTutorialCompleted('getting-started')).toBe(true);
+      });
     });
 
     it('should save tutorial progress to localStorage', () => {
@@ -221,18 +229,21 @@ describe('HelpContext', () => {
       const { result } = renderHook(() => useHelp(), { wrapper });
       
       act(() => {
-        result.current.startTutorial('test-tutorial');
+        result.current.startTutorial('getting-started');
+      });
+      
+      act(() => {
         result.current.completeTutorial();
       });
       
       const analytics = result.current.getHelpAnalytics();
-      expect(analytics.tutorialsCompleted).toContain('test-tutorial');
+      expect(analytics.tutorialsCompleted).toContain('getting-started');
     });
 
-    it('should calculate help effectiveness metrics', () => {
+    it('should calculate help effectiveness metrics', async () => {
       const { result } = renderHook(() => useHelp(), { wrapper });
       
-      act(() => {
+      await act(async () => {
         // View articles
         result.current.trackEvent('help_article_viewed', { articleId: '1' });
         result.current.trackEvent('help_article_viewed', { articleId: '2' });
@@ -242,7 +253,7 @@ describe('HelpContext', () => {
         result.current.completeTutorial();
         
         // Search
-        result.current.searchHelp('query1');
+        await result.current.searchHelp('query1');
       });
       
       const analytics = result.current.getHelpAnalytics();
@@ -288,19 +299,56 @@ describe('HelpContext', () => {
       const container = document.createElement('div');
       document.body.appendChild(container);
       
+      // Mock MutationObserver to actually call the callback
+      let mutationCallback: MutationCallback;
+      const mockObserve = vi.fn();
+      const mockDisconnect = vi.fn();
+      
+      global.MutationObserver = vi.fn().mockImplementation((callback) => {
+        mutationCallback = callback;
+        return {
+          observe: mockObserve,
+          disconnect: mockDisconnect,
+          takeRecords: vi.fn(() => []),
+        };
+      });
+      
       act(() => {
         result.current.enableAutoDetection();
       });
       
       const element = document.createElement('input');
       element.setAttribute('data-help-id', 'dynamic-input');
+      
+      // Add element to DOM
       container.appendChild(element);
       
-      // Wait for mutation observer
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Manually trigger the mutation observer callback
+      act(() => {
+        mutationCallback!([
+          {
+            type: 'childList',
+            addedNodes: [element] as any,
+            removedNodes: [] as any,
+            target: container,
+            attributeName: null,
+            attributeNamespace: null,
+            oldValue: null,
+            nextSibling: null,
+            previousSibling: null,
+          }
+        ], {} as MutationObserver);
+      });
+      
+      // Check that the help target was detected
       expect(result.current.getActiveHelpTargets()).toContain('dynamic-input');
       
+      // Cleanup
       document.body.removeChild(container);
+      
+      act(() => {
+        result.current.disableAutoDetection();
+      });
     });
   });
 });

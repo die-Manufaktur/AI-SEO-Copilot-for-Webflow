@@ -1,0 +1,1 @@
+/usr/bin/bash: Files\Git\bin\bash.exe: No such file or directory

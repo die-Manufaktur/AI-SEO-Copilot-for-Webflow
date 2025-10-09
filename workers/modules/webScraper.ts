@@ -210,7 +210,11 @@ function extractLinks($: cheerio.CheerioAPI, url: string): {
       if (linkUrl.hostname === baseDomain) {
         internalLinks.push(fullUrl);
       } else {
-        outboundLinks.push(fullUrl);
+        // Normalize external links by ensuring domain-only URLs have trailing slash
+        const normalizedUrl = linkUrl.pathname === '/' && !fullUrl.endsWith('/') 
+          ? fullUrl + '/' 
+          : fullUrl;
+        outboundLinks.push(normalizedUrl);
       }
     } catch (error) {
       // Skip invalid URLs

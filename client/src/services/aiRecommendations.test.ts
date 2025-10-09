@@ -5,11 +5,15 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { generateRecommendations } from './aiRecommendations';
+import { disableMSWForTest } from '../__tests__/utils/testHelpers';
 import type { AIRecommendationRequest, AIRecommendationResponse } from './aiRecommendations';
 
-// Mock fetch for AI API calls
+// Disable MSW for this test file since we need direct fetch mocking
+disableMSWForTest();
+
+// Mock fetch using vi.stubGlobal
 const mockFetch = vi.fn();
-global.fetch = mockFetch;
+vi.stubGlobal('fetch', mockFetch);
 
 describe('AI Recommendations Service', () => {
   beforeEach(() => {
@@ -35,14 +39,14 @@ describe('AI Recommendations Service', () => {
   });
 
   afterEach(() => {
-    vi.unstubAllEnvs();
-    
     // Clean up process.env
     delete process.env.USE_GPT_RECOMMENDATIONS;
     delete process.env.VITE_WORKER_URL;
     
     // Clean up window.env
     delete (window as any).env;
+    
+    vi.unstubAllEnvs();
   });
 
   describe('generateRecommendations', () => {
@@ -126,7 +130,7 @@ describe('AI Recommendations Service', () => {
 
     it('should support multiple languages', async () => {
       const frenchResponse: AIRecommendationResponse = {
-        title: 'Guide Complet d\'Optimisation IA: Conseils d\'Expert',
+        title: 'Guide Complet d\'Optimisation IA: Conseils d\'Expérience',
         description: 'Découvrez les techniques avancées d\'optimisation IA dans ce guide complet. Stratégies éprouvées et conseils pratiques inclus.',
         keywords: ['optimisation IA', 'guide', 'conseils'],
         reasoning: {
@@ -187,7 +191,7 @@ describe('AI Recommendations Service', () => {
 
       const result = await generateRecommendations(request);
 
-      expect(result.title).toContain('SEO tools');
+      expect(result.title?.toLowerCase()).toContain('seo tools');
       expect(result.description).toContain('keyword optimization');
       expect(result.keywords).toContain('SEO tools');
       expect(result.keywords).toContain('keyword optimization');
@@ -248,8 +252,16 @@ describe('AI Recommendations Service', () => {
     });
 
     it('should handle missing environment configuration', async () => {
+      // Temporarily override environment for this test
+      const originalEnv = { ...process.env };
+      const originalWindowEnv = (window as any).env;
+      
       vi.unstubAllEnvs();
       vi.stubEnv('USE_GPT_RECOMMENDATIONS', 'false');
+      
+      // Clean up and set disabled state
+      process.env.USE_GPT_RECOMMENDATIONS = 'false';
+      delete (window as any).env;
 
       const request: AIRecommendationRequest = {
         content: {
@@ -264,6 +276,25 @@ describe('AI Recommendations Service', () => {
       await expect(generateRecommendations(request)).rejects.toThrow(
         'AI recommendations are disabled'
       );
+      
+      // Restore environment for subsequent tests
+      Object.assign(process.env, originalEnv);
+      (window as any).env = originalWindowEnv;
+      
+      // Re-setup the environment stubs
+      vi.stubEnv('VITE_WORKER_URL', 'http://localhost:8787');
+      vi.stubEnv('USE_GPT_RECOMMENDATIONS', 'true');
+      process.env.USE_GPT_RECOMMENDATIONS = 'true';
+      process.env.VITE_WORKER_URL = 'http://localhost:8787';
+      
+      Object.defineProperty(window, 'env', {
+        value: {
+          USE_GPT_RECOMMENDATIONS: 'true',
+          VITE_WORKER_URL: 'http://localhost:8787'
+        },
+        writable: true,
+        configurable: true
+      });
     });
 
     it('should provide fallback recommendations when AI fails', async () => {

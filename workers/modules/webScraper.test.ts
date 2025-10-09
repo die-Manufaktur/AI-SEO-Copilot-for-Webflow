@@ -3,15 +3,43 @@ import { scrapeWebPage } from './webScraper';
 
 // Mock fetch
 const mockFetch = vi.fn();
-global.fetch = mockFetch;
 
 describe('webScraper', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Override global fetch completely to bypass any MSW interference
+    // Ensure global object exists before using Object.defineProperty
+    if (typeof global !== 'undefined' && global !== null) {
+      try {
+        Object.defineProperty(global, 'fetch', {
+          value: mockFetch,
+          writable: true,
+          configurable: true
+        });
+      } catch (error) {
+        // If Object.defineProperty fails, try direct assignment
+        (global as any).fetch = mockFetch;
+      }
+    } else {
+      // Fallback for environments where global is not available
+      (globalThis as any).fetch = mockFetch;
+    }
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals();
     vi.restoreAllMocks();
+    // Restore original fetch if needed - handle cases where global might be undefined
+    try {
+      if (typeof global !== 'undefined' && global !== null) {
+        delete (global as any).fetch;
+      }
+      if (typeof globalThis !== 'undefined') {
+        delete (globalThis as any).fetch;
+      }
+    } catch (error) {
+      // Silently ignore cleanup errors in test environment
+    }
   });
 
   describe('scrapeWebPage', () => {

@@ -127,7 +127,9 @@ export default defineConfig(({ command, mode }) => {
     globals: true,
     environment: 'jsdom',
     // Setup file relative to project root
-    setupFiles: path.resolve(__dirname, './client/src/setupTests.ts'),
+    setupFiles: [
+      path.resolve(__dirname, './client/src/setupTests.ts')
+    ],
     // Include patterns relative to project root
     include: [
         // Adjust paths relative to project root if test.root is changed

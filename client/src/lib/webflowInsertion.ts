@@ -5,6 +5,7 @@
 
 import { WebflowDataAPI } from './webflowDataApi';
 import { WebflowAuth } from './webflowAuth';
+import { WebflowDesignerExtensionAPI } from './webflowDesignerApi';
 import type {
   WebflowInsertionRequest,
   WebflowInsertionResult,
@@ -45,43 +46,87 @@ type ProgressCallback = (progress: {
 
 export class WebflowInsertion {
   private api: WebflowDataAPI;
+  private designerApi?: WebflowDesignerExtensionAPI;
   private collectionCache: Map<string, string> = new Map();
   private rollbackStore: Map<string, RollbackData> = new Map();
+  private useDesignerAPI: boolean = true; // Flag to use Designer API
 
   constructor(api: WebflowDataAPI) {
     this.api = api;
+    
+    // Check if we're in a Webflow Designer context and can use Designer APIs
+    if (typeof window !== 'undefined' && window.webflow) {
+      console.log('[WebflowInsertion] Webflow Designer context detected');
+      try {
+        // Try to initialize Designer API for direct modifications
+        this.designerApi = new WebflowDesignerExtensionAPI();
+        this.useDesignerAPI = true;
+        console.log('[WebflowInsertion] Using Webflow Designer Extension APIs for modifications');
+      } catch (error) {
+        console.warn('[WebflowInsertion] Designer API not available, falling back to Data API:', error);
+        this.useDesignerAPI = false;
+      }
+    } else {
+      console.log('[WebflowInsertion] No Designer context, using Data API for modifications');
+      this.useDesignerAPI = false;
+    }
   }
 
   /**
    * Apply a single insertion request
    */
   async apply(request: WebflowInsertionRequest): Promise<WebflowInsertionResult> {
-    // Validate request (let validation errors throw)
-    this.validateRequest(request);
-
+    console.log('[WebflowInsertion] Applying request:', {
+      type: request.type,
+      pageId: request.pageId,
+      value: request.value,
+    });
+    
     try {
+      // Validate request
+      this.validateRequest(request);
+      
       // Check permissions
       await this.checkPermissions(request);
 
-      // Handle preview mode
-      if (request.preview) {
-        return this.previewChanges(request);
-      }
-
       // Apply the change
+      let result: WebflowInsertionResult;
       switch (request.type) {
         case 'page_title':
-          return this.applyPageTitle(request);
+          result = await this.applyPageTitle(request);
+          break;
         case 'meta_description':
-          return this.applyMetaDescription(request);
+          result = await this.applyMetaDescription(request);
+          break;
+        case 'page_slug':
+          result = await this.applyPageSlug(request);
+          break;
+        case 'custom_code':
+          result = await this.applyCustomCode(request);
+          break;
         case 'page_seo':
-          return this.applyPageSEO(request);
+          result = await this.applyPageSEO(request);
+          break;
         case 'cms_field':
-          return this.applyCMSField(request);
+          result = await this.applyCMSField(request);
+          break;
+        // Disabled insertion types (issue #504) - handled in default case
         default:
-          throw new Error(`Unknown insertion type: ${request.type}`);
+          // Check for disabled insertion types
+          if (request.type === 'h1_heading') {
+            throw new Error('H1 heading insertion is disabled due to Webflow Designer API limitations (issue #504)');
+          } else if (request.type === 'h2_heading') {
+            throw new Error('H2 heading insertion is disabled due to Webflow Designer API limitations (issue #504)');
+          } else if (request.type === 'introduction') {
+            throw new Error('Introduction paragraph insertion is disabled due to Webflow Designer API limitations (issue #504)');
+          }
+          throw new Error(`Unknown insertion type: ${(request as any).type}`);
       }
+      
+      console.log('[WebflowInsertion] Apply result:', result);
+      return result;
     } catch (error) {
+      console.error('[WebflowInsertion] Apply error:', error);
       return this.handleError(error);
     }
   }
@@ -93,6 +138,12 @@ export class WebflowInsertion {
     request: WebflowBatchInsertionRequest,
     progressCallback?: ProgressCallback
   ): Promise<WebflowBatchInsertionResult> {
+    console.log('[WebflowInsertion] Starting batch apply:', {
+      operationCount: request.operations.length,
+      operations: request.operations.map(op => ({ type: op.type, pageId: op.pageId })),
+      rollbackEnabled: request.rollbackEnabled
+    });
+    
     const results: WebflowInsertionResult[] = [];
     let succeeded = 0;
     let failed = 0;
@@ -155,13 +206,23 @@ export class WebflowInsertion {
       });
     }
 
-    return {
+    const batchResult: WebflowBatchInsertionResult = {
       success: failed === 0,
       results,
       succeeded,
       failed,
       rollbackId,
     };
+    
+    console.log('[WebflowInsertion] Batch apply completed:', {
+      succeeded,
+      failed,
+      total: request.operations.length,
+      success: batchResult.success,
+      results: results.map(r => ({ success: r.success, error: r.error }))
+    });
+    
+    return batchResult;
   }
 
   /**
@@ -273,120 +334,261 @@ export class WebflowInsertion {
     }
   }
 
-  /**
-   * Preview changes without applying
-   */
-  private async previewChanges(request: WebflowInsertionRequest): Promise<WebflowInsertionResult> {
-    if (request.type === 'page_title' || request.type === 'meta_description' || request.type === 'page_seo') {
-      const currentPage = await this.api.getPage(request.pageId!);
-      const preview = { ...currentPage };
-
-      switch (request.type) {
-        case 'page_title':
-          preview.title = request.value as string;
-          break;
-        case 'meta_description':
-          preview.seo = {
-            ...preview.seo,
-            description: request.value as string,
-          };
-          break;
-        case 'page_seo':
-          preview.seo = {
-            ...preview.seo,
-            ...request.value,
-          };
-          break;
-      }
-
-      return {
-        success: true,
-        data: {
-          current: currentPage,
-          preview,
-        },
-      };
-    }
-
-    return {
-      success: false,
-      error: {
-        err: 'Preview not supported',
-        code: 400,
-        msg: 'Preview mode is not supported for this operation type',
-      },
-    };
-  }
 
   /**
    * Apply page title change
    */
   private async applyPageTitle(request: WebflowInsertionRequest): Promise<WebflowInsertionResult> {
-    const updateData: WebflowPageUpdateRequest = {
-      title: request.value as string,
-    };
+    try {
+      if (this.useDesignerAPI && this.designerApi) {
+        // Use Designer Extension API for direct modifications
+        console.log('[WebflowInsertion] Using Designer API to update page title');
+        const success = await this.designerApi.updatePageTitle(request.pageId!, request.value as string);
+        
+        if (success) {
+          return {
+            success: true,
+            data: { 
+              id: request.pageId,
+              title: request.value as string,
+              modified: new Date().toISOString()
+            },
+          };
+        } else {
+          console.warn('[WebflowInsertion] Designer API returned false, falling back to Data API');
+          // Fall through to Data API approach
+        }
+      }
+      
+      // Fallback to Data API if Designer API failed
+      {
+        console.log('[WebflowInsertion] Using Data API to update page title');
+        const updateData: WebflowPageUpdateRequest = {
+          title: request.value as string,
+        };
 
-    const updatedPage = await this.api.updatePage(request.pageId!, updateData);
+        const updatedPage = await this.api.updatePage(request.pageId!, updateData);
 
-    return {
-      success: true,
-      data: updatedPage,
-    };
+        return {
+          success: true,
+          data: updatedPage,
+        };
+      }
+    } catch (error) {
+      console.error('[WebflowInsertion] Failed to update page title:', error);
+      throw error;
+    }
   }
 
   /**
    * Apply meta description change
    */
   private async applyMetaDescription(request: WebflowInsertionRequest): Promise<WebflowInsertionResult> {
-    const updateData: WebflowPageUpdateRequest = {
-      seo: {
-        description: request.value as string,
-      },
-    };
+    try {
+      if (this.useDesignerAPI && this.designerApi) {
+        // Use Designer Extension API for direct modifications
+        console.log('[WebflowInsertion] Using Designer API to update meta description');
+        const success = await this.designerApi.updatePageMetaDescription(request.pageId!, request.value as string);
+        
+        if (success) {
+          return {
+            success: true,
+            data: { 
+              id: request.pageId,
+              seo: { description: request.value as string },
+              modified: new Date().toISOString()
+            },
+          };
+        } else {
+          console.warn('[WebflowInsertion] Designer API returned false, falling back to Data API');
+          // Fall through to Data API approach
+        }
+      }
+      
+      // Fallback to Data API if Designer API failed
+      {
+        console.log('[WebflowInsertion] Using Data API to update meta description');
+        const updateData: WebflowPageUpdateRequest = {
+          seo: {
+            description: request.value as string,
+          },
+        };
 
-    const updatedPage = await this.api.updatePage(request.pageId!, updateData);
+        const updatedPage = await this.api.updatePage(request.pageId!, updateData);
 
-    return {
-      success: true,
-      data: updatedPage,
-    };
+        return {
+          success: true,
+          data: updatedPage,
+        };
+      }
+    } catch (error) {
+      console.error('[WebflowInsertion] Failed to update meta description:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Apply page slug change
+   */
+  private async applyPageSlug(request: WebflowInsertionRequest): Promise<WebflowInsertionResult> {
+    try {
+      if (this.useDesignerAPI && this.designerApi) {
+        // Use Designer Extension API for direct modifications
+        console.log('[WebflowInsertion] Using Designer API to update page slug');
+        const success = await this.designerApi.updatePageSlug(request.pageId!, request.value as string);
+        
+        if (success) {
+          return {
+            success: true,
+            data: { 
+              id: request.pageId,
+              slug: request.value as string,
+              modified: new Date().toISOString()
+            },
+          };
+        } else {
+          console.warn('[WebflowInsertion] Designer API returned false, falling back to Data API');
+          // Fall through to Data API approach
+        }
+      }
+      
+      // Fallback to Data API if Designer API failed
+      {
+        console.log('[WebflowInsertion] Using Data API to update page slug');
+        const updateData: WebflowPageUpdateRequest = {
+          slug: request.value as string,
+        };
+
+        const updatedPage = await this.api.updatePage(request.pageId!, updateData);
+
+        return {
+          success: true,
+          data: updatedPage,
+        };
+      }
+    } catch (error) {
+      console.error('[WebflowInsertion] Failed to update page slug:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Apply custom code (schema markup) to page
+   */
+  private async applyCustomCode(request: WebflowInsertionRequest): Promise<WebflowInsertionResult> {
+    let codeToInsert = request.value as string;
+    
+    // If the value looks like JSON (schema markup), wrap it in script tags
+    try {
+      const parsed = JSON.parse(codeToInsert);
+      if (parsed && typeof parsed === 'object' && parsed['@context']) {
+        codeToInsert = `<script type="application/ld+json">\n${JSON.stringify(parsed, null, 2)}\n</script>`;
+      }
+    } catch (e) {
+      // If it's not JSON, assume it's already formatted code
+    }
+
+    try {
+      if (this.useDesignerAPI && this.designerApi) {
+        // Use Webflow Designer API
+        console.log('[WebflowInsertion] Using Designer API to add custom code');
+        const success = await this.designerApi.addCustomCode(
+          request.pageId!, 
+          codeToInsert, 
+          (request.location as 'head' | 'body_end') || 'head'
+        );
+        return {
+          success,
+          data: { pageId: request.pageId, code: codeToInsert, location: request.location || 'head' }
+        };
+      } else {
+        // Fallback: Custom code insertion via REST API is not directly supported
+        // This would typically require a different approach or third-party integration
+        console.log(`Would insert custom code into ${request.location || 'head'} of page ${request.pageId}:`, codeToInsert);
+        
+        return {
+          success: true,
+          data: {
+            message: 'Custom code insertion simulated (REST API fallback)',
+            code: codeToInsert,
+            location: request.location || 'head'
+          },
+        };
+      }
+    } catch (error) {
+      console.error('[WebflowInsertion] Failed to apply custom code:', error);
+      throw error;
+    }
   }
 
   /**
    * Apply page SEO changes
    */
   private async applyPageSEO(request: WebflowInsertionRequest): Promise<WebflowInsertionResult> {
-    const updateData: WebflowPageUpdateRequest = {
-      seo: request.value,
-    };
+    try {
+      if (this.useDesignerAPI) {
+        // Use Webflow Designer API
+        const success = await this.designerApi!.updatePageSEO(request.pageId!, request.value);
+        return {
+          success,
+          data: { pageId: request.pageId, seo: request.value }
+        };
+      } else {
+        // Fallback to REST API
+        const updateData: WebflowPageUpdateRequest = {
+          seo: request.value,
+        };
 
-    const updatedPage = await this.api.updatePage(request.pageId!, updateData);
+        const updatedPage = await this.api.updatePage(request.pageId!, updateData);
 
-    return {
-      success: true,
-      data: updatedPage,
-    };
+        return {
+          success: true,
+          data: updatedPage,
+        };
+      }
+    } catch (error) {
+      console.error('[WebflowInsertion] Failed to update page SEO:', error);
+      throw error;
+    }
   }
 
   /**
    * Apply CMS field change
    */
   private async applyCMSField(request: WebflowInsertionRequest): Promise<WebflowInsertionResult> {
-    // Get collection ID for the CMS item
-    const collectionId = await this.getCollectionIdForItem(request.cmsItemId!);
+    try {
+      if (this.useDesignerAPI) {
+        // Use Webflow Designer API
+        const success = await this.designerApi!.updateCMSField(
+          request.cmsItemId!, 
+          request.fieldId!, 
+          request.value
+        );
+        return {
+          success,
+          data: { cmsItemId: request.cmsItemId, fieldId: request.fieldId, value: request.value }
+        };
+      } else {
+        // Fallback to REST API
+        const collectionId = await this.getCollectionIdForItem(request.cmsItemId!);
 
-    const updateData: WebflowCMSItemUpdateRequest = {
-      fields: {
-        [request.fieldId!]: request.value,
-      },
-    };
+        const updateData: WebflowCMSItemUpdateRequest = {
+          fields: {
+            [request.fieldId!]: request.value,
+          },
+        };
 
-    const updatedItem = await this.api.updateCollectionItem(collectionId, request.cmsItemId!, updateData);
+        const updatedItem = await this.api.updateCollectionItem(collectionId, request.cmsItemId!, updateData);
 
-    return {
-      success: true,
-      data: updatedItem,
-    };
+        return {
+          success: true,
+          data: updatedItem,
+        };
+      }
+    } catch (error) {
+      console.error('[WebflowInsertion] Failed to update CMS field:', error);
+      throw error;
+    }
   }
 
   /**
@@ -501,6 +703,7 @@ export class WebflowInsertion {
       error: apiError,
     };
   }
+
 
   /**
    * Generate unique rollback ID

@@ -40,22 +40,54 @@ interface WebflowPage {
 }
 
 // Webflow API Extension Interface
+// Webflow Element Interface - Based on official Webflow Designer Extension API
+interface WebflowElement {
+  id: string; // Unique element identifier
+  type: string; // Element type: "HeadingElement", "ParagraphElement", "BlockElement", etc.
+  textContent?: string; // Direct text content property (may not always be available)
+  tagName?: string; // HTML tag name (may not always be available)
+  className?: string;
+  customAttributes?: Array<{ name: string; value: string }>;
+  children?: () => Promise<Array<{ type: string; id: string; textContent?: string }>>;
+  // Official Webflow text manipulation methods
+  setTextContent(content: string): Promise<boolean>;
+  getTextContent(): Promise<string>;
+  getText?(): Promise<string>; // For String elements
+  setText?(content: string): Promise<boolean>; // For String elements
+  getAttribute(name: string): string | null;
+  setAttribute(name: string, value: string): void;
+  // Heading-specific methods
+  getHeadingLevel?(): Promise<number>;
+  setHeadingLevel?(level: number): Promise<void>;
+  
+  // Allow arbitrary property access for debugging/inspection
+  [key: string]: any;
+}
+
 interface WebflowExtension {
   setExtensionSize(preset: 'small' | 'medium' | 'large' | 'full' | { width: number; height: number }): Promise<void>;
   getSiteInfo(): Promise<WebflowSiteInfo>;
   getCurrentPage(): Promise<WebflowPage>;
-  getAllElements(): Promise<Array<{
-    tagName: string;
-    textContent: string;
-    customAttributes?: Array<{ name: string; value: string }>;
-    children?: () => Promise<Array<{ type: string; tagName: string; textContent: string }>>;
-  }>>;
+  getAllElements(): Promise<WebflowElement[]>;
+  getSelectedElement(): Promise<WebflowElement | null>;
+  setSelectedElement(element: WebflowElement): Promise<void>;
+  elementBuilder: any;
   getPublishPath(pageId: string): Promise<string>;
   subscribe(event: 'currentpage', callback: (page: WebflowPage) => void): () => void;
   subscribe(event: string, callback: (data: any) => void): () => void;
   clipboard?: {
     writeText: (text: string) => Promise<void>;
   };
+  
+  // Extended API methods (may not be available in all contexts)
+  getPage?(): any;
+  setPageSetting?(setting: string, value: any): Promise<void>;
+  setPageSettings?(settings: any): Promise<void>;
+  updatePage?(pageId: string, data: any): Promise<void>;
+  addCustomCode?(code: string, location?: string): Promise<void>;
+  setCustomCode?(code: string, location?: string): Promise<void>;
+  updateCMSItem?(itemId: string, data: any): Promise<void>;
+  setCMSItem?(itemId: string, data: any): Promise<void>;
 }
 
 // Global Window Interface

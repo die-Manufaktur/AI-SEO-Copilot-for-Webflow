@@ -153,7 +153,7 @@ export class ContentIntelligence {
       return cached.result as PageAnalysis;
     }
 
-    const analysis = await this.performPageAnalysis(page);
+    const analysis = await this.performAnalysis(page);
     
     // Cache result
     this.cache[cacheKey] = {
@@ -184,7 +184,7 @@ export class ContentIntelligence {
       return cached.result as CMSAnalysis;
     }
 
-    const analysis = await this.performCMSAnalysis(item, collectionId);
+    const analysis = await this.performAnalysis(item, collectionId);
     
     // Cache result
     this.cache[cacheKey] = {
@@ -271,6 +271,19 @@ export class ContentIntelligence {
   /**
    * Perform detailed page analysis
    */
+  private async performAnalysis(page: WebflowPage): Promise<PageAnalysis>;
+  private async performAnalysis(item: WebflowCMSItem, collectionId: string): Promise<CMSAnalysis>;
+  private async performAnalysis(pageOrItem: WebflowPage | WebflowCMSItem, collectionId?: string): Promise<PageAnalysis | CMSAnalysis> {
+    if ('siteId' in pageOrItem) {
+      return this.performPageAnalysis(pageOrItem as WebflowPage);
+    } else {
+      return this.performCMSAnalysis(pageOrItem as WebflowCMSItem, collectionId!);
+    }
+  }
+
+  /**
+   * Perform detailed page analysis
+   */
   private async performPageAnalysis(page: WebflowPage): Promise<PageAnalysis> {
     const issues: ContentIssue[] = [];
     const metrics = this.calculatePageMetrics(page);
@@ -305,17 +318,23 @@ export class ContentIntelligence {
     }
 
     // Analyze SEO title
-    if (page.seo?.title) {
-      if (page.seo.title.length > this.rules.title.maxLength) {
-        issues.push({
-          type: 'seo_title_length',
-          severity: 'high',
-          message: `SEO title is too long (${page.seo.title.length} characters, max ${this.rules.title.maxLength})`,
-          field: 'seo.title',
-          currentValue: page.seo.title,
-          recommendedAction: 'Shorten the SEO title',
-        });
-      }
+    if (!page.seo?.title || page.seo.title.trim() === '') {
+      issues.push({
+        type: 'missing_seo_title',
+        severity: 'critical',
+        message: 'SEO title is missing',
+        field: 'seo.title',
+        recommendedAction: 'Add an SEO title',
+      });
+    } else if (page.seo.title.length > this.rules.title.maxLength) {
+      issues.push({
+        type: 'seo_title_length',
+        severity: 'high',
+        message: `SEO title is too long (${page.seo.title.length} characters, max ${this.rules.title.maxLength})`,
+        field: 'seo.title',
+        currentValue: page.seo.title,
+        recommendedAction: 'Shorten the SEO title',
+      });
     }
 
     // Analyze meta description
@@ -725,7 +744,15 @@ export class ContentIntelligence {
    * Generate content hash for caching
    */
   private generateContentHash(content: any): string {
-    return btoa(JSON.stringify(content)).slice(0, 16);
+    const jsonString = JSON.stringify(content);
+    // Simple hash function for Node.js compatibility
+    let hash = 0;
+    for (let i = 0; i < jsonString.length; i++) {
+      const char = jsonString.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return hash.toString(16).slice(0, 16);
   }
 
   /**
@@ -1016,6 +1043,35 @@ export class ContentIntelligence {
    * Calculate string similarity using Levenshtein distance
    */
   private calculateStringSimilarity(str1: string, str2: string): number {
+    // Normalize strings for comparison
+    const normalize = (str: string) => str.toLowerCase().trim();
+    const norm1 = normalize(str1);
+    const norm2 = normalize(str2);
+    
+    // Direct match
+    if (norm1 === norm2) return 1.0;
+    
+    // Check semantic equivalencies for common field names
+    const semanticEquivalents: Record<string, string[]> = {
+      'title': ['heading', 'name', 'headline', 'header'],
+      'description': ['content', 'desc', 'text', 'body', 'summary'],
+      'image': ['img', 'photo', 'picture', 'pic'],
+      'heading': ['title', 'name', 'headline', 'header'],
+      'content': ['description', 'desc', 'text', 'body', 'summary'],
+      'photo': ['image', 'img', 'picture', 'pic'],
+      'name': ['title', 'heading', 'headline', 'header'],
+      'price': ['cost', 'amount', 'fee', 'rate'],
+      'cost': ['price', 'amount', 'fee', 'rate'],
+      'summary': ['excerpt', 'abstract', 'overview'],
+      'excerpt': ['summary', 'abstract', 'overview']
+    };
+    
+    // Check if they are semantically equivalent
+    if (semanticEquivalents[norm1]?.includes(norm2) || semanticEquivalents[norm2]?.includes(norm1)) {
+      return 0.9; // High semantic similarity
+    }
+    
+    // Fall back to Levenshtein distance
     const longer = str1.length > str2.length ? str1 : str2;
     const shorter = str1.length > str2.length ? str2 : str1;
     
@@ -1068,15 +1124,61 @@ export class ContentIntelligence {
    * Get reasoning for field mapping
    */
   private getFieldMappingReasoning(sourceField: any, targetField: any): string {
+    const sourceName = sourceField.name.toLowerCase();
+    const targetName = targetField.name.toLowerCase();
+    const sourceId = sourceField.id.toLowerCase();
+    const targetId = targetField.id.toLowerCase();
+    
+    // Check for semantic equivalence
+    const semanticEquivalents: Record<string, string[]> = {
+      'title': ['heading', 'name', 'headline', 'header'],
+      'description': ['content', 'desc', 'text', 'body', 'summary'],
+      'image': ['img', 'photo', 'picture', 'pic'],
+      'heading': ['title', 'name', 'headline', 'header'],
+      'content': ['description', 'desc', 'text', 'body', 'summary'],
+      'photo': ['image', 'img', 'picture', 'pic'],
+      'name': ['title', 'heading', 'headline', 'header'],
+      'price': ['cost', 'amount', 'fee', 'rate'],
+      'cost': ['price', 'amount', 'fee', 'rate'],
+      'summary': ['excerpt', 'abstract', 'overview'],
+      'excerpt': ['summary', 'abstract', 'overview']
+    };
+    
+    // Check semantic equivalence by name and ID
+    const isSemanticMatch = semanticEquivalents[sourceName]?.includes(targetName) ||
+                           semanticEquivalents[targetName]?.includes(sourceName) ||
+                           semanticEquivalents[sourceId]?.includes(targetId) ||
+                           semanticEquivalents[targetId]?.includes(sourceId);
+    
+    if (isSemanticMatch && sourceField.type === targetField.type) {
+      if (sourceField.type === 'RichText') {
+        return 'Both are rich text content fields';
+      }
+      if (sourceField.type === 'Image') {
+        return 'Both are image fields';
+      }
+      return 'Similar field names and types';
+    }
+    
     if (sourceField.type === targetField.type) {
-      if (sourceField.name.toLowerCase().includes(targetField.name.toLowerCase()) ||
-          targetField.name.toLowerCase().includes(sourceField.name.toLowerCase())) {
+      if (sourceName.includes(targetName) || targetName.includes(sourceName) ||
+          sourceId.includes(targetId) || targetId.includes(sourceId)) {
         return 'Similar field names and types';
       }
       return `Both are ${sourceField.type} fields`;
     }
     
     if (this.areTypesCompatible(sourceField.type, targetField.type)) {
+      // Provide more specific reasoning based on field semantics
+      const isSemanticConversion = semanticEquivalents[sourceName]?.includes(targetName) ||
+                                  semanticEquivalents[targetName]?.includes(sourceName) ||
+                                  semanticEquivalents[sourceId]?.includes(targetId) ||
+                                  semanticEquivalents[targetId]?.includes(sourceId);
+      
+      if (isSemanticConversion) {
+        return `${sourceField.name} field can be converted to ${targetField.type.toLowerCase()}`;
+      }
+      
       return `${sourceField.type} can be converted to ${targetField.type}`;
     }
 

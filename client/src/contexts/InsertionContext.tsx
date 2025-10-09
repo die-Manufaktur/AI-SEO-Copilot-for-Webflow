@@ -3,7 +3,7 @@
  * GREEN Phase: Minimal implementation to make tests pass
  */
 
-import React, { createContext, useContext, useReducer, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useCallback, ReactNode, useMemo } from 'react';
 import { WebflowInsertion } from '../lib/webflowInsertion';
 import { WebflowDataAPI } from '../lib/webflowDataApi';
 import { useAuth } from './AuthContext';
@@ -47,7 +47,7 @@ type InsertionAction =
   | { type: 'ADD_PENDING'; payload: WebflowInsertionRequest }
   | { type: 'REMOVE_PENDING'; payload: WebflowInsertionRequest }
   | { type: 'CLEAR_PENDING' }
-  | { type: 'ADD_HISTORY'; payload: InsertionHistoryEntry }
+  | { type: 'ADD_HISTORY'; payload: { entry: InsertionHistoryEntry; maxSize: number } }
   | { type: 'CLEAR_ERROR' };
 
 const initialState: InsertionState = {
@@ -112,7 +112,11 @@ function insertionReducer(state: InsertionState, action: InsertionAction): Inser
       return { ...state, pendingOperations: [] };
     
     case 'ADD_HISTORY': {
-      const newHistory = [action.payload, ...state.insertionHistory];
+      const newHistory = [action.payload.entry, ...state.insertionHistory];
+      // Trim history if it exceeds max size
+      if (newHistory.length > action.payload.maxSize) {
+        newHistory.splice(action.payload.maxSize);
+      }
       return { ...state, insertionHistory: newHistory };
     }
     
@@ -135,7 +139,6 @@ export interface InsertionContextValue {
   
   // Single operations
   applyInsertion: (request: WebflowInsertionRequest) => Promise<WebflowInsertionResult>;
-  previewInsertion: (request: WebflowInsertionRequest) => Promise<WebflowInsertionResult>;
   
   // Batch operations
   applyBatch: (request: WebflowBatchInsertionRequest) => Promise<WebflowBatchInsertionResult>;
@@ -167,14 +170,36 @@ export function InsertionProvider({
   const { token } = useAuth();
 
   // Create insertion instance if not provided
-  const insertion = insertionInstance || (() => {
+  const insertion = useMemo(() => {
+    if (insertionInstance) {
+      return insertionInstance;
+    }
+    
     if (!token) {
-      throw new Error('Authentication token is required for insertions');
+      // For Designer Extensions running within a logged-in Webflow Designer window,
+      // we don't need OAuth tokens since we can use Designer Extension APIs directly
+      console.log('[InsertionContext] No OAuth token available - will use Designer Extension APIs directly');
+      
+      // Create a minimal API that will allow WebflowInsertion to fallback to Designer APIs
+      const designerApi = {
+        getConfig: () => ({}),
+        getAuthHeaders: () => ({}),
+        // These methods won't be called when using Designer APIs
+        getPage: () => Promise.reject(new Error('Data API not available - using Designer Extension APIs')),
+        updatePage: () => Promise.reject(new Error('Data API not available - using Designer Extension APIs')),
+        listCollections: () => Promise.reject(new Error('Data API not available - using Designer Extension APIs')),
+        listCollectionItems: () => Promise.reject(new Error('Data API not available - using Designer Extension APIs')),
+        updateCollectionItem: () => Promise.reject(new Error('Data API not available - using Designer Extension APIs')),
+        getRateLimitInfo: () => ({ remainingRequests: 1000, resetTime: Date.now() + 3600000 }),
+      } as any;
+
+      // Return a WebflowInsertion instance that will use Designer Extension APIs
+      return new WebflowInsertion(designerApi);
     }
     
     const dataApi = new WebflowDataAPI(token);
     return new WebflowInsertion(dataApi);
-  })();
+  }, [insertionInstance, token]);
 
   const generateId = () => `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -193,13 +218,8 @@ export function InsertionProvider({
       duration,
     };
 
-    dispatch({ type: 'ADD_HISTORY', payload: entry });
-
-    // Limit history size
-    if (state.insertionHistory.length >= maxHistorySize) {
-      // Would need to implement history trimming
-    }
-  }, [state.insertionHistory.length, maxHistorySize]);
+    dispatch({ type: 'ADD_HISTORY', payload: { entry, maxSize: maxHistorySize } });
+  }, [maxHistorySize]);
 
   const applyInsertion = useCallback(async (request: WebflowInsertionRequest): Promise<WebflowInsertionResult> => {
     dispatch({ type: 'SET_LOADING', payload: true });
@@ -237,10 +257,6 @@ export function InsertionProvider({
     }
   }, [insertion, addToHistory]);
 
-  const previewInsertion = useCallback(async (request: WebflowInsertionRequest): Promise<WebflowInsertionResult> => {
-    const previewRequest = { ...request, preview: true };
-    return applyInsertion(previewRequest);
-  }, [applyInsertion]);
 
   const applyBatch = useCallback(async (request: WebflowBatchInsertionRequest): Promise<WebflowBatchInsertionResult> => {
     dispatch({ type: 'SET_LOADING', payload: true });
@@ -328,7 +344,6 @@ export function InsertionProvider({
     
     // Operations
     applyInsertion,
-    previewInsertion,
     applyBatch,
     rollbackBatch,
     

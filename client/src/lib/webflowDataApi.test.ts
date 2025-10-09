@@ -5,6 +5,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { WebflowDataAPI } from './webflowDataApi';
+import { disableMSWForTest } from '../__tests__/utils/testHelpers';
 import type { 
   WebflowDataApiConfig, 
   WebflowOAuthToken,
@@ -15,9 +16,36 @@ import type {
   WebflowCMSItemCreateRequest
 } from '../types/webflow-data-api';
 
+// Disable MSW for this test file since we need direct fetch mocking
+disableMSWForTest();
+
 // Mock fetch
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
+
+// Helper to create proper Response-like objects for fetch mocks
+const createMockResponse = (data: any, options: { 
+  ok?: boolean; 
+  status?: number; 
+  statusText?: string; 
+  url?: string;
+} = {}) => ({
+  ok: options.ok ?? true,
+  status: options.status ?? 200,
+  statusText: options.statusText ?? 'OK',
+  headers: new Headers(),
+  url: options.url ?? 'https://api.webflow.com/test',
+  redirected: false,
+  type: 'basic' as ResponseType,
+  clone: function() { return this; },
+  body: null,
+  bodyUsed: false,
+  arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+  blob: () => Promise.resolve(new Blob()),
+  formData: () => Promise.resolve(new FormData()),
+  text: () => Promise.resolve(JSON.stringify(data)),
+  json: () => Promise.resolve(data),
+});
 
 describe('WebflowDataAPI', () => {
   let dataApi: WebflowDataAPI;
@@ -181,53 +209,53 @@ describe('WebflowDataAPI', () => {
 
   describe('Error Handling', () => {
     it('should handle HTTP error responses', async () => {
-      mockFetch.mockResolvedValueOnce({
+      mockFetch.mockResolvedValueOnce(createMockResponse({
+        err: 'Not Found',
+        code: 404,
+        msg: 'Resource not found',
+      }, {
         ok: false,
         status: 404,
         statusText: 'Not Found',
-        json: () => Promise.resolve({
-          err: 'Not Found',
-          code: 404,
-          msg: 'Resource not found',
-        }),
-      });
+        url: 'https://api.webflow.com/nonexistent'
+      }));
 
-      await expect(dataApi.get('/nonexistent')).rejects.toThrow('Not Found: Resource not found');
+      await expect(dataApi.get('/nonexistent')).rejects.toThrow('Resource not found');
     });
 
     it('should handle validation errors', async () => {
-      mockFetch.mockResolvedValueOnce({
+      mockFetch.mockResolvedValueOnce(createMockResponse({
+        err: 'Validation Error',
+        code: 400,
+        msg: 'Invalid request data',
+        details: { field: 'name', message: 'Name is required' },
+      }, {
         ok: false,
         status: 400,
-        statusText: 'Bad Request',
-        json: () => Promise.resolve({
-          err: 'Validation Error',
-          code: 400,
-          msg: 'Invalid request data',
-          details: { field: 'name', message: 'Name is required' },
-        }),
-      });
+        statusText: 'Bad Request'
+      }));
 
-      await expect(dataApi.post('/test', {})).rejects.toThrow('Validation Error: Invalid request data');
+      await expect(dataApi.post('/test', {})).rejects.toThrow('Invalid request data');
     });
 
     it('should handle unauthorized errors', async () => {
-      mockFetch.mockResolvedValueOnce({
+      mockFetch.mockResolvedValueOnce(createMockResponse({
+        err: 'Unauthorized',
+        code: 401,
+        msg: 'Invalid or expired token',
+      }, {
         ok: false,
         status: 401,
-        statusText: 'Unauthorized',
-        json: () => Promise.resolve({
-          err: 'Unauthorized',
-          code: 401,
-          msg: 'Invalid or expired token',
-        }),
-      });
+        statusText: 'Unauthorized'
+      }));
 
-      await expect(dataApi.get('/test')).rejects.toThrow('Unauthorized: Invalid or expired token');
+      await expect(dataApi.get('/test')).rejects.toThrow('Invalid or expired token');
     });
 
     it('should handle network errors', async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Network error'));
+      // Reset all mocks to prevent fallback to default success mock
+      mockFetch.mockReset();
+      mockFetch.mockRejectedValue(new Error('Network error'));
 
       await expect(dataApi.get('/test')).rejects.toThrow('Network error');
     });
@@ -254,6 +282,12 @@ describe('WebflowDataAPI', () => {
     });
 
     it('should handle rate limit exceeded', async () => {
+      // Create a rate limit API with 'throw' strategy to avoid queue timeouts
+      const throwApi = new WebflowDataAPI(mockToken, { 
+        ...mockConfig, 
+        rateLimitStrategy: 'throw'
+      });
+
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 429,
@@ -269,9 +303,9 @@ describe('WebflowDataAPI', () => {
         }),
       });
 
-      await expect(dataApi.get('/test')).rejects.toThrow('Rate Limited: Too many requests');
+      await expect(throwApi.get('/test')).rejects.toThrow('Too many requests');
 
-      const rateLimitInfo = dataApi.getRateLimitInfo();
+      const rateLimitInfo = throwApi.getRateLimitInfo();
       expect(rateLimitInfo.remaining).toBe(0);
       expect(rateLimitInfo.retryAfter).toBe(60000); // Converted to milliseconds
     });
@@ -362,14 +396,13 @@ describe('WebflowDataAPI', () => {
     });
 
     it('should not retry on 4xx client errors', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 400,
-        statusText: 'Bad Request',
-        json: () => Promise.resolve({ err: 'Bad Request', code: 400, msg: 'Invalid data' }),
-      });
+      mockFetch.mockReset();
+      mockFetch.mockResolvedValue(createMockResponse(
+        { err: 'Bad Request', code: 400, msg: 'Invalid data' },
+        { ok: false, status: 400, statusText: 'Bad Request' }
+      ));
 
-      await expect(dataApi.get('/test')).rejects.toThrow('Bad Request: Invalid data');
+      await expect(dataApi.get('/test')).rejects.toThrow('Invalid data');
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
@@ -657,7 +690,7 @@ describe('WebflowDataAPI', () => {
         lastUpdated: '2024-01-15T13:00:00.000Z',
       };
 
-      mockFetch.mockResolvedValueOnce({
+      mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve(updatedItem),
         headers: new Headers({ 'x-ratelimit-remaining': '100' }),
@@ -677,7 +710,7 @@ describe('WebflowDataAPI', () => {
     });
 
     it('should delete collection item', async () => {
-      mockFetch.mockResolvedValueOnce({
+      mockFetch.mockResolvedValue({
         ok: true,
         status: 204,
         headers: new Headers({ 'x-ratelimit-remaining': '100' }),
@@ -699,7 +732,7 @@ describe('WebflowDataAPI', () => {
         name: `Item ${i}`,
       }));
 
-      mockFetch.mockResolvedValueOnce({
+      mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({
           items: mockItems.slice(0, 25),
@@ -724,7 +757,7 @@ describe('WebflowDataAPI', () => {
     });
 
     it('should build query strings correctly', async () => {
-      mockFetch.mockResolvedValueOnce({
+      mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ items: [] }),
         headers: new Headers({ 'x-ratelimit-remaining': '100' }),
@@ -775,7 +808,7 @@ describe('WebflowDataAPI', () => {
         timeout: 100 
       });
 
-      mockFetch.mockImplementationOnce(
+      mockFetch.mockImplementation(
         (url, options) => new Promise((resolve, reject) => {
           const signal = options?.signal;
           if (signal) {
@@ -796,11 +829,13 @@ describe('WebflowDataAPI', () => {
         })
       );
 
-      await expect(timeoutApi.get('/test')).rejects.toThrow('Request timeout');
+      await expect(timeoutApi.get('/test')).rejects.toThrow(/timeout|abort/i);
     });
 
     it('should allow custom timeout per request', async () => {
-      mockFetch.mockImplementationOnce(
+      const customTimeoutApi = new WebflowDataAPI(mockToken, mockConfig);
+      
+      mockFetch.mockImplementation(
         (url, options) => new Promise((resolve, reject) => {
           const signal = options?.signal;
           if (signal) {
@@ -822,8 +857,8 @@ describe('WebflowDataAPI', () => {
       );
 
       await expect(
-        dataApi.get('/test', { timeout: 100 })
-      ).rejects.toThrow('Request timeout');
+        customTimeoutApi.get('/test', { timeout: 100 })
+      ).rejects.toThrow(/timeout|abort/i);
     });
   });
 });

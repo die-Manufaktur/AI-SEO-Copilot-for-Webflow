@@ -9,6 +9,13 @@ import {
   calculateSEOScore,
 } from './seoAnalysis';
 
+// Mock the AI recommendations module
+vi.mock('./aiRecommendations', () => ({
+  getAIRecommendation: vi.fn()
+}));
+
+import { getAIRecommendation } from './aiRecommendations';
+
 describe('seoAnalysis', () => {
   describe('calculateSEOScore', () => {
     it('should calculate correct SEO score from checks', () => {
@@ -529,10 +536,10 @@ describe('seoAnalysis', () => {
     let mockAdvancedOptions: any;
 
     beforeEach(() => {
-      // Mock the AI recommendation function
-      vi.mock('./aiRecommendations', () => ({
-        getAIRecommendation: vi.fn().mockResolvedValue('Mocked AI recommendation')
-      }));
+      vi.clearAllMocks();
+      
+      // Set up the AI recommendation mock to return a test value
+      (getAIRecommendation as any).mockResolvedValue('Mocked AI recommendation');
 
       mockScrapedData = {
         title: 'Test Page Title',
@@ -949,9 +956,7 @@ describe('seoAnalysis', () => {
 
     it('should handle AI recommendation errors gracefully', async () => {
       // Mock AI function to throw error
-      vi.doMock('./aiRecommendations', () => ({
-        getAIRecommendation: vi.fn().mockRejectedValue(new Error('AI API Error'))
-      }));
+      (getAIRecommendation as any).mockRejectedValue(new Error('AI API Error'));
 
       const aiMockEnv = {
         USE_GPT_RECOMMENDATIONS: 'true',

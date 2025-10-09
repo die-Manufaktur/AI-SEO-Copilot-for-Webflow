@@ -1,17 +1,13 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { screen, waitFor, fireEvent, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useEffect } from 'react';
-import { renderWithQueryClient } from '../test-utils';
+import React, { useEffect } from 'react';
+import { renderWithProviders } from '../__tests__/utils/testHelpers';
 import Home from './Home';
 import { saveAdvancedOptionsForPage, loadAdvancedOptionsForPage } from '../utils/advancedOptionsStorage';
 
-// Mock ResizeObserver for ScrollArea component
-global.ResizeObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
-}));
+// Remove local ResizeObserver mock - use the one from setupTests.ts
+// The global ResizeObserver is already properly mocked in setupTests.ts
 
 // Mock IntersectionObserver
 global.IntersectionObserver = vi.fn().mockImplementation(() => ({
@@ -23,6 +19,22 @@ global.IntersectionObserver = vi.fn().mockImplementation(() => ({
 // Mock the API module
 vi.mock('../lib/api', () => ({
   analyzeSEO: vi.fn()
+}));
+
+// Mock Auth Context to prevent provider errors
+vi.mock('../contexts/AuthContext', () => ({
+  AuthProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  useAuth: () => ({
+    isAuthenticated: true,
+    isLoading: false,
+    user: { email: 'test@example.com', id: 'test-user-id' },
+    token: { access_token: 'test-token', scope: 'sites:read sites:write cms:read cms:write pages:read pages:write' },
+    status: 'authenticated' as const,
+    login: vi.fn(),
+    logout: vi.fn(),
+    hasPermission: vi.fn(() => true),
+    refreshAuth: vi.fn(() => Promise.resolve()),
+  }),
 }));
 
 // Mock the clipboard utility module
@@ -149,39 +161,43 @@ describe('Home Component', () => {
   });
 
   it('renders without crashing', () => {
-    renderWithQueryClient(<Home />);
+    renderWithProviders(<Home />);
     expect(screen.getByText(/SEO Analysis Tool/i)).toBeInTheDocument();
   });
 
   it('displays keyphrase input field', () => {
-    renderWithQueryClient(<Home />);
+    renderWithProviders(<Home />);
     expect(screen.getByPlaceholderText(/enter your target keyphrase/i)).toBeInTheDocument();
   });
 
   it('shows analyze button', () => {
-    renderWithQueryClient(<Home />);
+    renderWithProviders(<Home />);
     expect(screen.getByText(/start optimizing your seo/i)).toBeInTheDocument();
   });
 
   it('handles keyphrase input changes', async () => {
     const user = userEvent.setup();
-    renderWithQueryClient(<Home />);
+    renderWithProviders(<Home />);
     
     const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
-    await user.type(input, 'test keyphrase');
+    await act(async () => {
+      await user.type(input, 'test keyphrase');
+    });
     
     expect(input).toHaveValue('test keyphrase');
   });
 
   it('validates keyphrase length', async () => {
     const user = userEvent.setup();
-    renderWithQueryClient(<Home />);
+    renderWithProviders(<Home />);
     
     const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
     const button = screen.getByText(/start optimizing your seo/i);
     
-    await user.type(input, 'a');
-    await user.click(button);
+    await act(async () => {
+      await user.type(input, 'a');
+      await user.click(button);
+    });
     
     await waitFor(() => {
       expect(screen.getByText(/keyphrase must be at least 2 characters/i)).toBeInTheDocument();
@@ -195,33 +211,35 @@ describe('Home Component', () => {
     vi.mocked(analyzeSEO).mockResolvedValue(mockAnalysis);
     
     const user = userEvent.setup();
-    renderWithQueryClient(<Home />);
+    renderWithProviders(<Home />);
     
     const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
     const button = screen.getByText(/start optimizing your seo/i);
     
-    await user.type(input, 'test keyphrase');
-    await user.click(button);
+    await act(async () => {
+      await user.type(input, 'test keyphrase');
+      await user.click(button);
+    });
     
     await waitFor(() => {
-      expect(analyzeSEO).toHaveBeenCalledWith(
-        expect.objectContaining({
-          keyphrase: 'test keyphrase',
-          url: 'https://example.com/test-page',
-          isHomePage: false,
-          siteInfo: expect.objectContaining({
-            domains: expect.arrayContaining([
-              expect.objectContaining({
-                url: 'https://example.com'
-              })
-            ])
-          }),
-          publishPath: '/test-page',
-          webflowPageData: expect.objectContaining({
-            openGraphImage: 'https://example.com/og-image.jpg'
-          })
+      expect(analyzeSEO).toHaveBeenCalled();
+      const callArgs = vi.mocked(analyzeSEO).mock.calls[0];
+      expect(callArgs[0]).toEqual(expect.objectContaining({
+        keyphrase: 'test keyphrase',
+        url: 'https://example.com/test-page',
+        isHomePage: false,
+        siteInfo: expect.objectContaining({
+          domains: expect.arrayContaining([
+            expect.objectContaining({
+              url: 'https://example.com'
+            })
+          ])
+        }),
+        publishPath: '/test-page',
+        webflowPageData: expect.objectContaining({
+          openGraphImage: 'https://example.com/og-image.jpg'
         })
-      );
+      }));
     }, { timeout: 15000 });
   }, 20000);
 
@@ -230,13 +248,15 @@ describe('Home Component', () => {
     vi.mocked(analyzeSEO).mockImplementation(() => new Promise(() => {})); // Never resolves
     
     const user = userEvent.setup();
-    renderWithQueryClient(<Home />);
+    renderWithProviders(<Home />);
     
     const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
     const button = screen.getByText(/start optimizing your seo/i);
     
-    await user.type(input, 'test keyphrase');
-    await user.click(button);
+    await act(async () => {
+      await user.type(input, 'test keyphrase');
+      await user.click(button);
+    });
     
     // Wait for the button to be disabled due to pending mutation
     await waitFor(() => {
@@ -249,7 +269,7 @@ describe('Home Component', () => {
     vi.mocked(analyzeSEO).mockRejectedValue(new Error('Analysis failed'));
     
     const user = userEvent.setup();
-    renderWithQueryClient(<Home />);
+    renderWithProviders(<Home />);
     
     const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
     const button = screen.getByText(/start optimizing your seo/i);
@@ -294,7 +314,7 @@ describe('Home Component', () => {
     vi.mocked(analyzeSEO).mockResolvedValue(mockAnalysis);
     
     const user = userEvent.setup();
-    renderWithQueryClient(<Home />);
+    renderWithProviders(<Home />);
     
     const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
     const button = screen.getByText(/start optimizing your seo/i);
@@ -315,7 +335,7 @@ describe('Home Component', () => {
     vi.mocked(analyzeSEO).mockRejectedValue(new Error('Failed to fetch page content: 500'));
     
     const user = userEvent.setup();
-    renderWithQueryClient(<Home />);
+    renderWithProviders(<Home />);
     
     const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
     const button = screen.getByText(/start optimizing your seo/i);
@@ -361,7 +381,7 @@ describe('Home Component', () => {
     vi.mocked(analyzeSEO).mockResolvedValue(mockAnalysis);
     
     const user = userEvent.setup();
-    renderWithQueryClient(<Home />);
+    renderWithProviders(<Home />);
     
     const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
     const button = screen.getByText(/start optimizing your seo/i);
@@ -400,7 +420,7 @@ describe('Home Component', () => {
     vi.mocked(analyzeSEO).mockResolvedValue(mockAnalysis);
     
     const user = userEvent.setup();
-    renderWithQueryClient(<Home />);
+    renderWithProviders(<Home />);
     
     const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
     const button = screen.getByText(/start optimizing your seo/i);
@@ -461,7 +481,7 @@ describe('Home Component', () => {
     vi.mocked(analyzeSEO).mockResolvedValue(mockAnalysis);
     
     const user = userEvent.setup();
-    renderWithQueryClient(<Home />);
+    renderWithProviders(<Home />);
     
     const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
     const button = screen.getByText(/start optimizing your seo/i);
@@ -517,7 +537,7 @@ describe('Home Component', () => {
     vi.mocked(analyzeSEO).mockResolvedValue(mockPerfectAnalysis);
     
     const user = userEvent.setup();
-    renderWithQueryClient(<Home />);
+    renderWithProviders(<Home />);
     
     const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
     const button = screen.getByText(/start optimizing your seo/i);
@@ -538,7 +558,7 @@ describe('Home Component', () => {
     });
     
     const user = userEvent.setup();
-    renderWithQueryClient(<Home />);
+    renderWithProviders(<Home />);
     
     const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
     const button = screen.getByText(/start optimizing your seo/i);
@@ -586,7 +606,7 @@ describe('Home Component', () => {
     vi.mocked(analyzeSEO).mockResolvedValue(goodAnalysis);
     
     const user = userEvent.setup();
-    renderWithQueryClient(<Home />);
+    renderWithProviders(<Home />);
     
     const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
     const button = screen.getByText(/start optimizing your seo/i);
@@ -661,7 +681,7 @@ describe('Home Component', () => {
     vi.mocked(analyzeSEO).mockResolvedValue(mockAnalysis);
     
     const user = userEvent.setup();
-    renderWithQueryClient(<Home />);
+    renderWithProviders(<Home />);
     
     const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
     const button = screen.getByText(/start optimizing your seo/i);
@@ -736,7 +756,7 @@ describe('Home Component - Additional Coverage', () => {
       
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       
-      renderWithQueryClient(<Home />);
+      renderWithProviders(<Home />);
       
       // Component should still render
       expect(screen.getByText(/SEO Analysis Tool/i)).toBeInTheDocument();
@@ -760,7 +780,7 @@ describe('Home Component - Additional Coverage', () => {
       mockWebflowApi.getSiteInfo.mockRejectedValue(new Error('Site info error'));
       
       const user = userEvent.setup();
-      renderWithQueryClient(<Home />);
+      renderWithProviders(<Home />);
       
       const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
       const button = screen.getByText(/start optimizing your seo/i);
@@ -781,7 +801,7 @@ describe('Home Component - Additional Coverage', () => {
         .mockRejectedValue(new Error('Page fetch error')); // Analysis fails
       
       const user = userEvent.setup();
-      renderWithQueryClient(<Home />);
+      renderWithProviders(<Home />);
       
       const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
       const button = screen.getByText(/start optimizing your seo/i);
@@ -815,7 +835,7 @@ describe('Home Component - Additional Coverage', () => {
         .mockResolvedValueOnce('/initial-page') // Initial call
         .mockResolvedValueOnce('/new-page'); // After change
       
-      renderWithQueryClient(<Home />);
+      renderWithProviders(<Home />);
       
       // Wait for initial setup
       await waitFor(() => {
@@ -850,7 +870,7 @@ describe('Home Component - Additional Coverage', () => {
       // Mock same page path for both calls
       mockCurrentPage.getPublishPath.mockResolvedValue('/same-page');
       
-      renderWithQueryClient(<Home />);
+      renderWithProviders(<Home />);
       
       await waitFor(() => {
         expect(mockWebflowApi.subscribe).toHaveBeenCalled();
@@ -885,7 +905,7 @@ describe('Home Component - Additional Coverage', () => {
         .mockResolvedValueOnce(mockCurrentPage) // Initial setup succeeds
         .mockRejectedValue(new Error('Page change error')); // Subscription callback fails
       
-      renderWithQueryClient(<Home />);
+      renderWithProviders(<Home />);
       
       await waitFor(() => {
         expect(mockWebflowApi.subscribe).toHaveBeenCalled();
@@ -916,7 +936,7 @@ describe('Home Component - Additional Coverage', () => {
     });
 
     it('shows test button in development mode', () => {
-      renderWithQueryClient(<Home />);
+      renderWithProviders(<Home />);
       
       expect(screen.getByText(/🧪 Test 100 Score/)).toBeInTheDocument();
     });
@@ -941,7 +961,7 @@ describe('Home Component - Additional Coverage', () => {
       });
       
       const user = userEvent.setup();
-      renderWithQueryClient(<Home />);
+      renderWithProviders(<Home />);
       
       // Run initial analysis
       const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
@@ -967,7 +987,7 @@ describe('Home Component - Additional Coverage', () => {
 
     it('shows error when trying to test without existing results', async () => {
       const user = userEvent.setup();
-      renderWithQueryClient(<Home />);
+      renderWithProviders(<Home />);
       
       const testButton = screen.getByText(/🧪 Test 100 Score/);
       await user.click(testButton);
@@ -1015,7 +1035,7 @@ describe('Home Component - Additional Coverage', () => {
       vi.mocked(analyzeSEO).mockResolvedValue(mockAnalysisWithImages);
       
       const user = userEvent.setup();
-      renderWithQueryClient(<Home />);
+      renderWithProviders(<Home />);
       
       const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
       const button = screen.getByText(/start optimizing your seo/i);
@@ -1074,7 +1094,7 @@ describe('Home Component - Additional Coverage', () => {
     });
 
     it('should hide advanced options section by default', async () => {
-      renderWithQueryClient(<Home />);
+      renderWithProviders(<Home />);
       
       // Advanced Analysis section should be visible but form fields should be hidden initially
       expect(screen.getByText(/Advanced Analysis/i)).toBeInTheDocument();
@@ -1085,10 +1105,16 @@ describe('Home Component - Additional Coverage', () => {
 
     it('should show advanced options when toggle is enabled', async () => {
       const user = userEvent.setup();
-      renderWithQueryClient(<Home />);
+      renderWithProviders(<Home />);
       
       // Find and click the advanced options toggle
       const advancedToggle = screen.getByRole('switch');
+      
+      // Wait for component to fully render
+      await waitFor(() => {
+        expect(advancedToggle).toBeInTheDocument();
+      });
+      
       await user.click(advancedToggle);
       
       // Advanced options section should now be visible
@@ -1101,7 +1127,7 @@ describe('Home Component - Additional Coverage', () => {
 
     it('should preserve settings in storage when toggle is turned off', async () => {
       const user = userEvent.setup();
-      renderWithQueryClient(<Home />);
+      renderWithProviders(<Home />);
       
       // Enable advanced options
       const advancedToggle = screen.getByRole('switch');
@@ -1139,7 +1165,12 @@ describe('Home Component - Additional Coverage', () => {
       });
       
       const user = userEvent.setup();
-      renderWithQueryClient(<Home />);
+      renderWithProviders(<Home />);
+      
+      // Wait for component to initialize and page data to load
+      await waitFor(() => {
+        expect(screen.getByText(/SEO Analysis Tool/i)).toBeInTheDocument();
+      });
       
       // Enable advanced options
       const advancedToggle = screen.getByRole('switch');
@@ -1155,7 +1186,7 @@ describe('Home Component - Additional Coverage', () => {
         // Check that secondary keywords input shows the restored value
         const secondaryKeywordsInput = screen.getByDisplayValue('test keywords, blog content');
         expect(secondaryKeywordsInput).toBeInTheDocument();
-      });
+      }, { timeout: 5000 });
       
       // Verify loadAdvancedOptionsForPage was called
       expect(vi.mocked(loadAdvancedOptionsForPage)).toHaveBeenCalled();
@@ -1169,19 +1200,30 @@ describe('Home Component - Additional Coverage', () => {
       });
       
       const user = userEvent.setup();
-      renderWithQueryClient(<Home />);
+      renderWithProviders(<Home />);
+      
+      // Wait for component to initialize and page data to load
+      await waitFor(() => {
+        expect(screen.getByText(/SEO Analysis Tool/i)).toBeInTheDocument();
+      });
       
       // Enable advanced options
       const advancedToggle = screen.getByRole('switch');
       await user.click(advancedToggle);
       
+      // Wait for the advanced options form to appear
+      await waitFor(() => {
+        const comboboxes = screen.getAllByRole('combobox');
+        expect(comboboxes).toHaveLength(2); // page type + language selector
+      }, { timeout: 5000 });
+      
       // Wait for save status to show as 'saved'
       await waitFor(() => {
         expect(screen.getByText(/Secondary keywords and page type saved/i)).toBeInTheDocument();
-      });
+      }, { timeout: 3000 });
     });
 
-    it('should maintain toggle state separately from settings persistence', async () => {
+    it('should automatically enable toggle when saved settings exist', async () => {
       // Mock returning saved settings
       vi.mocked(loadAdvancedOptionsForPage).mockReturnValue({
         pageType: 'Product page',
@@ -1189,28 +1231,29 @@ describe('Home Component - Additional Coverage', () => {
       });
       
       const user = userEvent.setup();
-      renderWithQueryClient(<Home />);
+      renderWithProviders(<Home />);
+      
+      // Wait for component to initialize and page data to load
+      await waitFor(() => {
+        expect(screen.getByText(/SEO Analysis Tool/i)).toBeInTheDocument();
+      });
       
       const advancedToggle = screen.getByRole('switch');
       
-      // Initially toggle should be off and advanced fields hidden
-      expect(advancedToggle).toHaveAttribute('data-state', 'unchecked');
-      expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
-      
-      // Turn on - should show saved settings
-      fireEvent.click(advancedToggle);
+      // When saved settings exist, toggle should be automatically enabled
       await waitFor(() => {
         expect(advancedToggle).toHaveAttribute('data-state', 'checked');
       });
       
+      // Advanced fields should be visible with restored values
       await waitFor(() => {
         const comboboxes = screen.getAllByRole('combobox');
         expect(comboboxes).toHaveLength(2); // page type + language selector
         expect(screen.getByDisplayValue('product keywords')).toBeInTheDocument();
-      });
+      }, { timeout: 5000 });
       
       // Turn off - should hide section but preserve data
-      fireEvent.click(advancedToggle);
+      await user.click(advancedToggle);
       await waitFor(() => {
         expect(advancedToggle).toHaveAttribute('data-state', 'unchecked');
       });
@@ -1220,7 +1263,7 @@ describe('Home Component - Additional Coverage', () => {
       });
       
       // Turn on again - should restore the same settings
-      fireEvent.click(advancedToggle);
+      await user.click(advancedToggle);
       await waitFor(() => {
         expect(advancedToggle).toHaveAttribute('data-state', 'checked');
       });
@@ -1229,7 +1272,7 @@ describe('Home Component - Additional Coverage', () => {
         const comboboxes = screen.getAllByRole('combobox');
         expect(comboboxes).toHaveLength(2); // page type + language selector
         expect(screen.getByDisplayValue('product keywords')).toBeInTheDocument();
-      });
+      }, { timeout: 5000 });
     });
   });
 });

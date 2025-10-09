@@ -21,12 +21,20 @@ describe('Onboarding', () => {
       currentStep: 0,
       totalSteps: 5,
       isComplete: false,
+      shouldShowOnboarding: true,
       hasSeenOnboarding: false,
+      apiKey: null,
       completeStep: mockCompleteStep,
+      goToPreviousStep: vi.fn(),
       skipOnboarding: mockSkipOnboarding,
       resetOnboarding: mockResetOnboarding,
       setApiKey: mockSetApiKey,
-      apiKey: null
+      validateApiKey: vi.fn(() => ({ isValid: true, error: null })),
+      getStepInfo: vi.fn(() => ({
+        title: 'Welcome to AI SEO Copilot',
+        description: "Let's get you set up for success!",
+        component: 'welcome'
+      }))
     });
   });
 
@@ -65,12 +73,20 @@ describe('Onboarding', () => {
         currentStep: 1,
         totalSteps: 5,
         isComplete: false,
+        shouldShowOnboarding: true,
         hasSeenOnboarding: false,
+        apiKey: null,
         completeStep: mockCompleteStep,
+        goToPreviousStep: vi.fn(),
         skipOnboarding: mockSkipOnboarding,
         resetOnboarding: mockResetOnboarding,
         setApiKey: mockSetApiKey,
-        apiKey: null
+        validateApiKey: vi.fn(() => ({ isValid: true, error: null })),
+        getStepInfo: vi.fn(() => ({
+          title: 'Configure API Key',
+          description: 'Add your OpenAI API key to enable AI recommendations',
+          component: 'apiKey'
+        }))
       });
       rerender(<Onboarding />);
 
@@ -83,12 +99,20 @@ describe('Onboarding', () => {
         currentStep: 1,
         totalSteps: 5,
         isComplete: false,
+        shouldShowOnboarding: true,
         hasSeenOnboarding: false,
+        apiKey: null,
         completeStep: mockCompleteStep,
+        goToPreviousStep: vi.fn(),
         skipOnboarding: mockSkipOnboarding,
         resetOnboarding: mockResetOnboarding,
         setApiKey: mockSetApiKey,
-        apiKey: null
+        validateApiKey: vi.fn(() => ({ isValid: true, error: null })),
+        getStepInfo: vi.fn(() => ({
+          title: 'Configure API Key',
+          description: 'Add your OpenAI API key to enable AI recommendations',
+          component: 'apiKey'
+        }))
       });
 
       render(<Onboarding />);
@@ -102,12 +126,20 @@ describe('Onboarding', () => {
         currentStep: 1,
         totalSteps: 5,
         isComplete: false,
+        shouldShowOnboarding: true,
         hasSeenOnboarding: false,
+        apiKey: null,
         completeStep: mockCompleteStep,
+        goToPreviousStep: vi.fn(),
         skipOnboarding: mockSkipOnboarding,
         resetOnboarding: mockResetOnboarding,
         setApiKey: mockSetApiKey,
-        apiKey: null
+        validateApiKey: vi.fn(() => ({ isValid: true, error: null })),
+        getStepInfo: vi.fn(() => ({
+          title: 'Configure API Key',
+          description: 'Add your OpenAI API key to enable AI recommendations',
+          component: 'apiKey'
+        }))
       });
 
       render(<Onboarding />);
@@ -131,12 +163,20 @@ describe('Onboarding', () => {
         currentStep: 1,
         totalSteps: 5,
         isComplete: false,
+        shouldShowOnboarding: true,
         hasSeenOnboarding: false,
+        apiKey: null,
         completeStep: mockCompleteStep,
+        goToPreviousStep: vi.fn(),
         skipOnboarding: mockSkipOnboarding,
         resetOnboarding: mockResetOnboarding,
         setApiKey: mockSetApiKey,
-        apiKey: null
+        validateApiKey: vi.fn(() => ({ isValid: true, error: null })),
+        getStepInfo: vi.fn(() => ({
+          title: 'Configure API Key',
+          description: 'Add your OpenAI API key to enable AI recommendations',
+          component: 'apiKey'
+        }))
       });
 
       render(<Onboarding />);
@@ -153,11 +193,19 @@ describe('Onboarding', () => {
         currentStep: 2,
         totalSteps: 5,
         isComplete: false,
+        shouldShowOnboarding: true,
         hasSeenOnboarding: false,
         completeStep: mockCompleteStep,
+        goToPreviousStep: vi.fn(),
         skipOnboarding: mockSkipOnboarding,
         resetOnboarding: mockResetOnboarding,
         setApiKey: mockSetApiKey,
+        validateApiKey: vi.fn(() => ({ isValid: true, error: null })),
+        getStepInfo: vi.fn(() => ({
+          title: 'Key Features',
+          description: 'Here\'s what you can do with AI SEO Copilot',
+          component: 'features'
+        })),
         apiKey: 'sk-test'
       });
 
@@ -172,11 +220,19 @@ describe('Onboarding', () => {
         currentStep: 2,
         totalSteps: 5,
         isComplete: false,
+        shouldShowOnboarding: true,
         hasSeenOnboarding: false,
         completeStep: mockCompleteStep,
+        goToPreviousStep: vi.fn(),
         skipOnboarding: mockSkipOnboarding,
         resetOnboarding: mockResetOnboarding,
         setApiKey: mockSetApiKey,
+        validateApiKey: vi.fn(() => ({ isValid: true, error: null })),
+        getStepInfo: vi.fn(() => ({
+          title: 'Key Features',
+          description: 'Here\'s what you can do with AI SEO Copilot',
+          component: 'features'
+        })),
         apiKey: 'sk-test'
       });
 
@@ -194,11 +250,19 @@ describe('Onboarding', () => {
         currentStep: 3,
         totalSteps: 5,
         isComplete: false,
+        shouldShowOnboarding: true,
         hasSeenOnboarding: false,
         completeStep: mockCompleteStep,
+        goToPreviousStep: vi.fn(),
         skipOnboarding: mockSkipOnboarding,
         resetOnboarding: mockResetOnboarding,
         setApiKey: mockSetApiKey,
+        validateApiKey: vi.fn(() => ({ isValid: true, error: null })),
+        getStepInfo: vi.fn(() => ({
+          title: 'Try It Yourself',
+          description: 'Let\'s run a quick analysis to see how it works',
+          component: 'demo'
+        })),
         apiKey: 'sk-test'
       });
 
@@ -213,11 +277,19 @@ describe('Onboarding', () => {
         currentStep: 3,
         totalSteps: 5,
         isComplete: false,
+        shouldShowOnboarding: true,
         hasSeenOnboarding: false,
         completeStep: mockCompleteStep,
+        goToPreviousStep: vi.fn(),
         skipOnboarding: mockSkipOnboarding,
         resetOnboarding: mockResetOnboarding,
         setApiKey: mockSetApiKey,
+        validateApiKey: vi.fn(() => ({ isValid: true, error: null })),
+        getStepInfo: vi.fn(() => ({
+          title: 'Try It Yourself',
+          description: 'Let\'s run a quick analysis to see how it works',
+          component: 'demo'
+        })),
         apiKey: 'sk-test'
       });
 
@@ -241,11 +313,19 @@ describe('Onboarding', () => {
         currentStep: 4,
         totalSteps: 5,
         isComplete: false,
+        shouldShowOnboarding: true,
         hasSeenOnboarding: false,
         completeStep: mockCompleteStep,
+        goToPreviousStep: vi.fn(),
         skipOnboarding: mockSkipOnboarding,
         resetOnboarding: mockResetOnboarding,
         setApiKey: mockSetApiKey,
+        validateApiKey: vi.fn(() => ({ isValid: true, error: null })),
+        getStepInfo: vi.fn(() => ({
+          title: 'You\'re All Set!',
+          description: 'You\'re ready to start optimizing your Webflow pages',
+          component: 'completion'
+        })),
         apiKey: 'sk-test'
       });
 
@@ -259,11 +339,19 @@ describe('Onboarding', () => {
         currentStep: 4,
         totalSteps: 5,
         isComplete: false,
+        shouldShowOnboarding: true,
         hasSeenOnboarding: false,
         completeStep: mockCompleteStep,
+        goToPreviousStep: vi.fn(),
         skipOnboarding: mockSkipOnboarding,
         resetOnboarding: mockResetOnboarding,
         setApiKey: mockSetApiKey,
+        validateApiKey: vi.fn(() => ({ isValid: true, error: null })),
+        getStepInfo: vi.fn(() => ({
+          title: 'You\'re All Set!',
+          description: 'You\'re ready to start optimizing your Webflow pages',
+          component: 'completion'
+        })),
         apiKey: 'sk-test'
       });
 
@@ -341,6 +429,22 @@ describe('Onboarding', () => {
   });
 
   describe('Accessibility', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      (useOnboarding as any).mockReturnValue({
+        currentStep: 0,
+        totalSteps: 5,
+        isComplete: false,
+        shouldShowOnboarding: true,
+        hasSeenOnboarding: false,
+        apiKey: null,
+        completeStep: mockCompleteStep,
+        goToPreviousStep: vi.fn(),
+        saveApiKey: vi.fn(),
+        completeOnboarding: vi.fn()
+      });
+    });
+
     it('should have proper ARIA labels', () => {
       render(<Onboarding />);
       expect(screen.getByRole('dialog')).toHaveAttribute('aria-label', 'Onboarding');
@@ -349,13 +453,35 @@ describe('Onboarding', () => {
     });
 
     it('should be keyboard navigable', async () => {
+      const user = userEvent.setup();
+      
+      // Ensure proper mock setup for this specific test
+      (useOnboarding as any).mockReturnValue({
+        currentStep: 0,
+        totalSteps: 5,
+        isComplete: false,
+        shouldShowOnboarding: true,
+        hasSeenOnboarding: false,
+        apiKey: null,
+        completeStep: mockCompleteStep,
+        goToPreviousStep: vi.fn(),
+        saveApiKey: vi.fn(),
+        completeOnboarding: vi.fn(),
+        getStepInfo: vi.fn(() => ({
+          title: 'Welcome to AI SEO Copilot',
+          description: "Let's get you set up for success!",
+          component: 'welcome'
+        }))
+      });
+      
       render(<Onboarding />);
       const continueButton = screen.getByText(/get started/i);
       
       continueButton.focus();
       expect(document.activeElement).toBe(continueButton);
       
-      fireEvent.keyDown(continueButton, { key: 'Enter' });
+      // Use userEvent.click instead of fireEvent.keyDown for better reliability
+      await user.click(continueButton);
       expect(mockCompleteStep).toHaveBeenCalled();
     });
 
