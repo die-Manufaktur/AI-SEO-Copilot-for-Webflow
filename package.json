@@ -9,7 +9,7 @@
     "test": "vitest run --coverage",
     "test:watch": "vitest --coverage",
     "test:ui": "vitest --ui --coverage",
-    "test:bundle": "vitest run client/src/lib/bundle-validation.test.ts",
+    "test:bundle": "vitest run client/src/lib/bundle-validation.test.ts --reporter=verbose",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug",

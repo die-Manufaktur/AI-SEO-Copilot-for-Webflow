@@ -191,63 +191,117 @@ describe('HelpSystem', () => {
       expect(screen.getByText('Troubleshooting')).toBeInTheDocument();
     });
 
-    it.skip('should show articles when category is selected', async () => {
-      // Skip: This test causes "offset out of bounds" errors in CI environment
-      mockGetHelp.mockReturnValue([
-        { id: '1', title: 'What is SEO?', category: 'seo' },
-        { id: '2', title: 'Keyword Research', category: 'seo' }
+    it('should show articles when category is selected', async () => {
+      // Mock the getHelpByCategory to return articles for 'seo' category
+      mockGetHelpByCategory.mockReturnValue([
+        { id: '1', title: 'What is SEO?', category: 'seo', content: 'SEO basics...' },
+        { id: '2', title: 'Keyword Research', category: 'seo', content: 'How to research keywords...' }
       ]);
 
       render(<HelpSystem />);
-      await userEvent.click(screen.getByRole('button', { name: /help/i }));
-      await userEvent.click(screen.getByText('SEO Optimization'));
       
+      // Open help panel using fireEvent for more direct control
+      const helpButton = screen.getByRole('button', { name: /help/i });
+      fireEvent.click(helpButton);
+      
+      // Wait for help panel to be visible
       await waitFor(() => {
+        expect(screen.getByText(/help center/i)).toBeInTheDocument();
+      });
+      
+      // Click on SEO Optimization category using fireEvent
+      const seoCategory = screen.getByText('SEO Optimization');
+      fireEvent.click(seoCategory);
+      
+      // Wait for articles to appear
+      await waitFor(() => {
+        expect(mockGetHelpByCategory).toHaveBeenCalledWith('seo');
         expect(screen.getByText('What is SEO?')).toBeInTheDocument();
         expect(screen.getByText('Keyword Research')).toBeInTheDocument();
-      });
+      }, { timeout: 2000 });
     });
   });
 
   describe('Interactive Tutorials', () => {
-    it.skip('should start tutorial when clicked', async () => {
-      // Skip: This test causes "offset out of bounds" errors in CI environment
+    it('should start tutorial when clicked', async () => {
+      // Mock getCurrentTutorial to return a tutorial after starting
+      mockGetCurrentTutorial.mockReturnValue({
+        id: 'getting-started',
+        currentStep: 0,
+        totalSteps: 5,
+        startedAt: Date.now()
+      });
+
       render(<HelpSystem />);
-      await userEvent.click(screen.getByRole('button', { name: /help/i }));
-      await userEvent.click(screen.getByText('Start Tutorial'));
       
-      expect(screen.getByText(/step 1 of/i)).toBeInTheDocument();
+      // Open help panel
+      const helpButton = screen.getByRole('button', { name: /help/i });
+      fireEvent.click(helpButton);
+      
+      // Wait for help panel to be visible
+      await waitFor(() => {
+        expect(screen.getByText(/help center/i)).toBeInTheDocument();
+      });
+      
+      // Find and click Start Tutorial button
+      const startTutorialButton = screen.getByText('Start Tutorial');
+      fireEvent.click(startTutorialButton);
+      
+      // Verify tutorial was started
+      await waitFor(() => {
+        expect(mockStartTutorial).toHaveBeenCalledWith('getting-started');
+      });
     });
 
-    it.skip('should navigate through tutorial steps', async () => {
-      // Skip: This test causes "offset out of bounds" errors in CI environment
+    it('should navigate through tutorial steps', async () => {
+      // Mock tutorial state on step 1 initially
+      mockGetCurrentTutorial.mockReturnValue({
+        id: 'getting-started',
+        currentStep: 0,
+        totalSteps: 5,
+        startedAt: Date.now()
+      });
+
       render(<HelpSystem />);
-      await userEvent.click(screen.getByRole('button', { name: /help/i }));
-      await userEvent.click(screen.getByText('Start Tutorial'));
       
-      expect(screen.getByText(/step 1 of/i)).toBeInTheDocument();
+      // Wait for tutorial overlay to appear
+      await waitFor(() => {
+        expect(screen.getByText(/step 1 of/i)).toBeInTheDocument();
+      });
       
-      await userEvent.click(screen.getByText('Next'));
-      expect(screen.getByText(/step 2 of/i)).toBeInTheDocument();
+      // Click Next button
+      const nextButton = screen.getByText('Next');
+      fireEvent.click(nextButton);
       
-      await userEvent.click(screen.getByText('Previous'));
-      expect(screen.getByText(/step 1 of/i)).toBeInTheDocument();
+      await waitFor(() => {
+        expect(mockNextTutorialStep).toHaveBeenCalled();
+      });
     });
 
-    it.skip('should complete tutorial', async () => {
-      // Skip: This test causes "offset out of bounds" errors in CI environment
+    it('should complete tutorial', async () => {
+      // Mock tutorial at last step
+      mockGetCurrentTutorial.mockReturnValue({
+        id: 'getting-started',
+        currentStep: 4, // Last step (0-based, so 4 is step 5 of 5)
+        totalSteps: 5,
+        startedAt: Date.now()
+      });
+
       render(<HelpSystem />);
-      await userEvent.click(screen.getByRole('button', { name: /help/i }));
-      await userEvent.click(screen.getByText('Start Tutorial'));
       
-      // Navigate to last step
-      while (screen.queryByText('Next')) {
-        const nextButton = screen.getByText('Next');
-        await userEvent.click(nextButton);
-      }
+      // Wait for tutorial overlay to appear
+      await waitFor(() => {
+        expect(screen.getByText(/step 5 of/i)).toBeInTheDocument();
+      });
       
-      await userEvent.click(screen.getByText('Complete'));
-      expect(mockCompleteTutorial).toHaveBeenCalled();
+      // Find Complete button (should be visible on last step)
+      const completeButton = screen.getByText('Complete');
+      fireEvent.click(completeButton);
+      
+      // Verify tutorial completion was called
+      await waitFor(() => {
+        expect(mockCompleteTutorial).toHaveBeenCalled();
+      });
     });
   });
 
@@ -299,9 +353,9 @@ describe('HelpSystem', () => {
   });
 
   describe('Help Analytics', () => {
-    it.skip('should track help article views', async () => {
-      // Skip: This test causes "offset out of bounds" errors in CI environment
+    it('should track help article views', async () => {
       const localMockTrackEvent = vi.fn();
+      
       (useHelp as any).mockReturnValue({
         isHelpEnabled: true,
         toggleHelp: mockToggleHelp,
@@ -321,19 +375,41 @@ describe('HelpSystem', () => {
         getActiveHelpTargets: mockGetActiveHelpTargets
       });
 
-      mockGetHelp.mockReturnValue([
-        { id: '1', title: 'What is SEO?', category: 'seo' }
+      // Mock getHelpByCategory to return articles for 'seo' category
+      mockGetHelpByCategory.mockReturnValue([
+        { id: '1', title: 'What is SEO?', category: 'seo', content: 'SEO explanation...' }
       ]);
 
       render(<HelpSystem />);
-      await userEvent.click(screen.getByRole('button', { name: /help/i }));
-      await userEvent.click(screen.getByText('SEO Optimization'));
-      await userEvent.click(screen.getByText('What is SEO?'));
       
-      expect(localMockTrackEvent).toHaveBeenCalledWith('help_article_viewed', {
-        articleId: '1',
-        title: 'What is SEO?',
-        category: 'seo'
+      // Open help panel
+      const helpButton = screen.getByRole('button', { name: /help/i });
+      fireEvent.click(helpButton);
+      
+      // Wait for help panel to be visible
+      await waitFor(() => {
+        expect(screen.getByText(/help center/i)).toBeInTheDocument();
+      });
+      
+      // Click on SEO Optimization category
+      const seoCategory = screen.getByText('SEO Optimization');
+      fireEvent.click(seoCategory);
+      
+      // Wait for articles to appear, then click on article
+      await waitFor(() => {
+        expect(screen.getByText('What is SEO?')).toBeInTheDocument();
+      });
+      
+      const article = screen.getByText('What is SEO?');
+      fireEvent.click(article);
+      
+      // Verify tracking event was called
+      await waitFor(() => {
+        expect(localMockTrackEvent).toHaveBeenCalledWith('help_article_viewed', {
+          articleId: '1',
+          title: 'What is SEO?',
+          category: 'seo'
+        });
       });
     });
 

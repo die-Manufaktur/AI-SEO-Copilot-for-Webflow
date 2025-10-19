@@ -156,10 +156,6 @@ describe('getPageSlug', () => {
     });
   });
 
-  it.skip('uses correct logger namespace', () => {
-    // Skip: The logger is created during module import, making it difficult to assert reliably
-    // The createLogger call happens at module load time, not during test execution
-    expect(createLogger).toHaveBeenCalled();
-    expect(createLogger).toHaveBeenCalledWith('PageSlug');
-  });
+  // Note: Logger namespace testing is skipped because the logger is created during module import,
+  // making it difficult to assert reliably. The createLogger call happens at module load time.
 });

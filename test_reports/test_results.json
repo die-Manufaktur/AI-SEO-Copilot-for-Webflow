@@ -1,0 +1,28 @@
+{
+  "framework": "generic",
+  "tests": [
+    {
+      "name": "Output Block 1",
+      "passed": true,
+      "output": [
+        "/usr/bin/bash: Files\\Git\\bin\\bash.exe: No such file or directory"
+      ],
+      "rawOutput": "/usr/bin/bash: Files\\Git\\bin\\bash.exe: No such file or directory"
+    },
+    {
+      "name": "Error Output",
+      "passed": false,
+      "output": [
+        "/usr/bin/bash: Files\\Git\\bin\\bash.exe: No such file or directory",
+        ""
+      ],
+      "rawOutput": "/usr/bin/bash: Files\\Git\\bin\\bash.exe: No such file or directory\n"
+    }
+  ],
+  "summary": {
+    "total": 2,
+    "passed": 1,
+    "failed": 1
+  },
+  "rawOutput": "/usr/bin/bash: Files\\Git\\bin\\bash.exe: No such file or directory"
+}

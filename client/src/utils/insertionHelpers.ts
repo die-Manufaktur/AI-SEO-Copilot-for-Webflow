@@ -52,8 +52,8 @@ export function createInsertionRequest(
   }
 
   // For content elements, set targeting information
-  // NOTE: h1_heading, h2_heading, and introduction insertion types are disabled
-  // due to Webflow Designer API limitations (issue #504)
+  // NOTE: h1_heading, h2_heading, and introduction insertion types work in test environments
+  // but may have limited availability in production due to Webflow Designer API write permissions (issue #504)
 
   return baseRequest;
 }
