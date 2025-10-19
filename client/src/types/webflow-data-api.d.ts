@@ -220,9 +220,8 @@ export interface WebflowDataApiConfig {
 
 // Insertion Types (for apply functionality)
 export interface WebflowInsertionRequest {
-  type: 'page_title' | 'meta_description' | 'page_seo' | 'page_slug' | 'cms_field' | 'custom_code';
-  // Note: h1_heading, h2_heading, and introduction types are disabled due to 
-  // Webflow Designer API limitations (issue #504)
+  type: 'page_title' | 'meta_description' | 'page_seo' | 'page_slug' | 'cms_field' | 'custom_code' | 'h1_heading' | 'h2_heading' | 'introduction_text';
+  // Note: h1_heading, h2_heading, and introduction_text types are now supported via Webflow Designer API v2
   pageId?: string;
   cmsItemId?: string;
   fieldId?: string;
@@ -230,6 +229,8 @@ export interface WebflowInsertionRequest {
   location?: 'head' | 'body_end'; // For custom_code type
   elementIndex?: number; // For heading elements (e.g., first H2 = 0)
   selector?: string; // CSS selector for element targeting
+  preview?: boolean; // Whether this is a preview operation
+  checkTitle?: string; // Title of the SEO check this operation addresses
 }
 
 export interface WebflowInsertionResult {

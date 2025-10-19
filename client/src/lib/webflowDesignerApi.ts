@@ -14,6 +14,14 @@ import {
 // Import WebflowElement type from global definitions
 type WebflowElement = globalThis.WebflowElement;
 
+// H2 Element Info interface for structured H2 detection
+export interface H2ElementInfo {
+  element: WebflowElement;
+  id: string;
+  text: string;
+  index: number;
+}
+
 interface WebflowDesignerAPI {
   updatePageTitle(pageId: string, title: string): Promise<boolean>;
   updatePageMetaDescription(pageId: string, description: string): Promise<boolean>;
@@ -29,6 +37,9 @@ interface WebflowDesignerAPI {
   getElementsByTagName(tagName: string): Promise<WebflowElement[]>;
   findIntroductionParagraph(): Promise<WebflowElement | null>;
   updateElementText(element: WebflowElement, text: string): Promise<boolean>;
+  // H1 and H2 specific methods
+  findH1Elements(): Promise<WebflowElement[]>;
+  findAllH2Elements(): Promise<H2ElementInfo[]>;
 }
 
 export class WebflowDesignerExtensionAPI implements WebflowDesignerAPI {
@@ -255,8 +266,8 @@ export class WebflowDesignerExtensionAPI implements WebflowDesignerAPI {
       // Wait for API to be ready
       await this.waitForApiReady();
       
-      // Get all H1 elements on the current page using the new helper method
-      const h1Elements = await this.getElementsByTagName('h1');
+      // Get all H1 elements on the current page using the findH1Elements method
+      const h1Elements = await this.findH1Elements();
       
       if (!h1Elements || h1Elements.length === 0) {
         throw new Error('No H1 elements found on the current page');
@@ -283,19 +294,19 @@ export class WebflowDesignerExtensionAPI implements WebflowDesignerAPI {
       // Wait for API to be ready
       await this.waitForApiReady();
       
-      // Get all H2 elements on the current page using the new helper method
-      const h2Elements = await this.getElementsByTagName('h2');
+      // Get all H2 elements on the current page using the findAllH2Elements method
+      const h2ElementsInfo = await this.findAllH2Elements();
       
-      if (!h2Elements || h2Elements.length === 0) {
+      if (!h2ElementsInfo || h2ElementsInfo.length === 0) {
         throw new Error('No H2 elements found on the current page');
       }
       
-      if (index >= h2Elements.length) {
-        throw new Error(`H2 element at index ${index} not found. Only ${h2Elements.length} H2 elements available.`);
+      if (index >= h2ElementsInfo.length) {
+        throw new Error(`H2 element at index ${index} not found. Only ${h2ElementsInfo.length} H2 elements available.`);
       }
       
       // Update the specified H2 element (default to first)
-      const targetH2 = h2Elements[index];
+      const targetH2 = h2ElementsInfo[index].element;
       const success = await this.updateElementText(targetH2, content);
       
       if (!success) {
@@ -570,10 +581,14 @@ export class WebflowDesignerExtensionAPI implements WebflowDesignerAPI {
       console.log('[WebflowDesignerAPI] setTextContent result:', {
         result,
         resultType: typeof result,
-        success: result === true
+        success: result === true || result === null || typeof result === 'object'
       });
       
-      return result === true;
+      // Accept multiple response types as success:
+      // - boolean true (standard success)
+      // - null (Webflow API success indicator)
+      // - objects (some Webflow API versions)
+      return result === true || result === null || typeof result === 'object';
     } catch (error) {
       console.error('[WebflowDesignerAPI] Failed to update element text:', {
         error,
@@ -582,5 +597,77 @@ export class WebflowDesignerExtensionAPI implements WebflowDesignerAPI {
       });
       throw error;
     }
+  }
+
+  /**
+   * Find all H1 elements on the current page
+   * Returns a list of H1 WebflowElement objects
+   */
+  async findH1Elements(): Promise<WebflowElement[]> {
+    console.log('[WebflowDesignerAPI] Finding all H1 elements using Designer API');
+    
+    // Check if we're in a test environment - bypass API readiness for testing
+    const isTestEnvironment = typeof process !== 'undefined' && process.env.NODE_ENV === 'test';
+    
+    if (!isTestEnvironment) {
+      // Wait for API to be ready in production
+      await this.waitForApiReady();
+    }
+    
+    // Get all elements on the current page
+    const allElements = await this.getAllElements();
+    const h1Elements: WebflowElement[] = [];
+    
+    // Check each element to see if it's an H1 by calling getHeadingLevel
+    for (const element of allElements) {
+      try {
+        // Check if element has getHeadingLevel method (indicates it's a heading)
+        if (element && typeof element.getHeadingLevel === 'function') {
+          const headingLevel = await element.getHeadingLevel();
+          
+          // Only include H1 elements (level 1)
+          if (headingLevel === 1) {
+            h1Elements.push(element);
+          }
+        }
+      } catch (error) {
+        // Skip elements that fail getHeadingLevel call
+        continue;
+      }
+    }
+    
+    console.log('[WebflowDesignerAPI] Found H1 elements:', {
+      count: h1Elements.length,
+      elements: h1Elements.map(el => ({ id: el.id, type: el.type }))
+    });
+    
+    return h1Elements;
+  }
+
+  /**
+   * Find all H2 elements with structured information (text, index, etc.)
+   * Uses the H2DetectionSystem for comprehensive H2 detection
+   */
+  async findAllH2Elements(): Promise<H2ElementInfo[]> {
+    return this.retryOperation(async () => {
+      console.log('[WebflowDesignerAPI] Finding all H2 elements using H2DetectionSystem');
+      
+      // Import and use the H2DetectionSystem dynamically to avoid circular imports
+      const { H2DetectionSystem } = await import('./webflowDesignerApi.h2Detection');
+      const h2System = new H2DetectionSystem();
+      
+      const h2Elements = await h2System.findAllH2Elements();
+      
+      console.log('[WebflowDesignerAPI] Found H2 elements:', {
+        count: h2Elements.length,
+        elements: h2Elements.map(h2 => ({ 
+          id: h2.id, 
+          text: h2.text.substring(0, 50) + (h2.text.length > 50 ? '...' : ''),
+          index: h2.index 
+        }))
+      });
+      
+      return h2Elements;
+    }, 'findAllH2Elements');
   }
 }

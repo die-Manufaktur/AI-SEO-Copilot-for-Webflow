@@ -26,6 +26,7 @@ export interface BatchApplyButtonProps {
   onProgress?: (progress: BatchProgress) => void;
   onError?: (error: Error) => void;
   onRollback?: (rollbackId: string) => Promise<void> | void;
+  onSuccess?: (checkTitles: string[]) => void; // Callback for successful batch application
   loading?: boolean;
   success?: boolean;
   error?: string;
@@ -306,6 +307,7 @@ export function BatchApplyButton({
   onProgress,
   onError,
   onRollback,
+  onSuccess,
   loading = false,
   success = false,
   error,
@@ -357,8 +359,8 @@ export function BatchApplyButton({
           const analysis = await analyzeImpact(batchRequest.operations, { pages, cmsItems });
           setImpactAnalysis(analysis);
         } catch (error) {
-          console.warn('Impact analysis failed:', error);
-          // Continue without impact analysis
+          // Impact analysis failed, continue without it
+          // Error is silently handled as this is not critical functionality
         } finally {
           setImpactAnalysisLoading(false);
         }
@@ -372,7 +374,18 @@ export function BatchApplyButton({
   const handleBatchApply = async () => {
     setIsProcessing(true);
     try {
-      await onBatchApply(batchRequest);
+      const result = await onBatchApply(batchRequest);
+      
+      // Call onSuccess callback if batch apply succeeds
+      if (result && result.success && onSuccess) {
+        // Extract check titles from successful operations
+        const checkTitles = batchRequest.operations
+          .filter((_, index) => !result.results || result.results[index]?.success !== false)
+          .map(op => op.checkTitle)
+          .filter((title): title is string => Boolean(title));
+        
+        onSuccess(checkTitles);
+      }
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       onError?.(error);

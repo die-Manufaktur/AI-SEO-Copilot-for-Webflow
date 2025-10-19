@@ -134,7 +134,29 @@
       "Bash(timeout 20s npx vitest run client/src/pages/OAuthCallback.test.tsx -t \"should handle successful OAuth callback\")",
       "Bash(timeout 30s npx vitest run client/src/pages/OAuthCallback.test.tsx -t \"should show loading state initially|should handle successful OAuth callback\")",
       "WebFetch(domain:developers.webflow.com)",
-      "Bash(/c/Users/Paul Mulligan/AppData/Local/pnpm/pnpm test client/src/components/ui/ApplyButton.test.tsx)"
+      "Bash(/c/Users/Paul Mulligan/AppData/Local/pnpm/pnpm test client/src/components/ui/ApplyButton.test.tsx)",
+      "mcp__serena__think_about_whether_you_are_done",
+      "Bash(C:UsersPaul MulliganAppDataLocalpnpmpnpm.CMD check)",
+      "Bash(cmd.exe /c \"cd \"\"C:\\Users\\Paul Mulligan\\PMDS\\Projects\\AI-SEO-Copilot-for-Webflow\"\" & pnpm check\")",
+      "mcp__sequentialthinking__sequentialthinking",
+      "mcp__filesystem__edit_file",
+      "mcp__filesystem__move_file",
+      "mcp__git__git_status",
+      "Bash(timeout:*)",
+      "mcp__test-stats-scout__run_tests",
+      "mcp__filesystem__create_directory",
+      "mcp__filesystem__read_multiple_files",
+      "mcp__serena__onboarding",
+      "WebFetch(domain:docs.claude.com)",
+      "Bash(bash --version)",
+      "Bash(env)",
+      "Bash(unset COMSPEC)",
+      "WebFetch(domain:smartscope.blog)",
+      "mcp__webflow__element_tool",
+      "Bash(git log:*)",
+      "mcp__serena__insert_before_symbol",
+      "WebFetch(domain:alt-text-a11y-7473f2.webflow.io)",
+      "mcp__serena__insert_after_symbol"
     ],
     "deny": []
   },
@@ -145,5 +167,22 @@
     "Context7",
     "serena",
     "filesystem"
-  ]
+  ],
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/node-typescript/quality-check.js"
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/vscode-extension/quality-check.js"
+          }
+        ]
+      }
+    ]
+  }
 }

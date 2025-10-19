@@ -15,6 +15,7 @@ export default defineConfig({
       include: ['src/**/*.{ts,tsx}'],
       exclude: ['**/*.test.{ts,tsx}', '**/*.d.ts', '**/test-utils.tsx', '**/setupTests.ts']
     },
+    reporters: ['default', '../test-reporters/vitest-scout-reporter.js'],
   },
   resolve: {
     alias: {

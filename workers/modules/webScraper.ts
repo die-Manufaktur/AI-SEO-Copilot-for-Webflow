@@ -1,4 +1,4 @@
-import { URL } from "url";
+import { URL } from "node:url";
 import * as cheerio from 'cheerio';
 import { ScrapedPageData, Resource } from '../../shared/types/index';
 
@@ -10,6 +10,16 @@ import { ScrapedPageData, Resource } from '../../shared/types/index';
  */
 export async function scrapeWebPage(url: string, keyphrase: string): Promise<ScrapedPageData> {
   try {
+    console.log('[Web Scraper] Attempting to fetch URL:', url);
+    
+    // Try a HEAD request first to check if URL exists
+    try {
+      const headResponse = await fetch(url, { method: 'HEAD' });
+      console.log('[Web Scraper] HEAD request status:', headResponse.status, headResponse.statusText);
+    } catch (headError) {
+      console.log('[Web Scraper] HEAD request failed:', headError);
+    }
+    
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -283,11 +293,13 @@ function extractSchemaMarkup($: cheerio.CheerioAPI): {
   hasSchema: boolean;
   schemaTypes: string[];
   schemaCount: number;
+  detected?: any[];
 } {
   const schemaMarkup = {
     hasSchema: false,
     schemaTypes: [] as string[],
-    schemaCount: 0
+    schemaCount: 0,
+    detected: []
   };
   
   $('script[type="application/ld+json"]').each((_, element) => {

@@ -1,6 +1,9 @@
 import '@testing-library/jest-dom/vitest';
 import { vi, beforeEach } from 'vitest';
 
+// Import MSW configuration first
+import './__tests__/setup/mswConfig';
+
 // Import test infrastructure setup
 import './__tests__/utils/testHelpers.tsx';
 

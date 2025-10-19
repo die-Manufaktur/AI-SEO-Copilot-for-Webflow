@@ -201,8 +201,13 @@ describe('useOnboarding', () => {
     it('should validate API key format', () => {
       const { result } = renderHook(() => useOnboarding());
       
-      expect(result.current.validateApiKey('invalid')).toBe(false);
-      expect(result.current.validateApiKey('sk-1234567890abcdefghijklmnopqrstuvwxyz')).toBe(true);
+      const invalidResult = result.current.validateApiKey('invalid');
+      expect(invalidResult.isValid).toBe(false);
+      expect(invalidResult.error).toBeTruthy();
+      
+      const validResult = result.current.validateApiKey('sk-1234567890abcdefghijklmnopqrstuvwxyz');
+      expect(validResult.isValid).toBe(true);
+      expect(validResult.error).toBeNull();
     });
 
     it('should load saved API key', () => {

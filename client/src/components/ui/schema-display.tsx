@@ -12,9 +12,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from './tooltip';
-import { ApplyButton } from './ApplyButton';
-import { useInsertion } from '../../contexts/InsertionContext';
-import { createInsertionRequest, type RecommendationContext } from '../../utils/insertionHelpers';
 
 interface SchemaDisplayProps {
   pageType: string;
@@ -26,15 +23,11 @@ interface SchemaBlockProps {
   schema: SchemaRecommendation;
   isEnabled: boolean;
   onToggle: (enabled: boolean) => void;
-  pageId?: string;
 }
 
-const SchemaBlock: React.FC<SchemaBlockProps> = ({ schema, isEnabled, onToggle, pageId }) => {
+const SchemaBlock: React.FC<SchemaBlockProps> = ({ schema, isEnabled, onToggle }) => {
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
-  
-  // Insertion context for apply functionality
-  const { applyInsertion, isLoading, error } = useInsertion();
   
   const copySchemaToClipboard = async (text: string): Promise<boolean> => {
     // For schema code, we need to bypass sanitization that strips JSON formatting
@@ -47,8 +40,7 @@ const SchemaBlock: React.FC<SchemaBlockProps> = ({ schema, isEnabled, onToggle, 
       });
       return true;
     } catch (err) {
-      console.warn("Modern clipboard API failed:", err);
-      // Continue to fallbacks
+      // Modern clipboard API failed, continue to fallbacks
     }
 
     // Strategy 2: Try execCommand (legacy approach)
@@ -76,7 +68,7 @@ const SchemaBlock: React.FC<SchemaBlockProps> = ({ schema, isEnabled, onToggle, 
         return true;
       }
     } catch (err) {
-      console.warn("Legacy clipboard execCommand failed:", err);
+      // Legacy clipboard execCommand failed
     }
 
     // Strategy 3: Use Webflow's messaging system
@@ -93,7 +85,7 @@ const SchemaBlock: React.FC<SchemaBlockProps> = ({ schema, isEnabled, onToggle, 
         return true;
       }
     } catch (err) {
-      console.warn("Parent window messaging failed:", err);
+      // Parent window messaging failed
     }
 
     // All strategies failed
@@ -117,23 +109,6 @@ ${schema.jsonLdCode}
     }
   };
 
-  const handleApply = async (request: any) => {
-    if (!pageId) {
-      throw new Error('Page ID is required for schema insertion');
-    }
-
-    const insertionRequest = createInsertionRequest({
-      checkTitle: 'Schema Markup',
-      recommendation: schema.jsonLdCode,
-      pageId,
-    });
-    
-    if (!insertionRequest) {
-      throw new Error('Unable to create insertion request');
-    }
-    
-    return await applyInsertion(insertionRequest);
-  };
 
 
   const getGoogleSupportBadge = () => {
@@ -198,21 +173,6 @@ ${schema.jsonLdCode}
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-medium" style={{ color: 'var(--text1)' }}>JSON-LD Code:</span>
             <div className="flex items-center gap-2">
-              {pageId && (
-                <ApplyButton
-                  insertionRequest={createInsertionRequest({
-                    checkTitle: 'Schema Markup',
-                    recommendation: schema.jsonLdCode,
-                    pageId,
-                  }) || { type: 'custom_code', value: schema.jsonLdCode, location: 'head' }}
-                  onApply={handleApply}
-                  loading={isLoading}
-                  error={error || undefined}
-                  disabled={false}
-                  label="Apply"
-                  ariaLabel={`Apply ${schema.name} schema to page head`}
-                />
-              )}
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -315,7 +275,6 @@ export const SchemaDisplay: React.FC<SchemaDisplayProps> = ({ pageType, schemas,
                       schema={schema}
                       isEnabled={true}
                       onToggle={() => {}} // Required schemas are always enabled
-                      pageId={pageId}
                     />
                   ))}
                 </div>
@@ -333,7 +292,6 @@ export const SchemaDisplay: React.FC<SchemaDisplayProps> = ({ pageType, schemas,
                       schema={schema}
                       isEnabled={enabledOptionalSchemas.has(schema.name)}
                       onToggle={(enabled) => toggleOptionalSchema(schema.name, enabled)}
-                      pageId={pageId}
                     />
                   ))}
                 </div>

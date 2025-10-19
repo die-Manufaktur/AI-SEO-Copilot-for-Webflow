@@ -17,6 +17,7 @@ export default defineConfig({
   reporter: [
     ['html'],
     ['junit', { outputFile: 'test-results/e2e-results.xml' }],
+    ['./test-reporters/playwright-scout-reporter.js'],
     ['allure-playwright']
   ],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */

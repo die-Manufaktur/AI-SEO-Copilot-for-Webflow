@@ -6,8 +6,15 @@
 import React from 'react';
 import { cleanup, render } from '@testing-library/react';
 import { afterEach, beforeAll, afterAll, vi, expect } from 'vitest';
-import { setupServer } from 'msw/node';
-import { allHandlers } from '../mocks/webflowApi';
+import { 
+  startMSWServer, 
+  stopMSWServer, 
+  resetMSWHandlers, 
+  cleanupMSWInterceptors,
+  disableMSWTemporarily,
+  enableMSWAfterDisable,
+  getMSWServer
+} from '../setup/mswSetup';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { InsertionProvider } from '../../contexts/InsertionContext';
@@ -19,25 +26,28 @@ import { AuthProvider } from '../../contexts/AuthContext';
 /**
  * MSW server setup for API mocking
  */
-export const server = setupServer(...allHandlers);
+export const server = getMSWServer();
 
 /**
  * Global test setup
  */
 beforeAll(() => {
-  // Start MSW server but allow test-specific fetch mocks to override
-  server.listen({ 
-    onUnhandledRequest: 'bypass' // Don't intercept unhandled requests
-  });
+  // Start MSW server with proper error handling
+  startMSWServer();
 });
 
 afterEach(() => {
   // Reset MSW handlers after each test
-  server.resetHandlers();
+  resetMSWHandlers();
+  
   // Clean up DOM after each test
   cleanup();
-  // Restore global fetch if it was mocked by individual tests
+  
+  // Restore mocks after MSW reset to prevent conflicts
   vi.restoreAllMocks();
+  
+  // Clear any pending interceptors to prevent disposal errors
+  cleanupMSWInterceptors();
   
   // Clear clipboard to allow userEvent to set it up fresh
   try {
@@ -48,8 +58,11 @@ afterEach(() => {
 });
 
 afterAll(() => {
-  // Stop MSW server
-  server.close();
+  // Stop MSW server with proper cleanup
+  stopMSWServer();
+  
+  // Final cleanup of any remaining interceptors
+  cleanupMSWInterceptors();
 });
 
 
@@ -704,11 +717,11 @@ export const performanceHelpers = {
  */
 export function disableMSWForTest() {
   beforeAll(() => {
-    server.close();
+    disableMSWTemporarily();
   });
   
   afterAll(() => {
-    server.listen({ onUnhandledRequest: 'bypass' });
+    enableMSWAfterDisable();
   });
 }
 

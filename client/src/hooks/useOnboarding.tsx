@@ -198,8 +198,12 @@ export const useOnboarding = (options: UseOnboardingOptions = {}) => {
     localStorage.setItem(API_KEY_STORAGE, key);
   }, []);
 
-  const validateApiKey = useCallback((key: string): boolean => {
-    return /^sk-[a-zA-Z0-9]{32,}$/.test(key);
+  const validateApiKey = useCallback((key: string): { isValid: boolean; error: string | null } => {
+    const isValid = /^sk-[a-zA-Z0-9]{32,}$/.test(key);
+    return {
+      isValid,
+      error: isValid ? null : 'Invalid API key format. Should start with "sk-"'
+    };
   }, []);
 
   const getStepInfo = useCallback((stepIndex: number): OnboardingStep | null => {

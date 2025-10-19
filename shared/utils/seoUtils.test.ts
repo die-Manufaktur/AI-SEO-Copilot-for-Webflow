@@ -169,9 +169,6 @@ describe('seoUtils', () => {
       const keyphraseChecks = [
         "Keyphrase in Title",
         "Keyphrase in Meta Description",
-        "Keyphrase in H1 Heading",
-        "Keyphrase in H2 Headings", 
-        "Keyphrase in Introduction",
         "Keyphrase in URL"
       ];
       
@@ -232,10 +229,12 @@ describe('seoUtils', () => {
       // Test each exact string individually to ensure precision
       expect(shouldShowCopyButton("Keyphrase in Title")).toBe(true);
       expect(shouldShowCopyButton("Keyphrase in Meta Description")).toBe(true);
+      expect(shouldShowCopyButton("Keyphrase in URL")).toBe(true);
+      
+      // Content Optimization checks should also show copy buttons
       expect(shouldShowCopyButton("Keyphrase in H1 Heading")).toBe(true);
       expect(shouldShowCopyButton("Keyphrase in H2 Headings")).toBe(true);
       expect(shouldShowCopyButton("Keyphrase in Introduction")).toBe(true);
-      expect(shouldShowCopyButton("Keyphrase in URL")).toBe(true);
     });
 
     it('should handle similar but different strings', () => {

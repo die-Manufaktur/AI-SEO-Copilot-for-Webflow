@@ -225,6 +225,19 @@ describe('WebflowAuth', () => {
       ).rejects.toThrow('Invalid state parameter');
     });
 
+    it('should throw error when code verifier not found', async () => {
+      const authCode = 'test-auth-code';
+      const state = 'test-state';
+      
+      mockLocalStorage.getItem
+        .mockReturnValueOnce(state) // For state validation
+        .mockReturnValueOnce(null); // No code verifier found
+      
+      await expect(
+        webflowAuth.exchangeCodeForToken(authCode, state)
+      ).rejects.toThrow('Code verifier not found');
+    });
+
     it('should handle token exchange errors', async () => {
       const authCode = 'test-auth-code';
       const state = 'test-state';
@@ -321,6 +334,19 @@ describe('WebflowAuth', () => {
         webflowAuth.refreshToken('expired-refresh-token')
       ).rejects.toThrow('OAuth error: invalid_grant - The refresh token is expired');
     });
+
+    it('should handle refresh token errors without description', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        json: () => Promise.resolve({
+          error: 'server_error',
+        }),
+      });
+      
+      await expect(
+        webflowAuth.refreshToken('expired-refresh-token')
+      ).rejects.toThrow('OAuth error: server_error - Unknown error');
+    });
   });
 
   describe('Token Storage', () => {
@@ -389,6 +415,18 @@ describe('WebflowAuth', () => {
       expect(webflowAuth.isTokenExpired(expiredToken)).toBe(true);
     });
 
+    it('should treat tokens without expires_at as expired', () => {
+      const tokenWithoutExpiresAt: WebflowOAuthToken = {
+        access_token: 'test-token',
+        refresh_token: 'test-refresh',
+        token_type: 'Bearer',
+        expires_in: 3600,
+        scope: 'sites:read',
+      };
+      
+      expect(webflowAuth.isTokenExpired(tokenWithoutExpiresAt)).toBe(true);
+    });
+
     it('should detect valid tokens', () => {
       const validToken: WebflowOAuthToken = {
         access_token: 'test-token',
@@ -434,6 +472,33 @@ describe('WebflowAuth', () => {
   });
 
   describe('Auto Token Refresh', () => {
+    it('should return null when no token is stored', async () => {
+      mockLocalStorage.getItem.mockReturnValue(null);
+
+      const result = await webflowAuth.getValidToken();
+
+      expect(result).toBeNull();
+    });
+
+    it('should return token when it is still valid', async () => {
+      const validToken: WebflowOAuthToken = {
+        access_token: 'valid-token',
+        refresh_token: 'valid-refresh-token',
+        token_type: 'Bearer',
+        expires_in: 3600,
+        scope: 'sites:read',
+        expires_at: Date.now() + 3600000, // Expires in 1 hour
+      };
+
+      mockLocalStorage.getItem.mockReturnValue(JSON.stringify(validToken));
+
+      const result = await webflowAuth.getValidToken();
+
+      expect(result).toEqual(validToken);
+      // Should not call refresh since token is still valid
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
     it('should automatically refresh token when needed', async () => {
       const expiredToken: WebflowOAuthToken = {
         access_token: 'expired-token',
@@ -535,6 +600,30 @@ describe('WebflowAuth', () => {
       await expect(
         webflowAuth.handleOAuthCallback(mockUrl)
       ).rejects.toThrow('OAuth error: access_denied - User denied access');
+    });
+
+    it('should handle OAuth callback with missing parameters', async () => {
+      const mockUrl = new URL('http://localhost:1337/oauth/callback');
+
+      await expect(
+        webflowAuth.handleOAuthCallback(mockUrl)
+      ).rejects.toThrow('Missing authorization code or state parameter');
+    });
+
+    it('should handle OAuth callback with missing code only', async () => {
+      const mockUrl = new URL('http://localhost:1337/oauth/callback?state=test-state');
+
+      await expect(
+        webflowAuth.handleOAuthCallback(mockUrl)
+      ).rejects.toThrow('Missing authorization code or state parameter');
+    });
+
+    it('should handle OAuth callback with missing state only', async () => {
+      const mockUrl = new URL('http://localhost:1337/oauth/callback?code=test-code');
+
+      await expect(
+        webflowAuth.handleOAuthCallback(mockUrl)
+      ).rejects.toThrow('Missing authorization code or state parameter');
     });
   });
 });

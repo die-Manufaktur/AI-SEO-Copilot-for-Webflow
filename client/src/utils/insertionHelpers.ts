@@ -30,6 +30,7 @@ export function createInsertionRequest(
   const baseRequest: WebflowInsertionRequest = {
     type: insertionType,
     value: recommendation,
+    checkTitle: checkTitle,
   };
 
   // Add context-specific parameters
@@ -62,7 +63,7 @@ export function createInsertionRequest(
  */
 function getInsertionTypeFromCheckTitle(
   checkTitle: string
-): 'page_title' | 'meta_description' | 'page_seo' | 'page_slug' | 'cms_field' | 'custom_code' | null {
+): 'page_title' | 'meta_description' | 'page_seo' | 'page_slug' | 'cms_field' | 'custom_code' | 'h1_heading' | 'h2_heading' | 'introduction_text' | null {
   // Normalize the check title for comparison
   const normalizedTitle = checkTitle.toLowerCase().trim();
 
@@ -127,33 +128,34 @@ function getInsertionTypeFromCheckTitle(
     return 'cms_field';
   }
 
-  // H1 heading checks - DISABLED: Cannot be implemented with Webflow Designer API
+  // H1 heading checks - Now supported with Webflow Designer API v2
   if (
     normalizedTitle.includes('keyphrase in h1') ||
     normalizedTitle.includes('h1 heading') ||
     normalizedTitle === 'h1'
   ) {
-    return null; // Disabled for issue #504
+    return 'h1_heading';
   }
 
-  // H2 heading checks - DISABLED: Cannot be implemented with Webflow Designer API
+  // H2 heading checks - Now supported with Webflow Designer API v2  
   if (
     normalizedTitle.includes('keyphrase in h2') ||
     normalizedTitle.includes('h2 heading') ||
     normalizedTitle.includes('h2 headings') ||
     normalizedTitle === 'h2'
   ) {
-    return null; // Disabled for issue #504
+    return 'h2_heading';
   }
 
-  // Introduction paragraph checks - DISABLED: Cannot be implemented with Webflow Designer API
+  // Introduction paragraph checks - Now supported with Webflow Designer API v2
+  // Note: 'Keyphrase in Introduction' is excluded from apply functionality per user request
   if (
-    normalizedTitle.includes('keyphrase in introduction') ||
-    normalizedTitle.includes('introduction') ||
+    (normalizedTitle.includes('introduction') ||
     normalizedTitle.includes('first paragraph') ||
-    normalizedTitle.includes('intro')
+    normalizedTitle.includes('intro')) &&
+    !normalizedTitle.includes('keyphrase in introduction')
   ) {
-    return null; // Disabled for issue #504
+    return 'introduction_text';
   }
 
   // Return null for checks that don't map to insertable content
@@ -186,14 +188,17 @@ export function getApplyDescription(checkTitle: string): string {
       return 'Apply SEO settings';
     case 'cms_field':
       return 'Apply to CMS field';
-    // These cases are disabled due to Webflow Designer API limitations (issue #504)
-    // case 'h1_heading':
-    //   return 'Apply as H1 heading';
-    // case 'h2_heading':
-    //   return 'Apply as first H2 heading';
-    // case 'introduction':
-    //   return 'Apply as introduction paragraph';
+    case 'h1_heading':
+      return 'Apply as H1 heading';
+    case 'h2_heading':
+      return 'Apply as first H2 heading';
+    case 'introduction_text':
+      return 'Apply as introduction paragraph';
     default:
+      // Check if it's specifically the disabled 'Keyphrase in Introduction' check
+      if (checkTitle.toLowerCase().includes('keyphrase in introduction')) {
+        return 'This recommendation cannot be applied automatically';
+      }
       return 'Apply content';
   }
 }

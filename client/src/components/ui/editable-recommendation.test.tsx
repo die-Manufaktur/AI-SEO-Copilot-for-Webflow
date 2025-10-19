@@ -348,7 +348,7 @@ describe('EditableRecommendation', () => {
     expect(screen.queryByText(testRecommendation)).not.toBeInTheDocument();
   });
 
-  describe('Apply button visibility', () => {
+  describe('Apply button functionality', () => {
     it('should show Apply button for title recommendations', () => {
       render(
         <EditableRecommendation
@@ -362,6 +362,30 @@ describe('EditableRecommendation', () => {
       
       expect(screen.getByLabelText('Apply as page title')).toBeInTheDocument();
     });
+
+    it('should call onApplySuccess callback when apply succeeds', async () => {
+      const mockOnApplySuccess = vi.fn();
+      const user = userEvent.setup();
+      
+      render(
+        <EditableRecommendation
+          recommendation="Optimized Title Here"
+          onCopy={mockOnCopy}
+          checkTitle="Keyphrase in Title"
+          pageId="test-page"
+          showApplyButton={true}
+          onApplySuccess={mockOnApplySuccess}
+        />
+      );
+      
+      const applyButton = screen.getByLabelText('Apply as page title');
+      await user.click(applyButton);
+      
+      await waitFor(() => {
+        expect(mockOnApplySuccess).toHaveBeenCalledWith("Keyphrase in Title");
+      });
+    });
+
 
     it('should show Apply button for meta description recommendations', () => {
       render(

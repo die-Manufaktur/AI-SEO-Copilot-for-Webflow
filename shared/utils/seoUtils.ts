@@ -45,11 +45,13 @@ export const calculateSEOScore = (checks: SEOCheck[]): number => {
  */
 export function shouldShowCopyButton(checkTitle: string): boolean {
   return [
+    // Meta SEO category checks
     "Keyphrase in Title",
     "Keyphrase in Meta Description", 
-    "Keyphrase in H1 Heading",
-    "Keyphrase in H2 Headings",
+    "Keyphrase in URL",
+    // Content Optimization category checks
     "Keyphrase in Introduction",
-    "Keyphrase in URL"
+    "Keyphrase in H1 Heading",
+    "Keyphrase in H2 Headings"
   ].includes(checkTitle);
 }

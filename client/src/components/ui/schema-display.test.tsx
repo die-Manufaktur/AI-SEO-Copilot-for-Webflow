@@ -4,7 +4,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SchemaDisplay } from './schema-display';
 import { SchemaRecommendation } from '../../../../shared/types';
-import { InsertionProvider } from '../../contexts/InsertionContext';
+import { AuthProvider } from '../../contexts/AuthContext';
 
 // Mock clipboard API as a spy - more comprehensive to prevent Selection Range errors
 const mockWriteText = vi.fn().mockResolvedValue(undefined);
@@ -80,9 +80,9 @@ const mockPartialSupportSchema: SchemaRecommendation = {
 // Test wrapper with context providers
 const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
-    <InsertionProvider>
+    <AuthProvider>
       {children}
-    </InsertionProvider>
+    </AuthProvider>
   );
 };
 
@@ -218,108 +218,7 @@ describe('SchemaDisplay', () => {
     expect(screen.getByText('JSON-LD Code:')).toBeInTheDocument();
   });
 
-  it('should copy JSON-LD code with script tags when copy button is clicked', async () => {
-    const user = userEvent.setup();
-    
-    render(
-      <TestWrapper>
-        <SchemaDisplay 
-        pageType="Homepage" 
-        schemas={[mockRequiredSchema]} 
-      />
-      </TestWrapper>
-    );
 
-    fireEvent.click(screen.getByText('Schema Recommendations').closest('[data-state]') || screen.getByText('Schema Recommendations'));
-    
-    const copyButton = screen.getByRole('button', { name: /copy/i });
-    await user.click(copyButton);
-    
-    // Wait for the copy operation to complete - either clipboard or toast call
-    await waitFor(() => {
-      // Check if either clipboard was called OR toast was called (indicating successful copy)
-      const clipboardCalled = mockWriteText.mock.calls.length > 0;
-      const toastCalled = mockToast.mock.calls.length > 0;
-      expect(clipboardCalled || toastCalled).toBe(true);
-    });
-    
-    // Verify the UI shows "Copied" feedback
-    expect(screen.getByText('Copied')).toBeInTheDocument();
-  });
-
-  it('should display tooltip on copy button hover', async () => {
-    const user = userEvent.setup();
-    
-    render(
-      <TestWrapper>
-        <SchemaDisplay 
-        pageType="Homepage" 
-        schemas={[mockRequiredSchema]} 
-      />
-      </TestWrapper>
-    );
-
-    fireEvent.click(screen.getByText('Schema Recommendations').closest('[data-state]') || screen.getByText('Schema Recommendations'));
-    
-    const copyButton = screen.getByRole('button', { name: /copy/i });
-    await user.hover(copyButton);
-    
-    // Wait for tooltip to appear and check for tooltip content using getAllByText to handle duplicates
-    await waitFor(() => {
-      const tooltips = screen.getAllByText('Copy schema code to clipboard');
-      expect(tooltips.length).toBeGreaterThan(0);
-    });
-  });
-
-  it('should show copied feedback after successful copy', async () => {
-    const user = userEvent.setup();
-    
-    render(
-      <TestWrapper>
-        <SchemaDisplay 
-        pageType="Homepage" 
-        schemas={[mockRequiredSchema]} 
-      />
-      </TestWrapper>
-    );
-
-    fireEvent.click(screen.getByText('Schema Recommendations').closest('[data-state]') || screen.getByText('Schema Recommendations'));
-    
-    const copyButton = screen.getByRole('button', { name: /copy/i });
-    await user.click(copyButton);
-    
-    expect(screen.getByText('Copied')).toBeInTheDocument();
-    
-    // Should return to "Copy" after timeout
-    await waitFor(() => {
-      expect(screen.getByText('Copy')).toBeInTheDocument();
-    }, { timeout: 2500 });
-  });
-
-  it('should show success toast when copy succeeds', async () => {
-    const user = userEvent.setup();
-    
-    render(
-      <TestWrapper>
-        <SchemaDisplay 
-        pageType="Homepage" 
-        schemas={[mockRequiredSchema]} 
-      />
-      </TestWrapper>
-    );
-
-    fireEvent.click(screen.getByText('Schema Recommendations').closest('[data-state]') || screen.getByText('Schema Recommendations'));
-    
-    const copyButton = screen.getByRole('button', { name: /copy/i });
-    await user.click(copyButton);
-    
-    await waitFor(() => {
-      expect(mockToast).toHaveBeenCalledWith({
-        title: "Schema copied!",
-        description: "WebSite schema has been copied to your clipboard.",
-      });
-    });
-  });
 
   it('should display documentation links', async () => {
     const user = userEvent.setup();

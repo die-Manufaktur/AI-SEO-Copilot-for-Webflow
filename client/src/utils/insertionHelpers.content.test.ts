@@ -1,6 +1,6 @@
 /**
  * Tests for Content Element Apply Functionality (H1, H2, Introduction)
- * NOTE: These features are DISABLED due to Webflow Designer API limitations (issue #504)
+ * NOTE: These features are now ENABLED with Webflow Designer API v2
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -12,7 +12,7 @@ import {
 } from './insertionHelpers';
 import type { WebflowInsertionRequest } from '../types/webflow-data-api';
 
-describe('Content Element Apply Functionality - DISABLED', () => {
+describe('Content Element Apply Functionality - ENABLED', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -24,24 +24,27 @@ describe('Content Element Apply Functionality - DISABLED', () => {
       pageId: 'page_123'
     };
 
-    it('should NOT recognize H1 heading check as applicable (DISABLED)', () => {
-      // H1 insertion is disabled due to Webflow Designer API limitations
-      expect(canApplyRecommendation('Keyphrase in H1 Heading')).toBe(false);
+    it('should recognize H1 heading check as applicable (ENABLED)', () => {
+      // H1 insertion is now enabled with Webflow Designer API v2
+      expect(canApplyRecommendation('Keyphrase in H1 Heading')).toBe(true);
     });
 
-    it('should return null for h1_heading insertion request (DISABLED)', () => {
-      // H1 insertion is disabled due to Webflow Designer API limitations
+    it('should create h1_heading insertion request (ENABLED)', () => {
+      // H1 insertion is now enabled with Webflow Designer API v2
       const result = createInsertionRequest(h1Context);
       
-      expect(result).toBeNull();
+      expect(result).not.toBeNull();
+      expect(result?.type).toBe('h1_heading');
+      expect(result?.value).toBe('Optimized H1 with keyphrase');
+      expect(result?.pageId).toBe('page_123');
     });
 
-    it('should provide fallback description for H1 (DISABLED)', () => {
-      // H1 insertion is disabled, should return fallback description
-      expect(getApplyDescription('Keyphrase in H1 Heading')).toBe('Apply content');
+    it('should provide specific description for H1 (ENABLED)', () => {
+      // H1 insertion is now enabled, should return specific description
+      expect(getApplyDescription('Keyphrase in H1 Heading')).toBe('Apply as H1 heading');
     });
 
-    it('should return null for H1 context regardless of pageId (DISABLED)', () => {
+    it('should create H1 request even without pageId (ENABLED)', () => {
       const contextWithoutPageId: RecommendationContext = {
         checkTitle: 'Keyphrase in H1 Heading',
         recommendation: 'Optimized H1 with keyphrase'
@@ -49,7 +52,10 @@ describe('Content Element Apply Functionality - DISABLED', () => {
 
       const result = createInsertionRequest(contextWithoutPageId);
       
-      expect(result).toBeNull();
+      expect(result).not.toBeNull();
+      expect(result?.type).toBe('h1_heading');
+      expect(result?.value).toBe('Optimized H1 with keyphrase');
+      expect(result?.pageId).toBeUndefined();
     });
   });
 
@@ -60,27 +66,31 @@ describe('Content Element Apply Functionality - DISABLED', () => {
       pageId: 'page_123'
     };
 
-    it('should NOT recognize H2 heading check as applicable (DISABLED)', () => {
-      // H2 insertion is disabled due to Webflow Designer API limitations
-      expect(canApplyRecommendation('Keyphrase in H2 Headings')).toBe(false);
+    it('should recognize H2 heading check as applicable (ENABLED)', () => {
+      // H2 insertion is now enabled with Webflow Designer API v2
+      expect(canApplyRecommendation('Keyphrase in H2 Headings')).toBe(true);
     });
 
-    it('should return null for h2_heading insertion request (DISABLED)', () => {
-      // H2 insertion is disabled due to Webflow Designer API limitations
+    it('should create h2_heading insertion request (ENABLED)', () => {
+      // H2 insertion is now enabled with Webflow Designer API v2
       const result = createInsertionRequest(h2Context);
       
-      expect(result).toBeNull();
+      expect(result).not.toBeNull();
+      expect(result?.type).toBe('h2_heading');
+      expect(result?.value).toBe('Optimized first H2 with keyphrase');
+      expect(result?.pageId).toBe('page_123');
     });
 
-    it('should provide fallback description for H2 (DISABLED)', () => {
-      // H2 insertion is disabled, should return fallback description
-      expect(getApplyDescription('Keyphrase in H2 Headings')).toBe('Apply content');
+    it('should provide specific description for H2 (ENABLED)', () => {
+      // H2 insertion is now enabled, should return specific description
+      expect(getApplyDescription('Keyphrase in H2 Headings')).toBe('Apply as first H2 heading');
     });
 
-    it('should return null for H2 insertion regardless of configuration (DISABLED)', () => {
+    it('should create H2 insertion with proper configuration (ENABLED)', () => {
       const result = createInsertionRequest(h2Context);
       
-      expect(result).toBeNull();
+      expect(result).not.toBeNull();
+      expect(result?.type).toBe('h2_heading');
     });
   });
 
@@ -91,24 +101,24 @@ describe('Content Element Apply Functionality - DISABLED', () => {
       pageId: 'page_123'
     };
 
-    it('should NOT recognize introduction check as applicable (DISABLED)', () => {
-      // Introduction insertion is disabled due to Webflow Designer API limitations
+    it('should recognize introduction check as NOT applicable (DISABLED)', () => {
+      // Introduction insertion is disabled for 'Keyphrase in Introduction' check per user request
       expect(canApplyRecommendation('Keyphrase in Introduction')).toBe(false);
     });
 
-    it('should return null for introduction insertion request (DISABLED)', () => {
-      // Introduction insertion is disabled due to Webflow Designer API limitations
+    it('should NOT create introduction insertion request (DISABLED)', () => {
+      // Introduction insertion is disabled for 'Keyphrase in Introduction' check per user request
       const result = createInsertionRequest(introContext);
       
       expect(result).toBeNull();
     });
 
-    it('should provide fallback description for introduction (DISABLED)', () => {
-      // Introduction insertion is disabled, should return fallback description
-      expect(getApplyDescription('Keyphrase in Introduction')).toBe('Apply content');
+    it('should provide no description for introduction (DISABLED)', () => {
+      // Introduction insertion is disabled for 'Keyphrase in Introduction' check per user request
+      expect(getApplyDescription('Keyphrase in Introduction')).toBe('This recommendation cannot be applied automatically');
     });
 
-    it('should return null for introduction context regardless of configuration (DISABLED)', () => {
+    it('should NOT create introduction context (DISABLED)', () => {
       const contextWithSelector: RecommendationContext = {
         checkTitle: 'Keyphrase in Introduction',
         recommendation: 'Optimized introduction',
@@ -132,7 +142,7 @@ describe('Content Element Apply Functionality - DISABLED', () => {
       expect(canApplyRecommendation('Unsupported Content Check')).toBe(false);
     });
 
-    it('should return null for disabled insertion types even with empty recommendations', () => {
+    it('should create insertion request even with empty recommendations', () => {
       const emptyRecommendationContext: RecommendationContext = {
         checkTitle: 'Keyphrase in H1 Heading',
         recommendation: '',
@@ -141,13 +151,16 @@ describe('Content Element Apply Functionality - DISABLED', () => {
 
       const result = createInsertionRequest(emptyRecommendationContext);
       
-      expect(result).toBeNull();
+      expect(result).not.toBeNull();
+      expect(result?.type).toBe('h1_heading');
+      expect(result?.value).toBe('');
     });
 
-    it('should handle case-insensitive check title matching for disabled types', () => {
-      // All these should return false now since the types are disabled
-      expect(canApplyRecommendation('KEYPHRASE IN H1 HEADING')).toBe(false);
-      expect(canApplyRecommendation('keyphrase in h2 headings')).toBe(false);
+    it('should handle case-insensitive check title matching for enabled types', () => {
+      // All these should return true now since the types are enabled
+      expect(canApplyRecommendation('KEYPHRASE IN H1 HEADING')).toBe(true);
+      expect(canApplyRecommendation('keyphrase in h2 headings')).toBe(true);
+      // 'Keyphrase In Introduction' should return false since it's specifically disabled
       expect(canApplyRecommendation('Keyphrase In Introduction')).toBe(false);
     });
 

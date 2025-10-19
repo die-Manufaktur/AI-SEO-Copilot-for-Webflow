@@ -53,10 +53,13 @@ import { getDefaultLanguage, getLanguageByCode, type Language } from '../../../s
 import { loadLanguageForSite, saveLanguageForSite } from '../utils/languageStorage';
 import { SchemaDisplay } from '../components/ui/schema-display';
 import { EditableRecommendation } from '../components/ui/editable-recommendation';
+import { H2SelectionList } from '../components/ui/H2SelectionList';
 import { BatchApplyButton } from '../components/ui/BatchApplyButton';
 import { useInsertion } from '../contexts/InsertionContext';
 import { createBatchInsertionRequest, canApplyRecommendation, type RecommendationContext } from '../utils/insertionHelpers';
 import type { WebflowBatchInsertionRequest, WebflowBatchInsertionResult } from '../types/webflow-data-api';
+import { useAppliedRecommendations } from '../hooks/useAppliedRecommendations';
+import type { H2ElementInfo } from '../lib/webflowDesignerApi';
 
 const logger = createLogger("Home");
 
@@ -240,12 +243,12 @@ const fetchPageInfo = async (
       setSlug(currentSlug);
       setIsHomePage(isHome);
     } else {
-      console.warn("Webflow API not available for fetching page info.");
+      logger.warn("Webflow API not available for fetching page info.");
       setSlug(null);
       setIsHomePage(false);
     }
   } catch (error) {
-    console.error("Error fetching page info:", error);
+    logger.error("Error fetching page info:", error);
     setSlug(null);
     setIsHomePage(false);
   }
@@ -336,7 +339,7 @@ const getScoreRatingText = (score: number): string => {
 
 export default function Home() {
   const { toast } = useToast();
-  const { applyBatch } = useInsertion();
+  const { applyBatch, applyInsertion } = useInsertion();
   // Using underscore prefix for state variables that are set but not directly read
   const [_isLoading, setIsLoading] = useState(false);
   const [_slug, setSlug] = useState<string | null>(null);
@@ -354,12 +357,19 @@ export default function Home() {
   const [advancedOptionsEnabled, setAdvancedOptionsEnabled] = useState<boolean>(false);
   const [pageType, setPageType] = useState<string>('');
   const [secondaryKeywords, setSecondaryKeywords] = useState<string>('');
+  
+  // H2 elements state for H2SelectionList
+  const [h2Elements, setH2Elements] = useState<H2ElementInfo[]>([]);
+  const [h2ElementsFetched, setH2ElementsFetched] = useState(false);
   const [secondaryKeywordsError, setSecondaryKeywordsError] = useState<string>('');
   const [selectedLanguage, setSelectedLanguage] = useState<Language>(getDefaultLanguage());
   const [advancedOptionsSaveStatus, setAdvancedOptionsSaveStatus] = useState<'saved' | 'saving' | 'none'>('none');
   
   // Store the analysis request data for schema population
   const [analysisRequestData, setAnalysisRequestData] = useState<AnalyzeSEORequest | null>(null);
+  
+  // Applied recommendations hook
+  const { isApplied, markAsApplied, getApplied } = useAppliedRecommendations({ pageId: currentPageId });
   
   const seoScore = results?.score ?? 0;
   const scoreRating = getScoreRatingText(seoScore);
@@ -384,7 +394,7 @@ export default function Home() {
         return false;
       }
     } catch (err) {
-      console.error("Error in clipboard operation:", err);
+      logger.error("Error in clipboard operation:", err);
       toast({
         title: "Unable to copy",
         description: "Please select the text manually and copy.",
@@ -417,7 +427,7 @@ export default function Home() {
             logger.info("Copy result:", success ? "success" : "failed");
           })
           .catch(error => {
-            console.error("Copy error:", error);
+            logger.error("Copy error:", error);
           });
       }
     };
@@ -440,7 +450,7 @@ export default function Home() {
     
     // Check if webflow is available before proceeding
     if (!window.webflow) {
-      console.warn("Webflow API not available");
+      logger.warn("Webflow API not available");
       return;
     }
     
@@ -451,7 +461,7 @@ export default function Home() {
         const page = await window.webflow.getCurrentPage();
         currentPagePath = await page.getPublishPath();
       } catch (error) {
-        console.error("Failed to get initial page path:", error);
+        logger.error("Failed to get initial page path:", error);
       }
     };
     initCurrentPage();
@@ -474,7 +484,7 @@ export default function Home() {
           }, 300); // Slightly longer delay for stability
         }
       } catch (error) {
-        console.error("Error handling page change:", error);
+        logger.error("Error handling page change:", error);
       }
     });
     
@@ -517,13 +527,17 @@ export default function Home() {
         setCurrentPageId(pageId);
         setCurrentSiteId(siteInfo?.siteId || '');
         
+        // Reset H2 elements when page changes
+        setH2Elements([]);
+        setH2ElementsFetched(false);
+        
         // Load site-specific language preference
         if (siteInfo?.siteId) {
           try {
             const siteLanguage = loadLanguageForSite(siteInfo.siteId);
             setSelectedLanguage(siteLanguage);
           } catch (error) {
-            console.warn('Failed to load site language preference:', error);
+            logger.warn('Failed to load site language preference:', error);
             setSelectedLanguage(getDefaultLanguage());
           }
         }
@@ -559,7 +573,7 @@ export default function Home() {
           setAdvancedOptionsSaveStatus('none');
         }
       } catch (error) {
-        console.warn('Failed to initialize page keywords:', error);
+        logger.warn('Failed to initialize page keywords:', error);
       }
     };
 
@@ -614,7 +628,7 @@ export default function Home() {
     onSuccess: (data) => {
       // Validate API response structure
       if (!data || !Array.isArray(data.checks) || data.checks.length === 0) {
-        console.error('Invalid API response structure:', data);
+        logger.error('Invalid API response structure', { data });
         toast({
           variant: "destructive",
           title: "Invalid Response",
@@ -630,7 +644,7 @@ export default function Home() {
       );
       
       if (hasInvalidChecks) {
-        console.error('Invalid check structure in API response:', data.checks);
+        logger.error('Invalid check structure in API response', { checks: data.checks });
         toast({
           variant: "destructive",
           title: "Invalid Response",
@@ -676,6 +690,46 @@ export default function Home() {
         }
       }
 
+      // Check for applied H2 recommendations
+      const h2CheckIndex = modifiedData.checks.findIndex(check => 
+        check.title === "Keyphrase in H2 Headings"
+      );
+
+      if (h2CheckIndex !== -1 && isApplied("Keyphrase in H2 Headings")) {
+        // When H2 recommendation was applied, verify the current keyphrase is actually in current H2 content
+        const currentKeyphrase = analysisRequestData?.keyphrase?.toLowerCase();
+        const h2KeywordMatch = modifiedData.checks[h2CheckIndex];
+        
+        // Only mark as passed if the actual SEO check shows keyphrase is found in H2s
+        if (h2KeywordMatch && h2KeywordMatch.passed) {
+        // Create a mutable copy of the checks array
+        const newChecks = [...modifiedData.checks];
+        const originalH2Check = newChecks[h2CheckIndex];
+
+        // Check if the status is changing from failed to passed
+        const wasFailed = !originalH2Check.passed;
+
+        // Update the specific check
+        newChecks[h2CheckIndex] = {
+          ...originalH2Check,
+          passed: true,
+          description: `Good! The keyphrase "${analysisRequestData?.keyphrase || 'keyword'}" is found in at least one H2 heading.`,
+        };
+
+        // Update the overall counts if the status changed
+        if (wasFailed) {
+          modifiedData.passedChecks = (modifiedData.passedChecks ?? 0) + 1;
+          modifiedData.failedChecks = Math.max(0, (modifiedData.failedChecks ?? 0) - 1);
+          // Update score to simple percentage calculation to match backend
+          const passedCount = newChecks.filter(check => check.passed).length;
+          modifiedData.score = Math.round((passedCount / newChecks.length) * 100);
+        }
+
+        // Assign the modified checks array back to the data
+        modifiedData.checks = newChecks;
+        }
+      }
+
       setResults(modifiedData); // Set state with potentially modified data
       setSelectedCategory(null);
       setIsLoading(false);
@@ -688,6 +742,27 @@ export default function Home() {
            origin: { y: 0.6 }
          });
          setShowedPerfectScoreMessage(true); // Ensure flag is set here too
+      }
+
+      // Fetch H2 elements for H2SelectionList after successful analysis
+      const fetchH2Elements = async () => {
+        try {
+          if (typeof window !== 'undefined' && window.webflow) {
+            setH2ElementsFetched(true);
+            const api = new (await import('../lib/webflowDesignerApi')).WebflowDesignerExtensionAPI();
+            const h2s = await api.findAllH2Elements();
+            setH2Elements(h2s);
+          }
+        } catch (error) {
+          logger.warn('Failed to fetch H2 elements', { error });
+          setH2Elements([]); // Reset to empty array on error
+          setH2ElementsFetched(true); // Mark as fetched even on error to prevent retries
+        }
+      };
+      
+      // Only fetch H2s if we haven't already tried
+      if (!h2ElementsFetched) {
+        fetchH2Elements();
       }
     },
     onError: (error: Error) => {
@@ -782,6 +857,17 @@ export default function Home() {
         publishPath = (await currentPage.getPublishPath()) ?? "";
         setIsHomePage(await currentPage.isHomepage());
 
+        // Collect H2 elements using the Designer API
+        let h2Elements: H2ElementInfo[] = [];
+        try {
+          const { WebflowDesignerExtensionAPI } = await import('../lib/webflowDesignerApi');
+          const designerApi = new WebflowDesignerExtensionAPI();
+          h2Elements = await designerApi.findAllH2Elements();
+          logger.info("[Home onSubmit] Collected H2 elements:", h2Elements);
+        } catch (h2Error) {
+          logger.warn("[Home onSubmit] Failed to collect H2 elements:", h2Error);
+        }
+
         rawPageData = {
           title: (await currentPage.getTitle()) ?? "",
           metaDescription: (await currentPage.getDescription()) ?? "",
@@ -789,7 +875,8 @@ export default function Home() {
           ogTitle: (await currentPage.getOpenGraphTitle()) ?? '',
           ogDescription: (await currentPage.getOpenGraphDescription()) ?? '',
           usesTitleAsOpenGraphTitle: await currentPage.usesTitleAsOpenGraphTitle(),
-          usesDescriptionAsOpenGraphDescription: await currentPage.usesDescriptionAsOpenGraphDescription()
+          usesDescriptionAsOpenGraphDescription: await currentPage.usesDescriptionAsOpenGraphDescription(),
+          h2Elements
         };
         logger.info("[Home onSubmit] Fetched Raw Webflow Page Data:", rawPageData);
 
@@ -804,6 +891,14 @@ export default function Home() {
 
       const finalUrlPath = publishPath === '/' ? '' : publishPath;
       const url = `${baseUrl}${finalUrlPath.startsWith('/') ? '' : '/'}${finalUrlPath}`;
+      
+      // Debug logging for URL construction
+      logger.debug('URL construction debug', {
+        baseUrl,
+        publishPath,
+        finalUrlPath,
+        constructedUrl: url
+      });
 
       const pageDataForApi: Partial<WebflowPageData> = { ...rawPageData };
       
@@ -1068,12 +1163,12 @@ export default function Home() {
                                 if (currentSiteId) {
                                   saveLanguageForSite(currentSiteId, language.code);
                                 } else {
-                                  console.warn('No site ID available for saving language preference');
+                                  logger.warn('No site ID available for saving language preference');
                                 }
                                 
                                 setAdvancedOptionsSaveStatus('none'); // Mark as unsaved when changed
                               } catch (error) {
-                                console.warn('Failed to save language preference:', error);
+                                logger.warn('Failed to save language preference', { error });
                                 toast({
                                   variant: "destructive",
                                   title: "Language Setting Error",
@@ -1244,6 +1339,30 @@ export default function Home() {
                               onBatchApply={handleBatchApply}
                               showAffectedCount={true}
                               disabled={applyableChecks.length === 0}
+                              onSuccess={(appliedCheckTitles) => {
+                                // Mark all successfully applied checks as passed to trigger collapse-to-success pattern
+                                setResults(prevResults => {
+                                  if (!prevResults?.checks) return prevResults;
+                                  
+                                  const updatedChecks = prevResults.checks.map(check => 
+                                    appliedCheckTitles.includes(check.title)
+                                      ? { ...check, passed: true }
+                                      : check
+                                  );
+                                  
+                                  // Update score calculation
+                                  const passedCount = updatedChecks.filter(check => check.passed).length;
+                                  const updatedScore = Math.round((passedCount / updatedChecks.length) * 100);
+                                  
+                                  return {
+                                    ...prevResults,
+                                    checks: updatedChecks,
+                                    score: updatedScore,
+                                    passedChecks: passedCount,
+                                    failedChecks: updatedChecks.length - passedCount
+                                  };
+                                });
+                              }}
                             />
                           </div>
                         )}
@@ -1349,7 +1468,14 @@ export default function Home() {
                                 
                                 {/* Always show description - keyword results are no longer displayed */}
                                 <div className="text-sm text-muted-foreground text-break">
-                                  <p className="inline">{check.description}</p>
+                                  <p className="inline">
+                                    {check.passed 
+                                      ? check.description 
+                                      : isApplied(check.title)
+                                        ? `Previously applied recommendation but the issue persists. ${check.description}`
+                                        : check.description
+                                    }
+                                  </p>
                                   {!check.passed && (
                                     <a 
                                       href={getLearnMoreUrl(check.title)} 
@@ -1383,8 +1509,69 @@ export default function Home() {
                                       className="mt-2"
                                     />
                                   </>
+                                ) : check.title === "Keyphrase in H2 Headings" ? (
+                                  // Use H2SelectionList for H2 heading checks
+                                  <H2SelectionList
+                                    h2Elements={h2Elements}
+                                    recommendation={check.recommendation || ''}
+                                    onApply={async ({ h2Element, recommendation }) => {
+                                      try {
+                                        const insertionRequest = {
+                                          type: 'h2_heading' as const,
+                                          value: recommendation,
+                                          elementIndex: h2Element.index,
+                                          selector: `#${h2Element.id}`,
+                                          pageId: currentPageId
+                                        };
+                                        
+                                        const result = await applyInsertion(insertionRequest);
+                                        
+                                        if (result.success) {
+                                          toast({
+                                            title: "Applied!",
+                                            description: `H2 heading updated successfully.`
+                                          });
+                                          
+                                          // Immediately update the H2 check to passed state
+                                          setResults(prevResults => {
+                                            if (!prevResults?.checks) return prevResults;
+                                            
+                                            const updatedChecks = prevResults.checks.map(check => 
+                                              check.title === "Keyphrase in H2 Headings" 
+                                                ? { ...check, passed: true }
+                                                : check
+                                            );
+                                            
+                                            // Update score calculation
+                                            const passedCount = updatedChecks.filter(check => check.passed).length;
+                                            const updatedScore = Math.round((passedCount / updatedChecks.length) * 100);
+                                            
+                                            return {
+                                              ...prevResults,
+                                              checks: updatedChecks,
+                                              score: updatedScore,
+                                              passedChecks: passedCount,
+                                              failedChecks: updatedChecks.length - passedCount
+                                            };
+                                          });
+                                        }
+                                        return result;
+                                      } catch (error) {
+                                        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                                        toast({
+                                          variant: "destructive",
+                                          title: "Apply Failed",
+                                          description: errorMessage
+                                        });
+                                        throw error;
+                                      }
+                                    }}
+                                    pageId={currentPageId}
+                                    checkTitle="Keyphrase in H2 Headings"
+                                    disabled={mutation.isPending}
+                                  />
                                 ) : shouldShowCopyButton(check.title) ? (
-                                  // Use editable recommendation for AI-generated recommendations
+                                  // Use editable recommendation for other AI-generated recommendations
                                   <EditableRecommendation
                                     recommendation={check.recommendation || ''}
                                     onCopy={copyToClipboard}
@@ -1392,6 +1579,30 @@ export default function Home() {
                                     checkTitle={check.title}
                                     pageId={currentPageId}
                                     showApplyButton={true}
+                                    onApplySuccess={(appliedCheckTitle) => {
+                                      // Mark the check as passed to trigger collapse-to-success pattern
+                                      setResults(prevResults => {
+                                        if (!prevResults?.checks) return prevResults;
+                                        
+                                        const updatedChecks = prevResults.checks.map(check => 
+                                          check.title === appliedCheckTitle 
+                                            ? { ...check, passed: true }
+                                            : check
+                                        );
+                                        
+                                        // Update score calculation
+                                        const passedCount = updatedChecks.filter(check => check.passed).length;
+                                        const updatedScore = Math.round((passedCount / updatedChecks.length) * 100);
+                                        
+                                        return {
+                                          ...prevResults,
+                                          checks: updatedChecks,
+                                          score: updatedScore,
+                                          passedChecks: passedCount,
+                                          failedChecks: updatedChecks.length - passedCount
+                                        };
+                                      });
+                                    }}
                                   />
                                 ) : (
                                   // Keep current rendering for checks that don't support copying

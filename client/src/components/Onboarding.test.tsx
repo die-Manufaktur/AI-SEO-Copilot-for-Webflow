@@ -134,7 +134,12 @@ describe('Onboarding', () => {
         skipOnboarding: mockSkipOnboarding,
         resetOnboarding: mockResetOnboarding,
         setApiKey: mockSetApiKey,
-        validateApiKey: vi.fn(() => ({ isValid: true, error: null })),
+        validateApiKey: vi.fn((key: string) => {
+          if (key === 'invalid-key') {
+            return { isValid: false, error: 'Invalid API key format' };
+          }
+          return { isValid: true, error: null };
+        }),
         getStepInfo: vi.fn(() => ({
           title: 'Configure API Key',
           description: 'Add your OpenAI API key to enable AI recommendations',
@@ -268,7 +273,7 @@ describe('Onboarding', () => {
 
       render(<Onboarding />);
       expect(screen.getByText(/try it yourself/i)).toBeInTheDocument();
-      expect(screen.getByPlaceholderText(/enter keywords/i)).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/web design agency/i)).toBeInTheDocument();
       expect(screen.getByText(/analyze/i)).toBeInTheDocument();
     });
 
@@ -294,7 +299,7 @@ describe('Onboarding', () => {
       });
 
       render(<Onboarding />);
-      const keywordInput = screen.getByPlaceholderText(/enter keywords/i);
+      const keywordInput = screen.getByPlaceholderText(/web design agency/i);
       const analyzeButton = screen.getByText(/analyze/i);
 
       await userEvent.type(keywordInput, 'test keywords');
@@ -331,7 +336,7 @@ describe('Onboarding', () => {
 
       render(<Onboarding />);
       expect(screen.getByText(/you're all set/i)).toBeInTheDocument();
-      expect(screen.getByText(/start optimizing/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /start optimizing/i })).toBeInTheDocument();
     });
 
     it('should complete onboarding when finished', async () => {
@@ -356,7 +361,7 @@ describe('Onboarding', () => {
       });
 
       render(<Onboarding />);
-      const finishButton = screen.getByText(/start optimizing/i);
+      const finishButton = screen.getByRole('button', { name: /start optimizing/i });
       
       await userEvent.click(finishButton);
       expect(mockCompleteStep).toHaveBeenCalledWith(4);
@@ -440,8 +445,15 @@ describe('Onboarding', () => {
         apiKey: null,
         completeStep: mockCompleteStep,
         goToPreviousStep: vi.fn(),
-        saveApiKey: vi.fn(),
-        completeOnboarding: vi.fn()
+        skipOnboarding: mockSkipOnboarding,
+        resetOnboarding: mockResetOnboarding,
+        setApiKey: mockSetApiKey,
+        validateApiKey: vi.fn(() => ({ isValid: true, error: null })),
+        getStepInfo: vi.fn(() => ({
+          title: 'Welcome to AI SEO Copilot',
+          description: "Let's get you set up for success!",
+          component: 'welcome'
+        }))
       });
     });
 
@@ -454,25 +466,6 @@ describe('Onboarding', () => {
 
     it('should be keyboard navigable', async () => {
       const user = userEvent.setup();
-      
-      // Ensure proper mock setup for this specific test
-      (useOnboarding as any).mockReturnValue({
-        currentStep: 0,
-        totalSteps: 5,
-        isComplete: false,
-        shouldShowOnboarding: true,
-        hasSeenOnboarding: false,
-        apiKey: null,
-        completeStep: mockCompleteStep,
-        goToPreviousStep: vi.fn(),
-        saveApiKey: vi.fn(),
-        completeOnboarding: vi.fn(),
-        getStepInfo: vi.fn(() => ({
-          title: 'Welcome to AI SEO Copilot',
-          description: "Let's get you set up for success!",
-          component: 'welcome'
-        }))
-      });
       
       render(<Onboarding />);
       const continueButton = screen.getByText(/get started/i);

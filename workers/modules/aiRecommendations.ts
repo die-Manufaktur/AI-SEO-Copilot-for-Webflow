@@ -70,7 +70,7 @@ export async function getAIRecommendation(
       : `You are an SEO expert providing actionable advice.
          Provide a concise recommendation for the SEO check "${checkType}".${advancedContext ? ' Consider the page type and additional context provided to make recommendations more relevant and specific.' : ''}${languageInstruction}`;
 
-    // Special handling for URL checks with enhanced logic from v3.3.14
+    // Special handling for URL and H2 checks with enhanced logic
     const userPrompt = needsCopyableContent
       ? checkType === "Keyphrase in URL"
         ? `Create an SEO-friendly URL slug for the keyphrase "${keyphrase}".
@@ -84,6 +84,18 @@ export async function getAIRecommendation(
            - Keep it concise and readable
            - Example: For URL "https://example.com/blog/posts/my-page", return only "my-page-with-keyphrase"
            Return ONLY the page slug (no protocol, domain, folders, or slashes) with no explanations or other text.`
+        : checkType === "Keyphrase in H2 Headings"
+        ? `Create a perfect H2 heading for the keyphrase "${keyphrase}".
+           Current H2 headings: ${context || 'None'}${advancedContext}
+           CRITICAL: The H2 heading must contain the exact word "${keyphrase}" literally in the text.
+           
+           Requirements:
+           - Include the exact word "${keyphrase}" (not synonyms like "testimonials" for "test")
+           - Keep it engaging and readable (40-60 characters ideal)
+           - Make it compelling and relevant${advancedOptions?.pageType ? ` for a ${advancedOptions.pageType.toLowerCase()}` : ''}
+           - Use title case capitalization
+           
+           Return ONLY the H2 heading text with no explanations, quotes, or additional formatting.`
         : `Create a perfect ${checkType.toLowerCase()} for the keyphrase "${keyphrase}".
            Current content: ${context || 'None'}${advancedContext}
            Remember to:

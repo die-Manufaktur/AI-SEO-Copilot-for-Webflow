@@ -199,6 +199,39 @@ describe('seoAnalysis', () => {
       expect(result.found).toBe(true);
       expect(result.keywordResults.filter(r => r.keyword.trim().length > 0)).toHaveLength(4);
     });
+
+    it('should use word boundaries and not match partial words', () => {
+      // Test the specific bug: "test" should not match "testimonial"
+      const content = 'Read our customer testimonials and see what clients say about our service.';
+      const primaryKeyword = 'test';
+      
+      const result = checkKeywordMatch(content, primaryKeyword);
+      
+      expect(result.found).toBe(false);
+      expect(result.matchedKeyword).toBeUndefined();
+    });
+
+    it('should match whole words correctly', () => {
+      // "test" should match when it appears as a whole word
+      const content = 'We test our products thoroughly before release.';
+      const primaryKeyword = 'test';
+      
+      const result = checkKeywordMatch(content, primaryKeyword);
+      
+      expect(result.found).toBe(true);
+      expect(result.matchedKeyword).toBe(primaryKeyword);
+    });
+
+    it('should handle multi-word keyphrases with word boundaries', () => {
+      // "web design" should match "web design" but not in "website designer"
+      const content = 'We offer web design services and website designer consultation.';
+      const primaryKeyword = 'web design';
+      
+      const result = checkKeywordMatch(content, primaryKeyword);
+      
+      expect(result.found).toBe(true);
+      expect(result.matchedKeyword).toBe(primaryKeyword);
+    });
   });
 
   describe('checkUrlKeywordMatch', () => {

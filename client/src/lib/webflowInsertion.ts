@@ -101,6 +101,15 @@ export class WebflowInsertion {
         case 'page_slug':
           result = await this.applyPageSlug(request);
           break;
+        case 'h1_heading':
+          result = await this.applyH1Heading(request);
+          break;
+        case 'h2_heading':
+          result = await this.applyH2Heading(request);
+          break;
+        case 'introduction_text':
+          result = await this.applyIntroductionText(request);
+          break;
         case 'custom_code':
           result = await this.applyCustomCode(request);
           break;
@@ -110,16 +119,7 @@ export class WebflowInsertion {
         case 'cms_field':
           result = await this.applyCMSField(request);
           break;
-        // Disabled insertion types (issue #504) - handled in default case
         default:
-          // Check for disabled insertion types
-          if (request.type === 'h1_heading') {
-            throw new Error('H1 heading insertion is disabled due to Webflow Designer API limitations (issue #504)');
-          } else if (request.type === 'h2_heading') {
-            throw new Error('H2 heading insertion is disabled due to Webflow Designer API limitations (issue #504)');
-          } else if (request.type === 'introduction') {
-            throw new Error('Introduction paragraph insertion is disabled due to Webflow Designer API limitations (issue #504)');
-          }
           throw new Error(`Unknown insertion type: ${(request as any).type}`);
       }
       
@@ -283,7 +283,9 @@ export class WebflowInsertion {
    */
   private validateRequest(request: WebflowInsertionRequest): void {
     // Validate required fields
-    if (request.type === 'page_title' || request.type === 'meta_description' || request.type === 'page_seo') {
+    if (request.type === 'page_title' || request.type === 'meta_description' || request.type === 'page_seo' || 
+        request.type === 'page_slug' || request.type === 'h1_heading' || request.type === 'h2_heading' || 
+        request.type === 'introduction_text' || request.type === 'custom_code') {
       if (!request.pageId) {
         throw new Error('Page ID is required for page operations');
       }
@@ -587,6 +589,106 @@ export class WebflowInsertion {
       }
     } catch (error) {
       console.error('[WebflowInsertion] Failed to update CMS field:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Apply H1 heading text change using Webflow Designer API
+   */
+  private async applyH1Heading(request: WebflowInsertionRequest): Promise<WebflowInsertionResult> {
+    try {
+      if (this.useDesignerAPI && this.designerApi) {
+        console.log('[WebflowInsertion] Using Designer API to update H1 heading');
+        const success = await this.designerApi.updateH1Heading(request.pageId!, request.value as string);
+        
+        if (success) {
+          return {
+            success: true,
+            data: { 
+              type: 'h1_heading',
+              pageId: request.pageId,
+              originalValue: null, // Could be enhanced to store original value
+              newValue: request.value,
+              timestamp: new Date().toISOString()
+            }
+          };
+        } else {
+          throw new Error('Failed to update H1 heading via Designer API');
+        }
+      } else {
+        throw new Error('H1 heading updates require Designer Extension API');
+      }
+    } catch (error) {
+      console.error('[WebflowInsertion] Failed to update H1 heading:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Apply H2 heading text change using Webflow Designer API
+   */
+  private async applyH2Heading(request: WebflowInsertionRequest): Promise<WebflowInsertionResult> {
+    try {
+      if (this.useDesignerAPI && this.designerApi) {
+        console.log('[WebflowInsertion] Using Designer API to update H2 heading');
+        const success = await this.designerApi.updateH2Heading(
+          request.pageId!, 
+          request.value as string, 
+          request.elementIndex ?? 0  // Pass elementIndex, default to 0 if not provided
+        );
+        
+        if (success) {
+          return {
+            success: true,
+            data: { 
+              type: 'h2_heading',
+              pageId: request.pageId,
+              originalValue: null, // Could be enhanced to store original value
+              newValue: request.value,
+              timestamp: new Date().toISOString()
+            }
+          };
+        } else {
+          throw new Error('Failed to update H2 heading via Designer API');
+        }
+      } else {
+        throw new Error('H2 heading updates require Designer Extension API');
+      }
+    } catch (error) {
+      console.error('[WebflowInsertion] Failed to update H2 heading:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Apply introduction text change using Webflow Designer API  
+   */
+  private async applyIntroductionText(request: WebflowInsertionRequest): Promise<WebflowInsertionResult> {
+    try {
+      if (this.useDesignerAPI && this.designerApi) {
+        console.log('[WebflowInsertion] Using Designer API to update introduction text');
+        const success = await this.designerApi.updateIntroductionParagraph(request.pageId!, request.value as string);
+        
+        if (success) {
+          return {
+            success: true,
+            data: { 
+              type: 'introduction_text',
+              pageId: request.pageId,
+              originalValue: null, // Could be enhanced to store original value
+              newValue: request.value,
+              timestamp: new Date().toISOString()
+            }
+          };
+        } else {
+          throw new Error('Failed to update introduction text via Designer API');
+        }
+      } else {
+        throw new Error('Introduction text updates require Designer Extension API');
+      }
+    } catch (error) {
+      console.error('[WebflowInsertion] Failed to update introduction text:', error);
       throw error;
     }
   }

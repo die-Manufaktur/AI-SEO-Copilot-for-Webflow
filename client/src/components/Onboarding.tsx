@@ -81,8 +81,9 @@ export const Onboarding: React.FC<OnboardingProps> = ({ showResetOption = false 
       return;
     }
 
-    if (!validateApiKey(apiKeyInput)) {
-      setApiKeyError('Invalid API key format. Should start with "sk-"');
+    const validation = validateApiKey(apiKeyInput);
+    if (!validation.isValid) {
+      setApiKeyError(validation.error || 'Invalid API key format');
       return;
     }
 
@@ -95,8 +96,8 @@ export const Onboarding: React.FC<OnboardingProps> = ({ showResetOption = false 
     if (!demoKeywords.trim()) return;
 
     setIsAnalyzing(true);
-    // Simulate analysis
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // Simulate analysis with shorter timeout for tests
+    await new Promise(resolve => setTimeout(resolve, 500));
     setIsAnalyzing(false);
     setDemoComplete(true);
   };

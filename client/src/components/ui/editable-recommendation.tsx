@@ -25,6 +25,7 @@ interface EditableRecommendationProps {
   fieldId?: string;
   showApplyButton?: boolean;
   showOnlyApplyButton?: boolean; // When true, only show the apply button without text content
+  onApplySuccess?: (checkTitle: string) => void; // Callback for successful application
 }
 
 export function EditableRecommendation({
@@ -37,7 +38,8 @@ export function EditableRecommendation({
   cmsItemId,
   fieldId,
   showApplyButton = true,
-  showOnlyApplyButton = false
+  showOnlyApplyButton = false,
+  onApplySuccess
 }: EditableRecommendationProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedText, setEditedText] = useState(recommendation);
@@ -141,7 +143,7 @@ export function EditableRecommendation({
       await onCopy(editedText);
     } catch (error) {
       // Error handling is done in the parent component's copyToClipboard function
-      console.error('Copy operation failed:', error);
+      // Silently fail as the parent handles user notification
     }
   };
 
@@ -155,7 +157,14 @@ export function EditableRecommendation({
       throw new Error('Unable to create insertion request');
     }
     
-    return await applyInsertion(insertionRequest);
+    const result = await applyInsertion(insertionRequest);
+    
+    // Call onApplySuccess callback when application succeeds
+    if (result.success && checkTitle && onApplySuccess) {
+      onApplySuccess(checkTitle);
+    }
+    
+    return result;
   };
 
 
