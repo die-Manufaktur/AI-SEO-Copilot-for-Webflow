@@ -114,7 +114,7 @@
     "@vitejs/plugin-react": "^5.0.2",
     "@webflow/designer-extension-typings": "^2.0.23",
     "@webflow/webflow-cli": "^1.8.40",
-    "canvas-confetti": "^1.9.3",
+    "canvas-confetti": "^1.9.4",
     "cheerio": "^1.1.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
