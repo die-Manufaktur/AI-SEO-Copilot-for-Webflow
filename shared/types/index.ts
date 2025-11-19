@@ -9,6 +9,10 @@ export interface SEOCheck {
   recommendation?: string;
   introPhrase?: string;
   matchedKeyword?: string; // Which keyword was found (primary or secondary)
+  name?: string; // Name identifier for the check
+  details?: string; // Additional details about the check
+  errorMessage?: string; // Error message when check fails
+  successMessage?: string; // Success message when check passes
   imageData?: Array<{
     url: string;
     name: string;
@@ -38,12 +42,23 @@ export interface Resource {
 }
 
 /**
+ * H2 Element Information from Webflow Designer API
+ */
+export interface H2ElementInfo {
+  element: any; // WebflowElement type would be defined in client-side code
+  id: string;
+  text: string;
+  index: number;
+}
+
+/**
  * Type for Schema Markup detection results
  */
 export interface SchemaMarkupResult {
   hasSchema: boolean;
   schemaTypes: string[];
   schemaCount: number;
+  detected?: any[]; // Array of detected schema markup objects
 }
 
 /**
@@ -54,12 +69,15 @@ export interface WebflowPageData {
   metaDescription: string;
   canonicalUrl?: string;
   openGraphImage?: string;
+  openGraphTitle?: string;
+  openGraphDescription?: string;
   ogTitle?: string;
   ogDescription?: string;
   ogImage?: string;
   usesTitleAsOpenGraphTitle?: boolean;
   usesDescriptionAsOpenGraphDescription?: boolean;
   designerImages?: Array<{ url: string }>;
+  h2Elements?: H2ElementInfo[];
 }
 
 /**

@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { analyzeSEO, fetchOAuthToken, collectPageAssets, fetchFromAPI, getApiUrl, getApiBaseUrl } from './api';
+import { disableMSWForTest } from '../__tests__/utils/testHelpers';
 import type { AnalyzeSEORequest, SEOAnalysisResult } from '../../../shared/types';
+
+// Disable MSW for this test file since we need direct fetch mocking
+disableMSWForTest();
 
 // Mock the createLogger utility with prefix-aware behavior
 const mockLogger = vi.hoisted(() => ({
@@ -276,8 +280,9 @@ describe('api.ts error handling', () => {
 
       await expect(analyzeSEO(mockRequest)).rejects.toThrow('SEO Analysis failed: Persistent network error');
       
-      // The actual implementation is "1 original + 2 retries = 3 attempts" but we also have collectPageAssets() call
-      expect(mockFetch).toHaveBeenCalledTimes(4); // 1 for collectPageAssets + 3 for analyze attempts
+      // The actual implementation is "1 original + 2 retries = 3 attempts" 
+      // collectPageAssets() doesn't make fetch calls when no images are found
+      expect(mockFetch).toHaveBeenCalledTimes(3); // 3 for analyze attempts (0, 1, 2 retryCount)
       
       // Restore setTimeout
       global.setTimeout = originalSetTimeout;

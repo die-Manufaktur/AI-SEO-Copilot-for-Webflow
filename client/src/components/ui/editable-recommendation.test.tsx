@@ -4,6 +4,39 @@ import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { EditableRecommendation } from './editable-recommendation';
 
+// Mock the useInsertion hook to avoid needing the full provider setup
+vi.mock('../../contexts/InsertionContext', () => ({
+  useInsertion: () => ({
+    applyInsertion: vi.fn().mockResolvedValue({ success: true }),
+    isLoading: false,
+    error: null,
+    lastResult: null,
+    pendingOperations: [],
+    insertionHistory: [],
+    previewInsertion: vi.fn().mockResolvedValue({ success: true }),
+    applyBatch: vi.fn().mockResolvedValue({ success: true }),
+    rollbackBatch: vi.fn().mockResolvedValue({ success: true }),
+    addToPending: vi.fn(),
+    removeFromPending: vi.fn(),
+    clearPending: vi.fn(),
+    clearError: vi.fn(),
+  }),
+}));
+
+// Mock the ApplyButton component to avoid complex dependencies
+vi.mock('./ApplyButton', () => ({
+  ApplyButton: ({ onApply, onPreview, disabled, label, ariaLabel }: any) => (
+    <button
+      onClick={onApply}
+      disabled={disabled}
+      aria-label={ariaLabel}
+      data-testid="apply-button"
+    >
+      {label || 'Apply'}
+    </button>
+  ),
+}));
+
 describe('EditableRecommendation', () => {
   const mockOnCopy = vi.fn().mockResolvedValue(true);
   const testRecommendation = "This is a test AI recommendation that should be editable.";
@@ -11,6 +44,8 @@ describe('EditableRecommendation', () => {
   beforeEach(() => {
     mockOnCopy.mockClear();
     mockOnCopy.mockResolvedValue(true);
+    // Clear any residual DOM state
+    document.body.innerHTML = '';
   });
 
   it('renders recommendation text by default', () => {
@@ -34,19 +69,17 @@ describe('EditableRecommendation', () => {
       />
     );
 
-    const container = screen.getByText(testRecommendation).parentElement;
-    
-    // Initially buttons should be present but hidden (opacity-0)
+    // Buttons should be present in the DOM
     const editButton = screen.getByRole('button', { name: /edit recommendation/i });
     const copyButton = screen.getByRole('button', { name: /copy recommendation to clipboard/i });
     
     expect(editButton).toBeInTheDocument();
     expect(copyButton).toBeInTheDocument();
     
-    // Hover over the container to show buttons
-    if (container) {
-      await user.hover(container);
-    }
+    // The hover functionality is tested via CSS classes, 
+    // so we'll just verify the buttons exist and are clickable
+    expect(editButton).not.toBeDisabled();
+    expect(copyButton).not.toBeDisabled();
   });
 
   it('enters edit mode when edit button is clicked', async () => {
@@ -87,7 +120,7 @@ describe('EditableRecommendation', () => {
     const editButton = screen.getByRole('button', { name: /edit recommendation/i });
     await user.click(editButton);
 
-    // Clear and type new text
+    // Clear and type new text - use cleaner approach
     const textarea = screen.getByRole('textbox');
     await user.clear(textarea);
     await user.type(textarea, newText);
@@ -170,8 +203,8 @@ describe('EditableRecommendation', () => {
     await user.clear(textarea);
     await user.type(textarea, newText);
 
-    // Use Ctrl+Enter to save
-    await user.keyboard('{Control>}{Enter}{/Control}');
+    // Use fireEvent for more reliable keyboard shortcut testing
+    fireEvent.keyDown(textarea, { key: 'Enter', code: 'Enter', ctrlKey: true });
 
     // Should exit edit mode and show new text
     await waitFor(() => {
@@ -199,8 +232,8 @@ describe('EditableRecommendation', () => {
     await user.clear(textarea);
     await user.type(textarea, newText);
 
-    // Use Escape to cancel
-    await user.keyboard('{Escape}');
+    // Use fireEvent for more reliable Escape key testing
+    fireEvent.keyDown(textarea, { key: 'Escape', code: 'Escape' });
 
     // Should exit edit mode and show original text
     await waitFor(() => {
@@ -313,5 +346,101 @@ describe('EditableRecommendation', () => {
 
     expect(screen.getByText(newRecommendation)).toBeInTheDocument();
     expect(screen.queryByText(testRecommendation)).not.toBeInTheDocument();
+  });
+
+  describe('Apply button functionality', () => {
+    it('should show Apply button for title recommendations', () => {
+      render(
+        <EditableRecommendation
+          recommendation="Optimized Title Here"
+          onCopy={mockOnCopy}
+          checkTitle="Keyphrase in Title"
+          pageId="test-page"
+          showApplyButton={true}
+        />
+      );
+      
+      expect(screen.getByLabelText('Apply as page title')).toBeInTheDocument();
+    });
+
+    it('should call onApplySuccess callback when apply succeeds', async () => {
+      const mockOnApplySuccess = vi.fn();
+      const user = userEvent.setup();
+      
+      render(
+        <EditableRecommendation
+          recommendation="Optimized Title Here"
+          onCopy={mockOnCopy}
+          checkTitle="Keyphrase in Title"
+          pageId="test-page"
+          showApplyButton={true}
+          onApplySuccess={mockOnApplySuccess}
+        />
+      );
+      
+      const applyButton = screen.getByLabelText('Apply as page title');
+      await user.click(applyButton);
+      
+      await waitFor(() => {
+        expect(mockOnApplySuccess).toHaveBeenCalledWith("Keyphrase in Title");
+      });
+    });
+
+
+    it('should show Apply button for meta description recommendations', () => {
+      render(
+        <EditableRecommendation
+          recommendation="Optimized meta description here"
+          onCopy={mockOnCopy}
+          checkTitle="Keyphrase in Meta Description"
+          pageId="test-page"
+          showApplyButton={true}
+        />
+      );
+      
+      expect(screen.getByLabelText('Apply as meta description')).toBeInTheDocument();
+    });
+
+    it('should show Apply button for URL recommendations', () => {
+      render(
+        <EditableRecommendation
+          recommendation="optimized-url-slug"
+          onCopy={mockOnCopy}
+          checkTitle="Keyphrase in URL"
+          pageId="test-page"
+          showApplyButton={true}
+        />
+      );
+      
+      expect(screen.getByLabelText('Apply as page URL slug')).toBeInTheDocument();
+    });
+
+    it('should not show Apply button for non-insertable recommendations', () => {
+      render(
+        <EditableRecommendation
+          recommendation="Some general content advice"
+          onCopy={mockOnCopy}
+          checkTitle="Content Length"
+          pageId="test-page"
+          showApplyButton={true}
+        />
+      );
+      
+      expect(screen.queryByText('Apply')).not.toBeInTheDocument();
+    });
+
+    it('should not show Apply button when showApplyButton is false', () => {
+      render(
+        <EditableRecommendation
+          recommendation="Optimized Title Here"
+          onCopy={mockOnCopy}
+          checkTitle="Keyphrase in Title"
+          pageId="test-page"
+          showApplyButton={false}
+        />
+      );
+      
+      expect(screen.queryByText('Apply')).not.toBeInTheDocument();
+    });
   });
 });

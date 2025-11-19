@@ -9,6 +9,13 @@ import {
   calculateSEOScore,
 } from './seoAnalysis';
 
+// Mock the AI recommendations module
+vi.mock('./aiRecommendations', () => ({
+  getAIRecommendation: vi.fn()
+}));
+
+import { getAIRecommendation } from './aiRecommendations';
+
 describe('seoAnalysis', () => {
   describe('calculateSEOScore', () => {
     it('should calculate correct SEO score from checks', () => {
@@ -191,6 +198,39 @@ describe('seoAnalysis', () => {
       
       expect(result.found).toBe(true);
       expect(result.keywordResults.filter(r => r.keyword.trim().length > 0)).toHaveLength(4);
+    });
+
+    it('should use word boundaries and not match partial words', () => {
+      // Test the specific bug: "test" should not match "testimonial"
+      const content = 'Read our customer testimonials and see what clients say about our service.';
+      const primaryKeyword = 'test';
+      
+      const result = checkKeywordMatch(content, primaryKeyword);
+      
+      expect(result.found).toBe(false);
+      expect(result.matchedKeyword).toBeUndefined();
+    });
+
+    it('should match whole words correctly', () => {
+      // "test" should match when it appears as a whole word
+      const content = 'We test our products thoroughly before release.';
+      const primaryKeyword = 'test';
+      
+      const result = checkKeywordMatch(content, primaryKeyword);
+      
+      expect(result.found).toBe(true);
+      expect(result.matchedKeyword).toBe(primaryKeyword);
+    });
+
+    it('should handle multi-word keyphrases with word boundaries', () => {
+      // "web design" should match "web design" but not in "website designer"
+      const content = 'We offer web design services and website designer consultation.';
+      const primaryKeyword = 'web design';
+      
+      const result = checkKeywordMatch(content, primaryKeyword);
+      
+      expect(result.found).toBe(true);
+      expect(result.matchedKeyword).toBe(primaryKeyword);
     });
   });
 
@@ -529,10 +569,10 @@ describe('seoAnalysis', () => {
     let mockAdvancedOptions: any;
 
     beforeEach(() => {
-      // Mock the AI recommendation function
-      vi.mock('./aiRecommendations', () => ({
-        getAIRecommendation: vi.fn().mockResolvedValue('Mocked AI recommendation')
-      }));
+      vi.clearAllMocks();
+      
+      // Set up the AI recommendation mock to return a test value
+      (getAIRecommendation as any).mockResolvedValue('Mocked AI recommendation');
 
       mockScrapedData = {
         title: 'Test Page Title',
@@ -949,9 +989,7 @@ describe('seoAnalysis', () => {
 
     it('should handle AI recommendation errors gracefully', async () => {
       // Mock AI function to throw error
-      vi.doMock('./aiRecommendations', () => ({
-        getAIRecommendation: vi.fn().mockRejectedValue(new Error('AI API Error'))
-      }));
+      (getAIRecommendation as any).mockRejectedValue(new Error('AI API Error'));
 
       const aiMockEnv = {
         USE_GPT_RECOMMENDATIONS: 'true',

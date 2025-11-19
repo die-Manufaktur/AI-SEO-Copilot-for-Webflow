@@ -16,6 +16,7 @@ import {
 interface SchemaDisplayProps {
   pageType: string;
   schemas: SchemaRecommendation[];
+  pageId?: string;
 }
 
 interface SchemaBlockProps {
@@ -39,8 +40,7 @@ const SchemaBlock: React.FC<SchemaBlockProps> = ({ schema, isEnabled, onToggle }
       });
       return true;
     } catch (err) {
-      console.warn("Modern clipboard API failed:", err);
-      // Continue to fallbacks
+      // Modern clipboard API failed, continue to fallbacks
     }
 
     // Strategy 2: Try execCommand (legacy approach)
@@ -68,7 +68,7 @@ const SchemaBlock: React.FC<SchemaBlockProps> = ({ schema, isEnabled, onToggle }
         return true;
       }
     } catch (err) {
-      console.warn("Legacy clipboard execCommand failed:", err);
+      // Legacy clipboard execCommand failed
     }
 
     // Strategy 3: Use Webflow's messaging system
@@ -85,7 +85,7 @@ const SchemaBlock: React.FC<SchemaBlockProps> = ({ schema, isEnabled, onToggle }
         return true;
       }
     } catch (err) {
-      console.warn("Parent window messaging failed:", err);
+      // Parent window messaging failed
     }
 
     // All strategies failed
@@ -108,6 +108,8 @@ ${schema.jsonLdCode}
       setTimeout(() => setCopied(false), 2000);
     }
   };
+
+
 
   const getGoogleSupportBadge = () => {
     const baseClasses = "px-2 py-1 text-xs font-medium rounded-full";
@@ -170,39 +172,41 @@ ${schema.jsonLdCode}
         <div className="mt-3">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-medium" style={{ color: 'var(--text1)' }}>JSON-LD Code:</span>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <motion.div
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                  >
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="flex items-center gap-2"
-                      onClick={handleCopy}
+            <div className="flex items-center gap-2">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <motion.div
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
                     >
-                      {copied ? (
-                        <>
-                          <Check className="h-4 w-4" />
-                          Copied
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-4 w-4" />
-                          Copy
-                        </>
-                      )}
-                    </Button>
-                  </motion.div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Copy schema code to clipboard</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-2"
+                        onClick={handleCopy}
+                      >
+                        {copied ? (
+                          <>
+                            <Check className="h-4 w-4" />
+                            Copied
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-4 w-4" />
+                            Copy
+                          </>
+                        )}
+                      </Button>
+                    </motion.div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Copy schema code to clipboard</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
           </div>
           <pre 
             className="p-3 rounded text-xs overflow-x-auto font-mono"
@@ -218,7 +222,7 @@ ${schema.jsonLdCode}
   );
 };
 
-export const SchemaDisplay: React.FC<SchemaDisplayProps> = ({ pageType, schemas }) => {
+export const SchemaDisplay: React.FC<SchemaDisplayProps> = ({ pageType, schemas, pageId }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [enabledOptionalSchemas, setEnabledOptionalSchemas] = useState<Set<string>>(new Set());
 

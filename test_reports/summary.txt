@@ -1,0 +1,14 @@
+Test Framework: generic
+Total Tests: 2
+Passed: 1
+Failed: 1
+
+--- Test Results ---
+✓ Output Block 1
+✗ Error Output
+
+--- Failed Tests ---
+✗ Error Output
+  /usr/bin/bash: Files\Git\bin\bash.exe: No such file or directory
+  
+
