@@ -1,7 +1,7 @@
 {
   "$schema": "https://cdn.jsdelivr.net/gh/webflow/designer-extension-typings@latest/schema/webflow.manifest.schema.json",
   "name": "SEO Copilot",
-  "version": "4.6.3",
+  "version": "4.7.0",
   "schema_version": "2.0.0",
   "apiVersion": "2",
   "extensionType": "hybrid",
@@ -36,7 +36,7 @@
     "callbackPath": "/oauth/callback",
     "scopes": [
       "sites:read",
-      "sites:write", 
+      "sites:write",
       "pages:read",
       "pages:write",
       "cms:read",

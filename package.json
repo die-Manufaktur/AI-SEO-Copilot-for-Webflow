@@ -1,6 +1,6 @@
 {
   "name": "ai-seo-copilot",
-  "version": "4.6.3",
+  "version": "4.7.0",
   "private": true,
   "main": "client/src/main.tsx",
   "type": "module",
