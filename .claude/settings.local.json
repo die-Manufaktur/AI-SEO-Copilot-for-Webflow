@@ -156,7 +156,8 @@
       "Bash(git log:*)",
       "mcp__serena__insert_before_symbol",
       "WebFetch(domain:alt-text-a11y-7473f2.webflow.io)",
-      "mcp__serena__insert_after_symbol"
+      "mcp__serena__insert_after_symbol",
+      "Bash(chmod:*)"
     ],
     "deny": []
   },
