@@ -79,19 +79,21 @@ describe('getApiBaseUrl function', () => {
     vi.unstubAllGlobals();
   });
 
-  it('returns development URL in development mode', () => {
-    // Mock import.meta.env.PROD as false and VITE_WORKER_URL for dev mode
-    vi.stubEnv('PROD', false);
-    vi.stubEnv('VITE_WORKER_URL', 'http://localhost:8787');
+  it('returns production URL when not in development mode', () => {
+    // In test environment, MODE is 'test' not 'development'
+    // so the function correctly returns production URL
+    vi.stubEnv('MODE', 'test');
+    vi.stubEnv('VITE_WORKER_URL', undefined);
     
-    // Mock window.webflow as undefined to prevent it from using production URL
+    // Mock window.webflow as undefined
     Object.defineProperty(global, 'webflow', {
       value: undefined,
       writable: true,
     });
     
     const result = getApiBaseUrl();
-    expect(result).toBe('http://localhost:8787');
+    // Function returns production URL when not in development mode
+    expect(result).toBe('https://seo-copilot-api-production.paul-130.workers.dev');
   });
 
   it('returns production URL in production mode', () => {

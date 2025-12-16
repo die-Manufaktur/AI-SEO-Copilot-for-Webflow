@@ -1,26 +1,36 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "lib": ["dom", "dom.iterable", "esnext", "es2020", "webworker"],
-    "allowJs": true,
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
     "skipLibCheck": true,
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "strict": true,
-    "forceConsistentCasingInFileNames": true,
-    "noFallthroughCasesInSwitch": true,
-    "typeRoots": ["./node_modules/@types", "./node_modules/@webflow", "./client/src/types"],
-    "module": "esnext",
+
     "moduleResolution": "bundler",
-    "jsx": "react-jsx",
+    "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
+    "jsx": "react-jsx",
+
+    "strict": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noFallthroughCasesInSwitch": true,
+
     "baseUrl": ".",
     "paths": {
-      "@/*": ["client/src/*"]
+      "@/*": ["client/src/*"],
+      "@assets/*": ["attached_assets/*"]
     },
-    "sourceMap": true
+    "types": ["node", "vite/client"]
   },
-  "include": ["client/src", "client/src/types/**/*.d.ts", "workers", "shared"]
+  "include": [
+    "client/src/**/*.ts",
+    "client/src/**/*.tsx",
+    "shared/**/*.ts",
+    "workers/**/*.ts",
+    "scripts/**/*.ts"
+  ],
+  "exclude": ["node_modules", "public", "coverage"]
 }

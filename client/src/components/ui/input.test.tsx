@@ -7,7 +7,7 @@ describe('Input', () => {
   it('renders correctly with default props', () => {
     render(<Input />);
     expect(screen.getByRole('textbox')).toBeInTheDocument();
-    expect(screen.getByRole('textbox')).toHaveClass('h-10', 'w-full', 'rounded-md');
+    expect(screen.getByRole('textbox')).toHaveClass('h-11', 'w-full', 'rounded-[10px]');
   });
 
   it('applies custom className', () => {

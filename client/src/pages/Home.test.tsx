@@ -199,7 +199,7 @@ describe('Home Component', () => {
 
   it('renders without crashing', () => {
     renderWithProviders(<Home />);
-    expect(screen.getByText(/SEO Analysis Tool/i)).toBeInTheDocument();
+    expect(screen.getByText(/Set up your SEO analysis/i)).toBeInTheDocument();
   });
 
   it('displays keyphrase input field', () => {
@@ -209,7 +209,7 @@ describe('Home Component', () => {
 
   it('shows analyze button', () => {
     renderWithProviders(<Home />);
-    expect(screen.getByText(/start optimizing your seo/i)).toBeInTheDocument();
+    expect(screen.getByText(/optimize my seo/i)).toBeInTheDocument();
   });
 
   it('handles keyphrase input changes', async () => {
@@ -235,7 +235,7 @@ describe('Home Component', () => {
     renderWithProviders(<Home />);
     
     const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
-    const button = screen.getByText(/start optimizing your seo/i);
+    const button = screen.getByText(/optimize my seo/i);
     
     // Type a single character (should be invalid)
     await user.type(input, 'a');
@@ -265,7 +265,7 @@ describe('Home Component', () => {
     renderWithProviders(<Home />);
     
     const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
-    const button = screen.getByText(/start optimizing your seo/i);
+    const button = screen.getByText(/optimize my seo/i);
     
     // Type invalid input
     await user.type(input, 'x');
@@ -293,7 +293,7 @@ describe('Home Component', () => {
     renderWithProviders(<Home />);
     
     const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
-    const button = screen.getByText(/start optimizing your seo/i);
+    const button = screen.getByText(/optimize my seo/i);
     
     // Perform rapid input changes
     await user.type(input, 'a');
@@ -320,7 +320,7 @@ describe('Home Component', () => {
     renderWithProviders(<Home />);
     
     const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
-    const button = screen.getByText(/start optimizing your seo/i);
+    const button = screen.getByText(/optimize my seo/i);
     
     await user.type(input, 'test keyphrase');
     await user.click(button);
@@ -343,7 +343,7 @@ describe('Home Component', () => {
     renderWithProviders(<Home />);
     
     const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
-    const button = screen.getByText(/start optimizing your seo/i);
+    const button = screen.getByText(/optimize my seo/i);
     
     await user.type(input, 'test keyphrase');
     await user.click(button);
@@ -372,7 +372,7 @@ describe('Home Component', () => {
     renderWithProviders(<Home />);
     
     const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
-    const button = screen.getByText(/start optimizing your seo/i);
+    const button = screen.getByText(/optimize my seo/i);
     
     await user.type(input, 'test keyphrase');
     await user.click(button);
@@ -450,7 +450,7 @@ describe('Home Component - Additional Coverage', () => {
       renderWithProviders(<Home />);
       
       // Component should still render
-      expect(screen.getByText(/SEO Analysis Tool/i)).toBeInTheDocument();
+      expect(screen.getByText(/Set up your SEO analysis/i)).toBeInTheDocument();
       
       // Should log warning about webflow not being available with shorter timeout
       await waitFor(() => {
@@ -474,7 +474,7 @@ describe('Home Component - Additional Coverage', () => {
       renderWithProviders(<Home />);
       
       const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
-      const button = screen.getByText(/start optimizing your seo/i);
+      const button = screen.getByText(/optimize my seo/i);
       
       await user.type(input, 'test keyphrase');
       await user.click(button);
@@ -495,7 +495,7 @@ describe('Home Component - Additional Coverage', () => {
       renderWithProviders(<Home />);
       
       const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
-      const button = screen.getByText(/start optimizing your seo/i);
+      const button = screen.getByText(/optimize my seo/i);
       
       await user.type(input, 'test keyphrase');
       await user.click(button);

@@ -15,7 +15,7 @@ describe('Card Components', () => {
       
       const card = screen.getByTestId('card');
       expect(card).toBeInTheDocument();
-      expect(card).toHaveClass('rounded-lg', 'border', 'bg-background2', 'text-card-foreground', 'shadow-sm');
+      expect(card).toHaveClass('rounded-[20px]', 'border-0', 'bg-[#323232]', 'text-white', 'shadow-sm');
     });
 
     it('should accept additional className', () => {
@@ -78,7 +78,7 @@ describe('Card Components', () => {
       const title = screen.getByRole('heading', { level: 3 });
       expect(title).toBeInTheDocument();
       expect(title.tagName).toBe('H3');
-      expect(title).toHaveClass('text-2xl', 'font-semibold', 'leading-none', 'tracking-tight');
+      expect(title).toHaveClass('text-[28px]', 'font-medium', 'leading-tight', 'tracking-tight', 'text-white');
     });
 
     it('should accept additional className', () => {
@@ -109,7 +109,7 @@ describe('Card Components', () => {
       const description = screen.getByText('Test description');
       expect(description).toBeInTheDocument();
       expect(description.tagName).toBe('P');
-      expect(description).toHaveClass('text-sm', 'text-muted-foreground');
+      expect(description).toHaveClass('text-[16px]', 'text-[#c7c7c7]');
     });
 
     it('should accept additional className', () => {
