@@ -45,7 +45,7 @@ import { copyTextToClipboard } from "../utils/clipboard";
 import { shouldShowCopyButton } from '../../../shared/utils/seoUtils';
 import { generatePageId, saveKeywordsForPage, loadKeywordsForPage } from '../utils/keywordStorage';
 import { saveAdvancedOptionsForPage, loadAdvancedOptionsForPage, type AdvancedOptions } from '../utils/advancedOptionsStorage';
-import sanitizeHtml from 'sanitize-html';
+import { sanitizeHtmlBrowser as sanitizeHtml } from '../utils/htmlSanitizer';
 import { sanitizeText } from '../../../shared/utils/stringUtils';
 import { getPageTypes, getPopulatedSchemaRecommendations } from '../../../shared/utils/schemaRecommendations';
 import { LanguageSelector } from '../components/ui/language-selector';
@@ -111,7 +111,7 @@ const validateSecondaryKeywords = (input: string, languageCode?: string): { isVa
   });
 
   // Split by commas and validate individual keywords
-  const keywords = sanitized.split(',').map((k: string) => k.trim()).filter((k: string) => k.length > 0);
+  const keywords = sanitized.split(',').map(k => k.trim()).filter(k => k.length > 0);
   
   // Check for too many keywords
   if (keywords.length > MAX_KEYWORDS_COUNT) {
@@ -123,17 +123,17 @@ const validateSecondaryKeywords = (input: string, languageCode?: string): { isVa
   }
 
   // Check for keywords that are too short or too long
-  const invalidKeywords = keywords.filter((k: string) => k.length < 2 || k.length > 50);
+  const invalidKeywords = keywords.filter(k => k.length < 2 || k.length > 50);
   if (invalidKeywords.length > 0) {
     return {
       isValid: false,
       message: 'Each keyword must be between 2-50 characters.',
-      sanitized: keywords.filter((k: string) => k.length >= 2 && k.length <= 50).join(', ')
+      sanitized: keywords.filter(k => k.length >= 2 && k.length <= 50).join(', ')
     };
   }
 
   // Apply additional text sanitization and return cleaned keywords
-  const finalSanitized = keywords.map((k: string) => sanitizeText(k, languageCode).trim()).filter((k: string) => k.length > 0).join(', ');
+  const finalSanitized = keywords.map(k => sanitizeText(k, languageCode).trim()).filter(k => k.length > 0).join(', ');
 
   return { isValid: true, sanitized: finalSanitized };
 };
@@ -165,28 +165,15 @@ const iconAnimation = {
   }
 };
 
-// Get priority icon based on priority level - wrapped in filled circular background per Figma
+// Get priority icon based on priority level
 export const getPriorityIcon = (priority: string, className: string = "h-4 w-4") => {
-  const iconWrapperClass = "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0";
   switch (priority) {
     case 'high':
-      return (
-        <div className={iconWrapperClass} style={{ backgroundColor: 'var(--icon-fail-bg)' }}>
-          <AlertTriangle className={className} style={{ color: 'var(--redText)', stroke: 'var(--redText)' }} />
-        </div>
-      );
+      return <AlertTriangle className={`${className} text-redText`} style={{color: 'rgb(var(--redText))', stroke: 'rgb(var(--redText))'}} />;
     case 'medium':
-      return (
-        <div className={iconWrapperClass} style={{ backgroundColor: 'var(--icon-improve-bg)' }}>
-          <CircleAlert className={className} style={{ color: 'var(--yellowText)', stroke: 'var(--yellowText)' }} />
-        </div>
-      );
+      return <CircleAlert className={`${className} text-yellowText`} style={{color: 'rgb(var(--yellowText))', stroke: 'rgb(var(--yellowText))'}} />;
     case 'low':
-      return (
-        <div className={iconWrapperClass} style={{ backgroundColor: 'rgba(138, 194, 255, 0.24)' }}>
-          <Info className={className} style={{ color: 'var(--blueText)', stroke: 'var(--blueText)' }} />
-        </div>
-      );
+      return <Info className={`${className} text-blueText`} style={{color: 'rgb(var(--blueText))', stroke: 'rgb(var(--blueText))'}} />;
     default:
       return null;
   }
@@ -279,34 +266,17 @@ const getCategoryStatus = (checks: SEOCheck[]) => {
   return "inprogress";
 };
 
-// Get status icon for a category - wrapped in filled circular background per Figma
+// Get status icon for a category
 const getCategoryStatusIcon = (status: string) => {
-  const iconWrapperClass = "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0";
   switch (status) {
     case "complete":
-      return (
-        <div className={iconWrapperClass} style={{ backgroundColor: 'var(--icon-pass-bg)' }}>
-          <CheckCircle className="h-5 w-5" style={{ color: 'var(--greenText)', stroke: 'var(--greenText)' }} />
-        </div>
-      );
+      return <CheckCircle className="h-6 w-6 text-greenText" style={{color: 'rgb(var(--greenText))', stroke: 'rgb(var(--greenText))'}} />;
     case "inprogress":
-      return (
-        <div className={iconWrapperClass} style={{ backgroundColor: 'var(--icon-improve-bg)' }}>
-          <CircleAlert className="h-5 w-5" style={{ color: 'var(--yellowText)', stroke: 'var(--yellowText)' }} />
-        </div>
-      );
+      return <CircleAlert className="h-6 w-6 text-yellowText" style={{color: 'rgb(var(--yellowText))', stroke: 'rgb(var(--yellowText))'}} />;
     case "todo":
-      return (
-        <div className={iconWrapperClass} style={{ backgroundColor: 'var(--icon-fail-bg)' }}>
-          <XCircle className="h-5 w-5" style={{ color: 'var(--redText)', stroke: 'var(--redText)' }} />
-        </div>
-      );
+      return <XCircle className="h-6 w-6 text-redText" style={{color: 'rgb(var(--redText))', stroke: 'rgb(var(--redText))'}} />;
     default:
-      return (
-        <div className={iconWrapperClass} style={{ backgroundColor: 'rgba(138, 194, 255, 0.24)' }}>
-          <Info className="h-5 w-5" style={{ color: 'var(--blueText)', stroke: 'var(--blueText)' }} />
-        </div>
-      );
+      return <Info className="h-6 w-6 text-blueText" style={{color: 'rgb(var(--blueText))', stroke: 'rgb(var(--blueText))'}} />;
   }
 };
 
@@ -324,12 +294,16 @@ const BackButton = styled.button`
   padding: 0;
   margin: 0;
   cursor: pointer;
-  color: inherit;
+  color: var(--text1);
   font: inherit;
-  gap: 8px; /* Add some spacing between the chevron and title */
+  gap: 8px;
+
+  &:hover {
+    color: var(--text2);
+  }
 
   &:focus {
-    outline: 2px solid var(--primaryText); /* Add focus styling for accessibility */
+    outline: 2px solid var(--primary);
     outline-offset: 2px;
   }
 `;
@@ -337,7 +311,9 @@ const BackButton = styled.button`
 const CardTitle = styled.h2`
   font-size: 20px;
   margin: 0;
-  font-weight: 500;
+  font-weight: 600;
+  color: var(--text1);
+  letter-spacing: -0.12px;
 `;
 
 // Helper function to find the most recently published domain
@@ -1057,19 +1033,19 @@ export default function Home() {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="min-h-screen p-4 md:p-6 flex flex-col"
-      style={{ backgroundColor: "#1a1a1a", color: "#ffffff" }}
+      className="min-h-screen bg-background p-4 md:p-6 flex flex-col"
+      style={{ color: "#FFFFFF" }}
     >
-      <div className="mx-auto w-full max-w-[715px] space-y-6 flex-grow">
+      <div className="mx-auto w-full max-w-3xl space-y-6 flex-grow">
         <motion.div
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.5 }}
           className="w-full"
         >
-          <Card className="w-full" style={{ borderRadius: "20px", backgroundColor: "#323232", border: "none" }}>
-            <CardHeader className="pb-4">
-              <OriginalCardTitle className="text-center text-[28px] font-medium text-white">Set up your SEO analysis</OriginalCardTitle>
+          <Card className="w-full">
+            <CardHeader>
+              <OriginalCardTitle className="text-center">SEO Analysis Tool</OriginalCardTitle>
             </CardHeader>
             <CardContent>
               <Form {...form}>
@@ -1079,13 +1055,13 @@ export default function Home() {
                     name="keyphrase"
                     render={({ field }: { field: any }) => (
                       <FormItem className="w-full">
-                        <div className="flex justify-between items-center mb-2">
-                          <FormLabel className="mb-0 text-[16px] font-medium text-white">Target keyphrase</FormLabel>
+                        <div className="flex justify-between items-center mb-1">
+                          <FormLabel className="mb-0">Target keyphrase</FormLabel>
                           {/* Keyword Save Status Indicator */}
-                          <span className="text-[12px] font-medium" style={{
-                            color: keywordSaveStatus === 'saved' ? '#63d489' :
-                                   keywordSaveStatus === 'saving' ? '#ffdd64' :
-                                   '#ff8484'
+                          <span className="text-caption font-medium" style={{
+                            color: keywordSaveStatus === 'saved' ? 'rgb(var(--greenText))' :
+                                   keywordSaveStatus === 'saving' ? 'rgb(var(--yellowText))' :
+                                   'rgb(var(--redText))'
                           }}>
                             {keywordSaveStatus === 'saved' ? 'Keyword saved' :
                              keywordSaveStatus === 'saving' ? 'Saving...' :
@@ -1096,13 +1072,12 @@ export default function Home() {
                           <motion.div
                             whileHover={{ scale: 1.01 }}
                             whileTap={{ scale: 0.99 }}
-                            className="w-full"
+                            className="w-full mt-2"
                           >
                             <Input
                               placeholder="Enter your target keyphrase"
                               {...field}
-                              className="w-full h-12"
-                              style={{ backgroundColor: "#444444", borderRadius: "10px", border: "none", color: "#ffffff" }}
+                              className="w-full"
                             />
                           </motion.div>
                         </FormControl>
@@ -1112,16 +1087,17 @@ export default function Home() {
                   />
                   
                   {/* Advanced Tab Section */}
-                  <div className="pt-4 mt-4" style={{ borderTop: "1px solid #444444" }}>
+                  <div className="border-t pt-4 mt-4">
                     <div className="flex items-center justify-between mb-4">
                       <div>
-                        <h3 className="text-[18px] font-medium text-white">Advanced Analysis</h3>
-                        <p className="text-[14px]" style={{ color: "#c7c7c7" }}>
+                        <h3 className="text-body-lg font-semibold text-text1">Advanced Analysis</h3>
+                        <p className="text-body-sm text-text2">
                           Add secondary keywords and specify page type for more targeted SEO analysis
                         </p>
                       </div>
                       <div className="flex items-center space-x-2">
                         <Switch
+                          data-testid="advanced-analysis-switch"
                           checked={advancedOptionsEnabled}
                           onCheckedChange={(checked) => {
                             setAdvancedOptionsEnabled(checked);
@@ -1148,7 +1124,7 @@ export default function Home() {
                             }
                           }}
                         />
-                        <span className="text-[14px] text-white">{advancedOptionsEnabled ? 'On' : 'Off'}</span>
+                        <span className="text-body-sm text-text1">{advancedOptionsEnabled ? 'On' : 'Off'}</span>
                       </div>
                     </div>
 
@@ -1163,17 +1139,17 @@ export default function Home() {
                         >
                           {/* Page Type Dropdown */}
                           <div className="space-y-2">
-                            <label className="text-sm font-medium">Page Type</label>
+                            <label className="text-body-sm font-medium text-text1">Page Type</label>
                             <Select value={pageType} onValueChange={setPageType}>
                               <SelectTrigger className="focus:ring-0 focus:ring-offset-0">
                                 <SelectValue placeholder="Select a page type" />
                               </SelectTrigger>
-                              <SelectContent className="bg-background border border-input shadow-md">
+                              <SelectContent className="bg-background3 border border-divider shadow-md">
                                 {PAGE_TYPES.map((type) => (
                                   <SelectItem 
                                     key={type} 
                                     value={type}
-                                    className="cursor-pointer focus:bg-accent focus:text-accent-foreground data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                                    className="cursor-pointer focus:bg-background4 focus:text-text1 data-[highlighted]:bg-background4 data-[highlighted]:text-text1 hover:bg-background4 hover:text-text1 transition-colors"
                                   >
                                     {type}
                                   </SelectItem>
@@ -1214,9 +1190,9 @@ export default function Home() {
 
                           {/* Secondary Keywords Input */}
                           <div className="space-y-2">
-                            <label className="text-sm font-medium">
+                            <label className="text-body-sm font-medium text-text1">
                               Secondary Keywords
-                              <span className="text-xs text-muted-foreground ml-2">
+                              <span className="text-caption text-text3 ml-2">
                                 ({(secondaryKeywords || '').length}/{MAX_KEYWORDS_LENGTH} characters)
                               </span>
                             </label>
@@ -1236,20 +1212,20 @@ export default function Home() {
                               }}
                               placeholder="Enter secondary keywords separated by commas (e.g., webflow expert, webflow specialist, cms developer)"
                               rows={2}
-                              className={`w-full px-3 py-2 border rounded-md text-sm placeholder:text-muted-foreground resize-none ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                              className={`w-full px-4 py-3 border rounded-md text-body-sm text-text1 placeholder:text-text2 resize-none ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                                 secondaryKeywordsError 
-                                  ? 'border-red-500 focus-visible:ring-red-500' 
-                                  : 'border-input bg-background'
+                                  ? 'border-redText focus-visible:ring-redText bg-input' 
+                                  : 'border-divider bg-input'
                               }`}
                               maxLength={MAX_KEYWORDS_LENGTH}
                             />
                             {secondaryKeywordsError && (
-                              <p className="text-xs text-red-500 flex items-center gap-1">
+                              <p className="text-caption text-redText flex items-center gap-1">
                                 <AlertTriangle className="h-3 w-3" />
                                 {secondaryKeywordsError}
                               </p>
                             )}
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-caption text-text3">
                               Secondary keywords help your content rank for related terms. SEO checks will pass if either your main keyword or any secondary keyword is found.
                             </p>
                           </div>
@@ -1257,10 +1233,10 @@ export default function Home() {
                           {/* Advanced Options Save Status */}
                           {(pageType || secondaryKeywords || advancedOptionsSaveStatus === 'saving') && (
                             <div className="flex justify-end">
-                              <span className="text-xs font-medium" style={{
-                                color: advancedOptionsSaveStatus === 'saved' ? 'var(--greenText)' :
-                                       advancedOptionsSaveStatus === 'saving' ? 'var(--yellowText)' :
-                                       'var(--redText)'
+                              <span className="text-caption font-medium" style={{
+                                color: advancedOptionsSaveStatus === 'saved' ? 'rgb(var(--greenText))' :
+                                       advancedOptionsSaveStatus === 'saving' ? 'rgb(var(--yellowText))' :
+                                       'rgb(var(--redText))'
                               }}>
                                 {advancedOptionsSaveStatus === 'saved' ? 'Secondary keywords and page type saved' :
                                  advancedOptionsSaveStatus === 'saving' ? 'Saving...' :
@@ -1277,20 +1253,14 @@ export default function Home() {
                   <motion.div
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    className="w-full pt-4"
+                    className="w-full pt-2"
                   >
                     <Button
                       type="submit"
+                      variant="optimize"
+                      size="optimize"
                       disabled={mutation.isPending}
-                      className="w-full cursor-pointer text-[16px] font-medium"
-                      style={{ 
-                        backgroundColor: "#1a72f5", 
-                        borderRadius: "27px", 
-                        border: "none",
-                        color: "#ffffff",
-                        height: "44px",
-                        padding: "10px 24px"
-                      }}
+                      className="w-full cursor-pointer"
                     >
                       {mutation.isPending && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
                       Optimize my SEO
@@ -1360,14 +1330,14 @@ export default function Home() {
               exit={{ opacity: 0, y: -20 }}
               className="w-full"
             >
-              <Card className="w-full" style={{ borderRadius: "20px", backgroundColor: "#323232", border: "none" }}>
+              <Card className="w-full">
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     {selectedCategory ? (
                       <CategoryHeader>
-                        <BackButton onClick={() => setSelectedCategory(null)} style={{ color: "#ffffff" }}>
-                          <ChevronLeft style={{ stroke: "#ffffff" }} />
-                          <CardTitle style={{ color: "#ffffff", fontSize: "28px", fontWeight: 500 }}>{selectedCategory}</CardTitle>
+                        <BackButton onClick={() => setSelectedCategory(null)}>
+                          <ChevronLeft />
+                          <CardTitle>{selectedCategory}</CardTitle>
                         </BackButton>
                         {applyableChecks.length > 0 && (
                           <div className="ml-auto">
@@ -1407,59 +1377,31 @@ export default function Home() {
                         )}
                       </CategoryHeader>
                     ) : (
-                      <OriginalCardTitle className="text-center text-[28px] font-medium text-white">Analysis Results</OriginalCardTitle>
+                      <OriginalCardTitle className="text-center">Analysis Results</OriginalCardTitle>
                     )}
                   </div>
                   {!selectedCategory && (
-                    <div className="flex flex-col items-center justify-center mt-6">
+                    <div className="flex flex-col items-center justify-center mt-4">
                       <ProgressCircle 
                         value={seoScore} 
-                        size={160} 
-                        strokeWidth={12}
+                        size={140} 
+                        strokeWidth={10}
                         scoreText="SEO Score" 
                       />
-                      <div className="mt-4 text-center">
-                        <p className="text-[18px] font-normal" style={{ color: "#c7c7c7" }}>{scoreRating}</p>
-                        <div className="flex items-center justify-center gap-3 mt-3">
-                          <span 
-                            className="flex items-center gap-2 text-[14px] px-3 py-1.5"
-                            style={{ 
-                              backgroundColor: 'var(--badge-pass-bg)', 
-                              border: '1px solid var(--badge-pass-border)',
-                              borderRadius: '41px' 
-                            }}
-                          >
-                            <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--icon-pass-bg)' }}>
-                              <CheckCircle className="h-3 w-3" style={{ color: 'var(--badge-pass-text)', stroke: 'var(--badge-pass-text)' }} />
-                            </div>
-                            <span style={{ color: 'var(--badge-pass-text)' }}>{results.passedChecks}</span>
-                            <span style={{ color: "#c7c7c7" }}>passed</span>
-                          </span>
-                          <span 
-                            className="flex items-center gap-2 text-[14px] px-3 py-1.5"
-                            style={{ 
-                              backgroundColor: 'var(--badge-improve-bg)', 
-                              border: '1px solid var(--badge-improve-border)',
-                              borderRadius: '41px' 
-                            }}
-                          >
-                            <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--icon-fail-bg)' }}>
-                              <XCircle className="h-3 w-3" style={{ color: 'var(--redText)', stroke: 'var(--redText)' }} />
-                            </div>
-                            <span style={{ color: 'var(--redText)' }}>{results.failedChecks}</span>
-                            <span style={{ color: "#c7c7c7" }}>to improve</span>
-                          </span>
-                        </div>
+                      <div className="mt-2 text-center">
+                        <p className="text-body-lg font-medium text-text1">{scoreRating}</p>
+                        <p className="text-body-sm text-text2 mt-1">
+                          {results.passedChecks} passed <CheckCircle className="inline-block h-4 w-4 text-greenText" style={{color: 'rgb(var(--greenText))', stroke: 'rgb(var(--greenText))'}} /> • {results.failedChecks} to improve <XCircle className="inline-block h-4 w-4 text-redText" style={{color: 'rgb(var(--redText))', stroke: 'rgb(var(--redText))'}} />
+                        </p>
                         
                         {seoScore === 100 && (
                           <motion.div
                             initial={{ opacity: 0, scale: 0.8 }}
                             animate={{ opacity: 1, scale: 1 }}
-                            className="mt-4 p-4"
-                            style={{ backgroundColor: "#a2ffb4", borderRadius: "14px", color: "#1a1a1a" }}
+                            className="mt-4 p-3 bg-green-100 dark:bg-green-900 rounded-md text-green-800 dark:text-green-100 font-medium"
                           >
-                            <span className="font-medium">You are an absolute SEO legend, well done!</span>
-                            <p className="text-[14px] font-normal mt-1">
+                            You are an absolute SEO legend, well done! 🎉
+                            <p className="text-sm font-normal mt-1">
                               Feel free to take a screenshot and brag about it on Linkedin. We might have a special something for you in return.
                             </p>
                           </motion.div>
@@ -1468,36 +1410,13 @@ export default function Home() {
                     </div>
                   )}
                   {selectedCategory && (
-                    <div className="flex items-center justify-center gap-3 mt-3">
-                      <span 
-                        className="flex items-center gap-2 text-[14px] px-3 py-1.5"
-                        style={{ 
-                          backgroundColor: 'var(--badge-pass-bg)', 
-                          border: '1px solid var(--badge-pass-border)',
-                          borderRadius: '41px' 
-                        }}
-                      >
-                        <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--icon-pass-bg)' }}>
-                          <CheckCircle className="h-3 w-3" style={{ color: 'var(--badge-pass-text)', stroke: 'var(--badge-pass-text)' }} />
-                        </div>
-                        <span style={{ color: 'var(--badge-pass-text)' }}>{results.passedChecks}</span>
-                        <span style={{ color: "#c7c7c7" }}>passes</span>
-                      </span>
-                      <span 
-                        className="flex items-center gap-2 text-[14px] px-3 py-1.5"
-                        style={{ 
-                          backgroundColor: 'var(--badge-improve-bg)', 
-                          border: '1px solid var(--badge-improve-border)',
-                          borderRadius: '41px' 
-                        }}
-                      >
-                        <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--icon-fail-bg)' }}>
-                          <XCircle className="h-3 w-3" style={{ color: 'var(--redText)', stroke: 'var(--redText)' }} />
-                        </div>
-                        <span style={{ color: 'var(--redText)' }}>{results.failedChecks}</span>
-                        <span style={{ color: "#c7c7c7" }}>improvements needed</span>
-                      </span>
-                    </div>
+                    <motion.div
+                      initial={{ scale: 0.9 }}
+                      animate={{ scale: 1 }}
+                      className="text-body-sm text-text2 text-center"
+                    >
+                      {results.passedChecks} passes <CheckCircle className="inline-block h-4 w-4 text-greenText" style={{color: 'rgb(var(--greenText))', stroke: 'rgb(var(--greenText))'}} /> • {results.failedChecks} improvements needed <XCircle className="inline-block h-4 w-4 text-redText" style={{color: 'rgb(var(--redText))', stroke: 'rgb(var(--redText))'}} />
+                    </motion.div>
                   )}
                 </CardHeader>
                 <CardContent>
@@ -1513,8 +1432,7 @@ export default function Home() {
                           <motion.div
                             key={index}
                             variants={item}
-                            className="p-5 w-full transition-colors"
-                            style={{ backgroundColor: "#323232", borderRadius: "14px", border: "none" }}
+                            className="border p-4 w-full rounded-lg hover:bg-background2 transition-colors"
                             whileHover={{ y: -2, transition: { duration: 0.2 } }}
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
@@ -1531,13 +1449,9 @@ export default function Home() {
                                     animate="animate"
                                   >
                                     {check.passed ? (
-                                      <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'var(--icon-pass-bg)' }}>
-                                        <CheckCircle className="h-4 w-4" style={{ color: 'var(--greenText)', stroke: 'var(--greenText)' }} />
-                                      </div>
+                                      <CheckCircle className="h-5 w-5 text-greenText flex-shrink-0" style={{color: 'rgb(var(--greenText))', stroke: 'rgb(var(--greenText))'}} />
                                     ) : (
-                                      <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'var(--icon-fail-bg)' }}>
-                                        <XCircle className="h-4 w-4" style={{ color: 'var(--redText)', stroke: 'var(--redText)' }} />
-                                      </div>
+                                      <XCircle className="h-5 w-5 text-redText flex-shrink-0" style={{color: 'rgb(var(--redText))', stroke: 'rgb(var(--redText))'}} />
                                     )}
                                   </motion.div>
                                   {check.title}
@@ -1562,7 +1476,7 @@ export default function Home() {
                                 </motion.div>
                                 
                                 {/* Always show description - keyword results are no longer displayed */}
-                                <div className="text-sm text-muted-foreground text-break">
+                                <div className="text-body-sm text-text2 text-break">
                                   <p className="inline">
                                     {check.passed 
                                       ? check.description 
@@ -1755,8 +1669,8 @@ export default function Home() {
                               {checks.filter(check => check && check.title).map((check, idx) => (
                                 <div key={idx} className="flex items-center gap-1.5">
                                   {check.passed ? 
-                                    <CheckCircle className="h-4 w-4 text-greenText flex-shrink-0" style={{color: 'var(--greenText)', stroke: 'var(--greenText)'}} /> : 
-                                    <XCircle className="h-4 w-4 text-redText flex-shrink-0" style={{color: 'var(--redText)', stroke: 'var(--redText)'}} />
+                                    <CheckCircle className="h-4 w-4 text-greenText flex-shrink-0" style={{color: 'rgb(var(--greenText))', stroke: 'rgb(var(--greenText))'}} /> : 
+                                    <XCircle className="h-4 w-4 text-redText flex-shrink-0" style={{color: 'rgb(var(--redText))', stroke: 'rgb(var(--redText))'}} />
                                   }
                                   <span>{check.title}</span>
                                 </div>
