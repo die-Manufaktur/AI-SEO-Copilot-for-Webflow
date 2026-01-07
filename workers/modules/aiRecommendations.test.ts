@@ -64,12 +64,15 @@ describe('aiRecommendations', () => {
       OPENAI_API_KEY: 'test-api-key'
     } as any;
 
-    it('should throw error when OpenAI API key is not configured', async () => {
+    it('should return fallback recommendation when OpenAI API key is not configured', async () => {
       const envWithoutKey = {} as any;
-      
-      await expect(
-        getAIRecommendation('Keyphrase in Title', 'test keyword', envWithoutKey)
-      ).rejects.toThrow('OpenAI API key not configured');
+      mockShouldShowCopyButton.mockReturnValue(false);
+
+      const result = await getAIRecommendation('Keyphrase in Title', 'test keyword', envWithoutKey);
+
+      // Should return a fallback recommendation instead of throwing
+      expect(result).toContain('test keyword');
+      expect(result).toContain('title');
     });
 
     it('should generate AI recommendation for copyable content', async () => {
@@ -290,11 +293,11 @@ describe('aiRecommendations', () => {
       global.setTimeout = originalSetTimeout;
     });
 
-    it('should throw error after max retries exceeded', async () => {
+    it('should fallback to rule-based recommendation after max retries exceeded', async () => {
       const mockError = new Error('Persistent API error');
 
       mockShouldShowCopyButton.mockReturnValue(false);
-      
+
       const mockCreate = vi.fn().mockRejectedValue(mockError);
       mockOpenAI.mockImplementation(() => ({
         chat: { completions: { create: mockCreate } }
@@ -306,14 +309,15 @@ describe('aiRecommendations', () => {
         return 1 as any;
       }) as any;
 
-      await expect(
-        getAIRecommendation('Keyphrase in Title', 'test keyword', mockEnv)
-      ).rejects.toThrow('Persistent API error');
+      // Should return fallback recommendation instead of throwing
+      const result = await getAIRecommendation('Keyphrase in Title', 'test keyword', mockEnv);
 
       expect(mockCreate).toHaveBeenCalledTimes(3); // 1 initial + 2 retries
+      // Verify fallback recommendation is returned
+      expect(result).toContain('test keyword');
     });
 
-    it('should provide localized error messages for non-English languages', async () => {
+    it('should provide localized fallback recommendations for non-English languages', async () => {
       mockGetLanguageByCode.mockReturnValue({
         code: 'fr',
         name: 'French',
@@ -321,8 +325,10 @@ describe('aiRecommendations', () => {
         flag: '🇫🇷'
       });
 
+      mockShouldShowCopyButton.mockReturnValue(false);
+
       const mockError = new Error('API error');
-      
+
       const mockCreate = vi.fn().mockRejectedValue(mockError);
       mockOpenAI.mockImplementation(() => ({
         chat: { completions: { create: mockCreate } }
@@ -332,12 +338,14 @@ describe('aiRecommendations', () => {
         languageCode: 'fr'
       };
 
-      await expect(
-        getAIRecommendation('Keyphrase in Title', 'test', mockEnv, undefined, advancedOptions)
-      ).rejects.toThrow('Impossible de générer une recommandation');
+      // Should return French fallback recommendation instead of throwing
+      const result = await getAIRecommendation('Keyphrase in Title', 'test', mockEnv, undefined, advancedOptions);
+
+      // Verify French fallback is returned
+      expect(result).toContain('test');
     });
 
-    it('should handle empty AI response', async () => {
+    it('should fallback on empty AI response', async () => {
       const mockResponse = {
         choices: [{
           message: {
@@ -346,14 +354,18 @@ describe('aiRecommendations', () => {
         }]
       };
 
+      mockShouldShowCopyButton.mockReturnValue(false);
+
       const mockCreate = vi.fn().mockResolvedValue(mockResponse);
       mockOpenAI.mockImplementation(() => ({
         chat: { completions: { create: mockCreate } }
       } as any));
 
-      await expect(
-        getAIRecommendation('Keyphrase in Title', 'test keyword', mockEnv)
-      ).rejects.toThrow('No recommendation received from OpenAI');
+      // Should return fallback recommendation instead of throwing
+      const result = await getAIRecommendation('Keyphrase in Title', 'test keyword', mockEnv);
+
+      // Verify fallback recommendation is returned
+      expect(result).toContain('test keyword');
     });
 
     it('should warn about potential language mismatch', async () => {

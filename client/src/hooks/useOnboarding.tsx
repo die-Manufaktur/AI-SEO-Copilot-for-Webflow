@@ -23,7 +23,7 @@ type StepStatus = 'completed' | 'current' | 'upcoming';
 const ONBOARDING_STEPS: OnboardingStep[] = [
   {
     title: 'Welcome',
-    description: 'Get started with AI SEO Copilot',
+    description: "Get started with Roger's SEO Analysis Tool",
     component: 'WelcomeStep'
   },
   {

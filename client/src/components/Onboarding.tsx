@@ -111,7 +111,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ showResetOption = false 
               <Sparkles className="h-10 w-10 text-primary" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold mb-2">Welcome to AI SEO Copilot</h2>
+              <h2 className="text-2xl font-bold mb-2">Welcome to Roger's SEO Analysis Tool</h2>
               <p className="text-muted-foreground">
                 Let's get you set up in just a few steps
               </p>
@@ -221,7 +221,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ showResetOption = false 
             <div className="text-center">
               <h2 className="text-xl font-bold mb-2">Key Features</h2>
               <p className="text-muted-foreground text-sm">
-                Here's what you can do with AI SEO Copilot
+                Here's what you can do with Roger's SEO Analysis Tool
               </p>
             </div>
 

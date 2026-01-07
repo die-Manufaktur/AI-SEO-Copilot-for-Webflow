@@ -12,7 +12,151 @@ export function shouldHaveCopyButton(checkType: string): boolean {
 }
 
 /**
+ * Generate rule-based fallback recommendations when OpenAI is unavailable
+ * Provides useful SEO guidance without requiring an API key
+ */
+function generateFallbackRecommendation(
+  checkType: string,
+  keyphrase: string,
+  context?: string,
+  advancedOptions?: AdvancedOptions
+): string {
+  const languageCode = advancedOptions?.languageCode || DEFAULT_LANGUAGE_CODE;
+  const pageType = advancedOptions?.pageType?.toLowerCase() || 'page';
+  const needsCopyableContent = shouldShowCopyButton(checkType);
+
+  // Multilingual fallback templates
+  const templates: Record<string, Record<string, Record<string, string>>> = {
+    en: {
+      'Keyphrase in Title': {
+        copyable: `${keyphrase} - Professional ${pageType === 'homepage' ? 'Solutions' : 'Guide'} | Your Brand`,
+        advice: `Add "${keyphrase}" to your title tag. Optimal length is 50-60 characters. Place the keyphrase near the beginning for better SEO impact.`
+      },
+      'Keyphrase in Meta Description': {
+        copyable: `Discover expert insights about ${keyphrase}. Our comprehensive ${pageType} provides actionable tips and proven strategies to help you succeed. Learn more today!`,
+        advice: `Include "${keyphrase}" naturally in your meta description. Keep it between 120-155 characters and make it compelling to encourage clicks.`
+      },
+      'Keyphrase in URL': {
+        copyable: keyphrase.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
+        advice: `Use a URL-friendly version of "${keyphrase}". Use lowercase letters, hyphens for spaces, and keep it concise.`
+      },
+      'Keyphrase in Introduction': {
+        copyable: `Welcome to our comprehensive guide on ${keyphrase}. In this ${pageType}, we'll explore everything you need to know about ${keyphrase} and how it can benefit you.`,
+        advice: `Add "${keyphrase}" to your first paragraph. This helps search engines understand your content's topic immediately.`
+      },
+      'Keyphrase in H1 Heading': {
+        copyable: `Complete Guide to ${keyphrase}`,
+        advice: `Include "${keyphrase}" in your main H1 heading. Each page should have exactly one H1 tag.`
+      },
+      'Keyphrase in H2 Headings': {
+        copyable: `Understanding ${keyphrase}: Key Insights`,
+        advice: `Add at least one H2 heading containing "${keyphrase}". This improves content structure and SEO.`
+      },
+      'Image Alt Attributes': {
+        copyable: `${keyphrase} - descriptive image`,
+        advice: `Add descriptive alt text to all images. Include "${keyphrase}" where relevant, but keep it natural and descriptive.`
+      },
+      'Internal Links': {
+        copyable: '',
+        advice: `Add internal links to related pages on your site. This helps distribute link equity and improves user navigation.`
+      },
+      'Outbound Links': {
+        copyable: '',
+        advice: `Include 1-2 outbound links to authoritative, relevant sources. This adds credibility and context to your content.`
+      },
+      'default': {
+        copyable: '',
+        advice: `Review and optimize this SEO element for "${keyphrase}". Follow best practices for improved search visibility.`
+      }
+    },
+    de: {
+      'Keyphrase in Title': {
+        copyable: `${keyphrase} - Professioneller Leitfaden | Ihre Marke`,
+        advice: `Fügen Sie "${keyphrase}" zu Ihrem Titel hinzu. Optimale Länge: 50-60 Zeichen.`
+      },
+      'Keyphrase in Meta Description': {
+        copyable: `Entdecken Sie Expertenwissen über ${keyphrase}. Unser umfassender Leitfaden bietet praktische Tipps und bewährte Strategien.`,
+        advice: `Integrieren Sie "${keyphrase}" natürlich in Ihre Meta-Beschreibung. Halten Sie sie zwischen 120-155 Zeichen.`
+      },
+      'default': {
+        copyable: '',
+        advice: `Überprüfen und optimieren Sie dieses SEO-Element für "${keyphrase}".`
+      }
+    },
+    fr: {
+      'Keyphrase in Title': {
+        copyable: `${keyphrase} - Guide Professionnel | Votre Marque`,
+        advice: `Ajoutez "${keyphrase}" à votre titre. Longueur optimale : 50-60 caractères.`
+      },
+      'Keyphrase in Meta Description': {
+        copyable: `Découvrez des conseils d'experts sur ${keyphrase}. Notre guide complet offre des conseils pratiques et des stratégies éprouvées.`,
+        advice: `Incluez "${keyphrase}" naturellement dans votre méta-description. Gardez-la entre 120-155 caractères.`
+      },
+      'default': {
+        copyable: '',
+        advice: `Examinez et optimisez cet élément SEO pour "${keyphrase}".`
+      }
+    },
+    es: {
+      'Keyphrase in Title': {
+        copyable: `${keyphrase} - Guía Profesional | Tu Marca`,
+        advice: `Añade "${keyphrase}" a tu título. Longitud óptima: 50-60 caracteres.`
+      },
+      'Keyphrase in Meta Description': {
+        copyable: `Descubre información experta sobre ${keyphrase}. Nuestra guía completa ofrece consejos prácticos y estrategias probadas.`,
+        advice: `Incluye "${keyphrase}" de forma natural en tu meta descripción. Mantenla entre 120-155 caracteres.`
+      },
+      'default': {
+        copyable: '',
+        advice: `Revisa y optimiza este elemento SEO para "${keyphrase}".`
+      }
+    },
+    it: {
+      'default': {
+        copyable: '',
+        advice: `Rivedi e ottimizza questo elemento SEO per "${keyphrase}".`
+      }
+    },
+    ja: {
+      'default': {
+        copyable: '',
+        advice: `"${keyphrase}"のSEO要素を確認し、最適化してください。`
+      }
+    },
+    pt: {
+      'default': {
+        copyable: '',
+        advice: `Revise e otimize este elemento SEO para "${keyphrase}".`
+      }
+    },
+    nl: {
+      'default': {
+        copyable: '',
+        advice: `Controleer en optimaliseer dit SEO-element voor "${keyphrase}".`
+      }
+    },
+    pl: {
+      'default': {
+        copyable: '',
+        advice: `Sprawdź i zoptymalizuj ten element SEO dla "${keyphrase}".`
+      }
+    }
+  };
+
+  // Get templates for requested language, fallback to English
+  const langTemplates = templates[languageCode] || templates.en;
+  const checkTemplates = langTemplates[checkType] || langTemplates['default'] || templates.en['default'];
+
+  if (needsCopyableContent && checkTemplates.copyable) {
+    return checkTemplates.copyable;
+  }
+
+  return checkTemplates.advice;
+}
+
+/**
  * Generates an AI-powered recommendation for an SEO check
+ * Falls back to rule-based recommendations when OpenAI is unavailable
  * @param checkType The type of SEO check
  * @param keyphrase The target keyphrase
  * @param env Environment variables
@@ -23,13 +167,15 @@ export function shouldHaveCopyButton(checkType: string): boolean {
 export async function getAIRecommendation(
   checkType: string,
   keyphrase: string,
-  env: WorkerEnvironment, 
+  env: WorkerEnvironment,
   context?: string,
   advancedOptions?: AdvancedOptions
 ): Promise<string> {
-  try {    
+  try {
+    // If no OpenAI API key, use fallback recommendations
     if (!env.OPENAI_API_KEY) {
-      throw new Error('OpenAI API key not configured');
+      console.log('[AI Recommendations] No API key configured, using fallback recommendations');
+      return generateFallbackRecommendation(checkType, keyphrase, context, advancedOptions);
     }
 
     const openai = new OpenAI({
@@ -144,28 +290,10 @@ export async function getAIRecommendation(
     return recommendation;
   } catch (error) {
     console.error(`[AI Recommendations] Error generating AI recommendation:`, error);
-    
-    // Provide language-specific fallback message if possible
-    const requestedLanguageCode = advancedOptions?.languageCode || DEFAULT_LANGUAGE_CODE;
-    const requestedLanguage = getLanguageByCode(requestedLanguageCode);
-    
-    if (requestedLanguageCode !== DEFAULT_LANGUAGE_CODE && requestedLanguage) {
-      const fallbackMessages: Record<string, string> = {
-        'fr': 'Impossible de générer une recommandation pour le moment. Veuillez réessayer.',
-        'de': 'Kann derzeit keine Empfehlung generieren. Bitte versuchen Sie es erneut.',
-        'es': 'No se puede generar una recomendación en este momento. Por favor, inténtelo de nuevo.',
-        'it': 'Impossibile generare un consiglio al momento. Si prega di riprovare.',
-        'ja': '現在おすすめを生成できません。もう一度お試しください。',
-        'pt': 'Não é possível gerar uma recomendação neste momento. Tente novamente.',
-        'nl': 'Kan momenteel geen aanbeveling genereren. Probeer het opnieuw.',
-        'pl': 'Nie można wygenerować rekomendacji w tym momencie. Spróbuj ponownie.'
-      };
-      
-      const fallbackMessage = fallbackMessages[requestedLanguageCode] || 'Unable to generate recommendation at this time. Please try again.';
-      throw new Error(`Failed to get AI recommendation for ${checkType}: ${fallbackMessage}`);
-    }
-    
-    throw new Error(`Failed to get AI recommendation for ${checkType}: ${error instanceof Error ? error.message : String(error)}`);
+
+    // Gracefully fallback to rule-based recommendations on any error
+    console.log('[AI Recommendations] Falling back to rule-based recommendations due to error');
+    return generateFallbackRecommendation(checkType, keyphrase, context, advancedOptions);
   }
 }
 

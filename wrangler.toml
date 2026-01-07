@@ -1,5 +1,5 @@
 # Version: 4.6.3
-name = "seo-copilot-api"
+name = "rogers-seo-analysis-api"
 main = "./workers/index.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
@@ -17,8 +17,12 @@ port = 8787
 enabled = true  
 head_sampling_rate = 1 # Logs 100% of requests
 
+[env.development]
+name = "rogers-seo-analysis-api-dev"
+vars = { USE_GPT_RECOMMENDATIONS = "true", ALLOWED_ORIGINS = "https://webflow.com,https://*.webflow-ext.com,https://*.webflow.io,http://localhost:1337,http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:1337"}
+
 [env.production]
-name = "seo-copilot-api-production"
+name = "rogers-seo-analysis-api-production"
 vars = { USE_GPT_RECOMMENDATIONS = "true", ALLOWED_ORIGINS = "https://webflow.com,https://*.webflow-ext.com,https://*.webflow.io,http://localhost:1337,http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:1337"}
 
 
