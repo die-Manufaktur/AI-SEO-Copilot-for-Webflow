@@ -197,7 +197,7 @@ export const HelpSystem: React.FC<HelpSystemProps> = ({ className }) => {
       id: 'getting-started',
       title: 'Getting Started Tutorial',
       steps: [
-        { title: 'Welcome', content: 'Welcome to AI SEO Copilot!' },
+        { title: 'Welcome', content: "Welcome to Roger's SEO Analysis Tool!" },
         { title: 'Enter Keywords', content: 'Start by entering your target keywords.' },
         { title: 'Run Analysis', content: 'Click "Analyze Page" to scan for SEO issues.' },
         { title: 'Review Results', content: 'Review the color-coded results.' },

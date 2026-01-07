@@ -73,8 +73,8 @@ const HELP_ARTICLES: HelpArticle[] = [
   // Getting Started
   {
     id: 'getting-started',
-    title: 'Getting Started with SEO Copilot',
-    content: 'Welcome to AI SEO Copilot for Webflow! This extension helps you optimize your Webflow pages for search engines.',
+    title: "Getting Started with Roger's SEO Analysis Tool",
+    content: "Welcome to Roger's SEO Analysis Tool for Webflow! This extension helps you optimize your Webflow pages for search engines.",
     category: 'getting-started',
     tips: [
       'Start by entering your target keywords',
@@ -204,11 +204,11 @@ const TUTORIALS: Tutorial[] = [
   {
     id: 'getting-started',
     title: 'Getting Started Tutorial',
-    description: 'Learn the basics of using AI SEO Copilot',
+    description: "Learn the basics of using Roger's SEO Analysis Tool",
     steps: [
       {
         title: 'Welcome',
-        content: 'Welcome to AI SEO Copilot! This tutorial will guide you through the basics.',
+        content: "Welcome to Roger's SEO Analysis Tool! This tutorial will guide you through the basics.",
         targetElement: '.help-button'
       },
       {
