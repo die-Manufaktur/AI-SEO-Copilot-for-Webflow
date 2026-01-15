@@ -7,6 +7,10 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export function isDevelopmentMode(): boolean {
+  return import.meta.env.DEV;
+}
+
 
 /**
  * Log level types

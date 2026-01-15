@@ -8,6 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle as OriginalCardTitle } from ".
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "../components/ui/form";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
+import { Badge } from "../components/ui/badge";
+import { StatsSummary } from "../components/ui/stats-summary";
 import { ScrollArea } from "../components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Switch } from "../components/ui/switch";
@@ -1390,9 +1392,11 @@ export default function Home() {
                       />
                       <div className="mt-2 text-center">
                         <p className="text-body-lg font-medium text-text1">{scoreRating}</p>
-                        <p className="text-body-sm text-text2 mt-1">
-                          {results.passedChecks} passed <CheckCircle className="inline-block h-4 w-4 text-greenText" style={{color: 'rgb(var(--greenText))', stroke: 'rgb(var(--greenText))'}} /> • {results.failedChecks} to improve <XCircle className="inline-block h-4 w-4 text-redText" style={{color: 'rgb(var(--redText))', stroke: 'rgb(var(--redText))'}} />
-                        </p>
+                        <StatsSummary
+                          passed={results.passedChecks}
+                          toImprove={results.failedChecks}
+                          className="mt-1 justify-center"
+                        />
                         
                         {seoScore === 100 && (
                           <motion.div
@@ -1443,17 +1447,35 @@ export default function Home() {
                                 <motion.div
                                   className="font-medium flex items-center gap-2"
                                 >
-                                  <motion.div
-                                    variants={iconAnimation}
-                                    initial="initial"
-                                    animate="animate"
-                                  >
-                                    {check.passed ? (
-                                      <CheckCircle className="h-5 w-5 text-greenText flex-shrink-0" style={{color: 'rgb(var(--greenText))', stroke: 'rgb(var(--greenText))'}} />
-                                    ) : (
-                                      <XCircle className="h-5 w-5 text-redText flex-shrink-0" style={{color: 'rgb(var(--redText))', stroke: 'rgb(var(--redText))'}} />
-                                    )}
-                                  </motion.div>
+                                  <div className="flex items-center gap-2">
+                                    {/* Triangle arrow indicator */}
+                                    <span
+                                      style={{
+                                        display: 'inline-block',
+                                        width: '0',
+                                        height: '0',
+                                        borderStyle: 'solid',
+                                        borderWidth: check.passed ? '0 4px 8px 4px' : '8px 4px 0 4px',
+                                        borderColor: check.passed
+                                          ? 'transparent transparent var(--color-success) transparent'
+                                          : 'var(--color-error) transparent transparent transparent',
+                                        flexShrink: 0
+                                      }}
+                                      aria-hidden="true"
+                                    />
+                                    {/* Keep existing circle icon */}
+                                    <motion.div
+                                      variants={iconAnimation}
+                                      initial="initial"
+                                      animate="animate"
+                                    >
+                                      {check.passed ? (
+                                        <CheckCircle className="h-5 w-5 text-greenText flex-shrink-0" style={{color: 'rgb(var(--greenText))', stroke: 'rgb(var(--greenText))'}} />
+                                      ) : (
+                                        <XCircle className="h-5 w-5 text-redText flex-shrink-0" style={{color: 'rgb(var(--redText))', stroke: 'rgb(var(--redText))'}} />
+                                      )}
+                                    </motion.div>
+                                  </div>
                                   {check.title}
 
                                   <TooltipProvider>
@@ -1660,18 +1682,28 @@ export default function Home() {
                               <h3 className="text-lg font-medium">{category}</h3>
                               <div className="flex items-center gap-2">
                                 {getCategoryStatusIcon(status)}
-                                <span className="text-sm text-muted-foreground">
+                                <Badge variant="success" className="flex items-center gap-1">
+                                  {passedCount > 0 && <ChevronUp className="h-3 w-3" />}
+                                  {passedCount === 0 && <ChevronDown className="h-3 w-3" />}
                                   {passedCount}/{checks.length} passed
-                                </span>
+                                  <ExternalLink className="h-3 w-3" />
+                                </Badge>
                               </div>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-muted-foreground">
                               {checks.filter(check => check && check.title).map((check, idx) => (
                                 <div key={idx} className="flex items-center gap-1.5">
-                                  {check.passed ? 
-                                    <CheckCircle className="h-4 w-4 text-greenText flex-shrink-0" style={{color: 'rgb(var(--greenText))', stroke: 'rgb(var(--greenText))'}} /> : 
-                                    <XCircle className="h-4 w-4 text-redText flex-shrink-0" style={{color: 'rgb(var(--redText))', stroke: 'rgb(var(--redText))'}} />
-                                  }
+                                  <span style={{
+                                    display: 'inline-block',
+                                    width: '0',
+                                    height: '0',
+                                    borderStyle: 'solid',
+                                    borderWidth: check.passed ? '0 4px 8px 4px' : '8px 4px 0 4px',
+                                    borderColor: check.passed
+                                      ? 'transparent transparent #4CAF50 transparent'
+                                      : '#FF5252 transparent transparent transparent',
+                                    flexShrink: 0
+                                  }} />
                                   <span>{check.title}</span>
                                 </div>
                               ))}

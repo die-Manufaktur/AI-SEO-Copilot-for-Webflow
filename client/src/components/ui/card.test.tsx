@@ -12,10 +12,10 @@ describe('Card Components', () => {
   describe('Card', () => {
     it('should render with default classes', () => {
       render(<Card data-testid="card">Card content</Card>);
-      
+
       const card = screen.getByTestId('card');
       expect(card).toBeInTheDocument();
-      expect(card).toHaveClass('rounded-[20px]', 'border-0', 'bg-[#323232]', 'text-white', 'shadow-sm');
+      expect(card).toHaveClass('rounded-[var(--radius-card)]', 'border', 'border-color', 'bg-card-bg', 'text-text-primary', 'shadow-xs');
     });
 
     it('should accept additional className', () => {
@@ -53,7 +53,7 @@ describe('Card Components', () => {
       
       const header = screen.getByTestId('card-header');
       expect(header).toBeInTheDocument();
-      expect(header).toHaveClass('flex', 'flex-col', 'space-y-1.5', 'p-6');
+      expect(header).toHaveClass('flex', 'flex-col', 'space-y-1.5', 'px-5', 'pt-8');
     });
 
     it('should accept additional className', () => {
@@ -74,11 +74,11 @@ describe('Card Components', () => {
   describe('CardTitle', () => {
     it('should render as h3 element with default classes', () => {
       render(<CardTitle>Test Title</CardTitle>);
-      
+
       const title = screen.getByRole('heading', { level: 3 });
       expect(title).toBeInTheDocument();
       expect(title.tagName).toBe('H3');
-      expect(title).toHaveClass('text-[28px]', 'font-medium', 'leading-tight', 'tracking-tight', 'text-white');
+      expect(title).toHaveClass('text-h2', 'text-text-primary');
     });
 
     it('should accept additional className', () => {
@@ -105,11 +105,11 @@ describe('Card Components', () => {
   describe('CardDescription', () => {
     it('should render as p element with default classes', () => {
       render(<CardDescription>Test description</CardDescription>);
-      
+
       const description = screen.getByText('Test description');
       expect(description).toBeInTheDocument();
       expect(description.tagName).toBe('P');
-      expect(description).toHaveClass('text-[16px]', 'text-[#c7c7c7]');
+      expect(description).toHaveClass('text-body-16', 'text-text-secondary');
     });
 
     it('should accept additional className', () => {
@@ -133,7 +133,7 @@ describe('Card Components', () => {
       
       const content = screen.getByTestId('card-content');
       expect(content).toBeInTheDocument();
-      expect(content).toHaveClass('p-6', 'pt-0');
+      expect(content).toHaveClass('px-5', 'pb-5');
     });
 
     it('should accept additional className', () => {

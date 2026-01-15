@@ -45,17 +45,19 @@ export function LanguageSelector({
 
   return (
     <div className={className}>
-      <CopyTooltip content="Choose the language you want AI recommendations to appear in.">
-        <Label htmlFor="language-select" className="text-sm font-medium cursor-help">
-          {label}
-        </Label>
-      </CopyTooltip>
+      {label && (
+        <CopyTooltip content="Choose the language you want AI recommendations to appear in.">
+          <Label htmlFor="language-select" className="text-sm font-medium cursor-help">
+            {label}
+          </Label>
+        </CopyTooltip>
+      )}
       <Select
         value={selectedLanguage.code}
         onValueChange={handleValueChange}
         disabled={disabled}
       >
-        <SelectTrigger id="language-select" className="w-full mt-1 focus:ring-0 focus:ring-offset-0">
+        <SelectTrigger id="language-select" className={`w-full ${label ? 'mt-1' : ''} focus:ring-0 focus:ring-offset-0 border-0 bg-transparent p-0 h-auto`}>
           <SelectValue>
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide">{selectedLanguage.code}</span>

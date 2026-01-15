@@ -19,10 +19,10 @@ export function ProgressCircle({
   
   // Get color based on score value - Figma thresholds
   const getScoreColor = (score: number) => {
-    if (score >= 90) return "var(--score-high)"; // High: Green #63D489
-    if (score >= 75) return "var(--score-good)"; // Good: Blue #5AA9FF
-    if (score >= 60) return "var(--score-fair)"; // Fair: Yellow #FFDD64
-    return "var(--score-low)"; // Low: Red #FF8484
+    if (score >= 90) return "#4CAF50"; // High: Green (success color)
+    if (score >= 75) return "#5AA9FF"; // Good: Blue
+    if (score >= 60) return "#FFD064"; // Fair: Yellow
+    return "#FF5252"; // Low: Red (error color)
   };
 
   // Get the score color once so we can use it for both the circle and text
@@ -64,7 +64,7 @@ export function ProgressCircle({
           <span className="font-bold" style={{ color: scoreColor, fontSize: "60px", lineHeight: "1" }}>
             {Math.round(value)}
           </span>
-          <span className="font-semibold mt-2" style={{ color: "#ffffff", fontSize: "16px" }}>{scoreText}</span>
+          <span className="font-semibold mt-2" style={{ color: "var(--color-text-primary)", fontSize: "16px" }}>{scoreText}</span>
         </div>
       </div>
     </div>

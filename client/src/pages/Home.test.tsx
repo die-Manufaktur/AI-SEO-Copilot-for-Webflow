@@ -48,6 +48,7 @@ vi.mock('canvas-confetti', () => ({
   default: vi.fn()
 }));
 
+
 // Mock advanced options storage
 vi.mock('../utils/advancedOptionsStorage', () => ({
   saveAdvancedOptionsForPage: vi.fn(),
@@ -204,7 +205,7 @@ describe('Home Component', () => {
 
   it('displays keyphrase input field', () => {
     renderWithProviders(<Home />);
-    expect(screen.getByPlaceholderText(/enter your target keyphrase/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/enter your main keyword/i)).toBeInTheDocument();
   });
 
   it('shows analyze button', () => {
@@ -216,7 +217,7 @@ describe('Home Component', () => {
     const user = userEvent.setup();
     renderWithProviders(<Home />);
     
-    const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
+    const input = screen.getByPlaceholderText(/enter your main keyword/i);
     
     // Type text into input field
     await user.type(input, 'test keyphrase');
@@ -234,7 +235,7 @@ describe('Home Component', () => {
     const user = userEvent.setup();
     renderWithProviders(<Home />);
     
-    const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
+    const input = screen.getByPlaceholderText(/enter your main keyword/i);
     const button = screen.getByText(/optimize my seo/i);
     
     // Type a single character (should be invalid)
@@ -264,7 +265,7 @@ describe('Home Component', () => {
     const user = userEvent.setup();
     renderWithProviders(<Home />);
     
-    const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
+    const input = screen.getByPlaceholderText(/enter your main keyword/i);
     const button = screen.getByText(/optimize my seo/i);
     
     // Type invalid input
@@ -292,7 +293,7 @@ describe('Home Component', () => {
     const user = userEvent.setup();
     renderWithProviders(<Home />);
     
-    const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
+    const input = screen.getByPlaceholderText(/enter your main keyword/i);
     const button = screen.getByText(/optimize my seo/i);
     
     // Perform rapid input changes
@@ -319,7 +320,7 @@ describe('Home Component', () => {
     const user = userEvent.setup();
     renderWithProviders(<Home />);
     
-    const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
+    const input = screen.getByPlaceholderText(/enter your main keyword/i);
     const button = screen.getByText(/optimize my seo/i);
     
     await user.type(input, 'test keyphrase');
@@ -342,7 +343,7 @@ describe('Home Component', () => {
     const user = userEvent.setup();
     renderWithProviders(<Home />);
     
-    const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
+    const input = screen.getByPlaceholderText(/enter your main keyword/i);
     const button = screen.getByText(/optimize my seo/i);
     
     await user.type(input, 'test keyphrase');
@@ -371,7 +372,7 @@ describe('Home Component', () => {
     const user = userEvent.setup();
     renderWithProviders(<Home />);
     
-    const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
+    const input = screen.getByPlaceholderText(/enter your main keyword/i);
     const button = screen.getByText(/optimize my seo/i);
     
     await user.type(input, 'test keyphrase');
@@ -473,7 +474,7 @@ describe('Home Component - Additional Coverage', () => {
       const user = userEvent.setup();
       renderWithProviders(<Home />);
       
-      const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
+      const input = screen.getByPlaceholderText(/enter your main keyword/i);
       const button = screen.getByText(/optimize my seo/i);
       
       await user.type(input, 'test keyphrase');
@@ -494,7 +495,7 @@ describe('Home Component - Additional Coverage', () => {
       const user = userEvent.setup();
       renderWithProviders(<Home />);
       
-      const input = screen.getByPlaceholderText(/enter your target keyphrase/i);
+      const input = screen.getByPlaceholderText(/enter your main keyword/i);
       const button = screen.getByText(/optimize my seo/i);
       
       await user.type(input, 'test keyphrase');
@@ -546,24 +547,6 @@ describe('Home Component - Additional Coverage', () => {
 
   });
 
-  describe('Test Mode Functionality', () => {
-    beforeEach(() => {
-      // Mock NODE_ENV for development mode
-      vi.stubEnv('NODE_ENV', 'development');
-    });
-
-    afterEach(() => {
-      vi.unstubAllEnvs();
-    });
-
-    it('shows test button in development mode', () => {
-      renderWithProviders(<Home />);
-      
-      expect(screen.getByText(/🧪 Test 100 Score/)).toBeInTheDocument();
-    });
-
-
-  });
 
 
   describe('Advanced Options Persistent Settings', () => {

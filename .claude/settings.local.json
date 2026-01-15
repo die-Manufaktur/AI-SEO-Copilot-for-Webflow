@@ -181,6 +181,10 @@
           {
             "type": "command",
             "command": "node .claude/hooks/vscode-extension/quality-check.js"
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/validation/run-checks.cjs"
           }
         ]
       }
