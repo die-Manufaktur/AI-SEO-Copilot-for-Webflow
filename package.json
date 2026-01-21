@@ -34,7 +34,7 @@
     "commit": "git-cz --sign"
   },
   "devDependencies": {
-    "@anthropic-ai/claude-code": "^1.0.72",
+    "@anthropic-ai/claude-code": "^2.1.14",
     "@cloudflare/vite-plugin": "^1.11.2",
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
