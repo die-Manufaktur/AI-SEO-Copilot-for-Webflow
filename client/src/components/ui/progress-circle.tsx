@@ -10,7 +10,7 @@ interface ProgressCircleProps {
 export function ProgressCircle({
   value,
   size = 120,
-  strokeWidth = 10,
+  strokeWidth = 25,
   scoreText = "Score",
 }: ProgressCircleProps) {
   const radius = (size - strokeWidth) / 2;
@@ -19,10 +19,9 @@ export function ProgressCircle({
   
   // Get color based on score value - Figma thresholds
   const getScoreColor = (score: number) => {
-    if (score >= 90) return "#4CAF50"; // High: Green (success color)
-    if (score >= 75) return "#5AA9FF"; // Good: Blue
-    if (score >= 60) return "#FFD064"; // Fair: Yellow
-    return "#FF5252"; // Low: Red (error color)
+    if (score >= 67) return "var(--color-green)"; // >= 67%: Green
+    if (score >= 33) return "var(--color-yellow)"; // >= 33%: Yellow
+    return "var(--color-red)"; // < 33%: Red
   };
 
   // Get the score color once so we can use it for both the circle and text
@@ -43,7 +42,7 @@ export function ProgressCircle({
             cy={size / 2}
             r={radius}
             fill="transparent"
-            stroke="rgba(255, 255, 255, 0.08)"
+            stroke="var(--color-bg-300)"
             strokeWidth={strokeWidth}
           />
           {/* Progress circle */}

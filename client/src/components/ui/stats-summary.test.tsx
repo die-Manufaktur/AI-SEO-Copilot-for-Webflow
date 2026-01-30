@@ -16,16 +16,17 @@ describe('StatsSummary', () => {
       expect(screen.getByText(/2 to improve/i)).toBeInTheDocument();
     });
 
-    it('should render as a paragraph element by default', () => {
+    it('should render as a div element', () => {
       render(<StatsSummary passed={1} toImprove={1} />);
       const summary = screen.getByRole('status');
-      expect(summary.tagName).toBe('P');
+      expect(summary.tagName).toBe('DIV');
     });
 
-    it('should format text correctly with bullet separator', () => {
+    it('should format text correctly with triangle indicators', () => {
       render(<StatsSummary passed={10} toImprove={5} />);
-      const bullet = screen.getByText('•');
-      expect(bullet).toBeInTheDocument();
+      const summary = screen.getByRole('status');
+      expect(summary.textContent).toContain('▲');
+      expect(summary.textContent).toContain('▼');
     });
   });
 
@@ -58,8 +59,8 @@ describe('StatsSummary', () => {
   describe('Styling and Design Tokens', () => {
     it('should use flex layout with gap for icons and text', () => {
       render(<StatsSummary passed={5} toImprove={3} />);
-      const summary = screen.getByText(/5 passed/i).closest('p');
-      expect(summary).toHaveClass('flex', 'items-center', 'gap-2');
+      const passedText = screen.getByText(/5 passed/i).closest('span');
+      expect(passedText).toHaveClass('flex', 'items-center', 'gap-2');
     });
 
     it('should use correct font size from design token', () => {
@@ -68,10 +69,10 @@ describe('StatsSummary', () => {
       expect(summary).toHaveClass('text-font-size-sm');
     });
 
-    it('should have no margin by default', () => {
+    it('should have vertical margin', () => {
       render(<StatsSummary passed={5} toImprove={3} />);
       const summary = screen.getByRole('status');
-      expect(summary).toHaveClass('m-0');
+      expect(summary).toHaveClass('my-6');
     });
 
     it('should use medium font weight', () => {
@@ -91,7 +92,7 @@ describe('StatsSummary', () => {
     it('should merge custom className with default classes', () => {
       render(<StatsSummary passed={5} toImprove={3} className="custom-stats" />);
       const summary = screen.getByRole('status');
-      expect(summary).toHaveClass('custom-stats', 'text-font-size-sm', 'font-font-weight-medium', 'm-0');
+      expect(summary).toHaveClass('custom-stats', 'text-font-size-sm', 'font-font-weight-medium', 'my-6');
     });
 
     it('should accept passed as a required prop', () => {
@@ -106,10 +107,10 @@ describe('StatsSummary', () => {
   });
 
   describe('Semantic HTML and Accessibility', () => {
-    it('should use semantic paragraph element', () => {
+    it('should use semantic div element', () => {
       render(<StatsSummary passed={5} toImprove={3} />);
       const summary = screen.getByRole('status');
-      expect(summary.tagName).toBe('P');
+      expect(summary.tagName).toBe('DIV');
     });
 
     it('should have proper aria-label for screen readers', () => {
@@ -135,7 +136,7 @@ describe('StatsSummary', () => {
     it('should forward ref correctly', () => {
       const ref = { current: null };
       render(<StatsSummary passed={5} toImprove={3} ref={ref} />);
-      expect(ref.current).toBeInstanceOf(HTMLParagraphElement);
+      expect(ref.current).toBeInstanceOf(HTMLDivElement);
     });
 
     it('should handle numeric props correctly', () => {
@@ -146,58 +147,53 @@ describe('StatsSummary', () => {
   });
 
   describe('Text formatting', () => {
-    it('should use proper bullet character (•)', () => {
-      render(<StatsSummary passed={5} toImprove={3} />);
-      const bullet = screen.getByText('•');
-      expect(bullet).toBeInTheDocument();
-    });
-
-    it('should have proper spacing around bullet', () => {
+    it('should use proper triangle indicators', () => {
       render(<StatsSummary passed={5} toImprove={3} />);
       const summary = screen.getByRole('status');
-      expect(summary.textContent).toBe('5 passed•3 to improve');
+      expect(summary.textContent).toContain('▲');
+      expect(summary.textContent).toContain('▼');
+    });
+
+    it('should have proper text content', () => {
+      render(<StatsSummary passed={5} toImprove={3} />);
+      const summary = screen.getByRole('status');
+      expect(summary.textContent).toBe('▲ 5 passed▼ 3 to improve');
     });
 
     it('should handle singular and plural correctly', () => {
       render(<StatsSummary passed={1} toImprove={1} />);
       const summary = screen.getByRole('status');
-      expect(summary).toHaveTextContent('1 passed•1 to improve');
+      expect(summary).toHaveTextContent('▲ 1 passed▼ 1 to improve');
     });
   });
 
   describe('StatsSummary Color Styling', () => {
-    it('should display passed count in green with ChevronUp icon', () => {
+    it('should display passed count in green with up triangle indicator', () => {
       render(<StatsSummary passed={5} toImprove={3} />);
 
       const passedText = screen.getByText(/5 passed/i);
       const passedSpan = passedText.closest('span');
-      expect(passedSpan).toHaveStyle({ color: '#4CAF50' });
+      expect(passedSpan).toHaveStyle({ color: 'var(--color-green)' });
 
-      // Check for ChevronUp icon
-      const svg = passedSpan?.querySelector('svg');
-      expect(svg).toBeInTheDocument();
-      expect(svg).toHaveClass('h-3', 'w-3');
+      // Check for up triangle indicator in the text
+      expect(passedSpan?.textContent).toContain('▲');
     });
 
-    it('should display to improve count in red with ChevronDown icon', () => {
+    it('should display to improve count in red with down triangle indicator', () => {
       render(<StatsSummary passed={5} toImprove={3} />);
 
       const improveText = screen.getByText(/3 to improve/i);
       const improveSpan = improveText.closest('span');
-      expect(improveSpan).toHaveStyle({ color: '#FF5252' });
+      expect(improveSpan).toHaveStyle({ color: 'var(--color-red)' });
 
-      // Check for ChevronDown icon
-      const svg = improveSpan?.querySelector('svg');
-      expect(svg).toBeInTheDocument();
-      expect(svg).toHaveClass('h-3', 'w-3');
+      // Check for down triangle indicator in the text
+      expect(improveSpan?.textContent).toContain('▼');
     });
 
-    it('should display bullet separator in secondary text color', () => {
+    it('should use flexbox layout with space between', () => {
       render(<StatsSummary passed={5} toImprove={3} />);
-
-      const bullet = screen.getByText('•');
-      const bulletSpan = bullet.closest('span');
-      expect(bulletSpan).toHaveStyle({ color: 'var(--text-secondary)' });
+      const summary = screen.getByRole('status');
+      expect(summary).toHaveClass('justify-between');
     });
   });
 });

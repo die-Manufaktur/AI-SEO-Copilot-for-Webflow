@@ -157,7 +157,20 @@
       "mcp__serena__insert_before_symbol",
       "WebFetch(domain:alt-text-a11y-7473f2.webflow.io)",
       "mcp__serena__insert_after_symbol",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(tee:*)",
+      "Bash(CI=true npx vitest:*)",
+      "Bash(NODE_OPTIONS=\"--max-old-space-size=4096\" pnpm exec vitest:*)",
+      "Bash(../node_modules/.bin/vitest.CMD run:*)",
+      "Bash(../node_modules/.bin/vitest.CMD list:*)",
+      "Bash(powershell.exe -Command \"cd ''C:\\\\Users\\\\Paul Mulligan\\\\PMDS\\\\Projects\\\\AI-SEO-Copilot-for-Webflow''; pnpm test 2>&1 | Select-Object -First 100\")",
+      "Bash(powershell.exe -Command \"cd ''C:\\\\Users\\\\Paul Mulligan\\\\PMDS\\\\Projects\\\\AI-SEO-Copilot-for-Webflow''; pnpm test 2>&1 | Select-Object -Last 200\")",
+      "Bash(powershell.exe -Command \"cd ''C:\\\\Users\\\\Paul Mulligan\\\\PMDS\\\\Projects\\\\AI-SEO-Copilot-for-Webflow\\\\client''; npx vitest run src/components/ui/category-card.test.tsx --reporter=verbose 2>&1\")",
+      "Bash(powershell.exe -Command \"cd ''C:\\\\Users\\\\Paul Mulligan\\\\PMDS\\\\Projects\\\\AI-SEO-Copilot-for-Webflow\\\\client''; npx vitest run src/components/ui/category-card.test.tsx 2>&1 | Select-Object -Last 50\")",
+      "Bash(powershell.exe -Command \"cd ''C:\\\\Users\\\\Paul Mulligan\\\\PMDS\\\\Projects\\\\AI-SEO-Copilot-for-Webflow''; pnpm test 2>&1 | Select-Object -Last 30\")",
+      "Bash(powershell.exe -Command \"cd ''C:\\\\Users\\\\Paul Mulligan\\\\PMDS\\\\Projects\\\\AI-SEO-Copilot-for-Webflow''; pnpm test 2>&1 | Select-String -Pattern ''Test Files|Tests  |FAIL.*category-card''\")",
+      "Bash(powershell.exe -Command \"cd ''C:\\\\Users\\\\Paul Mulligan\\\\PMDS\\\\Projects\\\\AI-SEO-Copilot-for-Webflow''; pnpm test 2>&1 | Select-String -Pattern ''Test Files|      Tests''\")",
+      "Bash(powershell.exe -Command \"cd ''C:\\\\Users\\\\Paul Mulligan\\\\PMDS\\\\Projects\\\\AI-SEO-Copilot-for-Webflow\\\\client''; npx vitest run src/components/ui/category-card.test.tsx 2>&1 | Select-Object -Last 10\")"
     ],
     "deny": []
   },
@@ -168,26 +181,5 @@
     "Context7",
     "serena",
     "filesystem"
-  ],
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Write|Edit|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node .claude/hooks/node-typescript/quality-check.js"
-          },
-          {
-            "type": "command",
-            "command": "node .claude/hooks/vscode-extension/quality-check.js"
-          },
-          {
-            "type": "command",
-            "command": "node .claude/hooks/validation/run-checks.cjs"
-          }
-        ]
-      }
-    ]
-  }
+  ]
 }

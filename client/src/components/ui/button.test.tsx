@@ -81,13 +81,24 @@ describe('Button', () => {
   });
 
   describe('New Design System Features', () => {
-    it('should have full-width optimize variant with primary blue styling', () => {
-      render(<Button variant="optimize" fullWidth>Optimize my SEO</Button>);
+    it('should have auto-width optimize variant with primary blue styling and custom border radius', () => {
+      render(<Button variant="optimize" size="optimize">Optimize my SEO</Button>);
       const button = screen.getByRole('button');
 
-      expect(button).toHaveClass('w-full');
+      // Should NOT have w-full class - button sizes to content
+      expect(button).not.toHaveClass('w-full');
       expect(button).toHaveClass('bg-primary-blue');
-      expect(button).toHaveClass('rounded-[var(--radius-compact-button)]');
+      expect(button).toHaveClass('rounded-[27px]');
+    });
+
+    it('should apply optimize size variant correctly', () => {
+      render(<Button variant="optimize" size="optimize">Optimize my SEO</Button>);
+      const button = screen.getByRole('button');
+
+      // Optimize size uses compact design tokens (height: 40px)
+      expect(button).toHaveClass('h-[var(--button-height-compact)]');
+      expect(button).toHaveClass('px-[var(--padding-compact-button-x)]');
+      expect(button).toHaveClass('py-[var(--padding-compact-button-y)]');
     });
 
     it('should use new design tokens for primary variant', () => {

@@ -55,77 +55,77 @@ describe('ProgressCircle', () => {
     expect(actualOffset).toBeCloseTo(expectedOffset, 2);
   });
 
-  it('applies low (red) color for scores below 60', () => {
-    const { container } = render(<ProgressCircle value={40} size={120} strokeWidth={10} />);
-    
+  it('applies low (red) color for scores below 33', () => {
+    const { container } = render(<ProgressCircle value={20} size={120} strokeWidth={10} />);
+
     const circles = container.querySelectorAll('circle');
     const progressCircle = circles[1];
-    const valueText = screen.getByText('40');
-    
-    expect(progressCircle).toHaveAttribute('stroke', 'var(--score-low)');
-    expect(valueText).toHaveStyle('color: var(--score-low)');
+    const valueText = screen.getByText('20');
+
+    expect(progressCircle).toHaveAttribute('stroke', 'var(--color-red)');
+    expect(valueText).toHaveStyle('color: var(--color-red)');
   });
 
-  it('applies fair (yellow) color for scores between 60 and 74', () => {
-    const { container } = render(<ProgressCircle value={65} size={120} strokeWidth={10} />);
-    
+  it('applies fair (yellow) color for scores between 33 and 66', () => {
+    const { container } = render(<ProgressCircle value={50} size={120} strokeWidth={10} />);
+
     const circles = container.querySelectorAll('circle');
     const progressCircle = circles[1];
-    const valueText = screen.getByText('65');
-    
-    expect(progressCircle).toHaveAttribute('stroke', 'var(--score-fair)');
-    expect(valueText).toHaveStyle('color: var(--score-fair)');
+    const valueText = screen.getByText('50');
+
+    expect(progressCircle).toHaveAttribute('stroke', 'var(--color-yellow)');
+    expect(valueText).toHaveStyle('color: var(--color-yellow)');
   });
 
-  it('applies good (blue) color for scores between 75 and 89', () => {
-    const { container } = render(<ProgressCircle value={80} size={120} strokeWidth={10} />);
-    
+  it('applies good (green) color for scores 67 and above', () => {
+    const { container } = render(<ProgressCircle value={67} size={120} strokeWidth={10} />);
+
     const circles = container.querySelectorAll('circle');
     const progressCircle = circles[1];
-    const valueText = screen.getByText('80');
-    
-    expect(progressCircle).toHaveAttribute('stroke', 'var(--score-good)');
-    expect(valueText).toHaveStyle('color: var(--score-good)');
+    const valueText = screen.getByText('67');
+
+    expect(progressCircle).toHaveAttribute('stroke', 'var(--color-green)');
+    expect(valueText).toHaveStyle('color: var(--color-green)');
   });
 
   it('applies high (green) color for scores 90 and above', () => {
     const { container } = render(<ProgressCircle value={95} size={120} strokeWidth={10} />);
-    
+
     const circles = container.querySelectorAll('circle');
     const progressCircle = circles[1];
     const valueText = screen.getByText('95');
-    
-    expect(progressCircle).toHaveAttribute('stroke', 'var(--score-high)');
-    expect(valueText).toHaveStyle('color: var(--score-high)');
+
+    expect(progressCircle).toHaveAttribute('stroke', 'var(--color-green)');
+    expect(valueText).toHaveStyle('color: var(--color-green)');
   });
 
   it('handles edge cases for color thresholds', () => {
     const { container, rerender } = render(
-      <ProgressCircle value={60} size={120} strokeWidth={10} />
+      <ProgressCircle value={33} size={120} strokeWidth={10} />
     );
     let circles = container.querySelectorAll('circle');
     let progressCircle = circles[1];
-    expect(progressCircle).toHaveAttribute('stroke', 'var(--score-fair)');
-    
-    rerender(<ProgressCircle value={75} size={120} strokeWidth={10} />);
+    expect(progressCircle).toHaveAttribute('stroke', 'var(--color-yellow)');
+
+    rerender(<ProgressCircle value={66} size={120} strokeWidth={10} />);
     circles = container.querySelectorAll('circle');
     progressCircle = circles[1];
-    expect(progressCircle).toHaveAttribute('stroke', 'var(--score-good)');
-    
-    rerender(<ProgressCircle value={90} size={120} strokeWidth={10} />);
+    expect(progressCircle).toHaveAttribute('stroke', 'var(--color-yellow)');
+
+    rerender(<ProgressCircle value={67} size={120} strokeWidth={10} />);
     circles = container.querySelectorAll('circle');
     progressCircle = circles[1];
-    expect(progressCircle).toHaveAttribute('stroke', 'var(--score-high)');
-    
+    expect(progressCircle).toHaveAttribute('stroke', 'var(--color-green)');
+
     rerender(<ProgressCircle value={100} size={120} strokeWidth={10} />);
     circles = container.querySelectorAll('circle');
     progressCircle = circles[1];
-    expect(progressCircle).toHaveAttribute('stroke', 'var(--score-high)');
-    
+    expect(progressCircle).toHaveAttribute('stroke', 'var(--color-green)');
+
     rerender(<ProgressCircle value={0} size={120} strokeWidth={10} />);
     circles = container.querySelectorAll('circle');
     progressCircle = circles[1];
-    expect(progressCircle).toHaveAttribute('stroke', 'var(--score-low)');
+    expect(progressCircle).toHaveAttribute('stroke', 'var(--color-red)');
   });
 
   it('has a proper rotation transform on SVG', () => {
@@ -172,11 +172,11 @@ describe('ProgressCircle', () => {
     expect(screen.getByText('100')).toBeInTheDocument();
   });
 
-  it('uses rgba color for background circle track', () => {
+  it('uses design token color for background circle track', () => {
     const { container } = render(<ProgressCircle value={50} size={120} strokeWidth={10} />);
-    
+
     const circles = container.querySelectorAll('circle');
     const backgroundCircle = circles[0];
-    expect(backgroundCircle).toHaveAttribute('stroke', 'rgba(255, 255, 255, 0.08)');
+    expect(backgroundCircle).toHaveAttribute('stroke', 'var(--color-bg-300)');
   });
 });

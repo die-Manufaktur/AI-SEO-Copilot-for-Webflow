@@ -140,7 +140,7 @@
     "wouter": "^3.7.1",
     "zod": "^4.1.8"
   },
-  "packageManager": "pnpm@10.14.0",
+  "packageManager": "pnpm@10.28.1",
   "workspaces": [
     "packages/*"
   ],

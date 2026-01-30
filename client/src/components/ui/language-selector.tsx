@@ -44,10 +44,10 @@ export function LanguageSelector({
   };
 
   return (
-    <div className={className}>
+    <div className={`space-y-2 ${className || ''}`}>
       {label && (
         <CopyTooltip content="Choose the language you want AI recommendations to appear in.">
-          <Label htmlFor="language-select" className="text-sm font-medium cursor-help">
+          <Label htmlFor="language-select" className="text-body-sm font-medium text-text1">
             {label}
           </Label>
         </CopyTooltip>
@@ -57,37 +57,19 @@ export function LanguageSelector({
         onValueChange={handleValueChange}
         disabled={disabled}
       >
-        <SelectTrigger id="language-select" className={`w-full ${label ? 'mt-1' : ''} focus:ring-0 focus:ring-offset-0 border-0 bg-transparent p-0 h-auto`}>
-          <SelectValue>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide">{selectedLanguage.code}</span>
-              <span>{selectedLanguage.nativeName}</span>
-            </div>
-          </SelectValue>
+        <SelectTrigger id="language-select" className="focus:ring-0 focus:ring-offset-0 bg-[var(--color-bg-500)] text-text1 placeholder:text-text2 [&>span]:!text-[var(--color-text-primary)]">
+          <SelectValue placeholder="Select a language" />
         </SelectTrigger>
-        <SelectContent className="bg-background border border-input shadow-md">
+        <SelectContent className="bg-background3 border border-divider shadow-md">
           {SUPPORTED_LANGUAGES.map((language) => {
             const isDetectedDefault = language.code === detectedLanguageCode;
             return (
-              <SelectItem 
-                key={language.code} 
+              <SelectItem
+                key={language.code}
                 value={language.code}
-                className="cursor-pointer focus:bg-accent focus:text-accent-foreground data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                className="cursor-pointer focus:bg-background4 focus:text-text1 data-[highlighted]:bg-background4 data-[highlighted]:text-text1 hover:bg-background4 hover:text-text1 transition-colors"
               >
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide w-8">{language.code}</span>
-                  <div className="flex flex-col">
-                    <span>
-                      {language.nativeName}
-                      {isDetectedDefault && <span className="text-muted-foreground"> (default)</span>}
-                    </span>
-                    {language.name !== language.nativeName && (
-                      <span className="text-xs text-muted-foreground">
-                        {language.name}
-                      </span>
-                    )}
-                  </div>
-                </div>
+                {language.code.toUpperCase()} - {language.nativeName}{isDetectedDefault ? ' (default)' : ''}
               </SelectItem>
             );
           })}

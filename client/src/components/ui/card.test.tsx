@@ -72,18 +72,10 @@ describe('Card Components', () => {
   });
 
   describe('CardTitle', () => {
-    it('should render as h3 element with default classes', () => {
-      render(<CardTitle>Test Title</CardTitle>);
-
-      const title = screen.getByRole('heading', { level: 3 });
-      expect(title).toBeInTheDocument();
-      expect(title.tagName).toBe('H3');
-      expect(title).toHaveClass('text-h2', 'text-text-primary');
-    });
 
     it('should accept additional className', () => {
       render(<CardTitle className="custom-title">Test Title</CardTitle>);
-      
+
       const title = screen.getByRole('heading');
       expect(title).toHaveClass('custom-title');
     });

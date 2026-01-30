@@ -31,8 +31,8 @@ describe('LanguageSelector', () => {
     );
 
     expect(screen.getByText('Language')).toBeInTheDocument();
-    expect(screen.getByText(defaultLanguage.nativeName)).toBeInTheDocument();
-    expect(screen.getByText(defaultLanguage.code)).toBeInTheDocument();
+    // The component displays "EN - English (default)" so we need to match the pattern
+    expect(screen.getByText(/EN.*English/i)).toBeInTheDocument();
   });
 
   it('renders with custom label', () => {
@@ -57,8 +57,8 @@ describe('LanguageSelector', () => {
       />
     );
 
-    expect(screen.getByText(germanLanguage.nativeName)).toBeInTheDocument();
-    expect(screen.getByText(germanLanguage.code)).toBeInTheDocument();
+    // The component displays "DE - Deutsch" so we need to match the pattern
+    expect(screen.getByText(/DE.*Deutsch/i)).toBeInTheDocument();
   });
 
   it('can be disabled', () => {
@@ -101,7 +101,7 @@ describe('LanguageSelector', () => {
 
     // Test that the component renders without throwing
     expect(screen.getByText('Language')).toBeInTheDocument();
-    expect(screen.getByText('English')).toBeInTheDocument();
+    expect(screen.getByText(/EN.*English/i)).toBeInTheDocument();
   });
 
   it('falls back to default language for invalid selection', async () => {
@@ -114,10 +114,10 @@ describe('LanguageSelector', () => {
 
     // Simulate selecting an invalid language code (this shouldn't normally happen)
     const handleValueChange = (mockOnLanguageChange as any).mock.calls[0]?.[0];
-    
+
     // We'll test this by directly calling the internal handler with invalid code
     // Since the component is well-designed, it should handle this gracefully
-    expect(screen.getByText(defaultLanguage.nativeName)).toBeInTheDocument();
+    expect(screen.getByText(/EN.*English/i)).toBeInTheDocument();
   });
 
   it('renders all supported languages in dropdown', async () => {

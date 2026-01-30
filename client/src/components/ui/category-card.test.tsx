@@ -59,31 +59,31 @@ describe('CategoryCard', () => {
     it('should apply medium border radius', () => {
       render(<CategoryCard {...defaultProps} />);
       const card = screen.getByRole('article');
-      expect(card).toHaveClass('rounded-radius-md');
+      expect(card).toHaveClass('rounded-[0.875rem]');
     });
 
     it('should have proper padding', () => {
       render(<CategoryCard {...defaultProps} />);
       const card = screen.getByRole('article');
-      expect(card).toHaveClass('p-spacing-md');
+      expect(card).toHaveClass('p-5');
     });
 
-    it('should apply green success badge for failing scores', () => {
+    it('should apply yellow warning badge for failing scores', () => {
       render(<CategoryCard {...defaultProps} score={3} />);
       const badge = screen.getByText(/3\/10/).closest('div');
-      expect(badge).toHaveClass('bg-[#4CAF50]');
+      expect(badge).toHaveClass('bg-[#FFD064]');
     });
 
-    it('should apply green success badge for high scores', () => {
+    it('should apply yellow warning badge for high scores', () => {
       render(<CategoryCard {...defaultProps} score={9} />);
       const badge = screen.getByText(/9\/10/).closest('div');
-      expect(badge).toHaveClass('bg-[#4CAF50]');
+      expect(badge).toHaveClass('bg-[#FFD064]');
     });
 
-    it('should apply green success badge for medium scores', () => {
+    it('should apply yellow warning badge for medium scores', () => {
       render(<CategoryCard {...defaultProps} score={6} />);
       const badge = screen.getByText(/6\/10/).closest('div');
-      expect(badge).toHaveClass('bg-[#4CAF50]');
+      expect(badge).toHaveClass('bg-[#FFD064]');
     });
   });
 
@@ -277,7 +277,7 @@ describe('CategoryCard', () => {
   });
 
   describe('CategoryCard Badge Colors', () => {
-    it('should display green success badge for partial passes', () => {
+    it('should display yellow warning badge for partial passes', () => {
       render(
         <CategoryCard
           title="Test Category"
@@ -290,22 +290,22 @@ describe('CategoryCard', () => {
       );
 
       const badge = screen.getByText(/2\/5 passed/i).closest('[class*="bg-"]');
-      expect(badge).toHaveClass('bg-[#4CAF50]');
+      expect(badge).toHaveClass('bg-[#FFD064]');
     });
 
     it('should display green success badge with ExternalLink icon', () => {
       render(
         <CategoryCard
           title="Test Category"
-          score={2}
+          score={5}
           total={5}
-          issueCount={3}
+          issueCount={0}
         >
           <div>Test content</div>
         </CategoryCard>
       );
 
-      const badge = screen.getByText(/2\/5 passed/i).closest('div');
+      const badge = screen.getByText(/5\/5 passed/i).closest('div');
       const svgs = badge?.querySelectorAll('svg');
       // ExternalLink should be the last icon in the badge
       const externalLinkIcon = svgs?.[svgs.length - 1];
@@ -327,6 +327,38 @@ describe('CategoryCard', () => {
 
       const badge = screen.getByText(/5\/5 passed/i);
       expect(badge).toHaveClass('bg-[#4CAF50]');
+    });
+
+    it('should display red badge for zero score', () => {
+      render(
+        <CategoryCard
+          title="Test Category"
+          score={0}
+          total={5}
+          issueCount={5}
+        >
+          <div>Test content</div>
+        </CategoryCard>
+      );
+
+      const badge = screen.getByText(/0\/5 to improve/i);
+      expect(badge).toHaveClass('bg-[#FF4343]');
+    });
+
+    it('should display yellow badge for partial score', () => {
+      render(
+        <CategoryCard
+          title="Test Category"
+          score={3}
+          total={5}
+          issueCount={2}
+        >
+          <div>Test content</div>
+        </CategoryCard>
+      );
+
+      const badge = screen.getByText(/3\/5 passed/i);
+      expect(badge).toHaveClass('bg-[#FFD064]');
     });
   });
 });

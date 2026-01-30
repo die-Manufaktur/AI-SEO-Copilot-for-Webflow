@@ -40,7 +40,7 @@ import { ProgressCircle } from "../components/ui/progress-circle";
 import { getLearnMoreUrl } from "../lib/docs-links";
 import styled from 'styled-components';
 import Footer from "../components/Footer";
-import { createLogger } from "./../lib/utils";
+import { createLogger, cn } from "./../lib/utils";
 import React from 'react';
 import { ImageSizeDisplay } from "../components/ImageSizeDisplay";
 import { copyTextToClipboard } from "../utils/clipboard";
@@ -73,7 +73,7 @@ const formSchema = z.object({
 });
 
 // Secondary keywords validation
-const MAX_KEYWORDS_LENGTH = 500;
+const MAX_KEYWORDS_LENGTH = 2000;
 const MAX_KEYWORDS_COUNT = 10;
 const validateSecondaryKeywords = (input: string, languageCode?: string): { isValid: boolean; message?: string; sanitized: string } => {
   if (!input) return { isValid: true, sanitized: '' };
@@ -359,11 +359,10 @@ export default function Home() {
   const [showedPerfectScoreMessage, setShowedPerfectScoreMessage] = useState<boolean>(false);
   const [currentPageId, setCurrentPageId] = useState<string>('');
   const [currentSiteId, setCurrentSiteId] = useState<string>('');
-  const [keywordSaveStatus, setKeywordSaveStatus] = useState<'saved' | 'saving' | 'none'>('none');
   
   // Advanced options state
   const [advancedOptionsEnabled, setAdvancedOptionsEnabled] = useState<boolean>(false);
-  const [pageType, setPageType] = useState<string>('');
+  const [pageType, setPageType] = useState<string>("none");
   const [secondaryKeywords, setSecondaryKeywords] = useState<string>('');
   
   // H2 elements state for H2SelectionList
@@ -447,7 +446,7 @@ export default function Home() {
   useEffect(() => {
     toast({
       title: "SEO Analyzer Ready",
-      description: "Enter your target keyphrase to begin analysis",
+      description: "Enter your main keyword to begin analysis",
       duration: 5000
     });
   }, []);
@@ -554,15 +553,12 @@ export default function Home() {
         const savedKeywords = loadKeywordsForPage(pageId);
         if (savedKeywords) {
           form.setValue('keyphrase', savedKeywords);
-          setKeywordSaveStatus('saved');
-        } else {
-          setKeywordSaveStatus('none');
         }
         
         // Load saved advanced options for this page
         const savedAdvancedOptions = loadAdvancedOptionsForPage(pageId);
         if (savedAdvancedOptions.pageType || savedAdvancedOptions.secondaryKeywords || savedAdvancedOptions.languageCode) {
-          setPageType(savedAdvancedOptions.pageType || '');
+          setPageType(savedAdvancedOptions.pageType || "none");
           setSecondaryKeywords(savedAdvancedOptions.secondaryKeywords || '');
           
           // For backward compatibility, also check languageCode in advanced options
@@ -575,7 +571,7 @@ export default function Home() {
           setAdvancedOptionsEnabled(true);
           setAdvancedOptionsSaveStatus('saved');
         } else {
-          setPageType('');
+          setPageType("none");
           setSecondaryKeywords('');
           setAdvancedOptionsEnabled(false);
           setAdvancedOptionsSaveStatus('none');
@@ -590,31 +586,17 @@ export default function Home() {
     }
   }, [form]);
 
-  // Watch for keyphrase changes to update save status
-  const watchedKeyphrase = form.watch('keyphrase');
-  useEffect(() => {
-    if (currentPageId) {
-      const savedKeywords = loadKeywordsForPage(currentPageId);
-      if (watchedKeyphrase === savedKeywords && watchedKeyphrase) {
-        setKeywordSaveStatus('saved');
-      } else if (watchedKeyphrase && watchedKeyphrase !== savedKeywords) {
-        setKeywordSaveStatus('none');
-      } else if (!watchedKeyphrase) {
-        setKeywordSaveStatus('none');
-      }
-    }
-  }, [watchedKeyphrase, currentPageId]);
 
   // Watch for advanced options changes to update save status
   useEffect(() => {
     if (currentPageId && advancedOptionsEnabled) {
       const savedAdvancedOptions = loadAdvancedOptionsForPage(currentPageId);
-      const currentOptions = { pageType, secondaryKeywords };
-      
+      const currentOptions = { pageType: pageType !== "none" ? pageType : undefined, secondaryKeywords };
+
       // Only show 'saved' status if there are actual values saved
       const hasSavedValues = savedAdvancedOptions.pageType || savedAdvancedOptions.secondaryKeywords;
-      const hasCurrentValues = pageType || secondaryKeywords;
-      
+      const hasCurrentValues = (pageType && pageType !== "none") || secondaryKeywords;
+
       if (hasSavedValues && JSON.stringify(currentOptions) === JSON.stringify({ pageType: savedAdvancedOptions.pageType, secondaryKeywords: savedAdvancedOptions.secondaryKeywords || '' })) {
         setAdvancedOptionsSaveStatus('saved');
       } else if (hasCurrentValues) {
@@ -801,19 +783,18 @@ export default function Home() {
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     // Save keywords for current page
     if (currentPageId && values.keyphrase) {
-      setKeywordSaveStatus('saving');
       saveKeywordsForPage(currentPageId, values.keyphrase);
-      setKeywordSaveStatus('saved');
     }
     
     // Save advanced options for current page
-    if (currentPageId && advancedOptionsEnabled && (pageType || secondaryKeywords || selectedLanguage.code !== getDefaultLanguage().code)) {
+    // Always save when advanced options is enabled to allow clearing previously saved values
+    if (currentPageId && advancedOptionsEnabled) {
       setAdvancedOptionsSaveStatus('saving');
       const sanitizedContext = secondaryKeywords ? validateSecondaryKeywords(secondaryKeywords, selectedLanguage.code).sanitized : '';
-      saveAdvancedOptionsForPage(currentPageId, { 
-        pageType, 
+      saveAdvancedOptionsForPage(currentPageId, {
+        pageType: pageType !== "none" ? pageType : undefined,
         secondaryKeywords: sanitizedContext,
-        languageCode: selectedLanguage.code 
+        languageCode: selectedLanguage.code
       });
       setAdvancedOptionsSaveStatus('saved');
     }
@@ -932,9 +913,9 @@ export default function Home() {
         siteInfo: mappedSiteInfo,
         publishPath,
         webflowPageData: pageDataForApi as WebflowPageData,
-        ...(advancedOptionsEnabled && (pageType || secondaryKeywords || selectedLanguage.code !== getDefaultLanguage().code) && {
+        ...(advancedOptionsEnabled && ((pageType && pageType !== "none") || secondaryKeywords || selectedLanguage.code !== getDefaultLanguage().code) && {
           advancedOptions: {
-            pageType: pageType || undefined,
+            pageType: pageType !== "none" ? pageType : undefined,
             secondaryKeywords: sanitizedKeywords,
             languageCode: selectedLanguage.code
           }
@@ -1035,7 +1016,7 @@ export default function Home() {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="min-h-screen bg-background p-4 md:p-6 flex flex-col"
+      className="w-full min-h-screen bg-background p-4 md:p-6 flex flex-col"
       style={{ color: "#FFFFFF" }}
     >
       <div className="mx-auto w-full max-w-3xl space-y-6 flex-grow">
@@ -1047,7 +1028,7 @@ export default function Home() {
         >
           <Card className="w-full">
             <CardHeader>
-              <OriginalCardTitle className="text-center">SEO Analysis Tool</OriginalCardTitle>
+              <OriginalCardTitle className="text-center">Set up your SEO analysis</OriginalCardTitle>
             </CardHeader>
             <CardContent>
               <Form {...form}>
@@ -1057,19 +1038,7 @@ export default function Home() {
                     name="keyphrase"
                     render={({ field }: { field: any }) => (
                       <FormItem className="w-full">
-                        <div className="flex justify-between items-center mb-1">
-                          <FormLabel className="mb-0">Target keyphrase</FormLabel>
-                          {/* Keyword Save Status Indicator */}
-                          <span className="text-caption font-medium" style={{
-                            color: keywordSaveStatus === 'saved' ? 'rgb(var(--greenText))' :
-                                   keywordSaveStatus === 'saving' ? 'rgb(var(--yellowText))' :
-                                   'rgb(var(--redText))'
-                          }}>
-                            {keywordSaveStatus === 'saved' ? 'Keyword saved' :
-                             keywordSaveStatus === 'saving' ? 'Saving...' :
-                             'No keyword saved'}
-                          </span>
-                        </div>
+                        <FormLabel className="mb-1">Main Keyword</FormLabel>
                         <FormControl>
                           <motion.div
                             whileHover={{ scale: 1.01 }}
@@ -1077,7 +1046,7 @@ export default function Home() {
                             className="w-full mt-2"
                           >
                             <Input
-                              placeholder="Enter your target keyphrase"
+                              placeholder="Enter your main keyword"
                               {...field}
                               className="w-full"
                             />
@@ -1091,10 +1060,15 @@ export default function Home() {
                   {/* Advanced Tab Section */}
                   <div className="border-t pt-4 mt-4">
                     <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h3 className="text-body-lg font-semibold text-text1">Advanced Analysis</h3>
+                      <div className="max-w-[28.625rem]">
+                        <h3 className="text-body-lg font-semibold text-text1">
+                          Advanced Analysis
+                          <span className="text-xs font-normal text-text2 ml-2">optional</span>
+                        </h3>
                         <p className="text-body-sm text-text2">
-                          Add secondary keywords and specify page type for more targeted SEO analysis
+                          Get smarter, page-specific recommendations based
+                          <br />
+                          on your page context.
                         </p>
                       </div>
                       <div className="flex items-center space-x-2">
@@ -1105,7 +1079,7 @@ export default function Home() {
                             setAdvancedOptionsEnabled(checked);
                             if (!checked) {
                               // When turning off, only clear UI state but preserve stored settings
-                              setPageType('');
+                              setPageType("none");
                               setSecondaryKeywords('');
                               setSelectedLanguage(getDefaultLanguage());
                               setAdvancedOptionsSaveStatus('none');
@@ -1114,9 +1088,9 @@ export default function Home() {
                               if (currentPageId) {
                                 const savedAdvancedOptions = loadAdvancedOptionsForPage(currentPageId);
                                 if (savedAdvancedOptions.pageType || savedAdvancedOptions.secondaryKeywords || savedAdvancedOptions.languageCode) {
-                                  setPageType(savedAdvancedOptions.pageType || '');
+                                  setPageType(savedAdvancedOptions.pageType || "none");
                                   setSecondaryKeywords(savedAdvancedOptions.secondaryKeywords || '');
-                                  const savedLanguage = savedAdvancedOptions.languageCode 
+                                  const savedLanguage = savedAdvancedOptions.languageCode
                                     ? getLanguageByCode(savedAdvancedOptions.languageCode) || getDefaultLanguage()
                                     : getDefaultLanguage();
                                   setSelectedLanguage(savedLanguage);
@@ -1126,7 +1100,7 @@ export default function Home() {
                             }
                           }}
                         />
-                        <span className="text-body-sm text-text1">{advancedOptionsEnabled ? 'On' : 'Off'}</span>
+                        <span className="text-body-sm text-text1 w-7 inline-block">{advancedOptionsEnabled ? 'On' : 'Off'}</span>
                       </div>
                     </div>
 
@@ -1143,13 +1117,19 @@ export default function Home() {
                           <div className="space-y-2">
                             <label className="text-body-sm font-medium text-text1">Page Type</label>
                             <Select value={pageType} onValueChange={setPageType}>
-                              <SelectTrigger className="focus:ring-0 focus:ring-offset-0">
+                              <SelectTrigger className="focus:ring-0 focus:ring-offset-0 bg-[var(--color-bg-500)] text-text1 placeholder:text-text2 [&>span]:!text-[var(--color-text-primary)]">
                                 <SelectValue placeholder="Select a page type" />
                               </SelectTrigger>
                               <SelectContent className="bg-background3 border border-divider shadow-md">
+                                <SelectItem
+                                  value="none"
+                                  className="cursor-pointer focus:bg-background4 focus:text-text1 data-[highlighted]:bg-background4 data-[highlighted]:text-text1 hover:bg-background4 hover:text-text1 transition-colors"
+                                >
+                                  Select a page type
+                                </SelectItem>
                                 {PAGE_TYPES.map((type) => (
-                                  <SelectItem 
-                                    key={type} 
+                                  <SelectItem
+                                    key={type}
                                     value={type}
                                     className="cursor-pointer focus:bg-background4 focus:text-text1 data-[highlighted]:bg-background4 data-[highlighted]:text-text1 hover:bg-background4 hover:text-text1 transition-colors"
                                   >
@@ -1162,7 +1142,7 @@ export default function Home() {
 
                           {/* Language Selector */}
                           <LanguageSelector
-                            label="Generate AI suggestions in"
+                            label="AI recommendations language"
                             selectedLanguage={selectedLanguage}
                             onLanguageChange={(language) => {
                               try {
@@ -1193,7 +1173,7 @@ export default function Home() {
                           {/* Secondary Keywords Input */}
                           <div className="space-y-2">
                             <label className="text-body-sm font-medium text-text1">
-                              Secondary Keywords
+                              Secondary keywords
                               <span className="text-caption text-text3 ml-2">
                                 ({(secondaryKeywords || '').length}/{MAX_KEYWORDS_LENGTH} characters)
                               </span>
@@ -1203,7 +1183,7 @@ export default function Home() {
                               onChange={(e) => {
                                 const input = e.target.value;
                                 setSecondaryKeywords(input);
-                                
+
                                 // Only validate and show errors, don't sanitize during typing
                                 const validation = validateSecondaryKeywords(input, selectedLanguage.code);
                                 if (!validation.isValid) {
@@ -1212,13 +1192,14 @@ export default function Home() {
                                   setSecondaryKeywordsError('');
                                 }
                               }}
-                              placeholder="Enter secondary keywords separated by commas (e.g., webflow expert, webflow specialist, cms developer)"
+                              placeholder="SEO Webflow, search engine optimization..."
                               rows={2}
-                              className={`w-full px-4 py-3 border rounded-md text-body-sm text-text1 placeholder:text-text2 resize-none ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
-                                secondaryKeywordsError 
-                                  ? 'border-redText focus-visible:ring-redText bg-input' 
-                                  : 'border-divider bg-input'
-                              }`}
+                              className={cn(
+                                "flex w-full p-[0.875rem] rounded-[0.625rem] border text-body-sm text-[var(--color-text-primary)] placeholder:!text-[var(--color-text-primary)] resize-none ring-offset-background focus-visible:outline-none focus-visible:ring-1",
+                                secondaryKeywordsError
+                                  ? 'border-redText focus-visible:ring-redText bg-input'
+                                  : 'border-[var(--color-bg-500)] bg-[var(--color-bg-500)]'
+                              )}
                               maxLength={MAX_KEYWORDS_LENGTH}
                             />
                             {secondaryKeywordsError && (
@@ -1228,24 +1209,9 @@ export default function Home() {
                               </p>
                             )}
                             <p className="text-caption text-text3">
-                              Secondary keywords help your content rank for related terms. SEO checks will pass if either your main keyword or any secondary keyword is found.
+                              Add related or synonym keywords to help AI deliver richer SEO recommendations.
                             </p>
                           </div>
-
-                          {/* Advanced Options Save Status */}
-                          {(pageType || secondaryKeywords || advancedOptionsSaveStatus === 'saving') && (
-                            <div className="flex justify-end">
-                              <span className="text-caption font-medium" style={{
-                                color: advancedOptionsSaveStatus === 'saved' ? 'rgb(var(--greenText))' :
-                                       advancedOptionsSaveStatus === 'saving' ? 'rgb(var(--yellowText))' :
-                                       'rgb(var(--redText))'
-                              }}>
-                                {advancedOptionsSaveStatus === 'saved' ? 'Secondary keywords and page type saved' :
-                                 advancedOptionsSaveStatus === 'saving' ? 'Saving...' :
-                                 'Secondary keywords and page type not saved'}
-                              </span>
-                            </div>
-                          )}
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -1255,14 +1221,14 @@ export default function Home() {
                   <motion.div
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    className="w-full pt-2"
+                    className="w-full pt-2 flex justify-center"
                   >
                     <Button
                       type="submit"
                       variant="optimize"
                       size="optimize"
                       disabled={mutation.isPending}
-                      className="w-full cursor-pointer"
+                      className="cursor-pointer"
                     >
                       {mutation.isPending && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
                       Optimize my SEO
@@ -1332,10 +1298,10 @@ export default function Home() {
               exit={{ opacity: 0, y: -20 }}
               className="w-full"
             >
-              <Card className="w-full">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    {selectedCategory ? (
+              {selectedCategory ? (
+                <Card className="w-full">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
                       <CategoryHeader>
                         <BackButton onClick={() => setSelectedCategory(null)}>
                           <ChevronLeft />
@@ -1354,17 +1320,17 @@ export default function Home() {
                                 // Mark all successfully applied checks as passed to trigger collapse-to-success pattern
                                 setResults(prevResults => {
                                   if (!prevResults?.checks) return prevResults;
-                                  
-                                  const updatedChecks = prevResults.checks.map(check => 
+
+                                  const updatedChecks = prevResults.checks.map(check =>
                                     appliedCheckTitles.includes(check.title)
                                       ? { ...check, passed: true }
                                       : check
                                   );
-                                  
+
                                   // Update score calculation
                                   const passedCount = updatedChecks.filter(check => check.passed).length;
                                   const updatedScore = Math.round((passedCount / updatedChecks.length) * 100);
-                                  
+
                                   return {
                                     ...prevResults,
                                     checks: updatedChecks,
@@ -1378,42 +1344,7 @@ export default function Home() {
                           </div>
                         )}
                       </CategoryHeader>
-                    ) : (
-                      <OriginalCardTitle className="text-center">Analysis Results</OriginalCardTitle>
-                    )}
-                  </div>
-                  {!selectedCategory && (
-                    <div className="flex flex-col items-center justify-center mt-4">
-                      <ProgressCircle 
-                        value={seoScore} 
-                        size={140} 
-                        strokeWidth={10}
-                        scoreText="SEO Score" 
-                      />
-                      <div className="mt-2 text-center">
-                        <p className="text-body-lg font-medium text-text1">{scoreRating}</p>
-                        <StatsSummary
-                          passed={results.passedChecks}
-                          toImprove={results.failedChecks}
-                          className="mt-1 justify-center"
-                        />
-                        
-                        {seoScore === 100 && (
-                          <motion.div
-                            initial={{ opacity: 0, scale: 0.8 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className="mt-4 p-3 bg-green-100 dark:bg-green-900 rounded-md text-green-800 dark:text-green-100 font-medium"
-                          >
-                            You are an absolute SEO legend, well done! 🎉
-                            <p className="text-sm font-normal mt-1">
-                              Feel free to take a screenshot and brag about it on Linkedin. We might have a special something for you in return.
-                            </p>
-                          </motion.div>
-                        )}
-                      </div>
                     </div>
-                  )}
-                  {selectedCategory && (
                     <motion.div
                       initial={{ scale: 0.9 }}
                       animate={{ scale: 1 }}
@@ -1421,10 +1352,8 @@ export default function Home() {
                     >
                       {results.passedChecks} passes <CheckCircle className="inline-block h-4 w-4 text-greenText" style={{color: 'rgb(var(--greenText))', stroke: 'rgb(var(--greenText))'}} /> • {results.failedChecks} improvements needed <XCircle className="inline-block h-4 w-4 text-redText" style={{color: 'rgb(var(--redText))', stroke: 'rgb(var(--redText))'}} />
                     </motion.div>
-                  )}
-                </CardHeader>
-                <CardContent>
-                  {selectedCategory ? (
+                  </CardHeader>
+                  <CardContent>
                     <ScrollArea className="h-[600px] w-full scrollarea-fix">
                       <motion.div
                         variants={container}
@@ -1645,13 +1574,13 @@ export default function Home() {
                         ))}
                         
                         {/* Schema Recommendations for Technical SEO category */}
-                        {selectedCategory === 'Technical SEO' && pageType && (
+                        {selectedCategory === 'Technical SEO' && pageType && pageType !== "none" && (
                           <motion.div
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             className="mt-6 pt-2 border-t"
                           >
-                            <SchemaDisplay 
+                            <SchemaDisplay
                               pageType={pageType}
                               schemas={getPopulatedSchemaRecommendations(pageType, {
                                 siteInfo: analysisRequestData?.siteInfo,
@@ -1664,57 +1593,93 @@ export default function Home() {
                         )}
                       </motion.div>
                     </ScrollArea>
-                  ) : (
-                    <div className="space-y-6">
-                      {groupedChecks && results && results.checks && Object.entries(groupChecksByCategory(results.checks)).map(([category, checks]) => {
-                        if (!checks || !Array.isArray(checks)) return null;
-                        const status = getCategoryStatus(checks);
-                        const passedCount = checks.filter(check => check && typeof check.passed === 'boolean' && check.passed).length;
-                        return (
-                          <motion.div
-                            key={category}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="border rounded-lg p-4 hover:bg-background2 transition-colors cursor-pointer"
-                            onClick={() => setSelectedCategory(category)}
-                          >
-                            <div className="flex items-center justify-between mb-2">
-                              <h3 className="text-lg font-medium">{category}</h3>
-                              <div className="flex items-center gap-2">
-                                {getCategoryStatusIcon(status)}
-                                <Badge variant="success" className="flex items-center gap-1">
-                                  {passedCount > 0 && <ChevronUp className="h-3 w-3" />}
-                                  {passedCount === 0 && <ChevronDown className="h-3 w-3" />}
-                                  {passedCount}/{checks.length} passed
-                                  <ExternalLink className="h-3 w-3" />
-                                </Badge>
-                              </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="flex flex-col gap-3 w-full">
+                  {/* Score Card */}
+                  <Card className="w-full">
+                    <CardHeader>
+                      <div className="flex flex-col items-center justify-center mt-4">
+                        <ProgressCircle
+                          value={seoScore}
+                          size={244}
+                          strokeWidth={25}
+                          scoreText="SEO Score"
+                        />
+                        <div className="mt-2 text-center">
+                          <p className="text-body-lg font-medium text-text1 max-w-xs mx-auto">{scoreRating}</p>
+                          <StatsSummary
+                            passed={results.passedChecks}
+                            toImprove={results.failedChecks}
+                            className="mx-auto"
+                          />
+
+                          {seoScore === 100 && (
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.8 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              className="mt-4 p-3 bg-green-100 dark:bg-green-900 rounded-md text-green-800 dark:text-green-100 font-medium"
+                            >
+                              You are an absolute SEO legend, well done! 🎉
+                              <p className="text-sm font-normal mt-1">
+                                Feel free to take a screenshot and brag about it on Linkedin. We might have a special something for you in return.
+                              </p>
+                            </motion.div>
+                          )}
+                        </div>
+                      </div>
+                    </CardHeader>
+                  </Card>
+
+                  {/* Category Summary Cards */}
+                  {groupedChecks && results && results.checks && Object.entries(groupChecksByCategory(results.checks)).map(([category, checks]) => {
+                    if (!checks || !Array.isArray(checks)) return null;
+                    const status = getCategoryStatus(checks);
+                    const passedCount = checks.filter(check => check && typeof check.passed === 'boolean' && check.passed).length;
+                    return (
+                      <motion.div
+                        key={category}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-card-bg border-2 border-border-color rounded-[0.875rem] p-5 hover:bg-background2 transition-colors cursor-pointer"
+                        onClick={() => setSelectedCategory(category)}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="text-lg font-medium">{category}</h3>
+                          <div className="flex items-center gap-2">
+                            {getCategoryStatusIcon(status)}
+                            <Badge variant="success" className="flex items-center gap-1">
+                              {passedCount > 0 && <ChevronUp className="h-3 w-3" />}
+                              {passedCount === 0 && <ChevronDown className="h-3 w-3" />}
+                              {passedCount}/{checks.length} passed
+                              <ExternalLink className="h-3 w-3" />
+                            </Badge>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-muted-foreground">
+                          {checks.filter(check => check && check.title).map((check, idx) => (
+                            <div key={idx} className="flex items-center gap-1.5">
+                              <span style={{
+                                display: 'inline-block',
+                                width: '0',
+                                height: '0',
+                                borderStyle: 'solid',
+                                borderWidth: check.passed ? '0 4px 8px 4px' : '8px 4px 0 4px',
+                                borderColor: check.passed
+                                  ? 'transparent transparent #4CAF50 transparent'
+                                  : '#FF5252 transparent transparent transparent',
+                                flexShrink: 0
+                              }} />
+                              <span>{check.title}</span>
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-muted-foreground">
-                              {checks.filter(check => check && check.title).map((check, idx) => (
-                                <div key={idx} className="flex items-center gap-1.5">
-                                  <span style={{
-                                    display: 'inline-block',
-                                    width: '0',
-                                    height: '0',
-                                    borderStyle: 'solid',
-                                    borderWidth: check.passed ? '0 4px 8px 4px' : '8px 4px 0 4px',
-                                    borderColor: check.passed
-                                      ? 'transparent transparent #4CAF50 transparent'
-                                      : '#FF5252 transparent transparent transparent',
-                                    flexShrink: 0
-                                  }} />
-                                  <span>{check.title}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </motion.div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                          ))}
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>

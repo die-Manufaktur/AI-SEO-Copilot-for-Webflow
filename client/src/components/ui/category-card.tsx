@@ -29,9 +29,9 @@ export const CategoryCard = React.forwardRef<HTMLElement, CategoryCardProps>(
 
     const getScoreColor = (score: number, total: number): string => {
       const percentage = (score / total) * 100;
-      if (percentage >= 80) return 'var(--color-success)';
-      if (percentage >= 60) return 'var(--color-warning)';
-      return 'var(--score-coral)';
+      if (percentage >= 67) return 'var(--color-green)';
+      if (percentage >= 33) return 'var(--color-yellow)';
+      return 'var(--color-red)';
     };
 
     const handleToggle = () => {
@@ -46,7 +46,7 @@ export const CategoryCard = React.forwardRef<HTMLElement, CategoryCardProps>(
       <article
         ref={ref}
         className={cn(
-          "bg-card-bg border border-border-subtle rounded-radius-md p-spacing-md",
+          "bg-card-bg border-2 border-border-subtle rounded-[0.875rem] p-5",
           className
         )}
       >
@@ -65,7 +65,7 @@ export const CategoryCard = React.forwardRef<HTMLElement, CategoryCardProps>(
               {title}
             </h3>
             <Badge
-              variant="success"
+              variant={score === 0 ? "destructive" : score === total ? "success" : "warning"}
               className="flex items-center gap-1"
             >
               {score > 0 && <ChevronUp className="h-3 w-3" />}
