@@ -189,11 +189,5 @@ describe('StatsSummary', () => {
       // Check for down triangle indicator in the text
       expect(improveSpan?.textContent).toContain('▼');
     });
-
-    it('should use flexbox layout with space between', () => {
-      render(<StatsSummary passed={5} toImprove={3} />);
-      const summary = screen.getByRole('status');
-      expect(summary).toHaveClass('justify-between');
-    });
   });
 });

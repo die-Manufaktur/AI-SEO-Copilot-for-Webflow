@@ -13,7 +13,7 @@ export const StatsSummary = React.forwardRef<HTMLDivElement, StatsSummaryProps>(
       <div
         ref={ref}
         className={cn(
-          "flex items-center justify-between bg-input-bg border border-input-bg rounded-full px-8 py-3 w-[22rem] my-6 text-font-size-sm font-font-weight-medium",
+          "flex items-center gap-4 bg-input-bg border border-input-bg rounded-full px-6 py-3 w-fit mx-auto my-6 text-font-size-sm font-font-weight-medium",
           className
         )}
         role="status"

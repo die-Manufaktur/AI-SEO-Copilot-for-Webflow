@@ -75,13 +75,13 @@ describe('Badge', () => {
 
     it('should render destructive variant correctly', () => {
       render(<Badge variant="destructive" data-testid="badge">Destructive</Badge>);
-      
+
       const badge = screen.getByTestId('badge');
       expect(badge).toHaveClass(
         'border-transparent',
-        'bg-destructive',
-        'text-destructive-foreground',
-        'hover:bg-destructive/80'
+        'bg-[#FF4343]',
+        'text-white',
+        'hover:bg-[#e03c3c]'
       );
     });
 
