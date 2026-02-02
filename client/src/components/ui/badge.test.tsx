@@ -80,7 +80,7 @@ describe('Badge', () => {
       expect(badge).toHaveClass(
         'border-transparent',
         'bg-[#FF4343]',
-        'text-white',
+        'text-black',
         'hover:bg-[#e03c3c]'
       );
     });
