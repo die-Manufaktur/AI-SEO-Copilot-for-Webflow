@@ -409,18 +409,13 @@ export const Onboarding: React.FC<OnboardingProps> = ({ showResetOption = false 
     }
   };
 
-  const isMobile = window.innerWidth < 640;
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
       <div
         data-testid="onboarding-modal"
         role="dialog"
         aria-label="Onboarding"
-        className={cn(
-          "bg-background border rounded-lg shadow-lg p-6",
-          isMobile ? "max-w-full mx-4" : "max-w-2xl w-full"
-        )}
+        className="bg-background border rounded-lg shadow-lg p-6 max-w-2xl w-full"
       >
         {/* Header */}
         <div className="flex items-center justify-between mb-6">

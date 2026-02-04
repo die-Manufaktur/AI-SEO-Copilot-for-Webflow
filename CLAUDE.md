@@ -6,12 +6,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Core Development
 - `pnpm dev` - Start full development environment (Vite + Webflow extension + Cloudflare Worker)
-- `pnpm build` - Build production extension bundle  
+- `pnpm build` - Build production extension bundle
 - `pnpm check` - TypeScript type checking
 - `pnpm test` - Run all tests with coverage
 - `pnpm test:watch` - Run tests in watch mode
 - `pnpm test:ui` - Run tests with Vitest UI
+
+### Testing
+- `pnpm test:unit` - Run unit tests only
+- `pnpm test:bundle` - Run bundle validation tests
+- `pnpm test:e2e` - Run Playwright end-to-end tests
+- `pnpm test:coverage` - Run tests with HTML coverage report
+
+### Deployment
 - `pnpm deploy:worker` - Deploy Cloudflare Worker to production (maintainer only)
+- `pnpm deploy:staging` - Deploy Worker to staging environment
+- `pnpm deploy:production` - Full production deploy with validation checks
 
 ### Worker Development
 - `npx wrangler dev ./workers/index.ts --port 8787` - Run Cloudflare Worker locally
@@ -43,7 +53,10 @@ This is a **Webflow Designer Extension** for SEO analysis with a **modular monor
 - `workers/index.ts` - Cloudflare Worker entry point
 - `shared/types/index.ts` - TypeScript interfaces
 - `vite.config.ts` - Vite configuration with Webflow compatibility
+- `client/vitest.config.ts` - Test configuration (tests run from `client/`)
 - `wrangler.toml` - Cloudflare Worker configuration
+- `docs/plans/` - Implementation plan documents
+- `scripts/` - Build and validation utilities
 
 ### Environment Variables
 #### Development (.env)
@@ -62,10 +75,23 @@ This is a **Webflow Designer Extension** for SEO analysis with a **modular monor
 3. Worker performs web scraping and OpenAI API calls
 4. Results displayed in extension UI with interactive recommendations
 
+### Design System
+The UI uses a design system built on CSS custom properties in `client/src/index.css`:
+- **Design tokens**: Colors, spacing, typography, shadows defined as CSS variables
+- **Component library**: Reusable components in `client/src/components/ui/`
+  - `category-card.tsx` - Collapsible SEO category cards with score display
+  - `circular-progress.tsx` - SVG circular progress indicator
+  - `stats-summary.tsx` - Passed/to-improve statistics display
+  - `header-controls.tsx` - Extension header with refresh/minimize/close controls
+  - `dev-badge.tsx` - Development mode indicator
+  - `BatchApplyButton.tsx` - Batch apply for AI recommendations
+- **Design system tests**: `client/src/styles/design-system.test.ts` validates token consistency
+
 ### Key Business Logic
 - **SEO Analysis**: 18 different SEO checks (title tags, meta descriptions, content structure, etc.)
 - **AI Recommendations**: OpenAI-powered suggestions for improvements in multiple languages
 - **Editable Recommendations**: Users can edit AI-generated recommendations inline before copying
+- **Batch Apply**: Apply multiple AI suggestions to Webflow elements at once
 - **Schema Generation**: Intelligent schema markup recommendations based on page type
 - **Keyword Persistence**: Automatically saves keywords per page for workflow continuity
 - **Multilingual Support**: AI recommendations available in 9 languages with automatic site language detection
@@ -95,5 +121,6 @@ The extension supports AI-generated SEO recommendations in multiple languages:
 - `shared/types/language.ts` - Language definitions and detection logic
 - `client/src/components/ui/language-selector.tsx` - Language selection component
 - `client/src/utils/languageStorage.ts` - Site-specific language preference storage
+- `client/src/utils/htmlSanitizer.ts` - HTML sanitization for AI-generated content
 - `workers/modules/aiRecommendations.ts` - Multilingual AI recommendation generation
 - `client/src/components/ui/editable-recommendation.tsx` - Inline editable recommendation component

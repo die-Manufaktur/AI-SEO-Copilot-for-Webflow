@@ -69,8 +69,8 @@ describe('WebflowAppWrapper', () => {
     );
 
     expect(mockWebflow.setExtensionSize).toHaveBeenCalledWith({
-      width: 540,
-      height: 720,
+      width: 715,
+      height: 1009,
     });
   });
 
@@ -106,8 +106,8 @@ describe('WebflowAppWrapper', () => {
     );
 
     expect(mockWebflowWithError.setExtensionSize).toHaveBeenCalledWith({
-      width: 540,
-      height: 720,
+      width: 715,
+      height: 1009,
     });
     expect(mockLogger.error).toHaveBeenCalledWith(
       'Failed to set extension size:',

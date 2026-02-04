@@ -992,8 +992,8 @@ export default function Home() {
     try {
       const result = await applyBatch(request);
       toast({
-        title: "Batch apply successful",
-        description: `Applied ${result.succeeded} recommendations successfully.`,
+        title: "✅ Your text has been included successfully",
+        description: "Don't forget to publish your website to update the SEO score.",
       });
       return result;
     } catch (error) {
@@ -1305,10 +1305,10 @@ export default function Home() {
                       <CategoryHeader>
                         <BackButton onClick={() => setSelectedCategory(null)}>
                           <ChevronLeft />
-                          <CardTitle>{selectedCategory}</CardTitle>
+                          <CardTitle>{selectedCategory} overview</CardTitle>
                         </BackButton>
                         {applyableChecks.length > 0 && (
-                          <div className="ml-auto">
+                          <div className="ml-auto flex flex-col items-end gap-1">
                             <BatchApplyButton
                               batchRequest={{
                                 operations: createBatchRequest()?.operations || [],
@@ -1341,6 +1341,22 @@ export default function Home() {
                                 });
                               }}
                             />
+                            <button
+                              className="text-xs"
+                              style={{
+                                backgroundColor: 'var(--color-bg-500)',
+                                borderRadius: '3px',
+                                padding: '6px',
+                                color: 'var(--color-text-primary)',
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontSize: '12px',
+                                fontWeight: 400,
+                              }}
+                              onClick={() => { /* placeholder - Include All functionality TBD */ }}
+                            >
+                              Include All
+                            </button>
                           </div>
                         )}
                       </CategoryHeader>
@@ -1348,9 +1364,16 @@ export default function Home() {
                     <motion.div
                       initial={{ scale: 0.9 }}
                       animate={{ scale: 1 }}
-                      className="text-body-sm text-text2 text-center"
+                      className="flex items-center justify-center mt-2"
                     >
-                      {results.passedChecks} passes <CheckCircle className="inline-block h-4 w-4 text-greenText" style={{color: 'rgb(var(--greenText))', stroke: 'rgb(var(--greenText))'}} /> • {results.failedChecks} improvements needed <XCircle className="inline-block h-4 w-4 text-redText" style={{color: 'rgb(var(--redText))', stroke: 'rgb(var(--redText))'}} />
+                      <div className="inline-flex items-center gap-4 bg-background3 rounded-full px-5 py-2" style={{ borderRadius: '41px' }}>
+                        <span className="flex items-center gap-1.5 text-sm font-medium" style={{ color: 'var(--greenText)' }}>
+                          <span style={{ fontSize: '10px' }}>▲</span> {results.passedChecks} passed
+                        </span>
+                        <span className="flex items-center gap-1.5 text-sm font-medium" style={{ color: 'var(--redText)' }}>
+                          <span style={{ fontSize: '10px' }}>▼</span> {results.failedChecks} to improve
+                        </span>
+                      </div>
                     </motion.div>
                   </CardHeader>
                   <CardContent>
@@ -1406,6 +1429,20 @@ export default function Home() {
                                     </motion.div>
                                   </div>
                                   {check.title}
+                                  {!check.passed && check.priority && (
+                                    <Badge
+                                      variant={check.priority === 'high' ? 'destructive' : 'default'}
+                                      className={
+                                        check.priority === 'high'
+                                          ? 'bg-[#FF4343] text-white border-transparent text-xs'
+                                          : check.priority === 'low'
+                                          ? 'bg-[#FFD064] text-black border-transparent text-xs'
+                                          : 'bg-[#FFD064] text-black border-transparent text-xs'
+                                      }
+                                    >
+                                      {getPriorityText(check.priority)}
+                                    </Badge>
+                                  )}
 
                                   <TooltipProvider>
                                     <Tooltip>
@@ -1437,14 +1474,13 @@ export default function Home() {
                                     }
                                   </p>
                                   {!check.passed && (
-                                    <a 
-                                      href={getLearnMoreUrl(check.title)} 
-                                      target="_blank" 
+                                    <a
+                                      href={getLearnMoreUrl(check.title)}
+                                      target="_blank"
                                       rel="noopener noreferrer"
-                                      className="ml-1 inline-flex items-center text-primaryText hover:underline"
+                                      className="ml-1 inline-flex items-center font-bold text-primaryText hover:underline"
                                     >
-                                      Learn more
-                                      <ExternalLink className="h-3 w-3 ml-1" />
+                                      Learn More <span className="ml-0.5">↗</span>
                                     </a>
                                   )}
                                 </div>
@@ -1488,8 +1524,8 @@ export default function Home() {
                                         
                                         if (result.success) {
                                           toast({
-                                            title: "Applied!",
-                                            description: `H2 heading updated successfully.`
+                                            title: "✅ Your text has been included successfully",
+                                            description: "Don't forget to publish your website to update the SEO score.",
                                           });
                                           
                                           // Immediately update the H2 check to passed state
@@ -1532,14 +1568,18 @@ export default function Home() {
                                   />
                                 ) : shouldShowCopyButton(check.title) ? (
                                   // Use editable recommendation for other AI-generated recommendations
-                                  <EditableRecommendation
-                                    recommendation={check.recommendation || ''}
-                                    onCopy={copyToClipboard}
-                                    disabled={mutation.isPending}
-                                    checkTitle={check.title}
-                                    pageId={currentPageId}
-                                    showApplyButton={true}
-                                    onApplySuccess={(appliedCheckTitle) => {
+                                  <>
+                                    <p className="text-base font-bold mb-2 mt-1" style={{ color: 'var(--text1)' }}>
+                                      {check.title} recommendation
+                                    </p>
+                                    <EditableRecommendation
+                                      recommendation={check.recommendation || ''}
+                                      onCopy={copyToClipboard}
+                                      disabled={mutation.isPending}
+                                      checkTitle={check.title}
+                                      pageId={currentPageId}
+                                      showApplyButton={true}
+                                      onApplySuccess={(appliedCheckTitle) => {
                                       // Mark the check as passed to trigger collapse-to-success pattern
                                       setResults(prevResults => {
                                         if (!prevResults?.checks) return prevResults;
@@ -1563,7 +1603,8 @@ export default function Home() {
                                         };
                                       });
                                     }}
-                                  />
+                                    />
+                                  </>
                                 ) : (
                                   // Keep current rendering for checks that don't support copying
                                   check.recommendation

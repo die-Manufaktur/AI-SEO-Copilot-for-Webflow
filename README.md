@@ -16,7 +16,7 @@ An advanced SEO analysis tool that performs 18 comprehensive checks with AI-powe
 - **📊 Visual Progress Tracking**: Real-time SEO score calculation and progress indicators
 - **🎯 Page-Specific Analysis**: Tailored analysis for homepage vs. other pages
 - **🖼️ Image Optimization**: Alt text, size, and format recommendations
-- **📱 Modern UI**: Clean, responsive interface with status indicators
+- **📱 Modern UI**: Clean interface with status indicators
 - **⚡ Fast Performance**: Optimized for quick analysis and feedback
 
 ### SEO Checks Include:

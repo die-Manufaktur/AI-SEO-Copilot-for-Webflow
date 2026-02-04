@@ -463,15 +463,15 @@ describe('Sheet Components', () => {
       );
     });
 
-    it('should handle different viewport sizes with responsive classes', () => {
+    it('should apply max-width constraint on side sheets', () => {
       render(
         <Sheet>
-          <SheetContent side="left">Responsive content</SheetContent>
+          <SheetContent side="left">Side content</SheetContent>
         </Sheet>
       );
-      
+
       const content = screen.getByTestId('sheet-content');
-      expect(content).toHaveClass('w-3/4', 'sm:max-w-sm');
+      expect(content).toHaveClass('w-3/4', 'max-w-sm');
     });
   });
 });

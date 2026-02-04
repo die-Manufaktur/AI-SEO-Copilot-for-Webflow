@@ -87,6 +87,16 @@ workers-site/
 temp/
 .wrangler/tmp/
 .wrangler/state/
+tmpclaude-*
+
+# Test output artifacts
+test-output*.txt
+test-results*.txt
+complete-test-output.txt
+client/test-output.txt
+
+# Debug files
+client/debug-badge.jsx
 
 # Additional IDE
 .history/

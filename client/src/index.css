@@ -1,45 +1,5 @@
 @import "tailwindcss";
 
-/* Box model reset for responsive design */
-*, *::before, *::after {
-  box-sizing: border-box;
-}
-
-/* Prevent horizontal overflow */
-html, body {
-  overflow-x: hidden;
-  margin: 0;
-  padding: 0;
-}
-
-/* Responsive text utilities */
-.text-responsive {
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-  max-width: 100%;
-}
-
-/* Responsive heading */
-.heading-responsive {
-  font-size: clamp(1.25rem, 3vw, 1.75rem);
-  max-width: 100%;
-}
-
-/* Container utilities */
-.container-responsive {
-  max-width: min(90%, 600px);
-  margin: 0 auto;
-  padding: 1rem;
-  box-sizing: border-box;
-}
-
-/* Full width utilities for form elements */
-.form-element-responsive {
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-}
-
 @layer base {
   :root {
     /* === FIGMA DESIGN SYSTEM - CANONICAL VALUES === */
@@ -202,7 +162,7 @@ html, body {
     --font-score: var(--font-size-score);
 
     /* === COMPACT DESIGN MODE === */
-    /* Reduces total height by ~29% to fit in 720px iframe */
+    /* Reduces total height by ~29% to fit in 1009px iframe */
 
     /* Compact Spacing Scale */
     --spacing-xs: 4px;
@@ -298,9 +258,9 @@ html, body {
     --input-height-sm: var(--size-button-small-height);
     --input-height-lg: var(--size-input-height);
 
-    --extension-width: 540px;
-    --extension-height: 720px;
-    --progress-circle-size: 160px;
+    --extension-width: 715px;
+    --extension-height: 1009px;
+    --progress-circle-size: 244px;
 
     /* Score color tokens from Figma */
     --score-high: var(--color-green);
@@ -768,4 +728,27 @@ textarea {
 }
 .border-border-subtle {
   border-color: var(--border-subtle);
+}
+
+/* Stats summary pill */
+.stats-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 1rem;
+  background-color: var(--background3);
+  border-radius: 41px;
+  padding: 8px 20px;
+}
+
+/* Priority badge overrides */
+.badge-high-priority {
+  background-color: #FF4343 !important;
+  color: white !important;
+  border: none !important;
+}
+
+.badge-low-priority {
+  background-color: #FFD064 !important;
+  color: black !important;
+  border: none !important;
 }

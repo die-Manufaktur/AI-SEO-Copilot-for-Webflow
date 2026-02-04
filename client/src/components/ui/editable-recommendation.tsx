@@ -248,13 +248,13 @@ export function EditableRecommendation({
 
   return (
     <div className={`group relative ${className}`}>
-      <div 
-        className={`${canApply ? "pr-32" : "pr-20"} cursor-pointer hover:bg-background2/50 -m-1 p-1 rounded transition-colors`} 
+      <div
+        className={`${canApply ? "pr-32" : "pr-20"} cursor-pointer hover:bg-background2/50 -m-1 p-1 rounded transition-colors`}
         onClick={handleEdit}
       >
         {editedText}
       </div>
-      <div className="absolute top-0 right-0 flex items-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="absolute top-1/2 -translate-y-1/2 right-2 flex flex-col items-center gap-1">
         {canApply && (
           <div className="flex items-center">
             <ApplyButton
