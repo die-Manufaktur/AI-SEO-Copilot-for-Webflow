@@ -8,7 +8,6 @@ pnpm-lock.yaml
 /dist
 /build
 .cache/
-.wrangler/
 .output/
 bundle.zip
 
@@ -19,11 +18,12 @@ bundle.zip
 .dev.vars*
 .prod.vars
 *.local
-.wrangler/
+.env.*.local
 kill-dev-servers.bat
 
 # Claude Code
 CLAUDE.local.md
+.claude/settings.local.json
 .claude/agents/*
 .claude/hooks/
 .claude/utils/
@@ -42,6 +42,7 @@ CLAUDE.local.md
 *.sln
 *.sw?
 .github/instructions/aiseocopilot.instructions.md
+.github/instructions.md
 
 # Logs & Debug
 logs
@@ -70,6 +71,7 @@ ehthumbs.db
 Thumbs.db
 
 # Cloudflare Workers
+.wrangler/
 .dev.vars
 .env.production
 .env.development
@@ -85,8 +87,6 @@ workers-site/
 *.temp
 .tmp/
 temp/
-.wrangler/tmp/
-.wrangler/state/
 tmpclaude-*
 
 # Test output artifacts
@@ -110,11 +110,7 @@ client/debug-badge.jsx
 stats.html
 .turbo
 dist-ssr
-*.local
-.env.*.local
 
 # Cloudflare specific
 .mf/
 .miniflare/
-
-.github/instructions.md

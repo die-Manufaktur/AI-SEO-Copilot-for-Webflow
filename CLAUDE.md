@@ -85,6 +85,8 @@ The UI uses a design system built on CSS custom properties in `client/src/index.
   - `header-controls.tsx` - Extension header with refresh/minimize/close controls
   - `dev-badge.tsx` - Development mode indicator
   - `BatchApplyButton.tsx` - Batch apply for AI recommendations
+  - `H2SelectionList.tsx` - H2 heading element list with per-row Apply and Generate icon buttons
+  - `editable-recommendation.tsx` - Inline editable recommendation with Apply/Regenerate icon buttons
 - **Design system tests**: `client/src/styles/design-system.test.ts` validates token consistency
 
 ### Key Business Logic
@@ -92,6 +94,7 @@ The UI uses a design system built on CSS custom properties in `client/src/index.
 - **AI Recommendations**: OpenAI-powered suggestions for improvements in multiple languages
 - **Editable Recommendations**: Users can edit AI-generated recommendations inline before copying
 - **Batch Apply**: Apply multiple AI suggestions to Webflow elements at once
+- **H2 Generate Buttons**: Per-row regenerate icons on H2 suggestions, plus a "Generate All" header button for batch regeneration
 - **Schema Generation**: Intelligent schema markup recommendations based on page type
 - **Keyword Persistence**: Automatically saves keywords per page for workflow continuity
 - **Multilingual Support**: AI recommendations available in 9 languages with automatic site language detection
