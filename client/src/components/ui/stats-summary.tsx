@@ -20,11 +20,11 @@ export const StatsSummary = React.forwardRef<HTMLDivElement, StatsSummaryProps>(
         role="status"
         aria-label={`Summary: ${passed} items passed, ${toImprove} items need improvement`}
       >
-        <span className="flex items-center gap-1.5" style={{ color: 'var(--greenText)' }}>
-          <span style={{ fontSize: '10px' }}>▲</span> {passed} passed
+        <span className="flex items-center gap-1.5" style={{ color: 'white' }}>
+          <span style={{ fontSize: '10px', color: 'var(--greenText)' }}>▲</span> {passed} passed
         </span>
-        <span className="flex items-center gap-1.5" style={{ color: 'var(--redText)' }}>
-          <span style={{ fontSize: '10px' }}>▼</span> {toImprove} to improve
+        <span className="flex items-center gap-1.5" style={{ color: 'white' }}>
+          <span style={{ fontSize: '10px', color: 'var(--redText)' }}>▼</span> {toImprove} to improve
         </span>
       </div>
     );

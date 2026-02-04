@@ -1,19 +1,44 @@
 /**
  * H2SelectionList Component
- * Displays all H2 elements with individual Apply buttons
+ * Displays all H2 elements with individual Apply and Regenerate icon buttons
  * Once one is applied, marks check as passed and disables all other buttons
  */
 
 import React, { useState } from 'react';
-import { ApplyButton } from './ApplyButton';
+import { Button } from './button';
+import { motion } from 'framer-motion';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from './tooltip';
 import { useAppliedRecommendations } from '../../hooks/useAppliedRecommendations';
 import type { H2ElementInfo } from '../../lib/webflowDesignerApi';
-import type { WebflowInsertionRequest, WebflowInsertionResult } from '../../types/webflow-data-api';
+import type { WebflowInsertionResult } from '../../types/webflow-data-api';
+
+const ApplyIcon = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="8" cy="8" r="5" stroke="currentColor" strokeWidth="1.5" />
+    <circle cx="8" cy="8" r="1.5" fill="currentColor" />
+    <line x1="8" y1="0.5" x2="8" y2="3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    <line x1="8" y1="13" x2="8" y2="15.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    <line x1="0.5" y1="8" x2="3" y2="8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    <line x1="13" y1="8" x2="15.5" y2="8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+  </svg>
+);
+
+const RegenerateIcon = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+    <path d="M8 0L9.5 6.5L16 8L9.5 9.5L8 16L6.5 9.5L0 8L6.5 6.5L8 0Z" />
+  </svg>
+);
 
 export interface H2SelectionListProps {
   h2Elements: H2ElementInfo[];
   recommendation: string;
   onApply: (request: { h2Element: H2ElementInfo; recommendation: string }) => Promise<WebflowInsertionResult>;
+  onRegenerate?: (h2Element: H2ElementInfo, index: number) => void;
   onError?: (error: Error) => void;
   disabled?: boolean;
   className?: string;
@@ -31,6 +56,7 @@ export function H2SelectionList({
   h2Elements,
   recommendation,
   onApply,
+  onRegenerate,
   onError,
   disabled = false,
   className = '',
@@ -39,15 +65,15 @@ export function H2SelectionList({
 }: H2SelectionListProps): React.ReactElement {
   const [appliedIndex, setAppliedIndex] = useState<number | null>(null);
   const [itemStates, setItemStates] = useState<Record<number, H2ItemState>>({});
-  
+
   // Use applied recommendations hook for persistent state tracking
   const { isApplied, markAsApplied } = useAppliedRecommendations({ pageId });
 
   // Filter out invalid H2 elements (empty text, missing id, etc.)
-  const validH2Elements = h2Elements.filter(h2Element => 
-    h2Element && 
-    h2Element.id && 
-    h2Element.text && 
+  const validH2Elements = h2Elements.filter(h2Element =>
+    h2Element &&
+    h2Element.id &&
+    h2Element.text &&
     h2Element.text.trim().length > 0
   );
 
@@ -75,11 +101,11 @@ export function H2SelectionList({
 
     try {
       const result = await onApply({ h2Element, recommendation });
-      
+
       if (result.success) {
         setAppliedIndex(index);
         updateItemState(index, { loading: false, success: true });
-        
+
         // Save to persistent storage if pageId and checkTitle are available
         if (pageId && checkTitle) {
           markAsApplied(checkTitle, recommendation, {
@@ -98,91 +124,99 @@ export function H2SelectionList({
     }
   };
 
-  const createInsertionRequest = (h2Element: H2ElementInfo): WebflowInsertionRequest => {
-    return {
-      type: 'h2_heading',
-      value: recommendation,
-      elementIndex: h2Element.index,
-      selector: `#${h2Element.id}`,
-    };
-  };
-
   return (
-    <div className={`space-y-4 ${className}`}>
-      {/* Recommendation Preview */}
-      <div className="p-3 bg-muted/50 rounded-lg border">
-        <h4 className="text-sm font-medium text-muted-foreground mb-2">
-          AI Recommendation:
-        </h4>
-        <p className="text-sm">{recommendation}</p>
-      </div>
+    <div className={`space-y-3 ${className}`}>
+      {validH2Elements.map((h2Element, index) => {
+        const itemState = itemStates[index] || {};
+        const isItemApplied = appliedIndex === index;
+        const isOtherApplied = appliedIndex !== null && appliedIndex !== index;
+        const isDisabled = disabled || (appliedIndex !== null) || itemState.loading;
 
-      {/* H2 Elements List */}
-      <div className="space-y-3">
-        <h4 className="text-sm font-medium text-muted-foreground">
-          Select an H2 element to apply the recommendation:
-        </h4>
-        
-        {validH2Elements.map((h2Element, index) => {
-          const itemState = itemStates[index] || {};
-          const isApplied = appliedIndex === index;
-          const isOtherApplied = appliedIndex !== null && appliedIndex !== index;
-          const isDisabled = disabled || (appliedIndex !== null) || itemState.loading;
-
-          return (
-            <div
-              key={`${h2Element.id}-${index}`}
-              className={`flex items-center justify-between p-3 border rounded-lg transition-colors ${
-                isApplied 
-                  ? 'bg-green-50 border-green-200 applied' 
-                  : isOtherApplied 
-                  ? 'bg-muted/30 border-muted' 
-                  : 'bg-background border-input hover:bg-muted/50'
-              }`}
-            >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs font-medium text-muted-foreground">
-                    H2 #{index + 1}
+        return (
+          <div
+            key={`${h2Element.id}-${index}`}
+            className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
+              isItemApplied
+                ? 'bg-green-900/30 border border-green-700'
+                : isOtherApplied
+                ? 'opacity-50'
+                : ''
+            }`}
+          >
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xs font-medium text-text2">
+                  H2 #{index + 1}
+                </span>
+                {isItemApplied && (
+                  <span className="text-xs font-medium text-green-400 bg-green-900/50 px-2 py-0.5 rounded">
+                    Applied
                   </span>
-                  {isApplied && (
-                    <span className="text-xs font-medium text-green-600 bg-green-100 px-2 py-0.5 rounded">
-                      Applied
-                    </span>
-                  )}
-                </div>
-                <p className={`text-sm truncate ${isOtherApplied ? 'text-muted-foreground' : 'text-foreground'}`}>
-                  {h2Element.text}
-                </p>
+                )}
               </div>
-              
-              <div className="ml-3 flex-shrink-0">
-                <ApplyButton
-                  insertionRequest={createInsertionRequest(h2Element)}
-                  onApply={async () => {
-                    await handleApply(h2Element, index);
-                    return { success: true, data: { applied: true } };
-                  }}
-                  loading={itemState.loading}
-                  success={itemState.success}
-                  error={itemState.error}
-                  disabled={isDisabled}
-                  label="Apply"
-                  ariaLabel={`Apply to H2 ${index + 1}: ${h2Element.text}`}
-                />
-              </div>
+              <p className={`text-sm text-break ${isOtherApplied ? 'text-text3' : 'text-text1'}`}>
+                {h2Element.text}
+              </p>
             </div>
-          );
-        })}
-      </div>
+
+            <div className="flex-shrink-0 flex flex-col items-center gap-2">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleApply(h2Element, index)}
+                        disabled={isDisabled}
+                        className="h-8 w-8 p-0 rounded-full bg-background2 hover:bg-background2/80"
+                        aria-label={`Apply to H2 ${index + 1}: ${h2Element.text}`}
+                      >
+                        <ApplyIcon className="h-4 w-4" />
+                      </Button>
+                    </motion.div>
+                  </TooltipTrigger>
+                  <TooltipContent side="left">
+                    <p>Apply to page</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              {onRegenerate && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onRegenerate(h2Element, index)}
+                          disabled={isDisabled}
+                          className="h-8 w-8 p-0 rounded-full bg-background2 hover:bg-background2/80"
+                          aria-label="Generate new suggestion"
+                        >
+                          <RegenerateIcon className="h-4 w-4" />
+                        </Button>
+                      </motion.div>
+                    </TooltipTrigger>
+                    <TooltipContent side="left">
+                      <p>Generate new suggestion</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
+          </div>
+        );
+      })}
 
       {/* Applied Success Message */}
       {appliedIndex !== null && (
-        <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-          <p className="text-sm text-green-800">
-            ✓ Successfully applied recommendation to H2 #{appliedIndex + 1}
+        <div className="p-3 bg-green-900/30 border border-green-700 rounded-lg">
+          <p className="text-sm text-green-400">
+            Successfully applied recommendation to H2 #{appliedIndex + 1}
           </p>
-          <p className="text-xs text-green-600 mt-1">
+          <p className="text-xs text-green-500 mt-1">
             The H2 check will now show as passed.
           </p>
         </div>

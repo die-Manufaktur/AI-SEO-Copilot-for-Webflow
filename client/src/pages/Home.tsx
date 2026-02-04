@@ -56,10 +56,7 @@ import { loadLanguageForSite, saveLanguageForSite } from '../utils/languageStora
 import { SchemaDisplay } from '../components/ui/schema-display';
 import { EditableRecommendation } from '../components/ui/editable-recommendation';
 import { H2SelectionList } from '../components/ui/H2SelectionList';
-import { BatchApplyButton } from '../components/ui/BatchApplyButton';
 import { useInsertion } from '../contexts/InsertionContext';
-import { createBatchInsertionRequest, canApplyRecommendation, type RecommendationContext } from '../utils/insertionHelpers';
-import type { WebflowBatchInsertionRequest, WebflowBatchInsertionResult } from '../types/webflow-data-api';
 import { useAppliedRecommendations } from '../hooks/useAppliedRecommendations';
 import type { H2ElementInfo } from '../lib/webflowDesignerApi';
 
@@ -285,6 +282,7 @@ const getCategoryStatusIcon = (status: string) => {
 const CategoryHeader = styled.div`
   display: flex;
   align-items: center;
+  width: 100%;
   margin-bottom: 16px;
 `;
 
@@ -347,7 +345,7 @@ const getScoreRatingText = (score: number): string => {
 
 export default function Home() {
   const { toast } = useToast();
-  const { applyBatch, applyInsertion } = useInsertion();
+  const { applyInsertion } = useInsertion();
   // Using underscore prefix for state variables that are set but not directly read
   const [_isLoading, setIsLoading] = useState(false);
   const [_slug, setSlug] = useState<string | null>(null);
@@ -973,45 +971,6 @@ export default function Home() {
       return categories[selectedCategory]?.includes(check);
     }) : [];
 
-  // Batch apply functionality
-  const applyableChecks = selectedCategoryChecks.filter(check => 
-    check.recommendation && !check.passed && canApplyRecommendation(check.title)
-  );
-
-  const createBatchRequest = () => {
-    const contexts: RecommendationContext[] = applyableChecks.map(check => ({
-      checkTitle: check.title,
-      recommendation: check.recommendation || '',
-      pageId: currentPageId,
-    }));
-
-    return createBatchInsertionRequest(contexts);
-  };
-
-  const handleBatchApply = async (request: WebflowBatchInsertionRequest): Promise<WebflowBatchInsertionResult> => {
-    try {
-      const result = await applyBatch(request);
-      toast({
-        title: "✅ Your text has been included successfully",
-        description: "Don't forget to publish your website to update the SEO score.",
-      });
-      return result;
-    } catch (error) {
-      toast({
-        title: "Batch apply failed",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
-        variant: "destructive",
-      });
-      // Return a failed result instead of throwing
-      return {
-        success: false,
-        results: [],
-        succeeded: 0,
-        failed: request.operations.length,
-      };
-    }
-  };
-
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -1299,79 +1258,27 @@ export default function Home() {
               className="w-full"
             >
               {selectedCategory ? (
-                <Card className="w-full">
+                <Card className="w-full bg-background border-none shadow-none">
                   <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CategoryHeader>
-                        <BackButton onClick={() => setSelectedCategory(null)}>
-                          <ChevronLeft />
-                          <CardTitle>{selectedCategory} overview</CardTitle>
-                        </BackButton>
-                        {applyableChecks.length > 0 && (
-                          <div className="ml-auto flex flex-col items-end gap-1">
-                            <BatchApplyButton
-                              batchRequest={{
-                                operations: createBatchRequest()?.operations || [],
-                              }}
-                              onBatchApply={handleBatchApply}
-                              showAffectedCount={true}
-                              disabled={applyableChecks.length === 0}
-                              onSuccess={(appliedCheckTitles) => {
-                                // Mark all successfully applied checks as passed to trigger collapse-to-success pattern
-                                setResults(prevResults => {
-                                  if (!prevResults?.checks) return prevResults;
-
-                                  const updatedChecks = prevResults.checks.map(check =>
-                                    appliedCheckTitles.includes(check.title)
-                                      ? { ...check, passed: true }
-                                      : check
-                                  );
-
-                                  // Update score calculation
-                                  const passedCount = updatedChecks.filter(check => check.passed).length;
-                                  const updatedScore = Math.round((passedCount / updatedChecks.length) * 100);
-
-                                  return {
-                                    ...prevResults,
-                                    checks: updatedChecks,
-                                    score: updatedScore,
-                                    passedChecks: passedCount,
-                                    failedChecks: updatedChecks.length - passedCount
-                                  };
-                                });
-                              }}
-                            />
-                            <button
-                              className="text-xs"
-                              style={{
-                                backgroundColor: 'var(--color-bg-500)',
-                                borderRadius: '3px',
-                                padding: '6px',
-                                color: 'var(--color-text-primary)',
-                                border: 'none',
-                                cursor: 'pointer',
-                                fontSize: '12px',
-                                fontWeight: 400,
-                              }}
-                              onClick={() => { /* placeholder - Include All functionality TBD */ }}
-                            >
-                              Include All
-                            </button>
-                          </div>
-                        )}
-                      </CategoryHeader>
-                    </div>
+                    <CategoryHeader>
+                      <BackButton onClick={() => setSelectedCategory(null)}>
+                        <ChevronLeft />
+                      </BackButton>
+                      <CardTitle className="flex-1 text-center">{selectedCategory} overview</CardTitle>
+                      {/* Invisible spacer to keep title centered */}
+                      <div style={{ width: 24 }} />
+                    </CategoryHeader>
                     <motion.div
                       initial={{ scale: 0.9 }}
                       animate={{ scale: 1 }}
-                      className="flex items-center justify-center mt-2"
+                      className="flex items-center justify-center mt-2 mb-10"
                     >
                       <div className="inline-flex items-center gap-4 bg-background3 rounded-full px-5 py-2" style={{ borderRadius: '41px' }}>
-                        <span className="flex items-center gap-1.5 text-sm font-medium" style={{ color: 'var(--greenText)' }}>
-                          <span style={{ fontSize: '10px' }}>▲</span> {results.passedChecks} passed
+                        <span className="flex items-center gap-1.5 text-sm font-medium" style={{ color: 'white' }}>
+                          <span style={{ fontSize: '10px', color: 'var(--greenText)' }}>▲</span> {results.passedChecks} passed
                         </span>
-                        <span className="flex items-center gap-1.5 text-sm font-medium" style={{ color: 'var(--redText)' }}>
-                          <span style={{ fontSize: '10px' }}>▼</span> {results.failedChecks} to improve
+                        <span className="flex items-center gap-1.5 text-sm font-medium" style={{ color: 'white' }}>
+                          <span style={{ fontSize: '10px', color: 'var(--redText)' }}>▼</span> {results.failedChecks} to improve
                         </span>
                       </div>
                     </motion.div>
@@ -1382,14 +1289,13 @@ export default function Home() {
                         variants={container}
                         initial="hidden"
                         animate="show"
-                        className="space-y-5 w-full pt-5"
+                        className="w-full bg-background2 rounded-[20px] p-5 py-8 border-2 border-[var(--color-bg-700)]"
                       >
                         {selectedCategoryChecks.map((check, index) => (
                           <motion.div
                             key={index}
                             variants={item}
-                            className="border p-4 w-full rounded-lg hover:bg-background2 transition-colors"
-                            whileHover={{ y: -2, transition: { duration: 0.2 } }}
+                            className={`p-4 w-full transition-colors ${index > 0 ? 'border-t border-[var(--color-bg-500)] pt-10' : ''}`}
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: index * 0.1 }}
@@ -1485,93 +1391,115 @@ export default function Home() {
                                   )}
                                 </div>
                               </div>
-                              
+                              {check.title === "Keyphrase in H2 Headings" && !check.passed && (
+                                <button
+                                  className="flex items-center gap-2 px-4 py-2 rounded-full bg-background4 border border-[var(--color-bg-300)] text-white text-sm whitespace-nowrap flex-shrink-0 hover:bg-background4/80 transition-colors"
+                                  onClick={() => {
+                                    // TODO: Wire up to batch AI recommendation generation endpoint
+                                    console.log('Generate All H2 suggestions');
+                                  }}
+                                >
+                                  <svg className="h-4 w-4" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M8 0L9.5 6.5L16 8L9.5 9.5L8 16L6.5 9.5L0 8L6.5 6.5L8 0Z" />
+                                  </svg>
+                                  Generate All
+                                </button>
+                              )}
                             </div>
                             {!check.passed && check.recommendation && (
-                              <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: "auto" }}
-                                exit={{ opacity: 0, height: 0 }}
-                                className="mt-4 text-sm p-4 bg-background3 rounded-md w-full"
-                                style={{ backgroundColor: 'var(--background3)' }}
-                              >
-                                {check.imageData && Array.isArray(check.imageData) && check.imageData.length > 0 ? (
-                                  <>
-                                    <ImageSizeDisplay 
-                                      images={check.imageData}
-                                      showMimeType={check.title === "Next-Gen Image Formats"}
-                                      showFileSize={check.title === "Image File Size" || check.title !== "Image Alt Attributes"}
-                                      showAltText={check.title === "Image Alt Attributes"}
-                                      className="mt-2"
-                                    />
-                                  </>
-                                ) : check.title === "Keyphrase in H2 Headings" ? (
-                                  // Use H2SelectionList for H2 heading checks
-                                  <H2SelectionList
-                                    h2Elements={h2Elements}
-                                    recommendation={check.recommendation || ''}
-                                    onApply={async ({ h2Element, recommendation }) => {
-                                      try {
-                                        const insertionRequest = {
-                                          type: 'h2_heading' as const,
-                                          value: recommendation,
-                                          elementIndex: h2Element.index,
-                                          selector: `#${h2Element.id}`,
-                                          pageId: currentPageId
-                                        };
-                                        
-                                        const result = await applyInsertion(insertionRequest);
-                                        
-                                        if (result.success) {
+                              <div className="mt-4">
+                                {/* Recommendation title - rendered outside dark box */}
+                                {shouldShowCopyButton(check.title)
+                                  && !(check.imageData && Array.isArray(check.imageData) && check.imageData.length > 0)
+                                  && check.title !== "Keyphrase in H2 Headings" && (
+                                  <p className="text-base font-bold mb-2" style={{ color: 'var(--text1)' }}>
+                                    {check.title} recommendation
+                                  </p>
+                                )}
+                                <motion.div
+                                  initial={{ opacity: 0, height: 0 }}
+                                  animate={{ opacity: 1, height: "auto" }}
+                                  exit={{ opacity: 0, height: 0 }}
+                                  className="text-sm p-4 bg-background3 rounded-[7px] w-full"
+                                  style={{ backgroundColor: 'var(--background3)' }}
+                                >
+                                  {check.imageData && Array.isArray(check.imageData) && check.imageData.length > 0 ? (
+                                    <>
+                                      <ImageSizeDisplay
+                                        images={check.imageData}
+                                        showMimeType={check.title === "Next-Gen Image Formats"}
+                                        showFileSize={check.title === "Image File Size" || check.title !== "Image Alt Attributes"}
+                                        showAltText={check.title === "Image Alt Attributes"}
+                                        className="mt-2"
+                                      />
+                                    </>
+                                  ) : check.title === "Keyphrase in H2 Headings" ? (
+                                    // Use H2SelectionList for H2 heading checks
+                                    <H2SelectionList
+                                      h2Elements={h2Elements}
+                                      recommendation={check.recommendation || ''}
+                                      onRegenerate={(h2Element, index) => {
+                                        // TODO: Wire up to AI recommendation generation endpoint
+                                        console.log('Regenerate H2 suggestion for:', h2Element.text, 'at index:', index);
+                                      }}
+                                      onApply={async ({ h2Element, recommendation }) => {
+                                        try {
+                                          const insertionRequest = {
+                                            type: 'h2_heading' as const,
+                                            value: recommendation,
+                                            elementIndex: h2Element.index,
+                                            selector: `#${h2Element.id}`,
+                                            pageId: currentPageId
+                                          };
+
+                                          const result = await applyInsertion(insertionRequest);
+
+                                          if (result.success) {
+                                            toast({
+                                              title: "✅ Your text has been included successfully",
+                                              description: "Don't forget to publish your website to update the SEO score.",
+                                            });
+
+                                            // Immediately update the H2 check to passed state
+                                            setResults(prevResults => {
+                                              if (!prevResults?.checks) return prevResults;
+
+                                              const updatedChecks = prevResults.checks.map(check =>
+                                                check.title === "Keyphrase in H2 Headings"
+                                                  ? { ...check, passed: true }
+                                                  : check
+                                              );
+
+                                              // Update score calculation
+                                              const passedCount = updatedChecks.filter(check => check.passed).length;
+                                              const updatedScore = Math.round((passedCount / updatedChecks.length) * 100);
+
+                                              return {
+                                                ...prevResults,
+                                                checks: updatedChecks,
+                                                score: updatedScore,
+                                                passedChecks: passedCount,
+                                                failedChecks: updatedChecks.length - passedCount
+                                              };
+                                            });
+                                          }
+                                          return result;
+                                        } catch (error) {
+                                          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
                                           toast({
-                                            title: "✅ Your text has been included successfully",
-                                            description: "Don't forget to publish your website to update the SEO score.",
+                                            variant: "destructive",
+                                            title: "Apply Failed",
+                                            description: errorMessage
                                           });
-                                          
-                                          // Immediately update the H2 check to passed state
-                                          setResults(prevResults => {
-                                            if (!prevResults?.checks) return prevResults;
-                                            
-                                            const updatedChecks = prevResults.checks.map(check => 
-                                              check.title === "Keyphrase in H2 Headings" 
-                                                ? { ...check, passed: true }
-                                                : check
-                                            );
-                                            
-                                            // Update score calculation
-                                            const passedCount = updatedChecks.filter(check => check.passed).length;
-                                            const updatedScore = Math.round((passedCount / updatedChecks.length) * 100);
-                                            
-                                            return {
-                                              ...prevResults,
-                                              checks: updatedChecks,
-                                              score: updatedScore,
-                                              passedChecks: passedCount,
-                                              failedChecks: updatedChecks.length - passedCount
-                                            };
-                                          });
+                                          throw error;
                                         }
-                                        return result;
-                                      } catch (error) {
-                                        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-                                        toast({
-                                          variant: "destructive",
-                                          title: "Apply Failed",
-                                          description: errorMessage
-                                        });
-                                        throw error;
-                                      }
-                                    }}
-                                    pageId={currentPageId}
-                                    checkTitle="Keyphrase in H2 Headings"
-                                    disabled={mutation.isPending}
-                                  />
-                                ) : shouldShowCopyButton(check.title) ? (
-                                  // Use editable recommendation for other AI-generated recommendations
-                                  <>
-                                    <p className="text-base font-bold mb-2 mt-1" style={{ color: 'var(--text1)' }}>
-                                      {check.title} recommendation
-                                    </p>
+                                      }}
+                                      pageId={currentPageId}
+                                      checkTitle="Keyphrase in H2 Headings"
+                                      disabled={mutation.isPending}
+                                    />
+                                  ) : shouldShowCopyButton(check.title) ? (
+                                    // Editable recommendation (title rendered above, outside dark box)
                                     <EditableRecommendation
                                       recommendation={check.recommendation || ''}
                                       onCopy={copyToClipboard}
@@ -1579,37 +1507,41 @@ export default function Home() {
                                       checkTitle={check.title}
                                       pageId={currentPageId}
                                       showApplyButton={true}
+                                      onRegenerate={async () => {
+                                        // TODO: Wire up to AI recommendation generation endpoint
+                                        console.log('Regenerate recommendation for:', check.title);
+                                      }}
                                       onApplySuccess={(appliedCheckTitle) => {
-                                      // Mark the check as passed to trigger collapse-to-success pattern
-                                      setResults(prevResults => {
-                                        if (!prevResults?.checks) return prevResults;
-                                        
-                                        const updatedChecks = prevResults.checks.map(check => 
-                                          check.title === appliedCheckTitle 
-                                            ? { ...check, passed: true }
-                                            : check
-                                        );
-                                        
-                                        // Update score calculation
-                                        const passedCount = updatedChecks.filter(check => check.passed).length;
-                                        const updatedScore = Math.round((passedCount / updatedChecks.length) * 100);
-                                        
-                                        return {
-                                          ...prevResults,
-                                          checks: updatedChecks,
-                                          score: updatedScore,
-                                          passedChecks: passedCount,
-                                          failedChecks: updatedChecks.length - passedCount
-                                        };
-                                      });
-                                    }}
+                                        // Mark the check as passed to trigger collapse-to-success pattern
+                                        setResults(prevResults => {
+                                          if (!prevResults?.checks) return prevResults;
+
+                                          const updatedChecks = prevResults.checks.map(check =>
+                                            check.title === appliedCheckTitle
+                                              ? { ...check, passed: true }
+                                              : check
+                                          );
+
+                                          // Update score calculation
+                                          const passedCount = updatedChecks.filter(check => check.passed).length;
+                                          const updatedScore = Math.round((passedCount / updatedChecks.length) * 100);
+
+                                          return {
+                                            ...prevResults,
+                                            checks: updatedChecks,
+                                            score: updatedScore,
+                                            passedChecks: passedCount,
+                                            failedChecks: updatedChecks.length - passedCount
+                                          };
+                                        });
+                                      }}
                                     />
-                                  </>
-                                ) : (
-                                  // Keep current rendering for checks that don't support copying
-                                  check.recommendation
-                                )}
-                              </motion.div>
+                                  ) : (
+                                    // Keep current rendering for checks that don't support copying
+                                    check.recommendation
+                                  )}
+                                </motion.div>
+                              </div>
                             )}
                           </motion.div>
                         ))}

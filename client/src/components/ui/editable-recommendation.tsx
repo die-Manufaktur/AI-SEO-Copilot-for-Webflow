@@ -1,7 +1,7 @@
 import * as React from "react";
 import { useState, useRef, useEffect } from "react";
 import { Button } from "./button";
-import { Copy, Edit3, Check, X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { motion } from "framer-motion";
 import {
   Tooltip,
@@ -12,6 +12,23 @@ import {
 import { ApplyButton } from "./ApplyButton";
 import { useInsertion } from "../../contexts/InsertionContext";
 import { createInsertionRequest, canApplyRecommendation, getApplyDescription, type RecommendationContext } from "../../utils/insertionHelpers";
+
+const ApplyIcon = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="8" cy="8" r="5" stroke="currentColor" strokeWidth="1.5" />
+    <circle cx="8" cy="8" r="1.5" fill="currentColor" />
+    <line x1="8" y1="0.5" x2="8" y2="3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    <line x1="8" y1="13" x2="8" y2="15.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    <line x1="0.5" y1="8" x2="3" y2="8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    <line x1="13" y1="8" x2="15.5" y2="8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+  </svg>
+);
+
+const RegenerateIcon = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+    <path d="M8 0L9.5 6.5L16 8L9.5 9.5L8 16L6.5 9.5L0 8L6.5 6.5L8 0Z" />
+  </svg>
+);
 
 interface EditableRecommendationProps {
   recommendation: string;
@@ -26,6 +43,7 @@ interface EditableRecommendationProps {
   showApplyButton?: boolean;
   showOnlyApplyButton?: boolean; // When true, only show the apply button without text content
   onApplySuccess?: (checkTitle: string) => void; // Callback for successful application
+  onRegenerate?: () => Promise<void>; // Callback to regenerate AI suggestion
 }
 
 export function EditableRecommendation({
@@ -39,7 +57,8 @@ export function EditableRecommendation({
   fieldId,
   showApplyButton = true,
   showOnlyApplyButton = false,
-  onApplySuccess
+  onApplySuccess,
+  onRegenerate
 }: EditableRecommendationProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedText, setEditedText] = useState(recommendation);
@@ -167,6 +186,26 @@ export function EditableRecommendation({
     return result;
   };
 
+  const [isRegenerating, setIsRegenerating] = useState(false);
+
+  const handleApplyClick = async () => {
+    if (!canApply) return;
+    try {
+      await handleApply(null);
+    } catch {
+      // Error handled by handleApply
+    }
+  };
+
+  const handleRegenerate = async () => {
+    if (!onRegenerate) return;
+    setIsRegenerating(true);
+    try {
+      await onRegenerate();
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
 
   if (isEditing) {
     return (
@@ -247,28 +286,11 @@ export function EditableRecommendation({
   }
 
   return (
-    <div className={`group relative ${className}`}>
-      <div
-        className={`${canApply ? "pr-32" : "pr-20"} cursor-pointer hover:bg-background2/50 -m-1 p-1 rounded transition-colors`}
-        onClick={handleEdit}
-      >
+    <div className={`flex items-center gap-3 ${className}`}>
+      <div className="flex-1 text-break">
         {editedText}
       </div>
-      <div className="absolute top-1/2 -translate-y-1/2 right-2 flex flex-col items-center gap-1">
-        {canApply && (
-          <div className="flex items-center">
-            <ApplyButton
-              insertionRequest={createInsertionRequest(insertionContext) || { type: 'page_title', value: editedText }}
-              onApply={handleApply}
-              loading={isLoading}
-              error={error || undefined}
-              disabled={disabled}
-              label="Apply"
-              ariaLabel={getApplyDescription(checkTitle || '')}
-            />
-          </div>
-        )}
-        
+      <div className="flex-shrink-0 flex flex-col items-center gap-2">
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -276,21 +298,21 @@ export function EditableRecommendation({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={handleEdit}
-                  disabled={disabled}
-                  className="h-8 w-8 p-0 hover:bg-background2"
-                  aria-label="Edit recommendation"
+                  onClick={handleApplyClick}
+                  disabled={disabled || !canApply}
+                  className="h-8 w-8 p-0 rounded-full bg-background2 hover:bg-background2/80"
+                  aria-label="Apply to page"
                 >
-                  <Edit3 className="h-3 w-3" />
+                  <ApplyIcon className="h-4 w-4" />
                 </Button>
               </motion.div>
             </TooltipTrigger>
-            <TooltipContent>
-              <p>Edit recommendation</p>
+            <TooltipContent side="left">
+              <p>Apply to page</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
-        
+
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -298,17 +320,17 @@ export function EditableRecommendation({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={handleCopy}
-                  disabled={disabled}
-                  className="h-8 w-8 p-0 hover:bg-background2"
-                  aria-label="Copy recommendation to clipboard"
+                  onClick={handleRegenerate}
+                  disabled={disabled || isRegenerating}
+                  className="h-8 w-8 p-0 rounded-full bg-background2 hover:bg-background2/80"
+                  aria-label="Generate new suggestion"
                 >
-                  <Copy className="h-3 w-3" />
+                  <RegenerateIcon className="h-4 w-4" />
                 </Button>
               </motion.div>
             </TooltipTrigger>
-            <TooltipContent>
-              <p>Copy recommendation to clipboard</p>
+            <TooltipContent side="left">
+              <p>Generate new suggestion</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>

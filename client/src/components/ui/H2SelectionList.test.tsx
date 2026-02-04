@@ -8,7 +8,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { H2SelectionList } from './H2SelectionList';
 import type { H2ElementInfo } from '../../lib/webflowDesignerApi';
-import type { WebflowInsertionRequest, WebflowInsertionResult } from '../../types/webflow-data-api';
+import type { WebflowInsertionResult } from '../../types/webflow-data-api';
 
 // Mock the useAppliedRecommendations hook
 vi.mock('../../hooks/useAppliedRecommendations', () => ({
@@ -93,7 +93,7 @@ describe('H2SelectionList', () => {
       });
     });
 
-    it('should display the AI recommendation text', () => {
+    it('should not display recommendation text directly (handled by parent)', () => {
       render(
         <H2SelectionList
           h2Elements={mockH2Elements}
@@ -102,7 +102,8 @@ describe('H2SelectionList', () => {
         />
       );
 
-      expect(screen.getByText(mockRecommendation)).toBeInTheDocument();
+      // Recommendation text is displayed by the parent component, not H2SelectionList
+      expect(screen.queryByText(mockRecommendation)).not.toBeInTheDocument();
     });
 
     it('should handle empty H2 elements list', () => {
@@ -183,15 +184,15 @@ describe('H2SelectionList', () => {
         />
       );
 
-      const applyButtons = screen.getAllByRole('button', { name: /apply/i });
-      const firstApplyButton = applyButtons[0];
-
+      const firstApplyButton = screen.getAllByRole('button', { name: /apply/i })[0];
       await user.click(firstApplyButton);
-      await waitFor(() => expect(mockOnApply).toHaveBeenCalled());
 
-      // All buttons should now be disabled
-      applyButtons.forEach(button => {
-        expect(button).toBeDisabled();
+      // All apply buttons should now be disabled after successful apply
+      await waitFor(() => {
+        const applyButtons = screen.getAllByRole('button', { name: /apply/i });
+        applyButtons.forEach(button => {
+          expect(button).toBeDisabled();
+        });
       });
     });
 
@@ -209,24 +210,19 @@ describe('H2SelectionList', () => {
 
       const firstApplyButton = screen.getAllByRole('button', { name: /apply/i })[0];
       await user.click(firstApplyButton);
-      await waitFor(() => expect(mockOnApply).toHaveBeenCalled());
 
-      // Should show Applied state in both badge and button
-      expect(screen.getAllByText('Applied')).toHaveLength(2); // Badge + Button
-      
-      // Applied H2 should have different styling
-      const appliedElement = screen.getByText(/Current H2 Title One/).closest('.applied');
-      expect(appliedElement).toBeInTheDocument();
-      expect(appliedElement).toHaveClass('applied');
+      // Should show Applied badge
+      await waitFor(() => {
+        expect(screen.getByText('Applied')).toBeInTheDocument();
+      });
+
+      // Should show success message
+      expect(screen.getByText(/Successfully applied recommendation to H2 #1/)).toBeInTheDocument();
     });
 
-    it('should show loading state during apply operation', async () => {
+    it('should transition to applied state after successful apply', async () => {
       const user = userEvent.setup();
-      let resolveApply: (value: WebflowInsertionResult) => void;
-      const applyPromise = new Promise<WebflowInsertionResult>((resolve) => {
-        resolveApply = resolve;
-      });
-      mockOnApply.mockReturnValue(applyPromise);
+      mockOnApply.mockResolvedValue(mockInsertionResult);
 
       render(
         <H2SelectionList
@@ -237,15 +233,18 @@ describe('H2SelectionList', () => {
       );
 
       const firstApplyButton = screen.getAllByRole('button', { name: /apply/i })[0];
+      expect(firstApplyButton).not.toBeDisabled();
+
       await user.click(firstApplyButton);
 
-      // Should show loading state
-      expect(screen.getByText('Applying...')).toBeInTheDocument();
-      expect(firstApplyButton).toBeDisabled();
-
-      // Resolve the promise
-      resolveApply!(mockInsertionResult);
+      // After the apply completes, should show Applied badge
       await waitFor(() => expect(screen.getByText('Applied')).toBeInTheDocument());
+
+      // All apply buttons should be disabled after successful apply (re-query after re-render)
+      const applyButtons = screen.getAllByRole('button', { name: /apply/i });
+      applyButtons.forEach(button => {
+        expect(button).toBeDisabled();
+      });
     });
   });
 
@@ -271,10 +270,7 @@ describe('H2SelectionList', () => {
         expect(mockOnError).toHaveBeenCalledWith(expect.any(Error));
       });
 
-      // Button should show error state
-      expect(screen.getByText('Error')).toBeInTheDocument();
-      
-      // Other buttons should remain enabled
+      // Other buttons should remain enabled (appliedIndex stays null on error)
       const applyButtons = screen.getAllByRole('button', { name: /apply/i });
       const otherButtons = applyButtons.slice(1);
       otherButtons.forEach(button => {
@@ -282,7 +278,7 @@ describe('H2SelectionList', () => {
       });
     });
 
-    it('should display error message when provided', async () => {
+    it('should call onError with error details when apply fails', async () => {
       const user = userEvent.setup();
       const errorMessage = 'Network connection failed';
       mockOnApply.mockRejectedValue(new Error(errorMessage));
@@ -292,6 +288,7 @@ describe('H2SelectionList', () => {
           h2Elements={mockH2Elements}
           recommendation={mockRecommendation}
           onApply={mockOnApply}
+          onError={mockOnError}
         />
       );
 
@@ -299,7 +296,9 @@ describe('H2SelectionList', () => {
       await user.click(firstApplyButton);
 
       await waitFor(() => {
-        expect(screen.getByText(errorMessage)).toBeInTheDocument();
+        expect(mockOnError).toHaveBeenCalledWith(
+          expect.objectContaining({ message: errorMessage })
+        );
       });
     });
   });
