@@ -44,12 +44,12 @@ export function LanguageSelector({
   };
 
   return (
-    <div className={`space-y-2 ${className || ''}`}>
+    <div className={className || 'flex flex-col gap-3'}>
       {label && (
         <CopyTooltip content="Choose the language you want AI recommendations to appear in.">
-          <Label htmlFor="language-select" className="text-body-sm font-medium text-text1">
+          <label htmlFor="language-select" className="text-[14px] font-semibold text-text1 block">
             {label}
-          </Label>
+          </label>
         </CopyTooltip>
       )}
       <Select

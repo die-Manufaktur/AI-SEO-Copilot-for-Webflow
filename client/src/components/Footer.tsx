@@ -11,8 +11,6 @@ import MailIcon from '../assets/icons/IconoirMail.svg';
 const FooterContainer = styled.footer`
   width: 100%;
   margin-top: 0.5rem !important;
-  background-color: var(--color-bg-700);
-  border: 2px solid var(--color-bg-700);
   margin-top: auto;
   position: sticky;
   bottom: 0;
@@ -22,6 +20,11 @@ const FooterContainer = styled.footer`
   height: var(--footer-height-compact);
   display: flex;
   align-items: center;
+  /* Gradient border */
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--color-bg-700), var(--color-bg-700)) padding-box,
+    linear-gradient(112deg, #5B5959 0%, #313131 100.39%) border-box;
 `;
 
 const LinksContainer = styled.div`

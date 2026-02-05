@@ -996,13 +996,13 @@ export default function Home() {
                     control={form.control}
                     name="keyphrase"
                     render={({ field }: { field: any }) => (
-                      <FormItem className="w-full">
-                        <FormLabel className="mb-1">Main Keyword</FormLabel>
+                      <FormItem className="w-full space-y-3">
+                        <FormLabel className="text-[14px] font-semibold text-text1">Main keyword</FormLabel>
                         <FormControl>
                           <motion.div
                             whileHover={{ scale: 1.01 }}
                             whileTap={{ scale: 0.99 }}
-                            className="w-full mt-2"
+                            className="w-full"
                           >
                             <Input
                               placeholder="Enter your main keyword"
@@ -1030,37 +1030,34 @@ export default function Home() {
                           on your page context.
                         </p>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          data-testid="advanced-analysis-switch"
-                          checked={advancedOptionsEnabled}
-                          onCheckedChange={(checked) => {
-                            setAdvancedOptionsEnabled(checked);
-                            if (!checked) {
-                              // When turning off, only clear UI state but preserve stored settings
-                              setPageType("none");
-                              setSecondaryKeywords('');
-                              setSelectedLanguage(getDefaultLanguage());
-                              setAdvancedOptionsSaveStatus('none');
-                            } else {
-                              // When turning on, restore saved settings
-                              if (currentPageId) {
-                                const savedAdvancedOptions = loadAdvancedOptionsForPage(currentPageId);
-                                if (savedAdvancedOptions.pageType || savedAdvancedOptions.secondaryKeywords || savedAdvancedOptions.languageCode) {
-                                  setPageType(savedAdvancedOptions.pageType || "none");
-                                  setSecondaryKeywords(savedAdvancedOptions.secondaryKeywords || '');
-                                  const savedLanguage = savedAdvancedOptions.languageCode
-                                    ? getLanguageByCode(savedAdvancedOptions.languageCode) || getDefaultLanguage()
-                                    : getDefaultLanguage();
-                                  setSelectedLanguage(savedLanguage);
-                                  setAdvancedOptionsSaveStatus('saved');
-                                }
+                      <Switch
+                        data-testid="advanced-analysis-switch"
+                        checked={advancedOptionsEnabled}
+                        onCheckedChange={(checked) => {
+                          setAdvancedOptionsEnabled(checked);
+                          if (!checked) {
+                            // When turning off, only clear UI state but preserve stored settings
+                            setPageType("none");
+                            setSecondaryKeywords('');
+                            setSelectedLanguage(getDefaultLanguage());
+                            setAdvancedOptionsSaveStatus('none');
+                          } else {
+                            // When turning on, restore saved settings
+                            if (currentPageId) {
+                              const savedAdvancedOptions = loadAdvancedOptionsForPage(currentPageId);
+                              if (savedAdvancedOptions.pageType || savedAdvancedOptions.secondaryKeywords || savedAdvancedOptions.languageCode) {
+                                setPageType(savedAdvancedOptions.pageType || "none");
+                                setSecondaryKeywords(savedAdvancedOptions.secondaryKeywords || '');
+                                const savedLanguage = savedAdvancedOptions.languageCode
+                                  ? getLanguageByCode(savedAdvancedOptions.languageCode) || getDefaultLanguage()
+                                  : getDefaultLanguage();
+                                setSelectedLanguage(savedLanguage);
+                                setAdvancedOptionsSaveStatus('saved');
                               }
                             }
-                          }}
-                        />
-                        <span className="text-body-sm text-text1 w-7 inline-block">{advancedOptionsEnabled ? 'On' : 'Off'}</span>
-                      </div>
+                          }
+                        }}
+                      />
                     </div>
 
                     <AnimatePresence>
@@ -1073,8 +1070,8 @@ export default function Home() {
                           className="space-y-4"
                         >
                           {/* Page Type Dropdown */}
-                          <div className="space-y-2">
-                            <label className="text-body-sm font-medium text-text1">Page Type</label>
+                          <div className="flex flex-col gap-3">
+                            <label className="text-[14px] font-semibold text-text1">Page type</label>
                             <Select value={pageType} onValueChange={setPageType}>
                               <SelectTrigger className="focus:ring-0 focus:ring-offset-0 bg-[var(--color-bg-500)] text-text1 placeholder:text-text2 [&>span]:!text-[var(--color-text-primary)]">
                                 <SelectValue placeholder="Select a page type" />
@@ -1126,14 +1123,14 @@ export default function Home() {
                                 setSelectedLanguage(getDefaultLanguage());
                               }
                             }}
-                            className="space-y-2"
+                            className="space-y-3"
                           />
 
                           {/* Secondary Keywords Input */}
-                          <div className="space-y-2">
-                            <label className="text-body-sm font-medium text-text1">
+                          <div className="space-y-3">
+                            <label className="text-[14px] font-semibold text-text1 flex items-center gap-3">
                               Secondary keywords
-                              <span className="text-caption text-text3 ml-2">
+                              <span className="text-xs font-normal text-text2">
                                 ({(secondaryKeywords || '').length}/{MAX_KEYWORDS_LENGTH} characters)
                               </span>
                             </label>
@@ -1154,10 +1151,10 @@ export default function Home() {
                               placeholder="SEO Webflow, search engine optimization..."
                               rows={2}
                               className={cn(
-                                "flex w-full p-[0.875rem] rounded-[0.625rem] border text-body-sm text-[var(--color-text-primary)] placeholder:!text-[var(--color-text-primary)] resize-none ring-offset-background focus-visible:outline-none focus-visible:ring-1",
+                                "flex w-full p-[0.875rem] rounded-[0.625rem] text-body-sm text-[var(--color-text-primary)] placeholder:!text-[var(--color-text-primary)] resize-none ring-offset-background focus-visible:outline-none focus-visible:ring-1",
                                 secondaryKeywordsError
-                                  ? 'border-redText focus-visible:ring-redText bg-input'
-                                  : 'border-[var(--color-bg-500)] bg-[var(--color-bg-500)]'
+                                  ? 'border border-redText focus-visible:ring-redText bg-input'
+                                  : 'gradient-border'
                               )}
                               maxLength={MAX_KEYWORDS_LENGTH}
                             />

@@ -752,3 +752,28 @@ textarea {
   color: black !important;
   border: none !important;
 }
+
+/* Gradient border utility - for inputs, selects, sections */
+.gradient-border {
+  position: relative;
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--color-bg-500), var(--color-bg-500)) padding-box,
+    linear-gradient(112deg, #5B5959 0%, #313131 100.39%) border-box;
+}
+
+.gradient-border-section {
+  position: relative;
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--color-bg-700), var(--color-bg-700)) padding-box,
+    linear-gradient(112deg, #5B5959 0%, #313131 100.39%) border-box;
+}
+
+.gradient-border-footer {
+  position: relative;
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--footer-bg), var(--footer-bg)) padding-box,
+    linear-gradient(112deg, #5B5959 0%, #313131 100.39%) border-box;
+}
