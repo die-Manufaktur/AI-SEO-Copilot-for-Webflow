@@ -759,7 +759,7 @@ textarea {
   border: 1px solid transparent;
   background:
     linear-gradient(var(--color-bg-500), var(--color-bg-500)) padding-box,
-    linear-gradient(112deg, #5B5959 0%, #313131 100.39%) border-box;
+    linear-gradient(112deg, #717171 0%, #4C4A4A 100.39%) border-box;
 }
 
 .gradient-border-section {
@@ -767,7 +767,7 @@ textarea {
   border: 1px solid transparent;
   background:
     linear-gradient(var(--color-bg-700), var(--color-bg-700)) padding-box,
-    linear-gradient(112deg, #5B5959 0%, #313131 100.39%) border-box;
+    linear-gradient(112deg, #717171 0%, #4C4A4A 100.39%) border-box;
 }
 
 .gradient-border-footer {
@@ -775,5 +775,5 @@ textarea {
   border: 1px solid transparent;
   background:
     linear-gradient(var(--footer-bg), var(--footer-bg)) padding-box,
-    linear-gradient(112deg, #5B5959 0%, #313131 100.39%) border-box;
+    linear-gradient(112deg, #717171 0%, #4C4A4A 100.39%) border-box;
 }

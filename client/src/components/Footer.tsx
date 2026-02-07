@@ -24,17 +24,16 @@ const FooterContainer = styled.footer`
   border: 1px solid transparent;
   background:
     linear-gradient(var(--color-bg-700), var(--color-bg-700)) padding-box,
-    linear-gradient(112deg, #5B5959 0%, #313131 100.39%) border-box;
+    linear-gradient(112deg, #717171 0%, #4C4A4A 100.39%) border-box;
 `;
 
 const LinksContainer = styled.div`
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
   display: flex;
   flex-direction: row;
-  justify-content: space-evenly;
+  justify-content: space-between;
+  align-items: center;
   flex-wrap: nowrap;
-  gap: 0.5rem;
 `;
 
 const StyledLink = styled.a`

@@ -46,7 +46,7 @@ export const CategoryCard = React.forwardRef<HTMLElement, CategoryCardProps>(
       <article
         ref={ref}
         className={cn(
-          "bg-card-bg border-2 border-border-subtle rounded-[0.875rem] p-5",
+          "gradient-border-section rounded-[0.875rem] p-5",
           className
         )}
       >

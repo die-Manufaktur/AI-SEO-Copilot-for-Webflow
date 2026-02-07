@@ -1286,7 +1286,7 @@ export default function Home() {
                         variants={container}
                         initial="hidden"
                         animate="show"
-                        className="w-full bg-background2 rounded-[20px] p-5 py-8 border-2 border-[var(--color-bg-700)]"
+                        className="w-full gradient-border-section rounded-[20px] p-5 py-8"
                       >
                         {selectedCategoryChecks.map((check, index) => (
                           <motion.div
@@ -1612,7 +1612,7 @@ export default function Home() {
                         key={category}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="bg-card-bg border-2 border-border-color rounded-[0.875rem] p-5 hover:bg-background2 transition-colors cursor-pointer"
+                        className="gradient-border-section rounded-[0.875rem] p-5 hover:brightness-110 transition-all cursor-pointer"
                         onClick={() => setSelectedCategory(category)}
                       >
                         <div className="flex items-center justify-between mb-2">
