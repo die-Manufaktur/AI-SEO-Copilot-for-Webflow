@@ -25,8 +25,9 @@ describe('StatsSummary', () => {
     it('should format text correctly with triangle indicators', () => {
       render(<StatsSummary passed={10} toImprove={5} />);
       const summary = screen.getByRole('status');
-      expect(summary.textContent).toContain('▲');
-      expect(summary.textContent).toContain('▼');
+      // SVG triangles are now used instead of text characters
+      const svgs = summary.querySelectorAll('svg');
+      expect(svgs.length).toBe(2);
     });
   });
 
@@ -60,13 +61,13 @@ describe('StatsSummary', () => {
     it('should use flex layout with gap for icons and text', () => {
       render(<StatsSummary passed={5} toImprove={3} />);
       const passedText = screen.getByText(/5 passed/i).closest('span');
-      expect(passedText).toHaveClass('flex', 'items-center', 'gap-2');
+      expect(passedText).toHaveClass('flex', 'items-center', 'gap-1.5');
     });
 
     it('should use correct font size from design token', () => {
       render(<StatsSummary passed={5} toImprove={3} />);
       const summary = screen.getByRole('status');
-      expect(summary).toHaveClass('text-font-size-sm');
+      expect(summary).toHaveClass('text-sm');
     });
 
     it('should have vertical margin', () => {
@@ -78,7 +79,7 @@ describe('StatsSummary', () => {
     it('should use medium font weight', () => {
       render(<StatsSummary passed={5} toImprove={3} />);
       const summary = screen.getByRole('status');
-      expect(summary).toHaveClass('font-font-weight-medium');
+      expect(summary).toHaveClass('font-medium');
     });
   });
 
@@ -92,7 +93,7 @@ describe('StatsSummary', () => {
     it('should merge custom className with default classes', () => {
       render(<StatsSummary passed={5} toImprove={3} className="custom-stats" />);
       const summary = screen.getByRole('status');
-      expect(summary).toHaveClass('custom-stats', 'text-font-size-sm', 'font-font-weight-medium', 'my-6');
+      expect(summary).toHaveClass('custom-stats', 'text-sm', 'font-medium', 'my-6');
     });
 
     it('should accept passed as a required prop', () => {
@@ -150,44 +151,51 @@ describe('StatsSummary', () => {
     it('should use proper triangle indicators', () => {
       render(<StatsSummary passed={5} toImprove={3} />);
       const summary = screen.getByRole('status');
-      expect(summary.textContent).toContain('▲');
-      expect(summary.textContent).toContain('▼');
+      // SVG triangles are now used instead of text characters
+      const svgs = summary.querySelectorAll('svg');
+      expect(svgs.length).toBe(2);
     });
 
     it('should have proper text content', () => {
       render(<StatsSummary passed={5} toImprove={3} />);
       const summary = screen.getByRole('status');
-      expect(summary.textContent).toBe('▲ 5 passed▼ 3 to improve');
+      expect(summary.textContent).toContain('5 passed');
+      expect(summary.textContent).toContain('3 to improve');
     });
 
     it('should handle singular and plural correctly', () => {
       render(<StatsSummary passed={1} toImprove={1} />);
       const summary = screen.getByRole('status');
-      expect(summary).toHaveTextContent('▲ 1 passed▼ 1 to improve');
+      expect(summary).toHaveTextContent('1 passed');
+      expect(summary).toHaveTextContent('1 to improve');
     });
   });
 
   describe('StatsSummary Color Styling', () => {
-    it('should display passed count in green with up triangle indicator', () => {
+    it('should display passed count with up triangle SVG indicator', () => {
       render(<StatsSummary passed={5} toImprove={3} />);
 
       const passedText = screen.getByText(/5 passed/i);
       const passedSpan = passedText.closest('span');
-      expect(passedSpan).toHaveStyle({ color: 'var(--color-green)' });
 
-      // Check for up triangle indicator in the text
-      expect(passedSpan?.textContent).toContain('▲');
+      // Check for SVG triangle indicator
+      const svg = passedSpan?.querySelector('svg');
+      expect(svg).toBeInTheDocument();
+      // Success triangle has #A2FFB4 fill
+      expect(svg?.querySelector('path[fill="#A2FFB4"]')).toBeInTheDocument();
     });
 
-    it('should display to improve count in red with down triangle indicator', () => {
+    it('should display to improve count with down triangle SVG indicator', () => {
       render(<StatsSummary passed={5} toImprove={3} />);
 
       const improveText = screen.getByText(/3 to improve/i);
       const improveSpan = improveText.closest('span');
-      expect(improveSpan).toHaveStyle({ color: 'var(--color-red)' });
 
-      // Check for down triangle indicator in the text
-      expect(improveSpan?.textContent).toContain('▼');
+      // Check for SVG triangle indicator
+      const svg = improveSpan?.querySelector('svg');
+      expect(svg).toBeInTheDocument();
+      // Fail triangle has #FF4343 fill
+      expect(svg?.querySelector('path[fill="#FF4343"]')).toBeInTheDocument();
     });
   });
 });
