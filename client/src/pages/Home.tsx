@@ -1696,13 +1696,13 @@ export default function Home() {
                           <h3 className="text-lg font-medium">{category}</h3>
                           <div className="flex items-center gap-2">
                             {getCategoryStatusIcon(status)}
-                            <Badge variant={passedCount === 0 ? "destructive" : passedCount === checks.length ? "success" : "warning"} className="flex items-center gap-1 h-9">
-                              {passedCount > 0 && <ChevronUp className="h-3 w-3" />}
-                              {passedCount === 0 && <ChevronDown className="h-3 w-3" />}
+                            <Badge variant={passedCount === 0 ? "destructive" : passedCount === checks.length ? "success" : "warning"} className="flex items-center">
                               {passedCount}/{checks.length} passed
                             </Badge>
-                            <Badge variant={passedCount === 0 ? "destructive" : passedCount === checks.length ? "success" : "warning"} className="flex items-center justify-center w-9 h-9 p-0 rounded-full">
-                              <ExternalLink className="h-3 w-3" />
+                            <Badge variant={passedCount === 0 ? "destructive" : passedCount === checks.length ? "success" : "warning"} className="flex items-center justify-center !w-9 !h-9 !p-0 !rounded-full !gap-0">
+                              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                                <path d="M4 4H12M12 4V12M12 4L4 12" stroke="black" strokeWidth="1.5"/>
+                              </svg>
                             </Badge>
                           </div>
                         </div>
