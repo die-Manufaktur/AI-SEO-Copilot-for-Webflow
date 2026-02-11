@@ -62,14 +62,13 @@ export function LanguageSelector({
         </SelectTrigger>
         <SelectContent className="bg-background3 border border-divider shadow-md">
           {SUPPORTED_LANGUAGES.map((language) => {
-            const isDetectedDefault = language.code === detectedLanguageCode;
             return (
               <SelectItem
                 key={language.code}
                 value={language.code}
                 className="cursor-pointer focus:bg-background4 focus:text-text1 data-[highlighted]:bg-background4 data-[highlighted]:text-text1 hover:bg-background4 hover:text-text1 transition-colors"
               >
-                {language.code.toUpperCase()} - {language.nativeName}{isDetectedDefault ? ' (default)' : ''}
+                {language.code.toUpperCase()} - {language.nativeName}
               </SelectItem>
             );
           })}

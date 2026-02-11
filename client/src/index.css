@@ -258,7 +258,7 @@
     --input-height-sm: var(--size-button-small-height);
     --input-height-lg: var(--size-input-height);
 
-    --extension-width: 715px;
+    --extension-width: 615px;
     --extension-height: 1009px;
     --progress-circle-size: 244px;
 
@@ -293,6 +293,7 @@
     display: block !important;
     visibility: visible !important;
     overflow: auto;
+    overflow-x: hidden;
     margin: 0;
     padding: 0;
   }

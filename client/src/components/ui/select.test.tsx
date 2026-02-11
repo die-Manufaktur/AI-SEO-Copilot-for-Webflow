@@ -76,7 +76,7 @@ describe('Select Components', () => {
     );
 
     const trigger = screen.getByTestId('select-trigger');
-    expect(trigger).toHaveClass('flex', 'h-10', 'w-full', 'items-center', 'justify-between');
+    expect(trigger).toHaveClass('flex', 'h-12', 'w-full', 'items-center', 'justify-between');
     expect(screen.getByTestId('select-value')).toHaveTextContent('Select option...');
   });
 

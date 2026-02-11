@@ -69,7 +69,7 @@ describe('WebflowAppWrapper', () => {
     );
 
     expect(mockWebflow.setExtensionSize).toHaveBeenCalledWith({
-      width: 715,
+      width: 615,
       height: 1009,
     });
   });
@@ -106,7 +106,7 @@ describe('WebflowAppWrapper', () => {
     );
 
     expect(mockWebflowWithError.setExtensionSize).toHaveBeenCalledWith({
-      width: 715,
+      width: 615,
       height: 1009,
     });
     expect(mockLogger.error).toHaveBeenCalledWith(

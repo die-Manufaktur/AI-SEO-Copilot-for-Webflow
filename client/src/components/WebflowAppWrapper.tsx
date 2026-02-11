@@ -13,7 +13,7 @@ export default function WebflowAppWrapper({ children }: WebflowAppWrapperProps) 
     if (window.webflow && window.webflow.setExtensionSize) {
       try {
         window.webflow.setExtensionSize({
-          width: 715,
+          width: 615,
           height: 1009
         });
       } catch (error) {

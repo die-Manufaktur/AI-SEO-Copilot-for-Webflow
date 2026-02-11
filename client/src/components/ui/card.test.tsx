@@ -15,7 +15,7 @@ describe('Card Components', () => {
 
       const card = screen.getByTestId('card');
       expect(card).toBeInTheDocument();
-      expect(card).toHaveClass('rounded-[var(--radius-card)]', 'border', 'border-color', 'bg-card-bg', 'text-text-primary', 'shadow-xs');
+      expect(card).toHaveClass('rounded-[var(--radius-card)]', 'gradient-border-section', 'text-text-primary', 'shadow-xs');
     });
 
     it('should accept additional className', () => {

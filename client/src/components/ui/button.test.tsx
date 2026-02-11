@@ -81,27 +81,26 @@ describe('Button', () => {
   });
 
   describe('New Design System Features', () => {
-    it('should have auto-width optimize variant with primary blue styling and custom border radius', () => {
+    it('should have auto-width optimize variant with primary blue styling and pill border radius', () => {
       render(<Button variant="optimize" size="optimize">Optimize my SEO</Button>);
       const button = screen.getByRole('button');
 
       // Should NOT have w-full class - button sizes to content
       expect(button).not.toHaveClass('w-full');
-      expect(button).toHaveClass('bg-primary-blue');
-      expect(button).toHaveClass('rounded-[27px]');
+      expect(button).toHaveClass('bg-[#1A72F5]');
+      expect(button).toHaveClass('!rounded-[9999px]');
     });
 
     it('should apply optimize size variant correctly', () => {
       render(<Button variant="optimize" size="optimize">Optimize my SEO</Button>);
       const button = screen.getByRole('button');
 
-      // Optimize size uses compact design tokens (height: 40px)
-      expect(button).toHaveClass('h-[var(--button-height-compact)]');
-      expect(button).toHaveClass('px-[var(--padding-compact-button-x)]');
-      expect(button).toHaveClass('py-[var(--padding-compact-button-y)]');
+      expect(button).toHaveClass('h-14');
+      expect(button).toHaveClass('px-8');
+      expect(button).toHaveClass('py-4');
     });
 
-    it('should use new design tokens for primary variant', () => {
+    it('should use design tokens for primary variant', () => {
       render(<Button variant="default">Primary Button</Button>);
       const button = screen.getByRole('button');
 
@@ -109,7 +108,7 @@ describe('Button', () => {
       expect(button).toHaveClass('hover:bg-primary-blue-hover');
     });
 
-    it('should have proper height with new design tokens', () => {
+    it('should have proper height with design tokens', () => {
       render(<Button size="lg">Large Button</Button>);
       const button = screen.getByRole('button');
 

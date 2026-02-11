@@ -154,7 +154,7 @@ describe('LanguageSelector', () => {
     expect(japaneseLanguage?.nativeName).not.toBe(japaneseLanguage?.name);
   });
 
-  it('shows (default) indicator for detected site language', () => {
+  it('calls detectSiteLanguage to determine site language', () => {
     // Mock French as the detected site language
     vi.mocked(detectSiteLanguage).mockReturnValue('fr');
 
@@ -165,15 +165,10 @@ describe('LanguageSelector', () => {
       />
     );
 
-    // The component should call detectSiteLanguage and show (default) for French
     expect(detectSiteLanguage).toHaveBeenCalled();
-    
-    // Note: In a real test environment, we would need to interact with the dropdown
-    // to see the options. Here we're testing that the function is called correctly.
-    // The visual test would require more complex interaction with Radix UI components.
   });
 
-  it('shows (default) indicator for different detected languages', () => {
+  it('calls detectSiteLanguage for different site languages', () => {
     // Mock German as the detected site language
     vi.mocked(detectSiteLanguage).mockReturnValue('de');
 

@@ -44,16 +44,10 @@ describe('CategoryCard', () => {
   });
 
   describe('Styling and Design Tokens', () => {
-    it('should apply card background color using design token', () => {
+    it('should apply gradient border section styling', () => {
       render(<CategoryCard {...defaultProps} />);
       const card = screen.getByRole('article');
-      expect(card).toHaveClass('bg-card-bg');
-    });
-
-    it('should apply subtle border using design token', () => {
-      render(<CategoryCard {...defaultProps} />);
-      const card = screen.getByRole('article');
-      expect(card).toHaveClass('border-border-subtle');
+      expect(card).toHaveClass('gradient-border-section');
     });
 
     it('should apply medium border radius', () => {
@@ -211,7 +205,7 @@ describe('CategoryCard', () => {
     it('should merge custom className with default classes', () => {
       render(<CategoryCard {...defaultProps} className="custom-category" />);
       const card = screen.getByRole('article');
-      expect(card).toHaveClass('custom-category', 'bg-card-bg', 'border-border-subtle');
+      expect(card).toHaveClass('custom-category', 'gradient-border-section');
     });
 
     it('should handle onToggle callback', async () => {
@@ -326,7 +320,7 @@ describe('CategoryCard', () => {
       );
 
       const badge = screen.getByText(/5\/5 passed/i);
-      expect(badge).toHaveClass('bg-[#4CAF50]');
+      expect(badge).toHaveClass('bg-[#A2FFB4]');
     });
 
     it('should display red badge for zero score', () => {

@@ -56,6 +56,7 @@ import { loadLanguageForSite, saveLanguageForSite } from '../utils/languageStora
 import { SchemaDisplay } from '../components/ui/schema-display';
 import { EditableRecommendation } from '../components/ui/editable-recommendation';
 import { H2SelectionList } from '../components/ui/H2SelectionList';
+import { ImageAltTextList } from '../components/ui/ImageAltTextList';
 import { useInsertion } from '../contexts/InsertionContext';
 import { useAppliedRecommendations } from '../hooks/useAppliedRecommendations';
 import type { H2ElementInfo } from '../lib/webflowDesignerApi';
@@ -1069,7 +1070,7 @@ export default function Home() {
                           transition={process.env.NODE_ENV === 'test' ? { duration: 0 } : { duration: 0.3 }}
                           className="space-y-4"
                         >
-                          {/* Page Type Dropdown */}
+                          {/* Page type Dropdown */}
                           <div className="flex flex-col gap-3">
                             <label className="text-[14px] font-semibold text-text1">Page type</label>
                             <Select value={pageType} onValueChange={setPageType}>
@@ -1479,100 +1480,135 @@ export default function Home() {
                                   Generate All
                                 </button>
                               )}
+                              {check.title === "Image Alt Attributes" && !check.passed && (
+                                <button
+                                  className="flex items-center gap-2 px-4 py-2 rounded-full bg-background4 border border-[var(--color-bg-300)] text-white text-sm whitespace-nowrap flex-shrink-0 hover:bg-background4/80 transition-colors"
+                                  onClick={() => {
+                                    // TODO: Wire up to batch AI alt text generation endpoint
+                                    console.log('Generate All alt text suggestions');
+                                  }}
+                                >
+                                  <svg className="h-4 w-4" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M8 0L9.5 6.5L16 8L9.5 9.5L8 16L6.5 9.5L0 8L6.5 6.5L8 0Z" />
+                                  </svg>
+                                  Generate All
+                                </button>
+                              )}
                             </div>
                             {!check.passed && check.recommendation && (
                               <div className="mt-4">
                                 {/* Recommendation title - rendered outside dark box */}
                                 {shouldShowCopyButton(check.title)
                                   && !(check.imageData && Array.isArray(check.imageData) && check.imageData.length > 0)
-                                  && check.title !== "Keyphrase in H2 Headings" && (
+                                  && check.title !== "Keyphrase in H2 Headings"
+                                  && check.title !== "Image Alt Attributes" && (
                                   <p className="text-base font-bold mb-2" style={{ color: 'var(--text1)' }}>
                                     {check.title} recommendation
                                   </p>
                                 )}
-                                <motion.div
-                                  initial={{ opacity: 0, height: 0 }}
-                                  animate={{ opacity: 1, height: "auto" }}
-                                  exit={{ opacity: 0, height: 0 }}
-                                  className="text-sm p-4 bg-background3 rounded-[7px] w-full"
-                                  style={{ backgroundColor: 'var(--background3)' }}
-                                >
-                                  {check.imageData && Array.isArray(check.imageData) && check.imageData.length > 0 ? (
-                                    <>
+                                {check.title === "Keyphrase in H2 Headings" ? (
+                                  // H2SelectionList renders its own per-item dark containers
+                                  <H2SelectionList
+                                    h2Elements={h2Elements}
+                                    recommendation={check.recommendation || ''}
+                                    onRegenerate={(h2Element, index) => {
+                                      // TODO: Wire up to AI recommendation generation endpoint
+                                      console.log('Regenerate H2 suggestion for:', h2Element.text, 'at index:', index);
+                                    }}
+                                    onApply={async ({ h2Element, recommendation }) => {
+                                      try {
+                                        const insertionRequest = {
+                                          type: 'h2_heading' as const,
+                                          value: recommendation,
+                                          elementIndex: h2Element.index,
+                                          selector: `#${h2Element.id}`,
+                                          pageId: currentPageId
+                                        };
+
+                                        const result = await applyInsertion(insertionRequest);
+
+                                        if (result.success) {
+                                          toast({
+                                            title: "✅ Your text has been included successfully",
+                                            description: "Don't forget to publish your website to update the SEO score.",
+                                          });
+
+                                          // Immediately update the H2 check to passed state
+                                          setResults(prevResults => {
+                                            if (!prevResults?.checks) return prevResults;
+
+                                            const updatedChecks = prevResults.checks.map(check =>
+                                              check.title === "Keyphrase in H2 Headings"
+                                                ? { ...check, passed: true }
+                                                : check
+                                            );
+
+                                            // Update score calculation
+                                            const passedCount = updatedChecks.filter(check => check.passed).length;
+                                            const updatedScore = Math.round((passedCount / updatedChecks.length) * 100);
+
+                                            return {
+                                              ...prevResults,
+                                              checks: updatedChecks,
+                                              score: updatedScore,
+                                              passedChecks: passedCount,
+                                              failedChecks: updatedChecks.length - passedCount
+                                            };
+                                          });
+                                        }
+                                        return result;
+                                      } catch (error) {
+                                        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                                        toast({
+                                          variant: "destructive",
+                                          title: "Apply Failed",
+                                          description: errorMessage
+                                        });
+                                        throw error;
+                                      }
+                                    }}
+                                    pageId={currentPageId}
+                                    checkTitle="Keyphrase in H2 Headings"
+                                    disabled={mutation.isPending}
+                                  />
+                                ) : check.title === "Image Alt Attributes" && check.imageData && Array.isArray(check.imageData) && check.imageData.length > 0 ? (
+                                  // ImageAltTextList renders its own per-item dark containers
+                                  <ImageAltTextList
+                                    images={check.imageData.map((img, idx) => ({
+                                      id: img.name || `img-${idx}`,
+                                      url: img.url,
+                                      name: img.name,
+                                      alt: img.alt || null,
+                                    }))}
+                                    onApply={async ({ image, newAltText }) => {
+                                      // TODO: Wire up to Webflow API to set alt text
+                                      console.log('Apply alt text:', image.name, newAltText);
+                                      return { success: true };
+                                    }}
+                                    onRegenerate={(image, index) => {
+                                      // TODO: Wire up to AI alt text generation endpoint
+                                      console.log('Regenerate alt text for:', image.name, 'at index:', index);
+                                    }}
+                                    pageId={currentPageId}
+                                    checkTitle="Image Alt Attributes"
+                                    disabled={mutation.isPending}
+                                  />
+                                ) : (
+                                  <motion.div
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: "auto" }}
+                                    exit={{ opacity: 0, height: 0 }}
+                                    className="text-sm p-4 bg-background3 rounded-[7px] w-full"
+                                    style={{ backgroundColor: 'var(--background3)' }}
+                                  >
+                                    {check.imageData && Array.isArray(check.imageData) && check.imageData.length > 0 ? (
                                       <ImageSizeDisplay
                                         images={check.imageData}
                                         showMimeType={check.title === "Next-Gen Image Formats"}
-                                        showFileSize={check.title === "Image File Size" || check.title !== "Image Alt Attributes"}
-                                        showAltText={check.title === "Image Alt Attributes"}
+                                        showFileSize={check.title === "Image File Size"}
                                         className="mt-2"
                                       />
-                                    </>
-                                  ) : check.title === "Keyphrase in H2 Headings" ? (
-                                    // Use H2SelectionList for H2 heading checks
-                                    <H2SelectionList
-                                      h2Elements={h2Elements}
-                                      recommendation={check.recommendation || ''}
-                                      onRegenerate={(h2Element, index) => {
-                                        // TODO: Wire up to AI recommendation generation endpoint
-                                        console.log('Regenerate H2 suggestion for:', h2Element.text, 'at index:', index);
-                                      }}
-                                      onApply={async ({ h2Element, recommendation }) => {
-                                        try {
-                                          const insertionRequest = {
-                                            type: 'h2_heading' as const,
-                                            value: recommendation,
-                                            elementIndex: h2Element.index,
-                                            selector: `#${h2Element.id}`,
-                                            pageId: currentPageId
-                                          };
-
-                                          const result = await applyInsertion(insertionRequest);
-
-                                          if (result.success) {
-                                            toast({
-                                              title: "✅ Your text has been included successfully",
-                                              description: "Don't forget to publish your website to update the SEO score.",
-                                            });
-
-                                            // Immediately update the H2 check to passed state
-                                            setResults(prevResults => {
-                                              if (!prevResults?.checks) return prevResults;
-
-                                              const updatedChecks = prevResults.checks.map(check =>
-                                                check.title === "Keyphrase in H2 Headings"
-                                                  ? { ...check, passed: true }
-                                                  : check
-                                              );
-
-                                              // Update score calculation
-                                              const passedCount = updatedChecks.filter(check => check.passed).length;
-                                              const updatedScore = Math.round((passedCount / updatedChecks.length) * 100);
-
-                                              return {
-                                                ...prevResults,
-                                                checks: updatedChecks,
-                                                score: updatedScore,
-                                                passedChecks: passedCount,
-                                                failedChecks: updatedChecks.length - passedCount
-                                              };
-                                            });
-                                          }
-                                          return result;
-                                        } catch (error) {
-                                          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-                                          toast({
-                                            variant: "destructive",
-                                            title: "Apply Failed",
-                                            description: errorMessage
-                                          });
-                                          throw error;
-                                        }
-                                      }}
-                                      pageId={currentPageId}
-                                      checkTitle="Keyphrase in H2 Headings"
-                                      disabled={mutation.isPending}
-                                    />
-                                  ) : shouldShowCopyButton(check.title) ? (
+                                    ) : shouldShowCopyButton(check.title) ? (
                                     // Editable recommendation (title rendered above, outside dark box)
                                     <EditableRecommendation
                                       recommendation={check.recommendation || ''}
@@ -1613,8 +1649,9 @@ export default function Home() {
                                   ) : (
                                     // Keep current rendering for checks that don't support copying
                                     check.recommendation
-                                  )}
-                                </motion.div>
+                                    )}
+                                  </motion.div>
+                                )}
                               </div>
                             )}
                           </motion.div>
