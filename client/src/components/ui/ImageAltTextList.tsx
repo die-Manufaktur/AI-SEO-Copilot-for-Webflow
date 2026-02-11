@@ -110,7 +110,7 @@ export function ImageAltTextList({
   };
 
   return (
-    <div className={`space-y-3 ${className}`}>
+    <div className={`space-y-2 ${className}`}>
       {images.map((image, index) => {
         const itemState = itemStates[index] || {};
         const isApplied = itemState.success;
@@ -119,10 +119,10 @@ export function ImageAltTextList({
         return (
           <div
             key={`${image.id}-${index}`}
-            className={`flex items-center gap-3 p-4 rounded-[7px] transition-colors ${
+            className={`flex items-center gap-3 p-4 transition-colors ${
               isApplied
-                ? 'bg-green-900/30 border border-green-700'
-                : 'bg-background3'
+                ? 'bg-green-900/30 border border-green-700 rounded-[7px]'
+                : ''
             }`}
           >
             {/* Image thumbnail */}

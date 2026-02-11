@@ -21,7 +21,7 @@ import {
   AlertTriangle,
   CircleAlert,
   Info,
-  ChevronLeft,
+  ArrowLeft,
   ExternalLink,
   ChevronDown,
   ChevronUp
@@ -1256,11 +1256,11 @@ export default function Home() {
               className="w-full"
             >
               {selectedCategory ? (
-                <Card className="w-full bg-background border-none shadow-none">
+                <Card className="w-full rounded-[14px] shadow-none" style={{ background: 'var(--color-bg-900)', border: '1px solid var(--color-bg-500)' }}>
                   <CardHeader>
                     <CategoryHeader>
                       <BackButton onClick={() => setSelectedCategory(null)}>
-                        <ChevronLeft />
+                        <ArrowLeft />
                       </BackButton>
                       <CardTitle className="flex-1 text-center">{selectedCategory} overview</CardTitle>
                       {/* Invisible spacer to keep title centered */}
@@ -1331,7 +1331,7 @@ export default function Home() {
                         variants={container}
                         initial="hidden"
                         animate="show"
-                        className="w-full gradient-border-section rounded-[20px] p-5 py-8"
+                        className="w-full bg-[var(--color-bg-700)] rounded-[20px] p-5 py-8"
                       >
                         {selectedCategoryChecks.map((check, index) => (
                           <motion.div
@@ -1343,9 +1343,9 @@ export default function Home() {
                             transition={{ delay: index * 0.1 }}
                           >
                             <div className="flex items-start justify-between w-full">
-                              <div className="space-y-2 flex-1">
+                              <div className="space-y-2 flex-1 min-w-0">
                                 <motion.div
-                                  className="font-medium flex items-center gap-2"
+                                  className="font-medium flex items-center gap-2 whitespace-nowrap"
                                 >
                                   <div className="flex items-center gap-2">
                                     {/* Triangle arrow indicator */}
@@ -1417,8 +1417,8 @@ export default function Home() {
                                         check.priority === 'high'
                                           ? 'bg-[#FF4343] text-white border-transparent text-xs'
                                           : check.priority === 'low'
-                                          ? 'bg-[#FFD064] text-black border-transparent text-xs'
-                                          : 'bg-[#FFD064] text-black border-transparent text-xs'
+                                          ? 'bg-[#FFEA9E] text-black border-transparent text-xs'
+                                          : 'bg-[#FFEA9E] text-black border-transparent text-xs'
                                       }
                                     >
                                       {getPriorityText(check.priority)}
@@ -1447,23 +1447,26 @@ export default function Home() {
                                 {/* Always show description - keyword results are no longer displayed */}
                                 <div className="text-body-sm text-text2 text-break">
                                   <p className="inline">
-                                    {check.passed 
-                                      ? check.description 
+                                    {check.passed
+                                      ? check.description
                                       : isApplied(check.title)
                                         ? `Previously applied recommendation but the issue persists. ${check.description}`
                                         : check.description
                                     }
+                                    {!check.passed && (
+                                      <>
+                                        {' '}
+                                        <a
+                                          href={getLearnMoreUrl(check.title)}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="inline-flex items-center font-bold text-primaryText hover:underline"
+                                        >
+                                          Learn More <span className="ml-0.5">↗</span>
+                                        </a>
+                                      </>
+                                    )}
                                   </p>
-                                  {!check.passed && (
-                                    <a
-                                      href={getLearnMoreUrl(check.title)}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="ml-1 inline-flex items-center font-bold text-primaryText hover:underline"
-                                    >
-                                      Learn More <span className="ml-0.5">↗</span>
-                                    </a>
-                                  )}
                                 </div>
                               </div>
                               {check.title === "Keyphrase in H2 Headings" && !check.passed && (
@@ -1496,7 +1499,7 @@ export default function Home() {
                               )}
                             </div>
                             {!check.passed && check.recommendation && (
-                              <div className="mt-4">
+                              <div className="mt-8">
                                 {/* Recommendation title - rendered outside dark box */}
                                 {shouldShowCopyButton(check.title)
                                   && !(check.imageData && Array.isArray(check.imageData) && check.imageData.length > 0)
