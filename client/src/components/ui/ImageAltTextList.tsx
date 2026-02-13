@@ -7,7 +7,6 @@
 
 import React, { useState } from 'react';
 import { Button } from './button';
-import { motion } from 'framer-motion';
 import {
   Tooltip,
   TooltipContent,
@@ -139,7 +138,7 @@ export function ImageAltTextList({
             </div>
 
             {/* Editable text area */}
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 border border-[var(--color-bg-500)] bg-[var(--color-bg-500)] rounded-[6px] p-3">
               <textarea
                 className="w-full bg-transparent text-sm text-text1 resize-none border-none focus:outline-none focus:ring-0 placeholder:text-text3"
                 value={editedTexts[index] ?? ''}
@@ -162,18 +161,16 @@ export function ImageAltTextList({
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleApply(image, index)}
-                        disabled={isDisabled}
-                        className="h-8 w-8 p-0 rounded-full bg-background2 hover:bg-background2/80"
-                        aria-label={`Apply alt text for ${image.name}`}
-                      >
-                        <ApplyIcon className="h-4 w-4" />
-                      </Button>
-                    </motion.div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleApply(image, index)}
+                      disabled={isDisabled}
+                      className="h-8 w-8 p-0 rounded-full bg-[var(--color-bg-500)] hover:bg-[#555555] hover:scale-110 active:scale-95 transition-transform"
+                      aria-label={`Apply alt text for ${image.name}`}
+                    >
+                      <ApplyIcon className="h-4 w-4" />
+                    </Button>
                   </TooltipTrigger>
                   <TooltipContent side="left">
                     <p>Apply to page</p>
@@ -185,18 +182,16 @@ export function ImageAltTextList({
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onRegenerate(image, index)}
-                          disabled={isDisabled}
-                          className="h-8 w-8 p-0 rounded-full bg-background2 hover:bg-background2/80"
-                          aria-label="Generate new suggestion"
-                        >
-                          <RegenerateIcon className="h-4 w-4" />
-                        </Button>
-                      </motion.div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onRegenerate(image, index)}
+                        disabled={isDisabled}
+                        className="h-8 w-8 p-0 rounded-full bg-[var(--color-bg-500)] hover:bg-[#555555] hover:scale-110 active:scale-95 transition-transform"
+                        aria-label="Generate new suggestion"
+                      >
+                        <RegenerateIcon className="h-4 w-4" />
+                      </Button>
                     </TooltipTrigger>
                     <TooltipContent side="left">
                       <p>Generate new suggestion</p>

@@ -2,7 +2,6 @@ import * as React from "react";
 import { useState, useRef, useEffect } from "react";
 import { Button } from "./button";
 import { Check, X } from "lucide-react";
-import { motion } from "framer-motion";
 import {
   Tooltip,
   TooltipContent,
@@ -294,18 +293,16 @@ export function EditableRecommendation({
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleApplyClick}
-                  disabled={disabled || !canApply}
-                  className="h-8 w-8 p-0 rounded-full bg-background2 hover:bg-background2/80"
-                  aria-label="Apply to page"
-                >
-                  <ApplyIcon className="h-4 w-4" />
-                </Button>
-              </motion.div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleApplyClick}
+                disabled={disabled || !canApply}
+                className="h-8 w-8 p-0 rounded-full bg-background2 hover:bg-background2/80 hover:scale-110 active:scale-95 transition-transform"
+                aria-label="Apply to page"
+              >
+                <ApplyIcon className="h-4 w-4" />
+              </Button>
             </TooltipTrigger>
             <TooltipContent side="left">
               <p>Apply to page</p>
@@ -316,18 +313,16 @@ export function EditableRecommendation({
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleRegenerate}
-                  disabled={disabled || isRegenerating}
-                  className="h-8 w-8 p-0 rounded-full bg-background2 hover:bg-background2/80"
-                  aria-label="Generate new suggestion"
-                >
-                  <RegenerateIcon className="h-4 w-4" />
-                </Button>
-              </motion.div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleRegenerate}
+                disabled={disabled || isRegenerating}
+                className="h-8 w-8 p-0 rounded-full bg-background2 hover:bg-background2/80 hover:scale-110 active:scale-95 transition-transform"
+                aria-label="Generate new suggestion"
+              >
+                <RegenerateIcon className="h-4 w-4" />
+              </Button>
             </TooltipTrigger>
             <TooltipContent side="left">
               <p>Generate new suggestion</p>

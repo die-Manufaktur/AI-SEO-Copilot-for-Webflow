@@ -13,8 +13,8 @@ export default function WebflowAppWrapper({ children }: WebflowAppWrapperProps) 
     if (window.webflow && window.webflow.setExtensionSize) {
       try {
         window.webflow.setExtensionSize({
-          width: 615,
-          height: 1009
+          width: 715,
+          height: 1054
         });
       } catch (error) {
         logger.error('Failed to set extension size:', error);
@@ -28,7 +28,8 @@ export default function WebflowAppWrapper({ children }: WebflowAppWrapperProps) 
     <div
       id="webflow-app-wrapper"
       data-testid="webflow-app-wrapper"
-      className="w-full bg-background text-text1 min-h-screen"
+      style={{ width: 715, minWidth: 715, maxWidth: 715 }}
+      className="bg-background text-text1"
     >
       {children}
     </div>

@@ -51,7 +51,7 @@ describe('WebflowAppWrapper', () => {
     );
 
     const wrapper = screen.getByTestId('webflow-app-wrapper');
-    expect(wrapper).toHaveClass('bg-background', 'text-text1', 'min-h-screen');
+    expect(wrapper).toHaveClass('bg-background', 'text-text1');
   });
 
   it('sets extension size when webflow API is available', () => {
@@ -69,8 +69,8 @@ describe('WebflowAppWrapper', () => {
     );
 
     expect(mockWebflow.setExtensionSize).toHaveBeenCalledWith({
-      width: 615,
-      height: 1009,
+      width: 715,
+      height: 1054,
     });
   });
 
@@ -106,8 +106,8 @@ describe('WebflowAppWrapper', () => {
     );
 
     expect(mockWebflowWithError.setExtensionSize).toHaveBeenCalledWith({
-      width: 615,
-      height: 1009,
+      width: 715,
+      height: 1054,
     });
     expect(mockLogger.error).toHaveBeenCalledWith(
       'Failed to set extension size:',

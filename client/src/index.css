@@ -286,24 +286,41 @@
     --icon-fail-glyph: #FFFFFF;
   }
 
-  /* Reset visibility and display properties */
-  html, body, #root, #webflow-app-wrapper {
-    width: 100%;
-    min-height: 100vh;
-    display: block !important;
-    visibility: visible !important;
-    overflow: auto;
+  /* ============================================
+     FIXED APP SIZE — DO NOT MODIFY
+     This app runs in a 715px Webflow extension panel.
+     Size is locked here so component class changes cannot affect it.
+     ============================================ */
+  html {
+    width: 715px !important;
+    min-width: 715px !important;
+    max-width: 715px !important;
     overflow-x: hidden;
-    margin: 0;
-    padding: 0;
+    overflow-y: auto;
   }
-  
-  /* Force all text to be visible */
-  * {
-    border-color: var(--border);
-    color: var(--text1);
+
+  body {
+    width: 715px !important;
+    min-width: 715px !important;
+    max-width: 715px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
-  
+
+  #root {
+    width: 715px !important;
+    min-width: 715px !important;
+    max-width: 715px !important;
+  }
+
+  #webflow-app-wrapper {
+    width: 715px !important;
+    min-width: 715px !important;
+    max-width: 715px !important;
+  }
+
   /* Ensure SVGs inherit colors properly */
   svg {
     color: inherit;

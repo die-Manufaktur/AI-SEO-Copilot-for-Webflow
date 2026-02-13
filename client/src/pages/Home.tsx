@@ -974,18 +974,12 @@ export default function Home() {
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="w-full min-h-screen bg-background p-4 md:p-6 flex flex-col"
-      style={{ color: "#FFFFFF" }}
+      initial={{ y: -20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ duration: 0.5 }}
+      style={{ width: 715, minWidth: 715, maxWidth: 715, color: "#FFFFFF" }}
+      className="bg-background p-[24px] flex flex-col items-center justify-between gap-[24px]"
     >
-      <div className="mx-auto w-full max-w-3xl space-y-6 flex-grow">
-        <motion.div
-          initial={{ y: -20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.5 }}
-          className="w-full"
-        >
           <Card className="w-full">
             <CardHeader>
               <OriginalCardTitle className="text-center">Set up your SEO analysis</OriginalCardTitle>
@@ -1245,7 +1239,6 @@ export default function Home() {
               </Form>
             </CardContent>
           </Card>
-        </motion.div>
 
         <AnimatePresence mode="wait">
           {results && (
@@ -1256,7 +1249,7 @@ export default function Home() {
               className="w-full"
             >
               {selectedCategory ? (
-                <Card className="w-full rounded-[14px] shadow-none" style={{ background: 'var(--color-bg-900)', border: '1px solid var(--color-bg-500)' }}>
+                <Card className="w-full rounded-[14px] shadow-none" style={{ border: '1px solid var(--color-bg-500)' }}>
                   <CardHeader>
                     <CategoryHeader>
                       <BackButton onClick={() => setSelectedCategory(null)}>
@@ -1269,7 +1262,7 @@ export default function Home() {
                     <motion.div
                       initial={{ scale: 0.9 }}
                       animate={{ scale: 1 }}
-                      className="flex items-center justify-center mt-2 mb-10"
+                      className="flex items-center justify-center mb-10"
                     >
                       <div className="inline-flex items-center gap-4 bg-background3 rounded-full px-5 py-2" style={{ borderRadius: '41px' }}>
                         <span className="flex items-center gap-1.5 text-sm font-medium" style={{ color: 'white' }}>
@@ -1332,12 +1325,13 @@ export default function Home() {
                         initial="hidden"
                         animate="show"
                         className="w-full bg-[var(--color-bg-700)] rounded-[20px] p-5 py-8"
+                        style={{ border: '2px solid var(--color-bg-500)' }}
                       >
                         {selectedCategoryChecks.map((check, index) => (
                           <motion.div
                             key={index}
                             variants={item}
-                            className={`p-4 w-full transition-colors ${index > 0 ? 'border-t border-[var(--color-bg-500)] pt-10' : ''}`}
+                            className={`py-6 px-0 w-full transition-colors ${index > 0 ? 'border-t border-[var(--color-bg-500)]' : ''}`}
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: index * 0.1 }}
@@ -1460,7 +1454,7 @@ export default function Home() {
                                           href={getLearnMoreUrl(check.title)}
                                           target="_blank"
                                           rel="noopener noreferrer"
-                                          className="inline-flex items-center font-bold text-primaryText hover:underline"
+                                          className="inline-flex items-center font-semibold text-primaryText hover:underline"
                                         >
                                           Learn More <span className="ml-0.5">↗</span>
                                         </a>
@@ -1683,7 +1677,7 @@ export default function Home() {
                   </CardContent>
                 </Card>
               ) : (
-                <div className="flex flex-col gap-3 w-full">
+                <div className="flex flex-col gap-[24px] w-full">
                   {/* Score Card */}
                   <Card className="w-full">
                     <CardHeader>
@@ -1811,8 +1805,7 @@ export default function Home() {
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
-      <Footer />
+        <Footer />
     </motion.div>
   );
 }
