@@ -982,7 +982,7 @@ export default function Home() {
     >
           <Card className="w-full">
             <CardHeader>
-              <OriginalCardTitle className="text-center">Set up your SEO analysis</OriginalCardTitle>
+              <CardTitle className="text-center" style={{ fontSize: 20, fontWeight: 600 }}>Set up your SEO analysis</CardTitle>
             </CardHeader>
             <CardContent>
               <Form {...form}>
@@ -1012,10 +1012,10 @@ export default function Home() {
                   />
                   
                   {/* Advanced Tab Section */}
-                  <div className="border-t pt-4 mt-4">
+                  <div className="border-t pt-4 mt-4" style={{ borderColor: 'var(--BG-500, #444)' }}>
                     <div className="flex items-center justify-between mb-4">
                       <div className="max-w-[28.625rem]">
-                        <h3 className="text-body-lg font-semibold text-text1">
+                        <h3 className="text-[14px] font-semibold text-text1">
                           Advanced Analysis
                           <span className="text-xs font-normal text-text2 ml-2">optional</span>
                         </h3>
@@ -1407,13 +1407,14 @@ export default function Home() {
                                   {!check.passed && check.priority && (
                                     <Badge
                                       variant={check.priority === 'high' ? 'destructive' : 'default'}
-                                      className={
-                                        check.priority === 'high'
-                                          ? 'bg-[#FF4343] text-white border-transparent text-xs'
-                                          : check.priority === 'low'
-                                          ? 'bg-[#FFEA9E] text-black border-transparent text-xs'
-                                          : 'bg-[#FFEA9E] text-black border-transparent text-xs'
-                                      }
+                                      style={{
+                                        background: check.priority === 'high' ? '#FF8484' : '#FFEA9E',
+                                        border: '1px solid rgba(255, 255, 255, 0.40)',
+                                        color: check.priority === 'high' ? 'white' : 'black',
+                                        fontSize: '0.75rem',
+                                        fontWeight: 400,
+                                        lineHeight: '130%',
+                                      }}
                                     >
                                       {getPriorityText(check.priority)}
                                     </Badge>
