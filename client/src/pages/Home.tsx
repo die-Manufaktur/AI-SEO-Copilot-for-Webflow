@@ -1410,10 +1410,11 @@ export default function Home() {
                                       style={{
                                         background: check.priority === 'high' ? '#FF8484' : '#FFEA9E',
                                         border: '1px solid rgba(255, 255, 255, 0.40)',
-                                        color: check.priority === 'high' ? 'white' : 'black',
+                                        color: 'black',
                                         fontSize: '0.75rem',
                                         fontWeight: 400,
                                         lineHeight: '130%',
+                                        padding: '2px 10px',
                                       }}
                                     >
                                       {getPriorityText(check.priority)}
