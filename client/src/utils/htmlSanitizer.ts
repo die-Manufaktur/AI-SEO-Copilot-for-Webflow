@@ -5,14 +5,17 @@
 
 /**
  * Strips all HTML tags from a string, returning only text content.
- * Uses the browser's DOMParser for safe parsing.
+ * Uses regex to avoid DOMParser HTML parsing of untrusted input.
  */
 export function stripHtmlTags(input: string): string {
   if (!input) return '';
-  
-  // Use DOMParser to safely parse HTML and extract text
-  const doc = new DOMParser().parseFromString(input, 'text/html');
-  return doc.body.textContent || '';
+
+  // Remove HTML tags using regex without parsing as HTML
+  const stripped = input.replace(/<[^>]*>/g, '');
+  // Decode common HTML entities
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = stripped;
+  return textarea.value;
 }
 
 /**
