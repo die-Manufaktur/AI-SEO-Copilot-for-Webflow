@@ -27,7 +27,6 @@
     "validate:config": "vitest run scripts/validate-production-config.test.ts",
     "validate:env": "node scripts/check-env.js",
     "kill-dev": "kill-dev-servers.bat",
-    "prepare": "husky",
     "release": "semantic-release",
     "release:dry": "semantic-release --dry-run",
     "version:update": "node scripts/update-versions.js",
@@ -144,9 +143,6 @@
     "zod": "^4.1.8"
   },
   "packageManager": "pnpm@10.14.0",
-  "workspaces": [
-    "packages/*"
-  ],
   "config": {
     "commitizen": {
       "path": "./node_modules/cz-conventional-changelog"
