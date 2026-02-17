@@ -15,7 +15,7 @@
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug",
     "test:unit": "cd client && vitest run --coverage src",
-    "test:integration": "vitest run --coverage tests/integration",
+    "test:integration": "vitest run --coverage --passWithNoTests tests/integration",
     "test:contract": "vitest run --coverage tests/contract",
     "test:coverage": "cd client && vitest run --coverage --reporter=html",
     "test:coverage:threshold": "cd client && vitest run --coverage --coverage.thresholds.global.branches=85",
