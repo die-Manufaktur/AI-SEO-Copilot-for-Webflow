@@ -5,17 +5,25 @@
 
 /**
  * Strips all HTML tags from a string, returning only text content.
- * Uses regex to avoid DOMParser HTML parsing of untrusted input.
+ * Uses a looped regex to prevent reassembly attacks (e.g. <scr<script>ipt>)
+ * and manual entity decoding to avoid innerHTML sinks.
  */
 export function stripHtmlTags(input: string): string {
   if (!input) return '';
-
-  // Remove HTML tags using regex without parsing as HTML
-  const stripped = input.replace(/<[^>]*>/g, '');
-  // Decode common HTML entities
-  const textarea = document.createElement('textarea');
-  textarea.innerHTML = stripped;
-  return textarea.value;
+  // Loop regex to prevent reassembly attacks like <scr<script>ipt>
+  let result = input;
+  let previous = '';
+  while (result !== previous) {
+    previous = result;
+    result = result.replace(/<[^>]*>/g, '');
+  }
+  // Decode common HTML entities without using innerHTML
+  return result
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
 }
 
 /**
@@ -23,7 +31,7 @@ export function stripHtmlTags(input: string): string {
  * Drop-in replacement for sanitize-html({ allowedTags: [], allowedAttributes: {} })
  */
 export function sanitizeHtmlBrowser(
-  input: string, 
+  input: string,
   _options?: { allowedTags?: string[]; allowedAttributes?: Record<string, string[]>; disallowedTagsMode?: string }
 ): string {
   return stripHtmlTags(input);
