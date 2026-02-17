@@ -46,7 +46,7 @@ This is a **Webflow Designer Extension** for SEO analysis with a **modular monor
 - **Frontend**: React 19 + TypeScript + Vite + Tailwind CSS v4 + Radix UI
 - **Backend**: Cloudflare Workers + Hono framework 
 - **Testing**: Vitest with jsdom environment
-- **Package Management**: pnpm with workspaces
+- **Package Management**: pnpm
 
 ### Important File Paths
 - `client/src/main.tsx` - React app entry point
@@ -55,6 +55,8 @@ This is a **Webflow Designer Extension** for SEO analysis with a **modular monor
 - `vite.config.ts` - Vite configuration with Webflow compatibility
 - `client/vitest.config.ts` - Test configuration (tests run from `client/`)
 - `wrangler.toml` - Cloudflare Worker configuration
+- `playwright.config.ts` - Playwright E2E test configuration
+- `tests/e2e/` - Playwright end-to-end test specs
 - `docs/plans/` - Implementation plan documents
 - `scripts/` - Build and validation utilities
 
@@ -124,6 +126,6 @@ The extension supports AI-generated SEO recommendations in multiple languages:
 - `shared/types/language.ts` - Language definitions and detection logic
 - `client/src/components/ui/language-selector.tsx` - Language selection component
 - `client/src/utils/languageStorage.ts` - Site-specific language preference storage
-- `client/src/utils/htmlSanitizer.ts` - HTML sanitization for AI-generated content
+- `client/src/utils/htmlSanitizer.ts` - HTML sanitization for AI-generated content (entity decode order matters — `&amp;` must be last to prevent double-unescaping)
 - `workers/modules/aiRecommendations.ts` - Multilingual AI recommendation generation
 - `client/src/components/ui/editable-recommendation.tsx` - Inline editable recommendation component

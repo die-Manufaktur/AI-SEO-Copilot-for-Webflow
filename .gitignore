@@ -65,6 +65,7 @@ test-output*
 test-results*
 complete-test-output.txt
 test_reports/
+playwright-report/
 
 # Debug files
 client/debug-badge.jsx
