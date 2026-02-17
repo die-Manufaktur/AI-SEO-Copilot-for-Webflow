@@ -18,12 +18,13 @@ export function stripHtmlTags(input: string): string {
     result = result.replace(/<[^>]*>/g, '');
   }
   // Decode common HTML entities without using innerHTML
+  // IMPORTANT: &amp; must be decoded LAST to prevent double-unescaping (XSS vector)
   return result
-    .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&');
 }
 
 /**
