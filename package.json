@@ -156,7 +156,6 @@
     "overrides": {
       "koa": ">=3.0.3",
       "lodash": ">=4.17.23",
-      "ajv": ">=8.18.0",
       "axios": ">=1.13.5",
       "@conventional-changelog/git-client": ">=2.0.0"
     }
