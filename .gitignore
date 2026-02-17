@@ -18,6 +18,7 @@ bundle.zip
 .prod.vars
 *.local
 .env.*.local
+.mcp.json
 kill-dev-servers.bat
 
 # Claude Code
@@ -27,6 +28,7 @@ CLAUDE.local.md
 .claude/hooks/
 .claude/utils/
 .serena/
+tmpclaude-*
 
 # IDE & Editor
 .vscode/*
@@ -59,6 +61,13 @@ coverage/
 *.lcov
 coverage-final.json
 clover.xml
+test-output*
+test-results*
+complete-test-output.txt
+test_reports/
+
+# Debug files
+client/debug-badge.jsx
 
 # OS Generated
 .DS_Store
@@ -86,16 +95,6 @@ workers-site/
 *.temp
 .tmp/
 temp/
-tmpclaude-*
-
-# Test output artifacts
-test-output*.txt
-test-results*.txt
-complete-test-output.txt
-client/test-output.txt
-
-# Debug files
-client/debug-badge.jsx
 
 # Additional IDE
 .history/
