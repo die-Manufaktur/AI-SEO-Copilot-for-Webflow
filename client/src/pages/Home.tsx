@@ -1585,8 +1585,11 @@ export default function Home() {
                                     initial={{ opacity: 0, height: 0 }}
                                     animate={{ opacity: 1, height: "auto" }}
                                     exit={{ opacity: 0, height: 0 }}
-                                    className="text-sm p-4 bg-background3 rounded-[7px] w-full"
-                                    style={{ backgroundColor: 'var(--background3)' }}
+                                    className="text-sm p-4 rounded-[7px] w-full"
+                                    style={{
+                                      background: 'linear-gradient(var(--background3), var(--background3)) padding-box, linear-gradient(135deg, rgba(255, 255, 255, 0.40) 0%, rgba(255, 255, 255, 0.00) 100%) border-box',
+                                      border: '1px solid transparent',
+                                    }}
                                   >
                                     {check.imageData && Array.isArray(check.imageData) && check.imageData.length > 0 ? (
                                       <ImageSizeDisplay
