@@ -18,18 +18,14 @@ import type { WebflowInsertionResult } from '../../types/webflow-data-api';
 
 const ApplyIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="8" cy="8" r="5" stroke="currentColor" strokeWidth="1.5" />
-    <circle cx="8" cy="8" r="1.5" fill="currentColor" />
-    <line x1="8" y1="0.5" x2="8" y2="3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    <line x1="8" y1="13" x2="8" y2="15.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    <line x1="0.5" y1="8" x2="3" y2="8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    <line x1="13" y1="8" x2="15.5" y2="8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M8 5V8M8 11V8M8 8H11M8 8H5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 );
 
 const RegenerateIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-    <path d="M8 0L9.5 6.5L16 8L9.5 9.5L8 16L6.5 9.5L0 8L6.5 6.5L8 0Z" />
+  <svg className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M8 1.5L8.63857 3.22572C9.34757 5.14175 10.8582 6.65243 12.7743 7.36143L14.5 8L12.7743 8.63857C10.8582 9.34757 9.34757 10.8582 8.63857 12.7743L8 14.5L7.36143 12.7743C6.65243 10.8582 5.14175 9.34757 3.22572 8.63857L1.5 8L3.22572 7.36143C5.14175 6.65243 6.65243 5.14175 7.36143 3.22572L8 1.5Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 );
 
@@ -167,7 +163,16 @@ export function H2SelectionList({
                       size="sm"
                       onClick={() => handleApply(h2Element, index)}
                       disabled={isDisabled}
-                      className="h-8 w-8 p-0 rounded-full bg-background2 hover:bg-background2/80 hover:scale-110 active:scale-95 transition-transform"
+                      className="hover:scale-110 active:scale-95 transition-transform flex items-center justify-center"
+                      style={{
+                        width: '2rem',
+                        height: '2rem',
+                        minWidth: '2rem',
+                        padding: '0.5rem',
+                        background: 'linear-gradient(#787878, #787878) padding-box, linear-gradient(135deg, rgba(255, 255, 255, 0.40) 0%, rgba(255, 255, 255, 0.00) 100%) border-box',
+                        border: '1px solid transparent',
+                        borderRadius: '1.6875rem',
+                      }}
                       aria-label={`Apply to H2 ${index + 1}: ${h2Element.text}`}
                     >
                       <ApplyIcon className="h-4 w-4" />
@@ -188,7 +193,16 @@ export function H2SelectionList({
                         size="sm"
                         onClick={() => onRegenerate(h2Element, index)}
                         disabled={isDisabled}
-                        className="h-8 w-8 p-0 rounded-full bg-background2 hover:bg-background2/80 hover:scale-110 active:scale-95 transition-transform"
+                        className="hover:scale-110 active:scale-95 transition-transform flex items-center justify-center"
+                      style={{
+                        width: '2rem',
+                        height: '2rem',
+                        minWidth: '2rem',
+                        padding: '0.5rem',
+                        background: 'linear-gradient(#787878, #787878) padding-box, linear-gradient(135deg, rgba(255, 255, 255, 0.40) 0%, rgba(255, 255, 255, 0.00) 100%) border-box',
+                        border: '1px solid transparent',
+                        borderRadius: '1.6875rem',
+                      }}
                         aria-label="Generate new suggestion"
                       >
                         <RegenerateIcon className="h-4 w-4" />
