@@ -134,9 +134,13 @@ export function H2SelectionList({
               isItemApplied
                 ? 'bg-green-900/30 border border-green-700'
                 : isOtherApplied
-                ? 'bg-background3 opacity-50'
-                : 'bg-background3'
+                ? 'opacity-50'
+                : ''
             }`}
+            style={!isItemApplied ? {
+              background: 'linear-gradient(var(--background3), var(--background3)) padding-box, linear-gradient(135deg, rgba(255, 255, 255, 0.40) 0%, rgba(255, 255, 255, 0.00) 100%) border-box',
+              border: '1px solid transparent',
+            } : undefined}
           >
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">

@@ -1455,7 +1455,13 @@ export default function Home() {
                               </div>
                               {check.title === "Keyphrase in H2 Headings" && !check.passed && (
                                 <button
-                                  className="flex items-center gap-2 px-4 py-2 rounded-full bg-background4 border border-[var(--color-bg-300)] text-white text-sm whitespace-nowrap flex-shrink-0 hover:bg-background4/80 transition-colors"
+                                  className="flex items-center gap-2 text-white text-sm whitespace-nowrap flex-shrink-0 hover:opacity-80 transition-opacity"
+                                  style={{
+                                    background: 'linear-gradient(#787878, #787878) padding-box, linear-gradient(135deg, rgba(255, 255, 255, 0.40) 0%, rgba(255, 255, 255, 0.00) 100%) border-box',
+                                    border: '1px solid transparent',
+                                    borderRadius: '1.6875rem',
+                                    padding: '8px 16px',
+                                  }}
                                   onClick={() => {
                                     // TODO: Wire up to batch AI recommendation generation endpoint
                                     console.log('Generate All H2 suggestions');
@@ -1469,7 +1475,13 @@ export default function Home() {
                               )}
                               {check.title === "Image Alt Attributes" && !check.passed && (
                                 <button
-                                  className="flex items-center gap-2 px-4 py-2 rounded-full bg-background4 border border-[var(--color-bg-300)] text-white text-sm whitespace-nowrap flex-shrink-0 hover:bg-background4/80 transition-colors"
+                                  className="flex items-center gap-2 text-white text-sm whitespace-nowrap flex-shrink-0 hover:opacity-80 transition-opacity"
+                                  style={{
+                                    background: 'linear-gradient(#787878, #787878) padding-box, linear-gradient(135deg, rgba(255, 255, 255, 0.40) 0%, rgba(255, 255, 255, 0.00) 100%) border-box',
+                                    border: '1px solid transparent',
+                                    borderRadius: '1.6875rem',
+                                    padding: '8px 16px',
+                                  }}
                                   onClick={() => {
                                     // TODO: Wire up to batch AI alt text generation endpoint
                                     console.log('Generate All alt text suggestions');
@@ -1516,7 +1528,7 @@ export default function Home() {
 
                                         if (result.success) {
                                           toast({
-                                            title: "✅ Your text has been included successfully",
+                                            title: "Your text has been included successfully",
                                             description: "Don't forget to publish your website to update the SEO score.",
                                           });
 

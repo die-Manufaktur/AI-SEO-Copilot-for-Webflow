@@ -114,11 +114,13 @@ export function ImageAltTextList({
         return (
           <div
             key={`${image.id}-${index}`}
-            className={`flex items-center gap-3 p-4 transition-colors ${
-              isApplied
-                ? 'bg-green-900/30 border border-green-700 rounded-[7px]'
-                : ''
+            className={`flex items-center gap-3 p-4 rounded-[7px] transition-colors ${
+              isApplied ? 'bg-green-900/30 border border-green-700' : ''
             }`}
+            style={!isApplied ? {
+              background: 'linear-gradient(var(--background3), var(--background3)) padding-box, linear-gradient(135deg, rgba(255, 255, 255, 0.40) 0%, rgba(255, 255, 255, 0.00) 100%) border-box',
+              border: '1px solid transparent',
+            } : undefined}
           >
             {/* Image thumbnail */}
             <div className="flex-shrink-0 w-[87px] h-[87px] rounded-[6px] overflow-hidden bg-background2">

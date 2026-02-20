@@ -456,11 +456,11 @@ export function BatchApplyButton({
       // Error and success states use Tailwind classes
       return {};
     }
-    // Default state: use CSS custom properties for pill button
+    // Default state: pill button with gradient border
     return {
-      backgroundColor: 'var(--color-bg-300)',
-      border: '1px solid var(--color-bg-300)',
-      borderRadius: '27px',
+      background: 'linear-gradient(#787878, #787878) padding-box, linear-gradient(135deg, rgba(255, 255, 255, 0.40) 0%, rgba(255, 255, 255, 0.00) 100%) border-box',
+      border: '1px solid transparent',
+      borderRadius: '1.6875rem',
       padding: '8px 16px',
       color: 'var(--color-text-primary)',
     };
