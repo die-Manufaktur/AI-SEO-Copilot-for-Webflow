@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { analyzeSEO, fetchOAuthToken, collectPageAssets, fetchFromAPI, getApiUrl, getApiBaseUrl } from './api';
+import { analyzeSEO, fetchOAuthToken, collectPageAssets, fetchFromAPI, getApiUrl, getApiBaseUrl, generateRecommendation } from './api';
 import { disableMSWForTest } from '../__tests__/utils/testHelpers';
-import type { AnalyzeSEORequest, SEOAnalysisResult } from '../../../shared/types';
+import type { AnalyzeSEORequest, SEOAnalysisResult, GenerateRecommendationRequest } from '../../../shared/types';
 
 // Disable MSW for this test file since we need direct fetch mocking
 disableMSWForTest();
@@ -588,6 +588,78 @@ describe('api.ts error handling', () => {
       await expect(fetchFromAPI('/test', { data: 'test' })).rejects.toThrow('String error message');
       
       expect(mockLogger.error).toHaveBeenCalledWith('API fetch error: String error message');
+    });
+  });
+
+  describe('generateRecommendation', () => {
+    const mockRequest: GenerateRecommendationRequest = {
+      checkType: 'Keyphrase in Title',
+      keyphrase: 'best running shoes',
+      context: 'Current title: Buy Shoes Online',
+      advancedOptions: undefined,
+    };
+
+    it('calls POST /api/generate-recommendation with correct body', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ recommendation: 'Best Running Shoes - Buy Online' }),
+      });
+
+      await generateRecommendation(mockRequest);
+
+      expect(mockFetch).toHaveBeenCalledOnce();
+      const [url, options] = mockFetch.mock.calls[0];
+      expect(url).toMatch(/\/api\/generate-recommendation$/);
+      expect(options.method).toBe('POST');
+      expect(options.headers).toEqual({
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      });
+      expect(options.credentials).toBe('include');
+      const body = JSON.parse(options.body);
+      expect(body).toEqual({
+        checkType: 'Keyphrase in Title',
+        keyphrase: 'best running shoes',
+        context: 'Current title: Buy Shoes Online',
+        advancedOptions: undefined,
+      });
+    });
+
+    it('returns the recommendation string on success', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ recommendation: 'Best Running Shoes - Buy Online' }),
+      });
+
+      const result = await generateRecommendation(mockRequest);
+
+      expect(result).toBe('Best Running Shoes - Buy Online');
+    });
+
+    it('throws on non-200 status (API error)', async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 500,
+      });
+
+      await expect(generateRecommendation(mockRequest)).rejects.toThrow('API returned status 500');
+    });
+
+    it('uses getApiUrl() for the base URL', async () => {
+      vi.stubEnv('MODE', 'test');
+      vi.stubEnv('VITE_WORKER_URL', undefined);
+      vi.stubEnv('VITE_FORCE_LOCAL_DEV', undefined);
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ recommendation: 'Test recommendation' }),
+      });
+
+      await generateRecommendation(mockRequest);
+
+      const [url] = mockFetch.mock.calls[0];
+      // In test mode (not 'development'), getApiUrl() returns the production URL
+      expect(url).toBe('https://seo-copilot-api-production.paul-130.workers.dev/api/generate-recommendation');
     });
   });
 
