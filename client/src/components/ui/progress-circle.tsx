@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useId } from "react";
 
 interface ProgressCircleProps {
   value: number;
@@ -16,12 +17,13 @@ export function ProgressCircle({
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * 2 * Math.PI;
   const strokeDashoffset = circumference - (value / 100) * circumference;
-  
-  // Get color based on score value - Figma thresholds
+  const filterId = useId();
+
+  // Get color based on score value - Figma thresholds (hex so SVG filter floodColor works)
   const getScoreColor = (score: number) => {
-    if (score >= 67) return "var(--color-green)"; // >= 67%: Green
-    if (score >= 33) return "var(--color-yellow)"; // >= 33%: Yellow
-    return "var(--color-red)"; // < 33%: Red
+    if (score >= 67) return "#A2FFB4"; // >= 67%: Green
+    if (score >= 33) return "#FFD064"; // >= 33%: Yellow
+    return "#FF4343"; // < 33%: Red
   };
 
   // Get the score color once so we can use it for both the circle and text
@@ -34,8 +36,13 @@ export function ProgressCircle({
           width={size}
           height={size}
           viewBox={`0 0 ${size} ${size}`}
-          style={{ transform: "rotate(-90deg)" }}
+          style={{ transform: "rotate(-90deg)", overflow: "visible" }}
         >
+          <defs>
+            <filter id={filterId} x="-30%" y="-30%" width="160%" height="160%">
+              <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor={scoreColor} floodOpacity="0.6" />
+            </filter>
+          </defs>
           {/* Background circle */}
           <circle
             cx={size / 2}
@@ -55,7 +62,7 @@ export function ProgressCircle({
             strokeWidth={strokeWidth}
             strokeDasharray={circumference}
             strokeDashoffset={strokeDashoffset}
-            strokeLinecap="round"
+            filter={`url(#${filterId})`}
             style={{ transition: "stroke-dashoffset 1s ease-in-out" }}
           />
         </svg>

@@ -53,7 +53,7 @@ describe('CircularProgress', () => {
       render(<CircularProgress value={50} />);
       const svg = screen.getByRole('progressbar').querySelector('svg');
       const progressCircle = svg?.querySelector('circle:last-child');
-      expect(progressCircle).toHaveAttribute('stroke-width', '8');
+      expect(progressCircle).toHaveAttribute('stroke-width', '16');
     });
   });
 
@@ -119,8 +119,8 @@ describe('CircularProgress', () => {
     it('should have dark background circle', () => {
       render(<CircularProgress value={50} />);
       const svg = screen.getByRole('progressbar').querySelector('svg');
-      const backgroundCircle = svg?.querySelector('circle:first-child');
-      expect(backgroundCircle).toHaveClass('text-muted');
+      const backgroundCircle = svg?.querySelectorAll('circle')[0];
+      expect(backgroundCircle).toHaveAttribute('stroke', '#4A4A4A');
     });
 
     it('should use coral color for progress arc', () => {

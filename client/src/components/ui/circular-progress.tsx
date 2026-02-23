@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { cn } from '@/lib/utils';
 
 interface CircularProgressProps {
@@ -18,10 +18,11 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
   const clampedValue = Math.max(0, Math.min(100, Math.round(value)));
 
   // Calculate stroke dash array for the progress circle
-  const radius = 70; // radius of the circle
+  const radius = 68; // radius of the circle
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (clampedValue / 100) * circumference;
 
+  const filterId = useId();
   const finalAriaLabel = ariaLabel || `${label}: ${clampedValue} out of 100`;
 
   return (
@@ -41,15 +42,20 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
         >
+          <defs>
+            <filter id={filterId} x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="2" stdDeviation="4" floodColor="rgba(0,0,0,0.5)" />
+            </filter>
+          </defs>
+
           {/* Background circle */}
           <circle
             cx="80"
             cy="80"
             r={radius}
-            stroke="currentColor"
-            strokeWidth="8"
+            stroke="#4A4A4A"
+            strokeWidth="16"
             fill="none"
-            className="text-muted opacity-20"
           />
 
           {/* Progress circle */}
@@ -58,11 +64,11 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
             cy="80"
             r={radius}
             stroke="currentColor"
-            strokeWidth="8"
+            strokeWidth="16"
             fill="none"
-            strokeLinecap="round"
             strokeDasharray={circumference}
             strokeDashoffset={strokeDashoffset}
+            filter={`url(#${filterId})`}
             className="text-score-coral transition-all duration-700 ease-in-out"
           />
         </svg>
