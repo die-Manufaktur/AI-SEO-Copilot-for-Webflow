@@ -135,7 +135,7 @@ export function H2SelectionList({
   };
 
   const handleRegenerate = async (h2Element: H2ElementInfo) => {
-    if (disabled || regeneratingAll) return;
+    if (disabled || regeneratingAll || regeneratingIndex !== null) return;
 
     setRegeneratingIndex(h2Element.index);
     try {

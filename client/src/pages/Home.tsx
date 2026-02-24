@@ -1596,7 +1596,7 @@ export default function Home() {
                                 </button>
                               )}
                             </div>
-                            {!check.passed && check.recommendation && (
+                            {!check.passed && (check.recommendation || check.h2Recommendations?.length) && (
                               <div className="mt-8">
                                 {/* Recommendation title - rendered outside dark box */}
                                 {shouldShowCopyButton(check.title)
