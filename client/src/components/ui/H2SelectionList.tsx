@@ -1,7 +1,7 @@
 /**
  * H2SelectionList Component
- * Displays all H2 elements with individual Apply and Regenerate icon buttons
- * Once one is applied, marks check as passed and disables all other buttons
+ * Displays H2 elements with per-H2 AI suggestions and individual/batch regenerate buttons.
+ * Once one is applied, marks check as passed and disables all other buttons.
  */
 
 import React, { useState } from 'react';
@@ -13,8 +13,10 @@ import {
   TooltipTrigger,
 } from './tooltip';
 import { useAppliedRecommendations } from '../../hooks/useAppliedRecommendations';
+import { generateRecommendation } from '../../lib/api';
 import type { H2ElementInfo } from '../../lib/webflowDesignerApi';
 import type { WebflowInsertionResult } from '../../types/webflow-data-api';
+import type { AdvancedOptions } from '../../../../shared/types';
 
 const ApplyIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -29,11 +31,24 @@ const RegenerateIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+const SpinnerIcon = ({ className }: { className?: string }) => (
+  <svg className={`animate-spin ${className}`} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeDasharray="25 13" strokeLinecap="round"/>
+  </svg>
+);
+
+export interface H2Recommendation {
+  h2Index: number;
+  h2Text: string;
+  suggestion: string;
+}
+
 export interface H2SelectionListProps {
   h2Elements: H2ElementInfo[];
-  recommendation: string;
+  h2Recommendations?: H2Recommendation[];
+  keyphrase: string;
+  advancedOptions?: AdvancedOptions;
   onApply: (request: { h2Element: H2ElementInfo; recommendation: string }) => Promise<WebflowInsertionResult>;
-  onRegenerate?: (h2Element: H2ElementInfo, index: number) => void;
   onError?: (error: Error) => void;
   disabled?: boolean;
   className?: string;
@@ -49,30 +64,32 @@ interface H2ItemState {
 
 export function H2SelectionList({
   h2Elements,
-  recommendation,
+  h2Recommendations,
+  keyphrase,
+  advancedOptions,
   onApply,
-  onRegenerate,
   onError,
   disabled = false,
   className = '',
   pageId,
   checkTitle = 'Keyphrase in H2 Headings',
 }: H2SelectionListProps): React.ReactElement {
+  const [suggestions, setSuggestions] = useState<Record<number, string>>(() => {
+    const init: Record<number, string> = {};
+    h2Recommendations?.forEach(rec => { init[rec.h2Index] = rec.suggestion; });
+    return init;
+  });
   const [appliedIndex, setAppliedIndex] = useState<number | null>(null);
   const [itemStates, setItemStates] = useState<Record<number, H2ItemState>>({});
+  const [regeneratingIndex, setRegeneratingIndex] = useState<number | null>(null);
+  const [regeneratingAll, setRegeneratingAll] = useState(false);
 
-  // Use applied recommendations hook for persistent state tracking
-  const { isApplied, markAsApplied } = useAppliedRecommendations({ pageId });
+  const { markAsApplied } = useAppliedRecommendations({ pageId });
 
-  // Filter out invalid H2 elements (empty text, missing id, etc.)
-  const validH2Elements = h2Elements.filter(h2Element =>
-    h2Element &&
-    h2Element.id &&
-    h2Element.text &&
-    h2Element.text.trim().length > 0
+  const validH2Elements = h2Elements.filter(h2 =>
+    h2 && h2.id && h2.text && h2.text.trim().length > 0
   );
 
-  // Handle empty state
   if (validH2Elements.length === 0) {
     return (
       <div className={`text-center py-6 text-muted-foreground ${className}`}>
@@ -83,16 +100,15 @@ export function H2SelectionList({
   }
 
   const updateItemState = (index: number, updates: Partial<H2ItemState>) => {
-    setItemStates(prev => ({
-      ...prev,
-      [index]: { ...prev[index], ...updates }
-    }));
+    setItemStates(prev => ({ ...prev, [index]: { ...prev[index], ...updates } }));
   };
 
   const handleApply = async (h2Element: H2ElementInfo, index: number) => {
     if (disabled || appliedIndex !== null) return;
 
     updateItemState(index, { loading: true, error: undefined });
+
+    const recommendation = suggestions[h2Element.index] ?? '';
 
     try {
       const result = await onApply({ h2Element, recommendation });
@@ -101,7 +117,6 @@ export function H2SelectionList({
         setAppliedIndex(index);
         updateItemState(index, { loading: false, success: true });
 
-        // Save to persistent storage if pageId and checkTitle are available
         if (pageId && checkTitle) {
           markAsApplied(checkTitle, recommendation, {
             elementType: 'h2',
@@ -119,18 +134,88 @@ export function H2SelectionList({
     }
   };
 
+  const handleRegenerate = async (h2Element: H2ElementInfo) => {
+    if (disabled || regeneratingAll) return;
+
+    setRegeneratingIndex(h2Element.index);
+    try {
+      const newSuggestion = await generateRecommendation({
+        checkType: 'Keyphrase in H2 Headings',
+        keyphrase,
+        context: h2Element.text,
+        advancedOptions,
+      });
+      setSuggestions(prev => ({ ...prev, [h2Element.index]: newSuggestion }));
+    } catch (error) {
+      onError?.(error instanceof Error ? error : new Error('Failed to regenerate suggestion'));
+    } finally {
+      setRegeneratingIndex(null);
+    }
+  };
+
+  const handleRegenerateAll = async () => {
+    if (disabled) return;
+
+    setRegeneratingAll(true);
+    try {
+      const results = await Promise.all(
+        validH2Elements.map(async h2El => {
+          try {
+            const newSuggestion = await generateRecommendation({
+              checkType: 'Keyphrase in H2 Headings',
+              keyphrase,
+              context: h2El.text,
+              advancedOptions,
+            });
+            return { index: h2El.index, suggestion: newSuggestion };
+          } catch {
+            return { index: h2El.index, suggestion: suggestions[h2El.index] ?? '' };
+          }
+        })
+      );
+      const updated: Record<number, string> = {};
+      results.forEach(r => { updated[r.index] = r.suggestion; });
+      setSuggestions(prev => ({ ...prev, ...updated }));
+    } finally {
+      setRegeneratingAll(false);
+    }
+  };
+
+  const isAnyLoading = regeneratingIndex !== null || regeneratingAll;
+
   return (
     <div className={`space-y-3 ${className}`}>
+      {/* Generate All header button */}
+      <div className="flex justify-end">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleRegenerateAll}
+          disabled={disabled || isAnyLoading || appliedIndex !== null}
+          className="flex items-center gap-1.5 text-xs text-text2 hover:text-text1"
+          aria-label="Generate All new suggestions"
+        >
+          {regeneratingAll ? (
+            <SpinnerIcon className="h-3 w-3" />
+          ) : (
+            <RegenerateIcon className="h-3 w-3" />
+          )}
+          Generate All
+        </Button>
+      </div>
+
       {validH2Elements.map((h2Element, index) => {
         const itemState = itemStates[index] || {};
         const isItemApplied = appliedIndex === index;
         const isOtherApplied = appliedIndex !== null && appliedIndex !== index;
-        const isDisabled = disabled || (appliedIndex !== null) || itemState.loading;
+        const isRegeneratingThis = regeneratingIndex === h2Element.index;
+        const isDisabled = disabled || appliedIndex !== null || itemState.loading || isAnyLoading;
+        const suggestion = suggestions[h2Element.index] ?? '';
 
         return (
           <div
             key={`${h2Element.id}-${index}`}
-            className={`flex items-center gap-3 p-4 rounded-[7px] transition-colors ${
+            className={`flex items-start gap-3 p-4 rounded-[7px] transition-colors ${
               isItemApplied
                 ? 'bg-green-900/30 border border-green-700'
                 : isOtherApplied
@@ -144,21 +229,24 @@ export function H2SelectionList({
           >
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs font-medium text-text2">
-                  H2 #{index + 1}
-                </span>
+                <span className="text-xs font-medium text-text2">H2 #{index + 1}</span>
                 {isItemApplied && (
                   <span className="text-xs font-medium text-green-400 bg-green-900/50 px-2 py-0.5 rounded">
                     Applied
                   </span>
                 )}
               </div>
-              <p className={`text-sm text-break ${isOtherApplied ? 'text-text3' : 'text-text1'}`}>
-                {h2Element.text}
-              </p>
+              {/* Current H2 text — secondary reference */}
+              <p className="text-xs text-text3 mb-1 text-break">{h2Element.text}</p>
+              {/* AI suggestion — prominent, actionable */}
+              {suggestion && (
+                <p className={`text-sm font-medium text-break ${isOtherApplied ? 'text-text3' : 'text-text1'}`}>
+                  {suggestion}
+                </p>
+              )}
             </div>
 
-            <div className="flex-shrink-0 flex flex-col items-center gap-2">
+            <div className="flex-shrink-0 flex flex-col items-center gap-2 pt-0.5">
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -166,7 +254,7 @@ export function H2SelectionList({
                       variant="ghost"
                       size="sm"
                       onClick={() => handleApply(h2Element, index)}
-                      disabled={isDisabled}
+                      disabled={isDisabled || !suggestion}
                       className="hover:scale-110 active:scale-95 transition-transform flex items-center justify-center"
                       style={{
                         width: '2rem',
@@ -182,22 +270,19 @@ export function H2SelectionList({
                       <ApplyIcon className="h-4 w-4" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent side="left">
-                    <p>Apply to page</p>
-                  </TooltipContent>
+                  <TooltipContent side="left"><p>Apply to page</p></TooltipContent>
                 </Tooltip>
               </TooltipProvider>
 
-              {onRegenerate && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onRegenerate(h2Element, index)}
-                        disabled={isDisabled}
-                        className="hover:scale-110 active:scale-95 transition-transform flex items-center justify-center"
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRegenerate(h2Element)}
+                      disabled={isDisabled || isRegeneratingThis}
+                      className="hover:scale-110 active:scale-95 transition-transform flex items-center justify-center"
                       style={{
                         width: '2rem',
                         height: '2rem',
@@ -207,23 +292,23 @@ export function H2SelectionList({
                         border: '1px solid transparent',
                         borderRadius: '1.6875rem',
                       }}
-                        aria-label="Generate new suggestion"
-                      >
+                      aria-label={`Generate new suggestion for H2 ${index + 1}: ${h2Element.text}`}
+                    >
+                      {isRegeneratingThis ? (
+                        <SpinnerIcon className="h-4 w-4" />
+                      ) : (
                         <RegenerateIcon className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="left">
-                      <p>Generate new suggestion</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left"><p>Generate new suggestion</p></TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
           </div>
         );
       })}
 
-      {/* Applied Success Message */}
       {appliedIndex !== null && (
         <div className="p-3 bg-green-900/30 border border-green-700 rounded-lg">
           <p className="text-sm text-green-400">
