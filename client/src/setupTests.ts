@@ -35,9 +35,7 @@ vi.mock('framer-motion', () => {
         });
       }
     }),
-    AnimatePresence: vi.fn().mockImplementation(({ children, mode, ...props }) => {
-      return React.createElement(React.Fragment, null, children);
-    }),
+    AnimatePresence: ({ children }: any) => React.createElement(React.Fragment, null, children),
     useAnimation: vi.fn(() => ({
       start: vi.fn().mockResolvedValue(undefined),
       stop: vi.fn(),
