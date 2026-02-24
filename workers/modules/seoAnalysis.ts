@@ -589,36 +589,69 @@ export async function analyzeSEOElements(
   // Prefer H2 content from Webflow Designer API when available, fall back to scraped data
   let h2Text = '';
   let h2Count = 0;
-  
+
   if (webflowPageData?.h2Elements && Array.isArray(webflowPageData.h2Elements)) {
-    // Use H2 content from Webflow Designer API
     h2Text = webflowPageData.h2Elements.map(h2 => h2.text).join(' ');
     h2Count = webflowPageData.h2Elements.length;
   } else {
-    // Fall back to scraped data
     const scrapedH2s = scrapedData.headings.filter(h => h.level === 2);
     h2Text = scrapedH2s.map(h => h.text).join(' ');
     h2Count = scrapedH2s.length;
   }
-  
+
   const h2KeywordMatch = checkKeywordMatch(h2Text, keyphrase, secondaryKeywords);
   console.log('[Backend H2 Debug] H2 text:', h2Text);
   console.log('[Backend H2 Debug] Keyphrase:', keyphrase);
   console.log('[Backend H2 Debug] Match result:', h2KeywordMatch);
-  
+
+  // When individual H2 elements are available, skip the blanket AI call and use per-H2 recs instead
+  const hasIndividualH2Elements = Boolean(webflowPageData?.h2Elements?.length);
+  const h2Env: WorkerEnvironment = hasIndividualH2Elements
+    ? { ...env, USE_GPT_RECOMMENDATIONS: undefined }
+    : env;
+
   const h2Check = await createSEOCheck(
     "Keyphrase in H2 Headings",
     () => h2KeywordMatch.found,
-    h2KeywordMatch.matchedKeyword ? 
+    h2KeywordMatch.matchedKeyword ?
       `Good! The keyword "${h2KeywordMatch.matchedKeyword}" is found in at least one H2 heading.` :
       `Good! The keyphrase "${keyphrase}" is found in at least one H2 heading.`,
     `H2 headings do not contain the keyphrase "${keyphrase}"${secondaryKeywords ? ' or any secondary keywords' : ''}.`,
     `${h2Text} (${h2Count} found)`,
     keyphrase,
-    env,
+    h2Env,
     advancedOptions,
     h2KeywordMatch.matchedKeyword
   );
+
+  // Generate per-H2 suggestions in parallel when individual H2 elements are available
+  if (
+    !h2Check.passed &&
+    hasIndividualH2Elements &&
+    env.USE_GPT_RECOMMENDATIONS === 'true' &&
+    env.OPENAI_API_KEY
+  ) {
+    const h2Elements = webflowPageData!.h2Elements!;
+    const recs = await Promise.all(
+      h2Elements.map(async (h2El) => {
+        try {
+          const suggestion = await getAIRecommendation(
+            'Keyphrase in H2 Headings',
+            keyphrase,
+            env,
+            h2El.text,
+            advancedOptions
+          );
+          return { h2Index: h2El.index, h2Text: h2El.text, suggestion };
+        } catch (error) {
+          console.error(`[Per-H2 AI] Failed to generate suggestion for H2 "${h2El.text}":`, error);
+          return { h2Index: h2El.index, h2Text: h2El.text, suggestion: '' };
+        }
+      })
+    );
+    h2Check.h2Recommendations = recs.filter(r => r.suggestion.length > 0);
+  }
+
   checks.push(h2Check);
 
   // --- Image Alt Attributes Check with v3.3.14 enhanced logic ---

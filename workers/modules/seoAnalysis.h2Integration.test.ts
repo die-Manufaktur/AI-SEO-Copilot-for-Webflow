@@ -3,11 +3,22 @@
  * Testing that SEO analysis uses H2 content from Designer API when available
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { analyzeSEOElements } from './seoAnalysis';
 import type { SEOCheck, WebflowPageData, ScrapedPageData, H2ElementInfo, Resource } from '../../shared/types';
+import { getAIRecommendation } from './aiRecommendations';
+
+vi.mock('./aiRecommendations', () => ({
+  getAIRecommendation: vi.fn(),
+  shouldHaveCopyButton: vi.fn(() => true),
+  handleRecommendationResult: vi.fn(),
+}));
 
 describe('SEO Analysis - H2 Heading Integration with Designer API', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   const mockEnv = {
     OPENAI_API_KEY: 'mock-key',
   };
@@ -258,7 +269,7 @@ describe('SEO Analysis - H2 Heading Integration with Designer API', () => {
       { id: 'h2-1', text: 'Our Professional Services', index: 0, element: {} as any },
       { id: 'h2-2', text: 'Business Solutions', index: 1, element: {} as any }
     ];
-    
+
     const scrapedData = createMockScrapedData([]);
     const webflowPageData = createMockWebflowPageData(mockH2Elements);
 
@@ -279,5 +290,79 @@ describe('SEO Analysis - H2 Heading Integration with Designer API', () => {
     expect(h2Check).toBeDefined();
     expect(h2Check!.passed).toBe(true);
     expect(h2Check!.successMessage).toContain('keyword "services" is found'); // Should match secondary keyword
+  });
+
+  it('should populate h2Recommendations with per-H2 suggestions when check fails', async () => {
+    const mockGetAI = vi.mocked(getAIRecommendation);
+    // Return per-H2 suggestions for H2-specific calls, generic for all others
+    mockGetAI.mockImplementation((_checkName, _keyphrase, _env, context) => {
+      if (context === 'Our Services') return Promise.resolve('Test Keyword in Our Services');
+      if (context === 'Why Choose Us') return Promise.resolve('Why We Use Test Keyword');
+      return Promise.resolve('Generic suggestion');
+    });
+
+    const keyphrase = 'test keyword';
+    const mockH2Elements: H2ElementInfo[] = [
+      { id: 'h2-1', text: 'Our Services', index: 0, element: {} as any },
+      { id: 'h2-2', text: 'Why Choose Us', index: 1, element: {} as any },
+    ];
+    const scrapedData = createMockScrapedData([
+      { level: 1, text: 'Main Heading' },
+      { level: 2, text: 'Our Services' },
+      { level: 2, text: 'Why Choose Us' },
+    ]);
+    const webflowPageData = createMockWebflowPageData(mockH2Elements);
+    const env = { OPENAI_API_KEY: 'mock-key', USE_GPT_RECOMMENDATIONS: 'true' };
+
+    const result = await analyzeSEOElements(
+      scrapedData, keyphrase, 'https://example.com', false,
+      env, webflowPageData
+    );
+
+    const h2Check = result.checks.find(c => c.name === 'Keyphrase in H2 Headings');
+    expect(h2Check?.passed).toBe(false);
+    expect(h2Check?.h2Recommendations).toHaveLength(2);
+    expect(h2Check?.h2Recommendations?.[0]).toEqual({
+      h2Index: 0,
+      h2Text: 'Our Services',
+      suggestion: 'Test Keyword in Our Services',
+    });
+    expect(h2Check?.h2Recommendations?.[1]).toEqual({
+      h2Index: 1,
+      h2Text: 'Why Choose Us',
+      suggestion: 'Why We Use Test Keyword',
+    });
+    // AI should be called with each H2's individual text, not concatenated
+    expect(mockGetAI).toHaveBeenCalledWith(
+      'Keyphrase in H2 Headings', keyphrase, env, 'Our Services', undefined
+    );
+    expect(mockGetAI).toHaveBeenCalledWith(
+      'Keyphrase in H2 Headings', keyphrase, env, 'Why Choose Us', undefined
+    );
+  });
+
+  it('should not populate h2Recommendations when no h2Elements in webflowPageData', async () => {
+    const mockGetAI = vi.mocked(getAIRecommendation);
+    mockGetAI.mockResolvedValue('Blanket H2 suggestion');
+
+    const keyphrase = 'test keyword';
+    const scrapedData = createMockScrapedData([
+      { level: 1, text: 'Main Heading' },
+      { level: 2, text: 'Our Services' },
+    ]);
+    // webflowPageData has no h2Elements
+    const webflowPageData = createMockWebflowPageData();
+    const env = { OPENAI_API_KEY: 'mock-key', USE_GPT_RECOMMENDATIONS: 'true' };
+
+    const result = await analyzeSEOElements(
+      scrapedData, keyphrase, 'https://example.com', false,
+      env, webflowPageData
+    );
+
+    const h2Check = result.checks.find(c => c.name === 'Keyphrase in H2 Headings');
+    expect(h2Check?.passed).toBe(false);
+    expect(h2Check?.h2Recommendations).toBeUndefined();
+    // Falls back to blanket recommendation
+    expect(h2Check?.recommendation).toBeDefined();
   });
 });
