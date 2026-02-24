@@ -34,7 +34,7 @@ import {
   TooltipTrigger,
 } from "../components/ui/tooltip";
 import { useToast } from "../hooks/use-toast";
-import { analyzeSEO } from "../lib/api";
+import { analyzeSEO, generateRecommendation } from "../lib/api";
 import type { SEOCheck, SEOAnalysisResult, WebflowPageData, AnalyzeSEORequest } from "../lib/types";
 import { ProgressCircle } from "../components/ui/progress-circle";
 import { getLearnMoreUrl } from "../lib/docs-links";
@@ -1462,9 +1462,62 @@ export default function Home() {
                                     borderRadius: '1.6875rem',
                                     padding: '8px 16px',
                                   }}
-                                  onClick={() => {
-                                    // TODO: Wire up to batch AI recommendation generation endpoint
-                                    console.log('Generate All H2 suggestions');
+                                  onClick={async () => {
+                                    // Generate AI suggestions for every H2 element in parallel.
+                                    // Promise.allSettled ensures one failure does not abort the batch.
+                                    if (!h2Elements || h2Elements.length === 0) return;
+                                    const keyphrase = analysisRequestData?.keyphrase || form.getValues('keyphrase');
+                                    const advancedOptions = analysisRequestData?.advancedOptions;
+
+                                    const results_settled = await Promise.allSettled(
+                                      h2Elements.map(h2El =>
+                                        generateRecommendation({
+                                          checkType: 'Keyphrase in H2 Headings',
+                                          keyphrase,
+                                          context: h2El.text,
+                                          advancedOptions,
+                                        })
+                                      )
+                                    );
+
+                                    const successCount = results_settled.filter(r => r.status === 'fulfilled').length;
+                                    const total = h2Elements.length;
+
+                                    // Compose a combined recommendation string from all fulfilled results
+                                    const combinedRec = results_settled
+                                      .map((r, i) =>
+                                        r.status === 'fulfilled'
+                                          ? `${h2Elements[i].text}: ${r.value}`
+                                          : null
+                                      )
+                                      .filter(Boolean)
+                                      .join('\n');
+
+                                    if (combinedRec) {
+                                      setResults(prev => {
+                                        if (!prev?.checks) return prev;
+                                        return {
+                                          ...prev,
+                                          checks: prev.checks.map(c =>
+                                            c.title === 'Keyphrase in H2 Headings'
+                                              ? { ...c, recommendation: combinedRec }
+                                              : c
+                                          ),
+                                        };
+                                      });
+                                    }
+
+                                    if (successCount === total) {
+                                      toast({
+                                        title: `Generated all ${total} suggestions`,
+                                        description: 'AI suggestions are ready for each H2 heading.',
+                                      });
+                                    } else {
+                                      toast({
+                                        title: `Generated ${successCount} of ${total} suggestions`,
+                                        description: 'Some suggestions could not be generated. Please try again.',
+                                      });
+                                    }
                                   }}
                                 >
                                   <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1482,9 +1535,58 @@ export default function Home() {
                                     borderRadius: '1.6875rem',
                                     padding: '8px 16px',
                                   }}
-                                  onClick={() => {
-                                    // TODO: Wire up to batch AI alt text generation endpoint
-                                    console.log('Generate All alt text suggestions');
+                                  onClick={async () => {
+                                    // Generate AI alt text for every image missing alt text in parallel.
+                                    // Promise.allSettled ensures one failure does not abort the batch.
+                                    const images = check.imageData;
+                                    if (!images || images.length === 0) return;
+                                    const keyphrase = analysisRequestData?.keyphrase || form.getValues('keyphrase');
+                                    const advancedOptions = analysisRequestData?.advancedOptions;
+
+                                    const results_settled = await Promise.allSettled(
+                                      images.map(img =>
+                                        generateRecommendation({
+                                          checkType: 'Image Alt Attributes',
+                                          keyphrase,
+                                          context: img.url,
+                                          advancedOptions,
+                                        })
+                                      )
+                                    );
+
+                                    const successCount = results_settled.filter(r => r.status === 'fulfilled').length;
+                                    const total = images.length;
+
+                                    // Update alt text for each image that succeeded
+                                    setResults(prev => {
+                                      if (!prev?.checks) return prev;
+                                      return {
+                                        ...prev,
+                                        checks: prev.checks.map(c => {
+                                          if (c.title !== 'Image Alt Attributes' || !c.imageData) return c;
+                                          const updatedImageData = c.imageData.map((img, idx) => {
+                                            const settled = results_settled[idx];
+                                            if (settled && settled.status === 'fulfilled') {
+                                              return { ...img, alt: settled.value };
+                                            }
+                                            return img;
+                                          });
+                                          return { ...c, imageData: updatedImageData };
+                                        }),
+                                      };
+                                    });
+
+                                    if (successCount === total) {
+                                      toast({
+                                        title: `Generated all ${total} alt text suggestions`,
+                                        description: 'AI alt text suggestions are ready for each image.',
+                                      });
+                                    } else {
+                                      toast({
+                                        title: `Generated ${successCount} of ${total} alt text suggestions`,
+                                        description: 'Some suggestions could not be generated. Please try again.',
+                                      });
+                                    }
                                   }}
                                 >
                                   <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1510,9 +1612,25 @@ export default function Home() {
                                   <H2SelectionList
                                     h2Elements={h2Elements}
                                     recommendation={check.recommendation || ''}
-                                    onRegenerate={(h2Element, index) => {
-                                      // TODO: Wire up to AI recommendation generation endpoint
-                                      console.log('Regenerate H2 suggestion for:', h2Element.text, 'at index:', index);
+                                    onRegenerate={async (h2Element, _index) => {
+                                      const keyphrase = analysisRequestData?.keyphrase || form.getValues('keyphrase');
+                                      const newRec = await generateRecommendation({
+                                        checkType: 'Keyphrase in H2 Headings',
+                                        keyphrase,
+                                        context: h2Element.text,
+                                        advancedOptions: analysisRequestData?.advancedOptions,
+                                      });
+                                      setResults(prev => {
+                                        if (!prev?.checks) return prev;
+                                        return {
+                                          ...prev,
+                                          checks: prev.checks.map(c =>
+                                            c.title === 'Keyphrase in H2 Headings'
+                                              ? { ...c, recommendation: newRec }
+                                              : c
+                                          ),
+                                        };
+                                      });
                                     }}
                                     onApply={async ({ h2Element, recommendation }) => {
                                       try {
@@ -1580,13 +1698,38 @@ export default function Home() {
                                       alt: img.alt || null,
                                     }))}
                                     onApply={async ({ image, newAltText }) => {
-                                      // TODO: Wire up to Webflow API to set alt text
-                                      console.log('Apply alt text:', image.name, newAltText);
+                                      // NOTE: The Webflow Designer API does not currently expose a
+                                      // method to set image alt text programmatically for arbitrary
+                                      // images. insertionHelpers.ts has no "image_alt" insertion type.
+                                      // Until Webflow exposes this capability, users must apply alt
+                                      // text manually in the Webflow Designer.
+                                      toast({
+                                        title: "Alt text must be applied manually",
+                                        description: `Copy "${newAltText}" and set it on "${image.name}" directly in the Webflow Designer Image settings.`,
+                                      });
                                       return { success: true };
                                     }}
-                                    onRegenerate={(image, index) => {
-                                      // TODO: Wire up to AI alt text generation endpoint
-                                      console.log('Regenerate alt text for:', image.name, 'at index:', index);
+                                    onRegenerate={async (image, _index) => {
+                                      const keyphrase = analysisRequestData?.keyphrase || form.getValues('keyphrase');
+                                      const newRec = await generateRecommendation({
+                                        checkType: 'Image Alt Attributes',
+                                        keyphrase,
+                                        context: image.url,
+                                        advancedOptions: analysisRequestData?.advancedOptions,
+                                      });
+                                      setResults(prev => {
+                                        if (!prev?.checks) return prev;
+                                        return {
+                                          ...prev,
+                                          checks: prev.checks.map(c => {
+                                            if (c.title !== 'Image Alt Attributes' || !c.imageData) return c;
+                                            const updatedImageData = c.imageData.map(img =>
+                                              img.url === image.url ? { ...img, alt: newRec } : img
+                                            );
+                                            return { ...c, imageData: updatedImageData };
+                                          }),
+                                        };
+                                      });
                                     }}
                                     pageId={currentPageId}
                                     checkTitle="Image Alt Attributes"
@@ -1620,8 +1763,24 @@ export default function Home() {
                                       pageId={currentPageId}
                                       showApplyButton={true}
                                       onRegenerate={async () => {
-                                        // TODO: Wire up to AI recommendation generation endpoint
-                                        console.log('Regenerate recommendation for:', check.title);
+                                        const keyphrase = analysisRequestData?.keyphrase || form.getValues('keyphrase');
+                                        const newRec = await generateRecommendation({
+                                          checkType: check.title,
+                                          keyphrase,
+                                          context: check.recommendation || check.description,
+                                          advancedOptions: analysisRequestData?.advancedOptions,
+                                        });
+                                        setResults(prev => {
+                                          if (!prev?.checks) return prev;
+                                          return {
+                                            ...prev,
+                                            checks: prev.checks.map(c =>
+                                              c.title === check.title
+                                                ? { ...c, recommendation: newRec }
+                                                : c
+                                            ),
+                                          };
+                                        });
                                       }}
                                       onApplySuccess={(appliedCheckTitle) => {
                                         // Mark the check as passed to trigger collapse-to-success pattern
