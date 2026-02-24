@@ -1611,27 +1611,9 @@ export default function Home() {
                                   // H2SelectionList renders its own per-item dark containers
                                   <H2SelectionList
                                     h2Elements={h2Elements}
-                                    recommendation={check.recommendation || ''}
-                                    onRegenerate={async (h2Element, _index) => {
-                                      const keyphrase = analysisRequestData?.keyphrase || form.getValues('keyphrase');
-                                      const newRec = await generateRecommendation({
-                                        checkType: 'Keyphrase in H2 Headings',
-                                        keyphrase,
-                                        context: h2Element.text,
-                                        advancedOptions: analysisRequestData?.advancedOptions,
-                                      });
-                                      setResults(prev => {
-                                        if (!prev?.checks) return prev;
-                                        return {
-                                          ...prev,
-                                          checks: prev.checks.map(c =>
-                                            c.title === 'Keyphrase in H2 Headings'
-                                              ? { ...c, recommendation: newRec }
-                                              : c
-                                          ),
-                                        };
-                                      });
-                                    }}
+                                    h2Recommendations={check.h2Recommendations}
+                                    keyphrase={analysisRequestData?.keyphrase || form.getValues('keyphrase')}
+                                    advancedOptions={analysisRequestData?.advancedOptions}
                                     onApply={async ({ h2Element, recommendation }) => {
                                       try {
                                         const insertionRequest = {
