@@ -21,6 +21,11 @@ export interface SEOCheck {
     mimeType?: string;
     alt?: string;
   }>;
+  h2Recommendations?: Array<{
+    h2Index: number;
+    h2Text: string;
+    suggestion: string;
+  }>;
 }
 
 /**

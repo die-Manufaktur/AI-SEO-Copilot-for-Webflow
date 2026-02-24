@@ -229,6 +229,27 @@ describe('SEO Analysis - H2 Heading Integration with Designer API', () => {
     expect(h2Check!.details).toContain('Valid H2 with test');
   });
 
+  it('should set h2Recommendations to undefined when check passes', async () => {
+    const keyphrase = 'test keyword';
+    const mockH2Elements: H2ElementInfo[] = [
+      { id: 'h2-1', text: 'Our Services with test keyword', index: 0, element: {} as any },
+    ];
+    const scrapedData = createMockScrapedData([
+      { level: 1, text: 'Main Heading' },
+      { level: 2, text: 'Our Services with test keyword' },
+    ]);
+    const webflowPageData = createMockWebflowPageData(mockH2Elements);
+
+    const result = await analyzeSEOElements(
+      scrapedData, keyphrase, 'https://example.com', false,
+      mockEnv, webflowPageData
+    );
+
+    const h2Check = result.checks.find(c => c.name === 'Keyphrase in H2 Headings');
+    expect(h2Check?.passed).toBe(true);
+    expect(h2Check?.h2Recommendations).toBeUndefined();
+  });
+
   it('should work with secondary keywords when using Designer API H2 data', async () => {
     // Arrange
     const keyphrase = 'primary';
