@@ -6,7 +6,7 @@ import {
   handleRecommendationResult
 } from './aiRecommendations';
 import { shouldShowCopyButton } from '../../shared/utils/seoUtils';
-import { sanitizeText } from '../../shared/utils/stringUtils';
+import { sanitizeText, stripWrappingQuotes } from '../../shared/utils/stringUtils';
 import { getLanguageByCode, DEFAULT_LANGUAGE_CODE } from '../../shared/types/language';
 
 // Mock dependencies
@@ -18,6 +18,7 @@ vi.mock('../../shared/types/language');
 const mockOpenAI = vi.mocked(OpenAI);
 const mockShouldShowCopyButton = vi.mocked(shouldShowCopyButton);
 const mockSanitizeText = vi.mocked(sanitizeText);
+const mockStripWrappingQuotes = vi.mocked(stripWrappingQuotes);
 const mockGetLanguageByCode = vi.mocked(getLanguageByCode);
 
 describe('aiRecommendations', () => {
@@ -26,6 +27,7 @@ describe('aiRecommendations', () => {
     
     // Default mock implementations
     mockSanitizeText.mockImplementation((text: string) => text);
+    mockStripWrappingQuotes.mockImplementation((text: string) => text);
     mockGetLanguageByCode.mockReturnValue({
       code: 'en',
       name: 'English',
@@ -216,6 +218,83 @@ describe('aiRecommendations', () => {
       // Check that language instruction was included in system prompt
       const systemPrompt = mockCreate.mock.calls[0][0].messages[0].content;
       expect(systemPrompt).toContain('Generate all content in French');
+    });
+
+    it('generates concise alt text for Image Alt Attributes (not instructional advice)', async () => {
+      const mockResponse = {
+        choices: [{
+          message: {
+            content: 'Modern home renovation showcasing test kitchen remodel'
+          }
+        }]
+      };
+
+      mockShouldShowCopyButton.mockReturnValue(true);
+
+      const mockCreate = vi.fn().mockResolvedValue(mockResponse);
+      mockOpenAI.mockImplementation(() => ({
+        chat: { completions: { create: mockCreate } }
+      } as any));
+
+      const result = await getAIRecommendation(
+        'Image Alt Attributes',
+        'test',
+        mockEnv,
+        'https://cdn.example.com/images/kitchen-renovation.jpg'
+      );
+
+      expect(result).toBe('Modern home renovation showcasing test kitchen remodel');
+
+      // The user prompt should reference the image URL/filename, not generic advice
+      const userPrompt = mockCreate.mock.calls[0][0].messages[1].content;
+      expect(userPrompt).toContain('kitchen-renovation.jpg');
+      expect(userPrompt).toContain('test');
+
+      // The system prompt should instruct copyable content, not advisory
+      const systemPrompt = mockCreate.mock.calls[0][0].messages[0].content;
+      expect(systemPrompt).toContain('ready-to-use');
+    });
+
+    it('instructs the AI to return only the alt text string for Image Alt Attributes', async () => {
+      const mockResponse = {
+        choices: [{ message: { content: 'SEO-optimised product photo featuring test' } }]
+      };
+
+      mockShouldShowCopyButton.mockReturnValue(true);
+
+      const mockCreate = vi.fn().mockResolvedValue(mockResponse);
+      mockOpenAI.mockImplementation(() => ({
+        chat: { completions: { create: mockCreate } }
+      } as any));
+
+      await getAIRecommendation(
+        'Image Alt Attributes',
+        'test',
+        mockEnv,
+        'https://cdn.example.com/photos/product-shot.jpg'
+      );
+
+      const userPrompt = mockCreate.mock.calls[0][0].messages[1].content;
+      // Must request only the alt text — no explanations, no quotes
+      expect(userPrompt).toMatch(/only.*alt text|Return ONLY/i);
+      // Must mention 125-char limit (alt tag best practice)
+      expect(userPrompt).toContain('125');
+    });
+
+    it('calls stripWrappingQuotes on the sanitized AI response', async () => {
+      const mockResponse = {
+        choices: [{ message: { content: '"Abstract background test pattern"' } }]
+      };
+
+      mockShouldShowCopyButton.mockReturnValue(true);
+      const mockCreate = vi.fn().mockResolvedValue(mockResponse);
+      mockOpenAI.mockImplementation(() => ({
+        chat: { completions: { create: mockCreate } }
+      } as any));
+
+      await getAIRecommendation('Image Alt Attributes', 'test', mockEnv, 'https://example.com/img.jpg');
+
+      expect(mockStripWrappingQuotes).toHaveBeenCalledWith('"Abstract background test pattern"');
     });
 
     it('should handle special URL slug generation', async () => {

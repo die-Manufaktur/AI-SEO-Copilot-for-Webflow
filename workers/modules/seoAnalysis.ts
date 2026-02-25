@@ -670,23 +670,9 @@ export async function analyzeSEOElements(
   } else {
     imageAltCheck.description = `Found ${imagesWithoutAlt.length} image(s) without alt attributes.`;
     
-    try {
-      if (env.USE_GPT_RECOMMENDATIONS === 'true' && env.OPENAI_API_KEY) {
-        const imageAltResult = await getAIRecommendation(
-          imageAltCheck.title,
-          keyphrase,
-          env,
-          `${imagesWithoutAlt.length} image(s) found without alt attributes.`,
-          advancedOptions
-        );
-        imageAltCheck.recommendation = imageAltResult;
-      }
-    } catch (error) {
-      console.error("[SEO Analysis] Error getting AI recommendation for image alt attributes:", error);
-    }
   }
   checks.push(imageAltCheck);
-  
+
   if (!imageAltCheck.passed) {
     imageAltCheck.imageData = imagesWithoutAlt.map(img => ({
       url: img.src,
@@ -696,6 +682,27 @@ export async function analyzeSEOElements(
       mimeType: 'Unknown',
       alt: img.alt || ''
     }));
+
+    // Generate AI alt text for each image in parallel during analysis
+    if (env.USE_GPT_RECOMMENDATIONS === 'true' && env.OPENAI_API_KEY) {
+      const altResults = await Promise.allSettled(
+        imagesWithoutAlt.map(async (img, idx) => {
+          const suggestion = await getAIRecommendation(
+            'Image Alt Attributes',
+            keyphrase,
+            env,
+            img.src,
+            advancedOptions
+          );
+          return { idx, suggestion };
+        })
+      );
+      altResults.forEach(result => {
+        if (result.status === 'fulfilled' && result.value.suggestion) {
+          imageAltCheck.imageData![result.value.idx].alt = result.value.suggestion;
+        }
+      });
+    }
   }
 
   // --- Internal Links Check with v3.3.14 enhanced logic ---

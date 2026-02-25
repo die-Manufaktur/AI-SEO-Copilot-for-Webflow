@@ -5,7 +5,7 @@
  * Follows the same pattern as H2SelectionList.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from './button';
 import {
   Tooltip,
@@ -39,7 +39,7 @@ export interface ImageAltTextItem {
 export interface ImageAltTextListProps {
   images: ImageAltTextItem[];
   onApply: (params: { image: ImageAltTextItem; newAltText: string }) => Promise<{ success: boolean }>;
-  onRegenerate?: (image: ImageAltTextItem, index: number) => void;
+  onRegenerate?: (image: ImageAltTextItem, index: number) => Promise<void>;
   pageId?: string;
   checkTitle?: string;
   disabled?: boolean;
@@ -50,6 +50,7 @@ interface ItemState {
   loading: boolean;
   success: boolean;
   error?: string;
+  regenerating: boolean;
 }
 
 export function ImageAltTextList({
@@ -68,6 +69,38 @@ export function ImageAltTextList({
     return initial;
   });
 
+  // Track the last alt value seen from the images prop so we can distinguish
+  // external updates (e.g. Generate All completing) from manual user edits.
+  const prevAltRef = useRef<Record<number, string>>({});
+
+  useEffect(() => {
+    // Collect entries where the external alt value changed since last render.
+    const changedEntries: Array<{ idx: number; prevAlt: string; newAlt: string }> = [];
+    images.forEach((img, idx) => {
+      const prevAlt = prevAltRef.current[idx] ?? '';
+      const newAlt = img.alt ?? '';
+      if (newAlt !== prevAlt) {
+        changedEntries.push({ idx, prevAlt, newAlt });
+        prevAltRef.current[idx] = newAlt;
+      }
+    });
+
+    if (changedEntries.length === 0) return;
+
+    // Only sync entries where the user hasn't manually typed something different.
+    // A user edit is detected when editedTexts[idx] no longer matches the previous
+    // external value — in that case we leave their text alone.
+    setEditedTexts(prev => {
+      const next = { ...prev };
+      for (const { idx, prevAlt, newAlt } of changedEntries) {
+        if ((prev[idx] ?? '') === prevAlt) {
+          next[idx] = newAlt;
+        }
+      }
+      return next;
+    });
+  }, [images]);
+
   if (images.length === 0) {
     return (
       <div className={`text-center py-6 text-muted-foreground ${className}`}>
@@ -83,8 +116,10 @@ export function ImageAltTextList({
     }));
   };
 
+  const isAnyLoading = disabled || Object.values(itemStates).some(s => s.loading || s.regenerating);
+
   const handleApply = async (image: ImageAltTextItem, index: number) => {
-    if (disabled) return;
+    if (isAnyLoading) return;
 
     const newAltText = editedTexts[index] ?? '';
     if (!newAltText.trim()) return;
@@ -104,12 +139,24 @@ export function ImageAltTextList({
     }
   };
 
+  const handleRegenerate = async (image: ImageAltTextItem, index: number) => {
+    if (!onRegenerate || isAnyLoading) return;
+    updateItemState(index, { regenerating: true });
+    try {
+      await onRegenerate(image, index);
+    } catch (err) {
+      console.error('[ImageAltTextList] Regeneration failed:', err);
+    } finally {
+      updateItemState(index, { regenerating: false });
+    }
+  };
+
   return (
     <div className={`space-y-2 ${className}`}>
       {images.map((image, index) => {
         const itemState = itemStates[index] || {};
         const isApplied = itemState.success;
-        const isDisabled = disabled || itemState.loading;
+        const isDisabled = isAnyLoading || itemState.loading || itemState.regenerating;
 
         return (
           <div
@@ -137,16 +184,20 @@ export function ImageAltTextList({
 
             {/* Editable text area */}
             <div className="flex-1 min-w-0 border border-[var(--color-bg-500)] bg-[var(--color-bg-500)] rounded-[6px] p-3">
-              <textarea
-                className="w-full bg-transparent text-sm text-text1 resize-none border-none focus:outline-none focus:ring-0 placeholder:text-text3"
-                value={editedTexts[index] ?? ''}
-                onChange={(e) =>
-                  setEditedTexts(prev => ({ ...prev, [index]: e.target.value }))
-                }
-                placeholder="No alt text"
-                rows={3}
-                disabled={isDisabled}
-              />
+              {itemState.regenerating ? (
+                <span className="text-muted-foreground italic animate-pulse text-sm">AI text is generating...</span>
+              ) : (
+                <textarea
+                  className="w-full bg-transparent text-sm text-text1 resize-none border-none focus:outline-none focus:ring-0 placeholder:text-text3"
+                  value={editedTexts[index] ?? ''}
+                  onChange={(e) =>
+                    setEditedTexts(prev => ({ ...prev, [index]: e.target.value }))
+                  }
+                  placeholder="No alt text"
+                  rows={3}
+                  disabled={isDisabled}
+                />
+              )}
               {isApplied && (
                 <span className="text-xs font-medium text-green-400 bg-green-900/50 px-2 py-0.5 rounded">
                   Applied
@@ -192,7 +243,7 @@ export function ImageAltTextList({
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => onRegenerate(image, index)}
+                        onClick={() => handleRegenerate(image, index)}
                         disabled={isDisabled}
                         className="hover:scale-110 active:scale-95 transition-transform flex items-center justify-center"
                       style={{
@@ -206,7 +257,7 @@ export function ImageAltTextList({
                       }}
                         aria-label="Generate new suggestion"
                       >
-                        <RegenerateIcon className="h-4 w-4" />
+                        <RegenerateIcon className={`h-4 w-4 ${itemState.regenerating ? 'animate-spin' : ''}`} />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent side="left">

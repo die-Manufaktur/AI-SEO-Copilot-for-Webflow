@@ -4,7 +4,7 @@
  * Once one is applied, marks check as passed and disables all other buttons.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useImperativeHandle } from 'react';
 import { Button } from './button';
 import {
   Tooltip,
@@ -54,6 +54,12 @@ export interface H2SelectionListProps {
   className?: string;
   pageId?: string;
   checkTitle?: string;
+  /** When true, suppresses the internal "Generate All" header row (use when rendering the button externally). */
+  hideGenerateAllHeader?: boolean;
+}
+
+export interface H2SelectionListHandle {
+  triggerRegenerateAll: () => Promise<void>;
 }
 
 interface H2ItemState {
@@ -62,7 +68,7 @@ interface H2ItemState {
   error?: string;
 }
 
-export function H2SelectionList({
+export const H2SelectionList = React.forwardRef<H2SelectionListHandle, H2SelectionListProps>(function H2SelectionList({
   h2Elements,
   h2Recommendations,
   keyphrase,
@@ -73,7 +79,8 @@ export function H2SelectionList({
   className = '',
   pageId,
   checkTitle = 'Keyphrase in H2 Headings',
-}: H2SelectionListProps): React.ReactElement {
+  hideGenerateAllHeader = false,
+}: H2SelectionListProps, ref) {
   const [suggestions, setSuggestions] = useState<Record<number, string>>(() => {
     const init: Record<number, string> = {};
     h2Recommendations?.forEach(rec => { init[rec.h2Index] = rec.suggestion; });
@@ -181,28 +188,38 @@ export function H2SelectionList({
     }
   };
 
+  useImperativeHandle(ref, () => ({ triggerRegenerateAll: handleRegenerateAll }));
+
   const isAnyLoading = regeneratingIndex !== null || regeneratingAll;
 
   return (
     <div className={`space-y-3 ${className}`}>
-      {/* Generate All header button */}
-      <div className="flex justify-end">
+      {/* Generate All header button — hidden when rendered externally in the check title row */}
+      {!hideGenerateAllHeader && <div className="flex justify-end">
         <Button
           variant="ghost"
           size="sm"
           onClick={handleRegenerateAll}
           disabled={disabled || isAnyLoading || appliedIndex !== null}
-          className="flex items-center gap-1.5 text-xs text-text2 hover:text-text1"
+          className="flex items-center gap-2 text-white text-sm whitespace-nowrap hover:opacity-80 transition-opacity"
+          style={{
+            background: 'linear-gradient(#787878, #787878) padding-box, linear-gradient(135deg, rgba(255, 255, 255, 0.40) 0%, rgba(255, 255, 255, 0.00) 100%) border-box',
+            border: '1px solid transparent',
+            borderRadius: '1.6875rem',
+            padding: '8px 16px',
+          }}
           aria-label="Generate All new suggestions"
         >
           {regeneratingAll ? (
-            <SpinnerIcon className="h-3 w-3" />
+            <SpinnerIcon className="h-4 w-4" />
           ) : (
-            <RegenerateIcon className="h-3 w-3" />
+            <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M8 1.5L8.63857 3.22572C9.34757 5.14175 10.8582 6.65243 12.7743 7.36143L14.5 8L12.7743 8.63857C10.8582 9.34757 9.34757 10.8582 8.63857 12.7743L8 14.5L7.36143 12.7743C6.65243 10.8582 5.14175 9.34757 3.22572 8.63857L1.5 8L3.22572 7.36143C5.14175 6.65243 6.65243 5.14175 7.36143 3.22572L8 1.5Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
           )}
           Generate All
         </Button>
-      </div>
+      </div>}
 
       {validH2Elements.map((h2Element, index) => {
         const itemState = itemStates[index] || {};
@@ -321,4 +338,4 @@ export function H2SelectionList({
       )}
     </div>
   );
-}
+});

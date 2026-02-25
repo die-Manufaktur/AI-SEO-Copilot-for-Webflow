@@ -47,11 +47,13 @@ export function shouldShowCopyButton(checkTitle: string): boolean {
   return [
     // Meta SEO category checks
     "Keyphrase in Title",
-    "Keyphrase in Meta Description", 
+    "Keyphrase in Meta Description",
     "Keyphrase in URL",
     // Content Optimization category checks
     "Keyphrase in Introduction",
     "Keyphrase in H1 Heading",
-    "Keyphrase in H2 Headings"
+    "Keyphrase in H2 Headings",
+    // Images and Assets category checks
+    "Image Alt Attributes"
   ].includes(checkTitle);
 }

@@ -5,7 +5,7 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     testTimeout: 15000,
-    include: ['workers/**/*.test.ts'],
+    include: ['workers/**/*.test.ts', 'shared/utils/**/*.test.ts'],
     reporters: ['default'],
   },
 });

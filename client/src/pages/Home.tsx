@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -55,11 +55,12 @@ import { getDefaultLanguage, getLanguageByCode, type Language } from '../../../s
 import { loadLanguageForSite, saveLanguageForSite } from '../utils/languageStorage';
 import { SchemaDisplay } from '../components/ui/schema-display';
 import { EditableRecommendation } from '../components/ui/editable-recommendation';
-import { H2SelectionList } from '../components/ui/H2SelectionList';
+import { H2SelectionList, type H2SelectionListHandle } from '../components/ui/H2SelectionList';
 import { ImageAltTextList } from '../components/ui/ImageAltTextList';
 import { useInsertion } from '../contexts/InsertionContext';
 import { useAppliedRecommendations } from '../hooks/useAppliedRecommendations';
 import type { H2ElementInfo } from '../lib/webflowDesignerApi';
+import { WebflowDesignerExtensionAPI } from '../lib/webflowDesignerApi';
 
 const logger = createLogger("Home");
 
@@ -366,6 +367,9 @@ export default function Home() {
   
   // H2 elements state for H2SelectionList
   const [h2Elements, setH2Elements] = useState<H2ElementInfo[]>([]);
+  const h2ListRef = useRef<H2SelectionListHandle>(null);
+  const [h2GeneratingAll, setH2GeneratingAll] = useState(false);
+  const [imageAltGeneratingAll, setImageAltGeneratingAll] = useState(false);
   const [h2ElementsFetched, setH2ElementsFetched] = useState(false);
   const [secondaryKeywordsError, setSecondaryKeywordsError] = useState<string>('');
   const [selectedLanguage, setSelectedLanguage] = useState<Language>(getDefaultLanguage());
@@ -1453,7 +1457,7 @@ export default function Home() {
                                   </p>
                                 </div>
                               </div>
-                              {check.title === "Keyphrase in H2 Headings" && !check.passed && (
+                              {check.title === "Keyphrase in H2 Headings" && !check.passed && h2Elements.length > 0 && (
                                 <button
                                   className="flex items-center gap-2 text-white text-sm whitespace-nowrap flex-shrink-0 hover:opacity-80 transition-opacity"
                                   style={{
@@ -1462,67 +1466,25 @@ export default function Home() {
                                     borderRadius: '1.6875rem',
                                     padding: '8px 16px',
                                   }}
+                                  disabled={h2GeneratingAll}
                                   onClick={async () => {
-                                    // Generate AI suggestions for every H2 element in parallel.
-                                    // Promise.allSettled ensures one failure does not abort the batch.
-                                    if (!h2Elements || h2Elements.length === 0) return;
-                                    const keyphrase = analysisRequestData?.keyphrase || form.getValues('keyphrase');
-                                    const advancedOptions = analysisRequestData?.advancedOptions;
-
-                                    const results_settled = await Promise.allSettled(
-                                      h2Elements.map(h2El =>
-                                        generateRecommendation({
-                                          checkType: 'Keyphrase in H2 Headings',
-                                          keyphrase,
-                                          context: h2El.text,
-                                          advancedOptions,
-                                        })
-                                      )
-                                    );
-
-                                    const successCount = results_settled.filter(r => r.status === 'fulfilled').length;
-                                    const total = h2Elements.length;
-
-                                    // Compose a combined recommendation string from all fulfilled results
-                                    const combinedRec = results_settled
-                                      .map((r, i) =>
-                                        r.status === 'fulfilled'
-                                          ? `${h2Elements[i].text}: ${r.value}`
-                                          : null
-                                      )
-                                      .filter(Boolean)
-                                      .join('\n');
-
-                                    if (combinedRec) {
-                                      setResults(prev => {
-                                        if (!prev?.checks) return prev;
-                                        return {
-                                          ...prev,
-                                          checks: prev.checks.map(c =>
-                                            c.title === 'Keyphrase in H2 Headings'
-                                              ? { ...c, recommendation: combinedRec }
-                                              : c
-                                          ),
-                                        };
-                                      });
-                                    }
-
-                                    if (successCount === total) {
-                                      toast({
-                                        title: `Generated all ${total} suggestions`,
-                                        description: 'AI suggestions are ready for each H2 heading.',
-                                      });
-                                    } else {
-                                      toast({
-                                        title: `Generated ${successCount} of ${total} suggestions`,
-                                        description: 'Some suggestions could not be generated. Please try again.',
-                                      });
+                                    setH2GeneratingAll(true);
+                                    try {
+                                      await h2ListRef.current?.triggerRegenerateAll();
+                                    } finally {
+                                      setH2GeneratingAll(false);
                                     }
                                   }}
                                 >
-                                  <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M8 1.5L8.63857 3.22572C9.34757 5.14175 10.8582 6.65243 12.7743 7.36143L14.5 8L12.7743 8.63857C10.8582 9.34757 9.34757 10.8582 8.63857 12.7743L8 14.5L7.36143 12.7743C6.65243 10.8582 5.14175 9.34757 3.22572 8.63857L1.5 8L3.22572 7.36143C5.14175 6.65243 6.65243 5.14175 7.36143 3.22572L8 1.5Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/>
-                                  </svg>
+                                  {h2GeneratingAll ? (
+                                    <svg className="animate-spin h-4 w-4" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                      <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeDasharray="25 13" strokeLinecap="round"/>
+                                    </svg>
+                                  ) : (
+                                    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                      <path d="M8 1.5L8.63857 3.22572C9.34757 5.14175 10.8582 6.65243 12.7743 7.36143L14.5 8L12.7743 8.63857C10.8582 9.34757 9.34757 10.8582 8.63857 12.7743L8 14.5L7.36143 12.7743C6.65243 10.8582 5.14175 9.34757 3.22572 8.63857L1.5 8L3.22572 7.36143C5.14175 6.65243 6.65243 5.14175 7.36143 3.22572L8 1.5Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/>
+                                    </svg>
+                                  )}
                                   Generate All
                                 </button>
                               )}
@@ -1535,11 +1497,14 @@ export default function Home() {
                                     borderRadius: '1.6875rem',
                                     padding: '8px 16px',
                                   }}
+                                  disabled={imageAltGeneratingAll}
                                   onClick={async () => {
                                     // Generate AI alt text for every image missing alt text in parallel.
                                     // Promise.allSettled ensures one failure does not abort the batch.
                                     const images = check.imageData;
                                     if (!images || images.length === 0) return;
+                                    setImageAltGeneratingAll(true);
+                                    try {
                                     const keyphrase = analysisRequestData?.keyphrase || form.getValues('keyphrase');
                                     const advancedOptions = analysisRequestData?.advancedOptions;
 
@@ -1587,16 +1552,30 @@ export default function Home() {
                                         description: 'Some suggestions could not be generated. Please try again.',
                                       });
                                     }
+                                  } finally {
+                                    setImageAltGeneratingAll(false);
+                                  }
                                   }}
                                 >
-                                  <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M8 1.5L8.63857 3.22572C9.34757 5.14175 10.8582 6.65243 12.7743 7.36143L14.5 8L12.7743 8.63857C10.8582 9.34757 9.34757 10.8582 8.63857 12.7743L8 14.5L7.36143 12.7743C6.65243 10.8582 5.14175 9.34757 3.22572 8.63857L1.5 8L3.22572 7.36143C5.14175 6.65243 6.65243 5.14175 7.36143 3.22572L8 1.5Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/>
-                                  </svg>
+                                  {imageAltGeneratingAll ? (
+                                    <svg className="animate-spin h-4 w-4" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                      <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeDasharray="25 13" strokeLinecap="round"/>
+                                    </svg>
+                                  ) : (
+                                    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                      <path d="M8 1.5L8.63857 3.22572C9.34757 5.14175 10.8582 6.65243 12.7743 7.36143L14.5 8L12.7743 8.63857C10.8582 9.34757 9.34757 10.8582 8.63857 12.7743L8 14.5L7.36143 12.7743C6.65243 10.8582 5.14175 9.34757 3.22572 8.63857L1.5 8L3.22572 7.36143C5.14175 6.65243 6.65243 5.14175 7.36143 3.22572L8 1.5Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/>
+                                    </svg>
+                                  )}
                                   Generate All
                                 </button>
                               )}
                             </div>
-                            {!check.passed && (check.recommendation || check.h2Recommendations?.length) && (
+                            {!check.passed && (
+                              check.recommendation ||
+                              check.h2Recommendations?.length ||
+                              (check.title === "Keyphrase in H2 Headings" && h2Elements.length > 0) ||
+                              (check.title === "Image Alt Attributes" && (check.imageData?.length ?? 0) > 0)
+                            ) && (
                               <div className="mt-8">
                                 {/* Recommendation title - rendered outside dark box */}
                                 {shouldShowCopyButton(check.title)
@@ -1610,6 +1589,8 @@ export default function Home() {
                                 {check.title === "Keyphrase in H2 Headings" ? (
                                   // H2SelectionList renders its own per-item dark containers
                                   <H2SelectionList
+                                    ref={h2ListRef}
+                                    hideGenerateAllHeader
                                     h2Elements={h2Elements}
                                     h2Recommendations={check.h2Recommendations}
                                     keyphrase={analysisRequestData?.keyphrase || form.getValues('keyphrase')}
@@ -1680,16 +1661,28 @@ export default function Home() {
                                       alt: img.alt || null,
                                     }))}
                                     onApply={async ({ image, newAltText }) => {
-                                      // NOTE: The Webflow Designer API does not currently expose a
-                                      // method to set image alt text programmatically for arbitrary
-                                      // images. insertionHelpers.ts has no "image_alt" insertion type.
-                                      // Until Webflow exposes this capability, users must apply alt
-                                      // text manually in the Webflow Designer.
-                                      toast({
-                                        title: "Alt text must be applied manually",
-                                        description: `Copy "${newAltText}" and set it on "${image.name}" directly in the Webflow Designer Image settings.`,
-                                      });
-                                      return { success: true };
+                                      try {
+                                        if (!window.webflow) {
+                                          throw new Error('Webflow Designer API not available');
+                                        }
+                                        const designerApi = new WebflowDesignerExtensionAPI();
+                                        const success = await designerApi.updateImageAltText(image.url, newAltText);
+                                        if (success) {
+                                          toast({
+                                            title: "Your text has been included successfully",
+                                            description: "Don't forget to publish your website to update the SEO score.",
+                                          });
+                                        }
+                                        return { success };
+                                      } catch (error) {
+                                        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                                        toast({
+                                          variant: "destructive",
+                                          title: "Apply Failed",
+                                          description: errorMessage,
+                                        });
+                                        return { success: false };
+                                      }
                                     }}
                                     onRegenerate={async (image, _index) => {
                                       const keyphrase = analysisRequestData?.keyphrase || form.getValues('keyphrase');
@@ -1715,7 +1708,7 @@ export default function Home() {
                                     }}
                                     pageId={currentPageId}
                                     checkTitle="Image Alt Attributes"
-                                    disabled={mutation.isPending}
+                                    disabled={imageAltGeneratingAll || mutation.isPending}
                                   />
                                 ) : (
                                   <motion.div

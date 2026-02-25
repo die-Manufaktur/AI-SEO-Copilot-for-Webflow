@@ -30,6 +30,7 @@ vi.mock('../lib/webflowDesignerApi', () => ({
   WebflowDesignerExtensionAPI: vi.fn().mockImplementation(() => ({
     findAllH2Elements: vi.fn().mockResolvedValue([]),
     updateH2Element: vi.fn().mockResolvedValue({ success: true }),
+    updateImageAltText: vi.fn().mockResolvedValue(true),
   })),
 }));
 
@@ -893,6 +894,127 @@ describe('Home Component - Generate/Regenerate wiring', () => {
 
     expect(generateRecommendation).toBeDefined();
     expect(screen.getByText('Image Alt Attributes')).toBeInTheDocument();
+  });
+
+  // --- Test 5b: Generate All Image Alt button shows loading state ---
+  it('Generate All Image Alt button is disabled and shows spinner while generating', async () => {
+    const analysis = {
+      checks: [
+        {
+          title: 'Image Alt Attributes',
+          passed: false,
+          priority: 'medium' as const,
+          description: '2 images missing alt text',
+          imageData: [
+            { url: 'https://example.com/photo1.jpg', name: 'photo1.jpg', shortName: 'photo1', alt: '' },
+          ],
+        },
+      ],
+      passedChecks: 0,
+      failedChecks: 1,
+      score: 0,
+      url: 'https://example.com/test-page',
+      keyphrase: 'test keyphrase',
+      totalChecks: 1,
+      isHomePage: false,
+      timestamp: new Date().toISOString(),
+    };
+
+    let resolveGeneration!: () => void;
+    const { generateRecommendation } = await renderAndAnalyzeGen(analysis);
+    generateRecommendation.mockImplementation(
+      () => new Promise<string>(resolve => { resolveGeneration = () => resolve('Generated alt text'); })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Images and Assets')).toBeInTheDocument();
+    }, { timeout: 3000 });
+    fireEvent.click(screen.getByText('Images and Assets'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Image Alt Attributes')).toBeInTheDocument();
+    }, { timeout: 3000 });
+
+    const generateAllBtn = screen.getByRole('button', { name: /generate all/i });
+    expect(generateAllBtn).not.toBeDisabled();
+
+    // fireEvent.click fires synchronously; the handler runs to its first await,
+    // calling setImageAltGeneratingAll(true) before suspending.
+    fireEvent.click(generateAllBtn);
+
+    // generateRecommendation being called proves the handler fired past the
+    // early-return guard and reached the Promise.allSettled call.
+    await waitFor(() => {
+      expect(generateRecommendation).toHaveBeenCalled();
+    }, { timeout: 2000 });
+
+    // Button must be disabled while the batch is in-flight
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /generate all/i })).toBeDisabled();
+    }, { timeout: 2000 });
+
+    // Resolve generation and verify button re-enables
+    resolveGeneration();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /generate all/i })).not.toBeDisabled();
+    }, { timeout: 3000 });
+  });
+
+  // --- Test 5c: ImageAltTextList onApply calls updateImageAltText ---
+  it('ImageAltTextList onApply calls updateImageAltText with image URL and alt text', async () => {
+    // vi.restoreAllMocks() in the global afterEach clears the mockImplementation on the
+    // WebflowDesignerExtensionAPI spy, so we must re-establish it for this test.
+    const { WebflowDesignerExtensionAPI } = await import('../lib/webflowDesignerApi');
+    const updateImageAltText = vi.fn().mockResolvedValue(true);
+    vi.mocked(WebflowDesignerExtensionAPI).mockImplementation(() => ({
+      findAllH2Elements: vi.fn().mockResolvedValue([]),
+      updateH2Element: vi.fn().mockResolvedValue(true),
+      updateImageAltText,
+    } as any));
+
+    const analysis = {
+      checks: [
+        {
+          title: 'Image Alt Attributes',
+          passed: false,
+          priority: 'medium' as const,
+          description: '1 image is missing alt text',
+          recommendation: 'Add alt text',
+          imageData: [
+            { url: 'https://example.com/photo1.jpg', name: 'photo1.jpg', shortName: 'photo1', alt: 'A beautiful photo' },
+          ],
+        },
+      ],
+      passedChecks: 0,
+      failedChecks: 1,
+      score: 0,
+      url: 'https://example.com/test-page',
+      keyphrase: 'test keyphrase',
+      totalChecks: 1,
+      isHomePage: false,
+      timestamp: new Date().toISOString(),
+    };
+
+    const { user } = await renderAndAnalyzeGen(analysis);
+
+    await waitFor(() => {
+      expect(screen.getByText('Images and Assets')).toBeInTheDocument();
+    }, { timeout: 3000 });
+    fireEvent.click(screen.getByText('Images and Assets'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /apply alt text for photo1\.jpg/i })).toBeInTheDocument();
+    }, { timeout: 3000 });
+
+    const applyBtn = screen.getByRole('button', { name: /apply alt text for photo1\.jpg/i });
+    await act(async () => { await user.click(applyBtn); });
+
+    await waitFor(() => {
+      expect(updateImageAltText).toHaveBeenCalledWith(
+        'https://example.com/photo1.jpg',
+        'A beautiful photo',
+      );
+    }, { timeout: 3000 });
   });
 
   // --- Test 6: Error handling during regeneration ---
