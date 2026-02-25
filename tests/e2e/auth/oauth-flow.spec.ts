@@ -13,7 +13,7 @@ test.describe('OAuth Authentication Flow', () => {
 
   test('should display login button when not authenticated', async ({ page }) => {
     // Wait for the extension to load
-    await page.waitForSelector('[data-testid="seo-extension"]', { timeout: 10000 });
+    await page.waitForSelector('[data-testid="webflow-app-wrapper"]', { timeout: 10000 });
     
     // Should show login button for unauthenticated state
     const loginButton = page.locator('[data-testid="login-button"]');

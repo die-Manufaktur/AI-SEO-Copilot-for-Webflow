@@ -1,14 +1,12 @@
 # Dependencies
 node_modules/
 .pnpm-store/
-pnpm-lock.yaml
 
 # Production & Build
 /public
 /dist
 /build
 .cache/
-.wrangler/
 .output/
 bundle.zip
 
@@ -19,15 +17,19 @@ bundle.zip
 .dev.vars*
 .prod.vars
 *.local
-.wrangler/
+.env.*.local
+.mcp.json
 kill-dev-servers.bat
 
 # Claude Code
 CLAUDE.local.md
+.claude/
+.claude/settings.local.json
 .claude/agents/*
 .claude/hooks/
 .claude/utils/
 .serena/
+tmpclaude-*
 
 # IDE & Editor
 .vscode/*
@@ -42,6 +44,7 @@ CLAUDE.local.md
 *.sln
 *.sw?
 .github/instructions/aiseocopilot.instructions.md
+.github/instructions.md
 
 # Logs & Debug
 logs
@@ -59,6 +62,14 @@ coverage/
 *.lcov
 coverage-final.json
 clover.xml
+test-output*
+test-results*
+complete-test-output.txt
+test_reports/
+playwright-report/
+
+# Debug files
+client/debug-badge.jsx
 
 # OS Generated
 .DS_Store
@@ -70,6 +81,7 @@ ehthumbs.db
 Thumbs.db
 
 # Cloudflare Workers
+.wrangler/
 .dev.vars
 .env.production
 .env.development
@@ -85,8 +97,6 @@ workers-site/
 *.temp
 .tmp/
 temp/
-.wrangler/tmp/
-.wrangler/state/
 
 # Additional IDE
 .history/
@@ -100,11 +110,7 @@ temp/
 stats.html
 .turbo
 dist-ssr
-*.local
-.env.*.local
 
 # Cloudflare specific
 .mf/
 .miniflare/
-
-.github/instructions.md

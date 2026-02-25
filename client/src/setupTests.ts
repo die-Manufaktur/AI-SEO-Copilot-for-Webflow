@@ -35,9 +35,7 @@ vi.mock('framer-motion', () => {
         });
       }
     }),
-    AnimatePresence: vi.fn().mockImplementation(({ children, mode, ...props }) => {
-      return React.createElement(React.Fragment, null, children);
-    }),
+    AnimatePresence: ({ children }: any) => React.createElement(React.Fragment, null, children),
     useAnimation: vi.fn(() => ({
       start: vi.fn().mockResolvedValue(undefined),
       stop: vi.fn(),
@@ -324,21 +322,6 @@ class MockMutationObserver {
 }
 
 global.MutationObserver = MockMutationObserver as any;
-
-// Mock matchMedia for responsive testing
-Object.defineProperty(window, 'matchMedia', {
-  writable: true,
-  value: vi.fn().mockImplementation((query) => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: vi.fn(), // deprecated
-    removeListener: vi.fn(), // deprecated
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    dispatchEvent: vi.fn(),
-  })),
-});
 
 // Mock scrollTo
 window.scrollTo = vi.fn();

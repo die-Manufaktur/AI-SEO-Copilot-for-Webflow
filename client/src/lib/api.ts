@@ -1,4 +1,4 @@
-import type { SEOAnalysisResult, WebflowPageData, AnalyzeSEORequest, Asset } from "../../../shared/types";
+import type { SEOAnalysisResult, WebflowPageData, AnalyzeSEORequest, Asset, GenerateRecommendationRequest } from "../../../shared/types";
 import { createLogger } from '../lib/utils';
 import { formatBytes } from '../../../shared/utils/formatUtils';
 
@@ -153,6 +153,22 @@ export async function analyzeSEO({
       ? new Error(`SEO Analysis failed: ${error.message}`)
       : new Error("An unknown error occurred during SEO analysis.");
   }
+}
+
+export async function generateRecommendation(
+  request: GenerateRecommendationRequest
+): Promise<string> {
+  const apiBaseUrl = getApiUrl();
+  logger.info("[Generate Recommendation] Starting with API endpoint:", apiBaseUrl);
+  const response = await fetch(`${apiBaseUrl}/api/generate-recommendation`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(request),
+  });
+  if (!response.ok) throw new Error(`API returned status ${response.status}`);
+  const data = await response.json();
+  return data.recommendation;
 }
 
 export async function fetchOAuthToken(authCode: string): Promise<string> {

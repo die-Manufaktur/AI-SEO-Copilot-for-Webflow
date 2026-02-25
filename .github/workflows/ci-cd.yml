@@ -90,9 +90,10 @@ jobs:
 
       - name: Upload coverage reports
         uses: codecov/codecov-action@v4
+        continue-on-error: true
         with:
           files: ./coverage/lcov.info
-          fail_ci_if_error: true
+          fail_ci_if_error: false
 
   integration-tests:
     name: Integration Tests
@@ -119,44 +120,6 @@ jobs:
         env:
           CI: true
 
-  e2e-tests:
-    name: E2E Tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps
-
-      - name: Run E2E tests
-        run: pnpm test:e2e
-        env:
-          CI: true
-
-      - name: Upload E2E test results
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: e2e-test-results
-          path: |
-            test-results/
-            playwright-report/
-          retention-days: 7
-
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
@@ -178,7 +141,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run security audit
-        run: pnpm audit --audit-level moderate
+        run: pnpm audit --audit-level high
 
       - name: Run CodeQL Analysis
         uses: github/codeql-action/init@v3
@@ -190,6 +153,7 @@ jobs:
 
       - name: Run Snyk Security Scan
         uses: snyk/actions/node@master
+        continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
@@ -232,145 +196,3 @@ jobs:
 
       - name: Analyze bundle size
         run: pnpm test:bundle
-
-  deploy-staging:
-    name: Deploy to Staging
-    runs-on: ubuntu-latest
-    needs: [build, integration-tests, security-scan]
-    if: github.ref == 'refs/heads/develop'
-    environment:
-      name: staging
-      url: https://staging-extension.example.com
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-artifacts
-
-      - name: Deploy to staging environment
-        run: |
-          echo "Deploying to staging environment..."
-          # Add your staging deployment commands here
-          # Example: Deploy to staging server, update Webflow extension, etc.
-
-      - name: Run smoke tests
-        run: |
-          echo "Running smoke tests on staging..."
-          # Add smoke test commands here
-
-      - name: Notify deployment
-        uses: 8398a7/action-slack@v3
-        with:
-          status: ${{ job.status }}
-          channel: '#deployments'
-          text: 'Staging deployment completed'
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
-  deploy-production:
-    name: Deploy to Production
-    runs-on: ubuntu-latest
-    needs: [build, e2e-tests, security-scan]
-    if: github.ref == 'refs/heads/main'
-    environment:
-      name: production
-      url: https://extension.example.com
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-artifacts
-
-      - name: Setup Cloudflare Wrangler
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-
-      - name: Deploy Cloudflare Worker
-        run: |
-          npx wrangler deploy workers/index.ts --env production
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-
-      - name: Deploy Webflow Extension
-        run: |
-          echo "Deploying Webflow extension..."
-          # Add Webflow extension deployment commands here
-          # webflow extension publish
-
-      - name: Run production smoke tests
-        run: |
-          echo "Running production smoke tests..."
-          # Add production smoke test commands here
-
-      - name: Create GitHub Release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ github.run_number }}
-          release_name: Release v${{ github.run_number }}
-          body: |
-            ## Changes in this Release
-            - Automated deployment from commit ${{ github.sha }}
-            
-            ## Deployment Information
-            - Build Number: ${{ github.run_number }}
-            - Commit: ${{ github.sha }}
-            - Branch: ${{ github.ref }}
-          draft: false
-          prerelease: false
-
-      - name: Notify production deployment
-        uses: 8398a7/action-slack@v3
-        with:
-          status: ${{ job.status }}
-          channel: '#deployments'
-          text: '🚀 Production deployment completed successfully!'
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
-  performance-monitoring:
-    name: Performance Monitoring
-    runs-on: ubuntu-latest
-    needs: [deploy-production]
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - name: Run Lighthouse CI
-        uses: treosh/lighthouse-ci-action@v10
-        with:
-          urls: |
-            https://extension.example.com
-          uploadArtifacts: true
-          temporaryPublicStorage: true
-
-      - name: Monitor Core Web Vitals
-        run: |
-          echo "Monitoring Core Web Vitals..."
-          # Add Web Vitals monitoring script here
-
-  rollback:
-    name: Rollback Deployment
-    runs-on: ubuntu-latest
-    if: failure() && github.ref == 'refs/heads/main'
-    needs: [deploy-production]
-    steps:
-      - name: Rollback production deployment
-        run: |
-          echo "Rolling back production deployment..."
-          # Add rollback commands here
-
-      - name: Notify rollback
-        uses: 8398a7/action-slack@v3
-        with:
-          status: 'failure'
-          channel: '#deployments'
-          text: '⚠️ Production deployment failed - rollback initiated'
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

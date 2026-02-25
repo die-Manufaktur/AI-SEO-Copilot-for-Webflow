@@ -31,8 +31,8 @@ describe('LanguageSelector', () => {
     );
 
     expect(screen.getByText('Language')).toBeInTheDocument();
-    expect(screen.getByText(defaultLanguage.nativeName)).toBeInTheDocument();
-    expect(screen.getByText(defaultLanguage.code)).toBeInTheDocument();
+    // The component displays "EN - English (default)" so we need to match the pattern
+    expect(screen.getByText(/EN.*English/i)).toBeInTheDocument();
   });
 
   it('renders with custom label', () => {
@@ -57,8 +57,8 @@ describe('LanguageSelector', () => {
       />
     );
 
-    expect(screen.getByText(germanLanguage.nativeName)).toBeInTheDocument();
-    expect(screen.getByText(germanLanguage.code)).toBeInTheDocument();
+    // The component displays "DE - Deutsch" so we need to match the pattern
+    expect(screen.getByText(/DE.*Deutsch/i)).toBeInTheDocument();
   });
 
   it('can be disabled', () => {
@@ -101,7 +101,7 @@ describe('LanguageSelector', () => {
 
     // Test that the component renders without throwing
     expect(screen.getByText('Language')).toBeInTheDocument();
-    expect(screen.getByText('English')).toBeInTheDocument();
+    expect(screen.getByText(/EN.*English/i)).toBeInTheDocument();
   });
 
   it('falls back to default language for invalid selection', async () => {
@@ -114,10 +114,10 @@ describe('LanguageSelector', () => {
 
     // Simulate selecting an invalid language code (this shouldn't normally happen)
     const handleValueChange = (mockOnLanguageChange as any).mock.calls[0]?.[0];
-    
+
     // We'll test this by directly calling the internal handler with invalid code
     // Since the component is well-designed, it should handle this gracefully
-    expect(screen.getByText(defaultLanguage.nativeName)).toBeInTheDocument();
+    expect(screen.getByText(/EN.*English/i)).toBeInTheDocument();
   });
 
   it('renders all supported languages in dropdown', async () => {
@@ -154,7 +154,7 @@ describe('LanguageSelector', () => {
     expect(japaneseLanguage?.nativeName).not.toBe(japaneseLanguage?.name);
   });
 
-  it('shows (default) indicator for detected site language', () => {
+  it('calls detectSiteLanguage to determine site language', () => {
     // Mock French as the detected site language
     vi.mocked(detectSiteLanguage).mockReturnValue('fr');
 
@@ -165,15 +165,10 @@ describe('LanguageSelector', () => {
       />
     );
 
-    // The component should call detectSiteLanguage and show (default) for French
     expect(detectSiteLanguage).toHaveBeenCalled();
-    
-    // Note: In a real test environment, we would need to interact with the dropdown
-    // to see the options. Here we're testing that the function is called correctly.
-    // The visual test would require more complex interaction with Radix UI components.
   });
 
-  it('shows (default) indicator for different detected languages', () => {
+  it('calls detectSiteLanguage for different site languages', () => {
     // Mock German as the detected site language
     vi.mocked(detectSiteLanguage).mockReturnValue('de');
 

@@ -1,14 +1,13 @@
 /**
- * TDD Tests for H2SelectionList Component
- * RED Phase: These tests should FAIL initially until implementation is complete
+ * Tests for H2SelectionList — per-H2 AI suggestions with regenerate functionality
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { H2SelectionList } from './H2SelectionList';
 import type { H2ElementInfo } from '../../lib/webflowDesignerApi';
-import type { WebflowInsertionRequest, WebflowInsertionResult } from '../../types/webflow-data-api';
+import type { WebflowInsertionResult } from '../../types/webflow-data-api';
 
 // Mock the useAppliedRecommendations hook
 vi.mock('../../hooks/useAppliedRecommendations', () => ({
@@ -18,363 +17,265 @@ vi.mock('../../hooks/useAppliedRecommendations', () => ({
   })),
 }));
 
-// Mock H2 elements data
+// Mock the api module so tests don't make real HTTP calls
+vi.mock('../../lib/api', () => ({
+  generateRecommendation: vi.fn(),
+}));
+
 const mockH2Elements: H2ElementInfo[] = [
-  {
-    element: {} as any, // Mock WebflowElement
-    id: 'h2_1',
-    text: 'Current H2 Title One',
-    index: 0,
-  },
-  {
-    element: {} as any, // Mock WebflowElement
-    id: 'h2_2', 
-    text: 'Current H2 Title Two',
-    index: 1,
-  },
-  {
-    element: {} as any, // Mock WebflowElement
-    id: 'h2_3',
-    text: 'Current H2 Title Three',
-    index: 2,
-  },
+  { element: {} as any, id: 'h2_1', text: 'Discover Our Real Results', index: 0 },
+  { element: {} as any, id: 'h2_2', text: 'Why Choose Our Platform', index: 1 },
+  { element: {} as any, id: 'h2_3', text: 'How It Works', index: 2 },
 ];
 
-const mockRecommendation = 'Optimized H2 Heading for SEO';
+const mockH2Recommendations = [
+  { h2Index: 0, h2Text: 'Discover Our Real Results', suggestion: 'Real Results with Test Keyword' },
+  { h2Index: 1, h2Text: 'Why Choose Our Platform', suggestion: 'Why Test Keyword Users Choose Us' },
+  { h2Index: 2, h2Text: 'How It Works', suggestion: 'How Test Keyword Works for You' },
+];
 
 const mockInsertionResult: WebflowInsertionResult = {
   success: true,
-  data: {
-    _id: 'h2_1',
-    content: mockRecommendation,
-    lastUpdated: new Date().toISOString(),
-  },
+  data: { _id: 'h2_1', content: 'Applied text', lastUpdated: new Date().toISOString() },
+};
+
+const defaultProps = {
+  h2Elements: mockH2Elements,
+  h2Recommendations: mockH2Recommendations,
+  keyphrase: 'test keyword',
+  onApply: vi.fn(),
 };
 
 describe('H2SelectionList', () => {
-  const mockOnApply = vi.fn();
-  const mockOnError = vi.fn();
-
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    // Re-establish default mock implementation after clearAllMocks
+    const { generateRecommendation } = await import('../../lib/api');
+    vi.mocked(generateRecommendation).mockResolvedValue('Freshly Generated Suggestion');
   });
 
-  describe('Basic Rendering', () => {
-    it('should render all H2 elements with their current text', () => {
-      render(
-        <H2SelectionList
-          h2Elements={mockH2Elements}
-          recommendation={mockRecommendation}
-          onApply={mockOnApply}
-        />
-      );
-
-      // Should show all H2 elements
-      expect(screen.getByText(/Current H2 Title One/)).toBeInTheDocument();
-      expect(screen.getByText(/Current H2 Title Two/)).toBeInTheDocument();
-      expect(screen.getByText(/Current H2 Title Three/)).toBeInTheDocument();
+  describe('Rendering with per-H2 suggestions', () => {
+    it('shows the AI suggestion as the prominent text for each H2 card', () => {
+      render(<H2SelectionList {...defaultProps} />);
+      expect(screen.getByText('Real Results with Test Keyword')).toBeInTheDocument();
+      expect(screen.getByText('Why Test Keyword Users Choose Us')).toBeInTheDocument();
+      expect(screen.getByText('How Test Keyword Works for You')).toBeInTheDocument();
     });
 
-    it('should render Apply button for each H2 element', () => {
-      render(
-        <H2SelectionList
-          h2Elements={mockH2Elements}
-          recommendation={mockRecommendation}
-          onApply={mockOnApply}
-        />
-      );
-
-      const applyButtons = screen.getAllByRole('button', { name: /apply/i });
-      expect(applyButtons).toHaveLength(3);
-      
-      // All buttons should be enabled initially
-      applyButtons.forEach(button => {
-        expect(button).not.toBeDisabled();
-      });
+    it('shows the current H2 text as secondary reference', () => {
+      render(<H2SelectionList {...defaultProps} />);
+      expect(screen.getByText('Discover Our Real Results')).toBeInTheDocument();
+      expect(screen.getByText('Why Choose Our Platform')).toBeInTheDocument();
     });
 
-    it('should display the AI recommendation text', () => {
-      render(
-        <H2SelectionList
-          h2Elements={mockH2Elements}
-          recommendation={mockRecommendation}
-          onApply={mockOnApply}
-        />
-      );
-
-      expect(screen.getByText(mockRecommendation)).toBeInTheDocument();
+    it('shows H2 #N label for each card', () => {
+      render(<H2SelectionList {...defaultProps} />);
+      expect(screen.getByText('H2 #1')).toBeInTheDocument();
+      expect(screen.getByText('H2 #2')).toBeInTheDocument();
+      expect(screen.getByText('H2 #3')).toBeInTheDocument();
     });
 
-    it('should handle empty H2 elements list', () => {
-      render(
-        <H2SelectionList
-          h2Elements={[]}
-          recommendation={mockRecommendation}
-          onApply={mockOnApply}
-        />
-      );
+    it('renders "Generate All" button', () => {
+      render(<H2SelectionList {...defaultProps} />);
+      expect(screen.getByRole('button', { name: /generate all/i })).toBeInTheDocument();
+    });
 
+    it('shows empty state when no valid H2 elements', () => {
+      render(<H2SelectionList {...defaultProps} h2Elements={[]} />);
       expect(screen.getByText(/no valid h2 elements found/i)).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: /apply/i })).not.toBeInTheDocument();
     });
 
-    it('should filter out invalid H2 elements (empty text, missing id)', () => {
-      const invalidH2Elements = [
-        { id: 'h2-1', text: 'Valid H2', index: 0 }, // Valid
-        { id: '', text: 'Missing ID', index: 1 }, // Invalid - missing id
-        { id: 'h2-3', text: '', index: 2 }, // Invalid - empty text
-        { id: 'h2-4', text: '   ', index: 3 }, // Invalid - whitespace only
-        null as any, // Invalid - null element
-        { id: 'h2-6', text: 'Another Valid H2', index: 5 } // Valid
-      ];
-
-      render(
-        <H2SelectionList
-          h2Elements={invalidH2Elements}
-          recommendation={mockRecommendation}
-          onApply={mockOnApply}
-        />
-      );
-
-      // Should only show the 2 valid H2 elements
-      expect(screen.getByText('Valid H2')).toBeInTheDocument();
-      expect(screen.getByText('Another Valid H2')).toBeInTheDocument();
-      
-      // Should not show invalid elements
-      expect(screen.queryByText('Missing ID')).not.toBeInTheDocument();
-      
-      // Should show 2 apply buttons (one for each valid element)
-      const applyButtons = screen.getAllByRole('button', { name: /apply/i });
-      expect(applyButtons).toHaveLength(2);
+    it('falls back gracefully when no h2Recommendations provided', () => {
+      render(<H2SelectionList {...defaultProps} h2Recommendations={undefined} />);
+      // Should still render h2 cards (no crash), just no suggestion text
+      expect(screen.getByText('H2 #1')).toBeInTheDocument();
     });
   });
 
-  describe('Apply Functionality', () => {
-    it('should call onApply with correct H2ElementInfo when Apply button is clicked', async () => {
+  describe('Apply functionality', () => {
+    it('calls onApply with the per-H2 suggestion (not a shared recommendation)', async () => {
       const user = userEvent.setup();
-      mockOnApply.mockResolvedValue(mockInsertionResult);
+      const mockOnApply = vi.fn().mockResolvedValue(mockInsertionResult);
 
-      render(
-        <H2SelectionList
-          h2Elements={mockH2Elements}
-          recommendation={mockRecommendation}
-          onApply={mockOnApply}
-        />
-      );
+      render(<H2SelectionList {...defaultProps} onApply={mockOnApply} />);
 
-      const firstApplyButton = screen.getAllByRole('button', { name: /apply/i })[0];
-      await user.click(firstApplyButton);
+      const applyButtons = screen.getAllByRole('button', { name: /apply to h2/i });
+      await user.click(applyButtons[0]);
 
       expect(mockOnApply).toHaveBeenCalledWith({
         h2Element: mockH2Elements[0],
-        recommendation: mockRecommendation,
+        recommendation: 'Real Results with Test Keyword', // per-H2 suggestion, not shared
       });
     });
 
-    it('should disable all Apply buttons after one is successfully applied', async () => {
+    it('calls onApply with the second H2s suggestion when second apply is clicked', async () => {
       const user = userEvent.setup();
-      mockOnApply.mockResolvedValue(mockInsertionResult);
+      const mockOnApply = vi.fn().mockResolvedValue(mockInsertionResult);
 
-      render(
-        <H2SelectionList
-          h2Elements={mockH2Elements}
-          recommendation={mockRecommendation}
-          onApply={mockOnApply}
-        />
-      );
+      render(<H2SelectionList {...defaultProps} onApply={mockOnApply} />);
 
-      const applyButtons = screen.getAllByRole('button', { name: /apply/i });
-      const firstApplyButton = applyButtons[0];
+      const applyButtons = screen.getAllByRole('button', { name: /apply to h2/i });
+      await user.click(applyButtons[1]);
 
-      await user.click(firstApplyButton);
-      await waitFor(() => expect(mockOnApply).toHaveBeenCalled());
-
-      // All buttons should now be disabled
-      applyButtons.forEach(button => {
-        expect(button).toBeDisabled();
+      expect(mockOnApply).toHaveBeenCalledWith({
+        h2Element: mockH2Elements[1],
+        recommendation: 'Why Test Keyword Users Choose Us',
       });
     });
 
-    it('should show visual feedback for the applied H2 element', async () => {
+    it('shows "Applied" badge and disables all buttons after successful apply', async () => {
       const user = userEvent.setup();
-      mockOnApply.mockResolvedValue(mockInsertionResult);
+      const mockOnApply = vi.fn().mockResolvedValue(mockInsertionResult);
 
-      render(
-        <H2SelectionList
-          h2Elements={mockH2Elements}
-          recommendation={mockRecommendation}
-          onApply={mockOnApply}
-        />
-      );
+      render(<H2SelectionList {...defaultProps} onApply={mockOnApply} />);
 
-      const firstApplyButton = screen.getAllByRole('button', { name: /apply/i })[0];
-      await user.click(firstApplyButton);
-      await waitFor(() => expect(mockOnApply).toHaveBeenCalled());
-
-      // Should show Applied state in both badge and button
-      expect(screen.getAllByText('Applied')).toHaveLength(2); // Badge + Button
-      
-      // Applied H2 should have different styling
-      const appliedElement = screen.getByText(/Current H2 Title One/).closest('.applied');
-      expect(appliedElement).toBeInTheDocument();
-      expect(appliedElement).toHaveClass('applied');
-    });
-
-    it('should show loading state during apply operation', async () => {
-      const user = userEvent.setup();
-      let resolveApply: (value: WebflowInsertionResult) => void;
-      const applyPromise = new Promise<WebflowInsertionResult>((resolve) => {
-        resolveApply = resolve;
-      });
-      mockOnApply.mockReturnValue(applyPromise);
-
-      render(
-        <H2SelectionList
-          h2Elements={mockH2Elements}
-          recommendation={mockRecommendation}
-          onApply={mockOnApply}
-        />
-      );
-
-      const firstApplyButton = screen.getAllByRole('button', { name: /apply/i })[0];
-      await user.click(firstApplyButton);
-
-      // Should show loading state
-      expect(screen.getByText('Applying...')).toBeInTheDocument();
-      expect(firstApplyButton).toBeDisabled();
-
-      // Resolve the promise
-      resolveApply!(mockInsertionResult);
-      await waitFor(() => expect(screen.getByText('Applied')).toBeInTheDocument());
-    });
-  });
-
-  describe('Error Handling', () => {
-    it('should handle apply errors gracefully', async () => {
-      const user = userEvent.setup();
-      const errorMessage = 'Failed to apply H2 heading';
-      mockOnApply.mockRejectedValue(new Error(errorMessage));
-
-      render(
-        <H2SelectionList
-          h2Elements={mockH2Elements}
-          recommendation={mockRecommendation}
-          onApply={mockOnApply}
-          onError={mockOnError}
-        />
-      );
-
-      const firstApplyButton = screen.getAllByRole('button', { name: /apply/i })[0];
-      await user.click(firstApplyButton);
+      const applyButtons = screen.getAllByRole('button', { name: /apply to h2/i });
+      await user.click(applyButtons[0]);
 
       await waitFor(() => {
-        expect(mockOnError).toHaveBeenCalledWith(expect.any(Error));
-      });
-
-      // Button should show error state
-      expect(screen.getByText('Error')).toBeInTheDocument();
-      
-      // Other buttons should remain enabled
-      const applyButtons = screen.getAllByRole('button', { name: /apply/i });
-      const otherButtons = applyButtons.slice(1);
-      otherButtons.forEach(button => {
-        expect(button).not.toBeDisabled();
+        expect(screen.getByText('Applied')).toBeInTheDocument();
       });
     });
+  });
 
-    it('should display error message when provided', async () => {
+  describe('Per-item regeneration', () => {
+    it('calls generateRecommendation with individual H2 text when per-item regenerate clicked', async () => {
+      const { generateRecommendation } = await import('../../lib/api');
       const user = userEvent.setup();
-      const errorMessage = 'Network connection failed';
-      mockOnApply.mockRejectedValue(new Error(errorMessage));
 
-      render(
-        <H2SelectionList
-          h2Elements={mockH2Elements}
-          recommendation={mockRecommendation}
-          onApply={mockOnApply}
-        />
-      );
+      render(<H2SelectionList {...defaultProps} />);
 
-      const firstApplyButton = screen.getAllByRole('button', { name: /apply/i })[0];
-      await user.click(firstApplyButton);
+      const regenerateButtons = screen.getAllByRole('button', { name: /generate new suggestion/i });
+      await user.click(regenerateButtons[0]); // First H2's regenerate button
 
       await waitFor(() => {
-        expect(screen.getByText(errorMessage)).toBeInTheDocument();
+        expect(generateRecommendation).toHaveBeenCalledWith({
+          checkType: 'Keyphrase in H2 Headings',
+          keyphrase: 'test keyword',
+          context: 'Discover Our Real Results', // individual H2 text
+          advancedOptions: undefined,
+        });
+      });
+    });
+
+    it('updates the suggestion for that card after regeneration', async () => {
+      const user = userEvent.setup();
+
+      render(<H2SelectionList {...defaultProps} />);
+
+      // Initially shows initial suggestion
+      expect(screen.getByText('Real Results with Test Keyword')).toBeInTheDocument();
+
+      const regenerateButtons = screen.getAllByRole('button', { name: /generate new suggestion/i });
+      await user.click(regenerateButtons[0]);
+
+      // After regeneration, shows the new suggestion from mock
+      await waitFor(() => {
+        expect(screen.getByText('Freshly Generated Suggestion')).toBeInTheDocument();
+      });
+    });
+
+    it('only regenerates the clicked H2, leaving others unchanged', async () => {
+      const user = userEvent.setup();
+
+      render(<H2SelectionList {...defaultProps} />);
+
+      const regenerateButtons = screen.getAllByRole('button', { name: /generate new suggestion/i });
+      await user.click(regenerateButtons[0]); // Only regenerate first H2
+
+      await waitFor(() => {
+        expect(screen.getByText('Freshly Generated Suggestion')).toBeInTheDocument();
+      });
+
+      // Second and third H2 suggestions unchanged
+      expect(screen.getByText('Why Test Keyword Users Choose Us')).toBeInTheDocument();
+      expect(screen.getByText('How Test Keyword Works for You')).toBeInTheDocument();
+    });
+
+    it('disables per-item regenerate button while regenerating', async () => {
+      const { generateRecommendation } = await import('../../lib/api');
+      // Delay the mock to simulate loading
+      vi.mocked(generateRecommendation).mockImplementation(
+        () => new Promise(resolve => setTimeout(() => resolve('New suggestion'), 100))
+      );
+      const user = userEvent.setup();
+
+      render(<H2SelectionList {...defaultProps} />);
+
+      const regenerateButtons = screen.getAllByRole('button', { name: /generate new suggestion/i });
+      await user.click(regenerateButtons[0]);
+
+      // During loading, all regenerate/apply buttons should be in loading/disabled state
+      await waitFor(() => {
+        expect(regenerateButtons[0]).toBeDisabled();
       });
     });
   });
 
-  describe('Disabled State', () => {
-    it('should disable all buttons when disabled prop is true', () => {
-      render(
-        <H2SelectionList
-          h2Elements={mockH2Elements}
-          recommendation={mockRecommendation}
-          onApply={mockOnApply}
-          disabled={true}
-        />
-      );
-
-      const applyButtons = screen.getAllByRole('button', { name: /apply/i });
-      applyButtons.forEach(button => {
-        expect(button).toBeDisabled();
-      });
-    });
-
-    it('should not trigger apply when disabled', async () => {
+  describe('"Generate All" button', () => {
+    it('calls generateRecommendation for every H2 when "Generate All" clicked', async () => {
+      const { generateRecommendation } = await import('../../lib/api');
       const user = userEvent.setup();
 
-      render(
-        <H2SelectionList
-          h2Elements={mockH2Elements}
-          recommendation={mockRecommendation}
-          onApply={mockOnApply}
-          disabled={true}
-        />
-      );
+      render(<H2SelectionList {...defaultProps} />);
 
-      const firstApplyButton = screen.getAllByRole('button', { name: /apply/i })[0];
-      await user.click(firstApplyButton);
+      const generateAllButton = screen.getByRole('button', { name: /generate all/i });
+      await user.click(generateAllButton);
 
-      expect(mockOnApply).not.toHaveBeenCalled();
+      await waitFor(() => {
+        expect(generateRecommendation).toHaveBeenCalledTimes(3);
+      });
+
+      expect(generateRecommendation).toHaveBeenCalledWith(expect.objectContaining({
+        context: 'Discover Our Real Results',
+      }));
+      expect(generateRecommendation).toHaveBeenCalledWith(expect.objectContaining({
+        context: 'Why Choose Our Platform',
+      }));
+      expect(generateRecommendation).toHaveBeenCalledWith(expect.objectContaining({
+        context: 'How It Works',
+      }));
+    });
+
+    it('updates all suggestions after "Generate All" completes', async () => {
+      const { generateRecommendation } = await import('../../lib/api');
+      vi.mocked(generateRecommendation).mockResolvedValue('Freshly Generated Suggestion');
+      const user = userEvent.setup();
+
+      render(<H2SelectionList {...defaultProps} />);
+
+      const generateAllButton = screen.getByRole('button', { name: /generate all/i });
+      await user.click(generateAllButton);
+
+      await waitFor(() => {
+        const allSuggestions = screen.getAllByText('Freshly Generated Suggestion');
+        expect(allSuggestions).toHaveLength(3);
+      });
     });
   });
 
-  describe('Accessibility', () => {
-    it('should have proper ARIA labels', () => {
-      render(
-        <H2SelectionList
-          h2Elements={mockH2Elements}
-          recommendation={mockRecommendation}
-          onApply={mockOnApply}
-        />
-      );
-
-      const applyButtons = screen.getAllByRole('button', { name: /apply/i });
-      applyButtons.forEach((button, index) => {
-        expect(button).toHaveAttribute('aria-label', expect.stringContaining(`Apply to H2 ${index + 1}`));
-      });
+  describe('Disabled state', () => {
+    it('disables all buttons when disabled prop is true', () => {
+      render(<H2SelectionList {...defaultProps} disabled={true} />);
+      const buttons = screen.getAllByRole('button');
+      buttons.forEach(btn => expect(btn).toBeDisabled());
     });
+  });
 
-    it('should support keyboard navigation', async () => {
+  describe('Error handling', () => {
+    it('calls onError when apply fails', async () => {
       const user = userEvent.setup();
-      mockOnApply.mockResolvedValue(mockInsertionResult);
+      const mockOnApply = vi.fn().mockRejectedValue(new Error('Apply failed'));
+      const mockOnError = vi.fn();
 
-      render(
-        <H2SelectionList
-          h2Elements={mockH2Elements}
-          recommendation={mockRecommendation}
-          onApply={mockOnApply}
-        />
-      );
+      render(<H2SelectionList {...defaultProps} onApply={mockOnApply} onError={mockOnError} />);
 
-      const firstApplyButton = screen.getAllByRole('button', { name: /apply/i })[0];
-      firstApplyButton.focus();
-      
-      expect(firstApplyButton).toHaveFocus();
-      
-      await user.keyboard('{Enter}');
-      expect(mockOnApply).toHaveBeenCalled();
+      const applyButtons = screen.getAllByRole('button', { name: /apply to h2/i });
+      await user.click(applyButtons[0]);
+
+      await waitFor(() => {
+        expect(mockOnError).toHaveBeenCalledWith(expect.objectContaining({ message: 'Apply failed' }));
+      });
     });
   });
 });

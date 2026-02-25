@@ -432,21 +432,38 @@ export function BatchApplyButton({
   };
 
   const getButtonClass = () => {
-    let baseClass = "inline-flex items-center px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-200";
-    
+    // Pill-shaped button with gap between icon and text
+    let baseClass = "inline-flex items-center gap-2 text-sm font-medium focus:outline-none transition-colors duration-200";
+
     if (isDisabled) {
       baseClass += " opacity-50 cursor-not-allowed";
     }
-    
+
     if (hasError) {
-      return `${baseClass} bg-red-600 text-white hover:bg-red-700 focus:ring-red-500`;
+      return `${baseClass} bg-red-600 text-white hover:bg-red-700`;
     }
-    
+
     if (success) {
-      return `${baseClass} bg-green-600 text-white hover:bg-green-700 focus:ring-green-500`;
+      return `${baseClass} bg-green-600 text-white hover:bg-green-700`;
     }
-    
-    return `${baseClass} bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500`;
+
+    // Default state: pill button with BG 300 color, 27px radius, 8px vertical / 16px horizontal padding
+    return baseClass;
+  };
+
+  const getButtonStyle = () => {
+    if (hasError || success) {
+      // Error and success states use Tailwind classes
+      return {};
+    }
+    // Default state: pill button with gradient border
+    return {
+      background: 'linear-gradient(#787878, #787878) padding-box, linear-gradient(135deg, rgba(255, 255, 255, 0.40) 0%, rgba(255, 255, 255, 0.00) 100%) border-box',
+      border: '1px solid transparent',
+      borderRadius: '1.6875rem',
+      padding: '8px 16px',
+      color: 'var(--color-text-primary)',
+    };
   };
 
   const getButtonContent = () => {
@@ -487,10 +504,10 @@ export function BatchApplyButton({
     
     return (
       <>
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M8 1.5L8.63857 3.22572C9.34757 5.14175 10.8582 6.65243 12.7743 7.36143L14.5 8L12.7743 8.63857C10.8582 9.34757 9.34757 10.8582 8.63857 12.7743L8 14.5L7.36143 12.7743C6.65243 10.8582 5.14175 9.34757 3.22572 8.63857L1.5 8L3.22572 7.36143C5.14175 6.65243 6.65243 5.14175 7.36143 3.22572L8 1.5Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
-        <span className="ml-2">Apply {batchRequest.operations.length} Changes</span>
+        <span>Generate All</span>
       </>
     );
   };
@@ -502,7 +519,7 @@ export function BatchApplyButton({
           onClick={handleApplyClick}
           disabled={isDisabled}
           className={getButtonClass()}
-          aria-describedby="batch-info"
+          style={getButtonStyle()}
         >
           {getButtonContent()}
         </button>
@@ -527,15 +544,6 @@ export function BatchApplyButton({
               </>
             )}
           </button>
-        )}
-      </div>
-
-      <div id="batch-info" className="text-sm text-gray-600">
-        <span>
-          {batchRequest.operations.length} operations: {affectedPages} pages, {affectedCmsItems} CMS items
-        </span>
-        {showEstimatedTime && (
-          <span className="ml-2">• Estimated time: {estimatedTime}</span>
         )}
       </div>
 

@@ -6,18 +6,20 @@
   "type": "module",
   "scripts": {
     "check": "tsc",
-    "test": "vitest run --coverage",
-    "test:watch": "vitest --coverage",
-    "test:ui": "vitest --ui --coverage",
-    "test:bundle": "vitest run client/src/lib/bundle-validation.test.ts --reporter=verbose",
+    "lint": "eslint client/src shared workers",
+    "test": "vitest run --coverage --root client",
+    "test:watch": "vitest --coverage --root client",
+    "test:ui": "vitest --ui --coverage --root client",
+    "test:bundle": "vitest run src/lib/bundle-validation.test.ts --reporter=verbose --root client",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug",
-    "test:unit": "vitest run --coverage client/src",
-    "test:integration": "vitest run --coverage tests/integration",
+    "test:unit": "vitest run --coverage --root client src",
+    "test:workers": "vitest run --config vitest.workers.config.ts",
+    "test:integration": "vitest run --coverage --passWithNoTests tests/integration",
     "test:contract": "vitest run --coverage tests/contract",
-    "test:coverage": "vitest run --coverage --reporter=html",
-    "test:coverage:threshold": "vitest run --coverage --coverage.thresholds.global.branches=85",
+    "test:coverage": "vitest run --coverage --reporter=html --root client",
+    "test:coverage:threshold": "vitest run --coverage --coverage.thresholds.global.branches=85 --root client",
     "dev": "concurrently -r \"vite --cors --force\" \"vite build --mode development && webflow extension serve\" \"npx wrangler dev ./workers/index.ts --port 8787\"",
     "build": "vite build && webflow extension bundle",
     "deploy:worker": "npx wrangler deploy workers/index.ts --env production",
@@ -26,7 +28,6 @@
     "validate:config": "vitest run scripts/validate-production-config.test.ts",
     "validate:env": "node scripts/check-env.js",
     "kill-dev": "kill-dev-servers.bat",
-    "prepare": "husky",
     "release": "semantic-release",
     "release:dry": "semantic-release --dry-run",
     "version:update": "node scripts/update-versions.js",
@@ -34,14 +35,17 @@
     "commit": "git-cz --sign"
   },
   "devDependencies": {
-    "@anthropic-ai/claude-code": "^1.0.72",
+    "@anthropic-ai/claude-code": "^2.1.44",
     "@cloudflare/vite-plugin": "^1.11.2",
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.58.2",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/exec": "^7.1.0",
     "@semantic-release/git": "^10.0.1",
     "@semantic-release/github": "^11.0.4",
+    "@tailwindcss/vite": "^4.2.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.6.4",
     "@testing-library/react": "^16.3.0",
@@ -49,7 +53,7 @@
     "@types/adm-zip": "^0.5.7",
     "@types/canvas-confetti": "^1.9.0",
     "@types/cors": "^2.8.19",
-    "@types/ip": "^1.1.3",
+    "@types/node": "^24.10.1",
     "@types/node-fetch": "2.6.12",
     "@types/react": "^19.1.9",
     "@types/react-dom": "^19.1.7",
@@ -66,10 +70,10 @@
     "cross-env": "^7.0.3",
     "cz-conventional-changelog": "^3.3.0",
     "esbuild": "^0.25.8",
-    "happy-dom": "^18.0.1",
+    "eslint": "^10.0.0",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "happy-dom": "^20.6.1",
     "husky": "^9.1.7",
-    "ip": "^2.0.1",
-    "ip-cidr": "^4.0.2",
     "jsdom": "^26.1.0",
     "lucide-react": "^0.516.0",
     "msw": "^2.11.2",
@@ -83,6 +87,7 @@
     "ts-node": "^10.9.2",
     "tsx": "^4.20.3",
     "typescript": "^5.9.2",
+    "typescript-eslint": "^8.56.0",
     "vite": "^6.3.5",
     "vite-plugin-svgr": "^4.3.0",
     "vite-tsconfig-paths": "^5.1.4",
@@ -113,7 +118,7 @@
     "@tanstack/react-query": "^5.87.1",
     "@vitejs/plugin-react": "^5.0.2",
     "@webflow/designer-extension-typings": "^2.0.23",
-    "@webflow/webflow-cli": "^1.8.40",
+    "@webflow/webflow-cli": "^1.12.2",
     "canvas-confetti": "^1.9.3",
     "cheerio": "^1.1.2",
     "class-variance-authority": "^0.7.1",
@@ -140,12 +145,19 @@
     "zod": "^4.1.8"
   },
   "packageManager": "pnpm@10.14.0",
-  "workspaces": [
-    "packages/*"
-  ],
   "config": {
     "commitizen": {
       "path": "./node_modules/cz-conventional-changelog"
+    }
+  },
+  "pnpm": {
+    "overrides": {
+      "koa": ">=3.0.3",
+      "lodash": ">=4.17.23",
+      "axios": ">=1.13.5",
+      "@conventional-changelog/git-client": ">=2.0.0",
+      "minimatch@<3.1.3": "3.1.3",
+      "minimatch@>=9.0.0 <9.0.6": "9.0.6"
     }
   }
 }

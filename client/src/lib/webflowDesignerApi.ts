@@ -32,6 +32,7 @@ interface WebflowDesignerAPI {
   updateH1Heading(pageId: string, content: string): Promise<boolean>;
   updateH2Heading(pageId: string, content: string, index?: number): Promise<boolean>;
   updateIntroductionParagraph(pageId: string, content: string): Promise<boolean>;
+  updateImageAltText(imageUrl: string, altText: string): Promise<boolean>;
   // Helper methods for element manipulation
   getAllElements(): Promise<WebflowElement[]>;
   getElementsByTagName(tagName: string): Promise<WebflowElement[]>;
@@ -669,5 +670,70 @@ export class WebflowDesignerExtensionAPI implements WebflowDesignerAPI {
       
       return h2Elements;
     }, 'findAllH2Elements');
+  }
+
+  /**
+   * Set the alt text attribute on an image element identified by its src URL.
+   * Matches by exact URL first, then by filename as a fallback.
+   */
+  async updateImageAltText(imageUrl: string, altText: string): Promise<boolean> {
+    return this.retryOperation(async () => {
+      console.log('[WebflowDesignerAPI] Updating image alt text:', { imageUrl, altText });
+
+      // Skip API readiness check in test environments (same pattern as findH1Elements)
+      const isTestEnvironment = typeof process !== 'undefined' && process.env.NODE_ENV === 'test';
+      if (!isTestEnvironment) {
+        await this.waitForApiReady();
+      }
+
+      if (!window.webflow?.getAllElements) {
+        throw new Error('getAllElements method not available in Webflow Designer API');
+      }
+      const rawElements = await window.webflow.getAllElements();
+      const allElements = (rawElements || []).filter((el: WebflowElement) => el != null);
+      const imageElement = this.findImageElementByUrl(allElements, imageUrl);
+
+      if (!imageElement) {
+        throw new Error(`No image element found matching URL: ${imageUrl}`);
+      }
+
+      imageElement.setAttribute('alt', altText);
+
+      console.log('[WebflowDesignerAPI] Successfully set alt text on image element');
+      return true;
+    }, 'updateImageAltText');
+  }
+
+  /**
+   * Find an image element whose src attribute matches the given URL.
+   * Strategy 1: filter by known image element types, match by src.
+   * Strategy 2: fallback — check getAttribute('src') on every element.
+   */
+  private findImageElementByUrl(elements: WebflowElement[], targetUrl: string): WebflowElement | null {
+    const targetFilename = targetUrl.split('/').pop()?.split('?')[0] ?? '';
+
+    const matchesByUrl = (src: string): boolean => {
+      if (src === targetUrl) return true;
+      if (targetUrl.includes(src) || src.includes(targetUrl)) return true;
+      const srcFilename = src.split('/').pop()?.split('?')[0] ?? '';
+      return !!(targetFilename && srcFilename && srcFilename === targetFilename);
+    };
+
+    // Strategy 1: known image element types
+    const imageTypes = ['ImageElement', 'Image', 'ImageWidget'];
+    for (const el of elements) {
+      if (!el?.type || !imageTypes.includes(el.type)) continue;
+      const src = el.getAttribute('src');
+      if (src && matchesByUrl(src)) return el;
+    }
+
+    // Strategy 2: any element that has a matching src attribute
+    for (const el of elements) {
+      if (!el) continue;
+      const src = el.getAttribute('src');
+      if (src && matchesByUrl(src)) return el;
+    }
+
+    return null;
   }
 }
