@@ -120,7 +120,7 @@ test.describe('SEO Content Insertion Workflows', () => {
     });
 
     await page.goto('/');
-    await page.waitForSelector('[data-testid="seo-extension"]', { timeout: 10000 });
+    await page.waitForSelector('[data-testid="webflow-app-wrapper"]', { timeout: 10000 });
   });
 
   test('should complete full SEO analysis and content application workflow', async ({ page }) => {

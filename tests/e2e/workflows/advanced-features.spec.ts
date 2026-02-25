@@ -106,7 +106,7 @@ test.describe('Advanced Workflow Features', () => {
     });
 
     await page.goto('/');
-    await page.waitForSelector('[data-testid="seo-extension"]', { timeout: 10000 });
+    await page.waitForSelector('[data-testid="webflow-app-wrapper"]', { timeout: 10000 });
   });
 
   test('should perform intelligent content analysis across pages and CMS', async ({ page }) => {
