@@ -23,6 +23,7 @@ kill-dev-servers.bat
 
 # Claude Code
 CLAUDE.local.md
+.claude/
 .claude/settings.local.json
 .claude/agents/*
 .claude/hooks/
