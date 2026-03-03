@@ -130,6 +130,9 @@ export function EditableRecommendation({
     if (disabled) return;
     setTempText(editedText);
     setIsEditing(true);
+    // Clear any previous error state when entering edit mode
+    setApplyError(false);
+    setApplyErrorMessage(null);
   };
 
   const handleSave = () => {
@@ -185,12 +188,14 @@ export function EditableRecommendation({
   const [isApplying, setIsApplying] = useState(false);
   const [applySuccess, setApplySuccess] = useState(false);
   const [applyError, setApplyError] = useState(false);
+  const [applyErrorMessage, setApplyErrorMessage] = useState<string | null>(null);
 
   const handleApplyClick = async () => {
     if (!canApply) return;
     setIsApplying(true);
     setApplySuccess(false);
     setApplyError(false);
+    setApplyErrorMessage(null);
     try {
       const result = await handleApply(null);
       if (result.success) {
@@ -198,12 +203,14 @@ export function EditableRecommendation({
         setTimeout(() => setApplySuccess(false), 2000);
       } else {
         setApplyError(true);
-        setTimeout(() => setApplyError(false), 2000);
+        const errorMsg = result.error?.msg || 'Failed to apply recommendation. Please try again.';
+        setApplyErrorMessage(errorMsg);
       }
     } catch (err) {
       console.error('[EditableRecommendation] Apply failed:', err);
       setApplyError(true);
-      setTimeout(() => setApplyError(false), 2000);
+      const errorMsg = err instanceof Error ? err.message : 'Failed to apply recommendation. Please try again.';
+      setApplyErrorMessage(errorMsg);
     } finally {
       setIsApplying(false);
     }
@@ -212,6 +219,9 @@ export function EditableRecommendation({
   const handleRegenerate = async () => {
     if (!onRegenerate) return;
     setIsRegenerating(true);
+    // Clear any previous error state when regenerating
+    setApplyError(false);
+    setApplyErrorMessage(null);
     try {
       await onRegenerate();
     } finally {
@@ -298,81 +308,86 @@ export function EditableRecommendation({
   }
 
   return (
-    <div className={`flex items-center gap-3 ${className}`}>
-      <div className="flex-1 text-break">
-        {editedText}
-      </div>
-      <div className="flex-shrink-0 flex flex-col items-center gap-2">
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleApplyClick}
-                disabled={disabled || !canApply || isApplying}
-                className="hover:scale-110 active:scale-95 transition-transform flex items-center justify-center"
-                style={{
-                  width: '2rem',
-                  height: '2rem',
-                  minWidth: '2rem',
-                  padding: '0.5rem',
-                  background: applySuccess
-                    ? 'linear-gradient(#22c55e, #16a34a) padding-box, linear-gradient(135deg, rgba(255, 255, 255, 0.40) 0%, rgba(255, 255, 255, 0.00) 100%) border-box'
-                    : applyError
-                    ? 'linear-gradient(#ef4444, #dc2626) padding-box, linear-gradient(135deg, rgba(255, 255, 255, 0.40) 0%, rgba(255, 255, 255, 0.00) 100%) border-box'
-                    : 'linear-gradient(#787878, #787878) padding-box, linear-gradient(135deg, rgba(255, 255, 255, 0.40) 0%, rgba(255, 255, 255, 0.00) 100%) border-box',
-                  border: '1px solid transparent',
-                  borderRadius: '1.6875rem',
-                  opacity: isApplying ? 0.6 : 1,
-                  transition: 'background 0.3s, opacity 0.2s',
-                }}
-                aria-label="Apply to page"
-              >
-                {isApplying ? (
-                  <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : applySuccess ? (
-                  <Check className="h-4 w-4 text-white" />
-                ) : (
-                  <ApplyIcon className="h-4 w-4" />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="left">
-              <p>Apply to page</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+    <div className={className}>
+      <div className="flex items-center gap-3">
+        <div className="flex-1 text-break">
+          {editedText}
+        </div>
+        <div className="flex-shrink-0 flex flex-col items-center gap-2">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleApplyClick}
+                  disabled={disabled || !canApply || isApplying}
+                  className="hover:scale-110 active:scale-95 transition-transform flex items-center justify-center"
+                  style={{
+                    width: '2rem',
+                    height: '2rem',
+                    minWidth: '2rem',
+                    padding: '0.5rem',
+                    background: applySuccess
+                      ? 'linear-gradient(#22c55e, #16a34a) padding-box, linear-gradient(135deg, rgba(255, 255, 255, 0.40) 0%, rgba(255, 255, 255, 0.00) 100%) border-box'
+                      : applyError
+                      ? 'linear-gradient(#ef4444, #dc2626) padding-box, linear-gradient(135deg, rgba(255, 255, 255, 0.40) 0%, rgba(255, 255, 255, 0.00) 100%) border-box'
+                      : 'linear-gradient(#787878, #787878) padding-box, linear-gradient(135deg, rgba(255, 255, 255, 0.40) 0%, rgba(255, 255, 255, 0.00) 100%) border-box',
+                    border: '1px solid transparent',
+                    borderRadius: '1.6875rem',
+                    opacity: isApplying ? 0.6 : 1,
+                    transition: 'background 0.3s, opacity 0.2s',
+                  }}
+                  aria-label="Apply to page"
+                >
+                  {isApplying ? (
+                    <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : applySuccess ? (
+                    <Check className="h-4 w-4 text-white" />
+                  ) : (
+                    <ApplyIcon className="h-4 w-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="left">
+                <p>Apply to page</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
 
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleRegenerate}
-                disabled={disabled || isRegenerating}
-                className="hover:scale-110 active:scale-95 transition-transform flex items-center justify-center"
-                style={{
-                  width: '2rem',
-                  height: '2rem',
-                  minWidth: '2rem',
-                  padding: '0.5rem',
-                  background: 'linear-gradient(#787878, #787878) padding-box, linear-gradient(135deg, rgba(255, 255, 255, 0.40) 0%, rgba(255, 255, 255, 0.00) 100%) border-box',
-                  border: '1px solid transparent',
-                  borderRadius: '1.6875rem',
-                }}
-                aria-label="Generate new suggestion"
-              >
-                <RegenerateIcon className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="left">
-              <p>Generate new suggestion</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRegenerate}
+                  disabled={disabled || isRegenerating}
+                  className="hover:scale-110 active:scale-95 transition-transform flex items-center justify-center"
+                  style={{
+                    width: '2rem',
+                    height: '2rem',
+                    minWidth: '2rem',
+                    padding: '0.5rem',
+                    background: 'linear-gradient(#787878, #787878) padding-box, linear-gradient(135deg, rgba(255, 255, 255, 0.40) 0%, rgba(255, 255, 255, 0.00) 100%) border-box',
+                    border: '1px solid transparent',
+                    borderRadius: '1.6875rem',
+                  }}
+                  aria-label="Generate new suggestion"
+                >
+                  <RegenerateIcon className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="left">
+                <p>Generate new suggestion</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
       </div>
+      {applyErrorMessage && (
+        <p className="text-xs text-red-400 mt-2">{applyErrorMessage}</p>
+      )}
     </div>
   );
 }

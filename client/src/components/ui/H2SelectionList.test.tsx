@@ -123,7 +123,7 @@ describe('H2SelectionList', () => {
       });
     });
 
-    it('shows "Applied" badge and disables all buttons after successful apply', async () => {
+    it('shows "Applied" badge after successful apply', async () => {
       const user = userEvent.setup();
       const mockOnApply = vi.fn().mockResolvedValue(mockInsertionResult);
 
@@ -134,6 +134,78 @@ describe('H2SelectionList', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Applied')).toBeInTheDocument();
+      });
+    });
+
+    it('allows applying to multiple H2s - other H2 buttons remain enabled after one is applied', async () => {
+      const user = userEvent.setup();
+      const mockOnApply = vi.fn().mockResolvedValue(mockInsertionResult);
+
+      render(<H2SelectionList {...defaultProps} onApply={mockOnApply} />);
+
+      const applyButtons = screen.getAllByRole('button', { name: /apply to h2/i });
+
+      // Apply to first H2
+      await user.click(applyButtons[0]);
+
+      await waitFor(() => {
+        expect(screen.getByText('Applied')).toBeInTheDocument();
+      });
+
+      // Other H2 apply buttons should still be enabled
+      expect(applyButtons[1]).not.toBeDisabled();
+      expect(applyButtons[2]).not.toBeDisabled();
+    });
+
+    it('can apply to multiple H2s sequentially', async () => {
+      const user = userEvent.setup();
+      const mockOnApply = vi.fn().mockResolvedValue(mockInsertionResult);
+
+      render(<H2SelectionList {...defaultProps} onApply={mockOnApply} />);
+
+      const applyButtons = screen.getAllByRole('button', { name: /apply to h2/i });
+
+      // Apply to first H2
+      await user.click(applyButtons[0]);
+      await waitFor(() => {
+        expect(mockOnApply).toHaveBeenCalledTimes(1);
+      });
+
+      // Apply to second H2
+      await user.click(applyButtons[1]);
+      await waitFor(() => {
+        expect(mockOnApply).toHaveBeenCalledTimes(2);
+      });
+
+      // Apply to third H2
+      await user.click(applyButtons[2]);
+      await waitFor(() => {
+        expect(mockOnApply).toHaveBeenCalledTimes(3);
+      });
+
+      // All three should show as applied
+      const appliedBadges = screen.getAllByText('Applied');
+      expect(appliedBadges).toHaveLength(3);
+    });
+
+    it('shows summary of applied recommendations count', async () => {
+      const user = userEvent.setup();
+      const mockOnApply = vi.fn().mockResolvedValue(mockInsertionResult);
+
+      render(<H2SelectionList {...defaultProps} onApply={mockOnApply} />);
+
+      const applyButtons = screen.getAllByRole('button', { name: /apply to h2/i });
+
+      // Apply to first H2
+      await user.click(applyButtons[0]);
+      await waitFor(() => {
+        expect(screen.getByText(/applied recommendations to 1 of 3/i)).toBeInTheDocument();
+      });
+
+      // Apply to second H2
+      await user.click(applyButtons[1]);
+      await waitFor(() => {
+        expect(screen.getByText(/applied recommendations to 2 of 3/i)).toBeInTheDocument();
       });
     });
   });

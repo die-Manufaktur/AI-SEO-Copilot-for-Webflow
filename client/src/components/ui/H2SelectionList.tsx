@@ -1,7 +1,8 @@
 /**
  * H2SelectionList Component
  * Displays H2 elements with per-H2 AI suggestions and individual/batch regenerate buttons.
- * Once one is applied, marks check as passed and disables all other buttons.
+ * Users can apply suggestions to multiple H2s. Each H2's Apply button is disabled after
+ * its suggestion is applied (to prevent re-applying), but other H2s remain actionable.
  */
 
 import React, { useState, useImperativeHandle } from 'react';
@@ -86,7 +87,7 @@ export const H2SelectionList = React.forwardRef<H2SelectionListHandle, H2Selecti
     h2Recommendations?.forEach(rec => { init[rec.h2Index] = rec.suggestion; });
     return init;
   });
-  const [appliedIndex, setAppliedIndex] = useState<number | null>(null);
+  const [appliedIndices, setAppliedIndices] = useState<Set<number>>(new Set());
   const [itemStates, setItemStates] = useState<Record<number, H2ItemState>>({});
   const [regeneratingIndex, setRegeneratingIndex] = useState<number | null>(null);
   const [regeneratingAll, setRegeneratingAll] = useState(false);
@@ -111,7 +112,8 @@ export const H2SelectionList = React.forwardRef<H2SelectionListHandle, H2Selecti
   };
 
   const handleApply = async (h2Element: H2ElementInfo, index: number) => {
-    if (disabled || appliedIndex !== null) return;
+    // Only block if this specific H2 has already been applied
+    if (disabled || appliedIndices.has(index)) return;
 
     updateItemState(index, { loading: true, error: undefined });
 
@@ -121,7 +123,7 @@ export const H2SelectionList = React.forwardRef<H2SelectionListHandle, H2Selecti
       const result = await onApply({ h2Element, recommendation });
 
       if (result.success) {
-        setAppliedIndex(index);
+        setAppliedIndices(prev => new Set([...prev, index]));
         updateItemState(index, { loading: false, success: true });
 
         if (pageId && checkTitle) {
@@ -200,7 +202,7 @@ export const H2SelectionList = React.forwardRef<H2SelectionListHandle, H2Selecti
           variant="ghost"
           size="sm"
           onClick={handleRegenerateAll}
-          disabled={disabled || isAnyLoading || appliedIndex !== null}
+          disabled={disabled || isAnyLoading || appliedIndices.size === validH2Elements.length}
           className="flex items-center gap-2 text-white text-sm whitespace-nowrap hover:opacity-80 transition-opacity"
           style={{
             background: 'linear-gradient(#787878, #787878) padding-box, linear-gradient(135deg, rgba(255, 255, 255, 0.40) 0%, rgba(255, 255, 255, 0.00) 100%) border-box',
@@ -223,21 +225,17 @@ export const H2SelectionList = React.forwardRef<H2SelectionListHandle, H2Selecti
 
       {validH2Elements.map((h2Element, index) => {
         const itemState = itemStates[index] || {};
-        const isItemApplied = appliedIndex === index;
-        const isOtherApplied = appliedIndex !== null && appliedIndex !== index;
+        const isItemApplied = appliedIndices.has(index);
         const isRegeneratingThis = regeneratingIndex === h2Element.index;
-        const isDisabled = disabled || appliedIndex !== null || itemState.loading || isAnyLoading;
+        // Only disable this item if it's already applied or currently loading
+        const isDisabled = disabled || isItemApplied || itemState.loading || isAnyLoading;
         const suggestion = suggestions[h2Element.index] ?? '';
 
         return (
           <div
             key={`${h2Element.id}-${index}`}
             className={`flex items-start gap-3 p-4 rounded-[7px] transition-colors ${
-              isItemApplied
-                ? 'bg-green-900/30 border border-green-700'
-                : isOtherApplied
-                ? 'opacity-50'
-                : ''
+              isItemApplied ? 'bg-green-900/30 border border-green-700' : ''
             }`}
             style={!isItemApplied ? {
               background: 'linear-gradient(var(--background3), var(--background3)) padding-box, linear-gradient(135deg, rgba(255, 255, 255, 0.40) 0%, rgba(255, 255, 255, 0.00) 100%) border-box',
@@ -257,7 +255,7 @@ export const H2SelectionList = React.forwardRef<H2SelectionListHandle, H2Selecti
               <p className="text-xs text-text3 mb-1 text-break">{h2Element.text}</p>
               {/* AI suggestion — prominent, actionable */}
               {suggestion && (
-                <p className={`text-sm font-medium text-break ${isOtherApplied ? 'text-text3' : 'text-text1'}`}>
+                <p className="text-sm font-medium text-break text-text1">
                   {suggestion}
                 </p>
               )}
@@ -326,13 +324,13 @@ export const H2SelectionList = React.forwardRef<H2SelectionListHandle, H2Selecti
         );
       })}
 
-      {appliedIndex !== null && (
+      {appliedIndices.size > 0 && (
         <div className="p-3 bg-green-900/30 border border-green-700 rounded-lg">
           <p className="text-sm text-green-400">
-            Successfully applied recommendation to H2 #{appliedIndex + 1}
+            Applied recommendations to {appliedIndices.size} of {validH2Elements.length} H2{validH2Elements.length !== 1 ? 's' : ''}
           </p>
           <p className="text-xs text-green-500 mt-1">
-            The H2 check will now show as passed.
+            Re-analyze the page to update your SEO score.
           </p>
         </div>
       )}
