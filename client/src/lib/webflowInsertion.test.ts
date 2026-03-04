@@ -513,6 +513,63 @@ describe('WebflowInsertion', () => {
     });
   });
 
+  describe('image_alt operations', () => {
+    it('should call designerApi.updateImageAltText for image_alt type', async () => {
+      const mockDesignerApi = {
+        updateImageAltText: vi.fn().mockResolvedValue(true),
+      };
+      (insertion as any).designerApi = mockDesignerApi;
+      (insertion as any).useDesignerAPI = true;
+
+      const request: WebflowInsertionRequest = {
+        type: 'image_alt',
+        value: 'A cute puppy playing',
+        imageUrl: 'https://example.com/puppy.jpg',
+        checkTitle: 'Image Alt Attributes',
+      };
+
+      const result = await insertion.apply(request);
+
+      expect(result.success).toBe(true);
+      expect(mockDesignerApi.updateImageAltText).toHaveBeenCalledWith(
+        'https://example.com/puppy.jpg',
+        'A cute puppy playing'
+      );
+    });
+
+    it('should fail when imageUrl is missing for image_alt type', async () => {
+      const mockDesignerApi = {
+        updateImageAltText: vi.fn(),
+      };
+      (insertion as any).designerApi = mockDesignerApi;
+      (insertion as any).useDesignerAPI = true;
+
+      const request: WebflowInsertionRequest = {
+        type: 'image_alt',
+        value: 'Some alt text',
+        checkTitle: 'Image Alt Attributes',
+      };
+
+      const result = await insertion.apply(request);
+      expect(result.success).toBe(false);
+    });
+
+    it('should fail when Designer API is not available for image_alt', async () => {
+      (insertion as any).designerApi = undefined;
+      (insertion as any).useDesignerAPI = false;
+
+      const request: WebflowInsertionRequest = {
+        type: 'image_alt',
+        value: 'Some alt text',
+        imageUrl: 'https://example.com/test.jpg',
+        checkTitle: 'Image Alt Attributes',
+      };
+
+      const result = await insertion.apply(request);
+      expect(result.success).toBe(false);
+    });
+  });
+
   describe('Collection ID Resolution', () => {
     it('should resolve collection ID for CMS items', async () => {
       const request: WebflowInsertionRequest = {
