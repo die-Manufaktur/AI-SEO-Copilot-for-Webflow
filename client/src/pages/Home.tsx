@@ -1676,18 +1676,20 @@ export default function Home() {
                                     }))}
                                     onApply={async ({ image, newAltText }) => {
                                       try {
-                                        if (!window.webflow) {
-                                          throw new Error('Webflow Designer API not available');
-                                        }
-                                        const designerApi = new WebflowDesignerExtensionAPI();
-                                        const success = await designerApi.updateImageAltText(image.url, newAltText);
-                                        if (success) {
+                                        const result = await applyInsertion({
+                                          type: 'image_alt',
+                                          value: newAltText,
+                                          checkTitle: 'Image Alt Attributes',
+                                          imageUrl: image.url,
+                                          pageId: currentPageId,
+                                        });
+                                        if (result.success) {
                                           toast({
                                             title: "Your text has been included successfully",
                                             description: "Don't forget to publish your website to update the SEO score.",
                                           });
                                         }
-                                        return { success };
+                                        return { success: result.success };
                                       } catch (error) {
                                         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
                                         toast({

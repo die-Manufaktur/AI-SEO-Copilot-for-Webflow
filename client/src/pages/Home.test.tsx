@@ -960,17 +960,20 @@ describe('Home Component - Generate/Regenerate wiring', () => {
     }, { timeout: 3000 });
   });
 
-  // --- Test 5c: ImageAltTextList onApply calls updateImageAltText ---
-  it('ImageAltTextList onApply calls updateImageAltText with image URL and alt text', async () => {
-    // vi.restoreAllMocks() in the global afterEach clears the mockImplementation on the
-    // WebflowDesignerExtensionAPI spy, so we must re-establish it for this test.
-    const { WebflowDesignerExtensionAPI } = await import('../lib/webflowDesignerApi');
-    const updateImageAltText = vi.fn().mockResolvedValue(true);
-    vi.mocked(WebflowDesignerExtensionAPI).mockImplementation(() => ({
-      findAllH2Elements: vi.fn().mockResolvedValue([]),
-      updateH2Element: vi.fn().mockResolvedValue(true),
-      updateImageAltText,
-    } as any));
+  // --- Test 5c: ImageAltTextList onApply routes through insertion pipeline ---
+  it('ImageAltTextList onApply calls applyInsertion through insertion pipeline', async () => {
+    // Mock WebflowInsertion.prototype.apply to verify the insertion pipeline is used
+    const { WebflowInsertion } = await import('../lib/webflowInsertion');
+    const applySpy = vi.spyOn(WebflowInsertion.prototype, 'apply').mockResolvedValue({
+      success: true,
+      data: {
+        type: 'image_alt',
+        imageUrl: 'https://example.com/photo1.jpg',
+        originalValue: null,
+        newValue: 'A beautiful photo',
+        timestamp: new Date().toISOString(),
+      },
+    });
 
     const analysis = {
       checks: [
@@ -1010,11 +1013,17 @@ describe('Home Component - Generate/Regenerate wiring', () => {
     await act(async () => { await user.click(applyBtn); });
 
     await waitFor(() => {
-      expect(updateImageAltText).toHaveBeenCalledWith(
-        'https://example.com/photo1.jpg',
-        'A beautiful photo',
+      expect(applySpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'image_alt',
+          value: 'A beautiful photo',
+          checkTitle: 'Image Alt Attributes',
+          imageUrl: 'https://example.com/photo1.jpg',
+        }),
       );
     }, { timeout: 3000 });
+
+    applySpy.mockRestore();
   });
 
   // --- Test 6: Error handling during regeneration ---
