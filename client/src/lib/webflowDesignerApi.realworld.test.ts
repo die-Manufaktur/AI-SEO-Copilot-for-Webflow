@@ -25,7 +25,7 @@ const mockWebflowElements = [
   },
   { 
     id: 'element-2',
-    type: 'HeadingElement',
+    type: 'Heading',
     textContent: 'Real H1 Content', 
     setTextContent: vi.fn(),
     getTextContent: vi.fn(),
@@ -42,14 +42,14 @@ const mockWebflowElements = [
   },
   { 
     id: 'element-4',
-    type: 'ParagraphElement',
+    type: 'Paragraph',
     textContent: 'This is a substantial paragraph with more than 50 characters to be considered for introduction',
     setTextContent: vi.fn(),
     getTextContent: vi.fn(),
   },
   {
     id: 'element-5', 
-    type: 'HeadingElement',
+    type: 'Heading',
     textContent: 'H2 Content',
     setTextContent: vi.fn(),
     getTextContent: vi.fn(),
@@ -91,8 +91,8 @@ describe('WebflowDesignerAPI Real-world Error Reproduction', () => {
       
       // Should return HeadingElements (both H1 and H2 are HeadingElement type)
       expect(h1Elements).toHaveLength(2); // Both heading elements
-      expect(h1Elements[0].type).toBe('HeadingElement');
-      expect(h1Elements[1].type).toBe('HeadingElement');
+      expect(h1Elements[0].type).toBe('Heading');
+      expect(h1Elements[1].type).toBe('Heading');
     });
 
     it('should find ParagraphElement for introduction content', async () => {
@@ -104,7 +104,7 @@ describe('WebflowDesignerAPI Real-world Error Reproduction', () => {
       // This should work - element detection is supported
       const introElement = await api.findIntroductionParagraph();
       expect(introElement).toBeTruthy();
-      expect(introElement?.type).toBe('ParagraphElement');
+      expect(introElement?.type).toBe('Paragraph');
       expect(introElement?.id).toBe('element-4');
     });
 
@@ -147,7 +147,7 @@ describe('WebflowDesignerAPI Real-world Error Reproduction', () => {
       const h1Elements = await api.getElementsByTagName('h1');
       
       expect(h1Elements).toHaveLength(2); // Both HeadingElements
-      expect(h1Elements[0].type).toBe('HeadingElement');
+      expect(h1Elements[0].type).toBe('Heading');
       expect(h1Elements[0].textContent).toBe('Real H1 Content');
     });
 
@@ -161,7 +161,7 @@ describe('WebflowDesignerAPI Real-world Error Reproduction', () => {
       const introElement = await api.findIntroductionParagraph();
       
       expect(introElement).toBeTruthy();
-      expect(introElement?.type).toBe('ParagraphElement');
+      expect(introElement?.type).toBe('Paragraph');
       expect(introElement?.id).toBe('element-4');
     });
 
@@ -185,7 +185,7 @@ describe('WebflowDesignerAPI Real-world Error Reproduction', () => {
       // Test with empty string type
       const elementsWithEmptyType = [
         { id: 'empty-1', type: '', textContent: 'Empty type', setTextContent: vi.fn(), getTextContent: vi.fn() },
-        { id: 'valid-1', type: 'HeadingElement', textContent: 'Valid H2', setTextContent: vi.fn(), getTextContent: vi.fn() }
+        { id: 'valid-1', type: 'Heading', textContent: 'Valid H2', setTextContent: vi.fn(), getTextContent: vi.fn() }
       ];
       
       mockWebflowAPI.getAllElements.mockResolvedValueOnce(elementsWithEmptyType);
@@ -193,13 +193,13 @@ describe('WebflowDesignerAPI Real-world Error Reproduction', () => {
       const h2Elements = await api.getElementsByTagName('h2');
       
       expect(h2Elements).toHaveLength(1);
-      expect(h2Elements[0].type).toBe('HeadingElement');
+      expect(h2Elements[0].type).toBe('Heading');
     });
 
     it('should correctly identify HeadingElements regardless of case', async () => {
       const elementsWithHeadings = [
-        { id: 'heading-1', type: 'HeadingElement', textContent: 'First heading', setTextContent: vi.fn(), getTextContent: vi.fn() },
-        { id: 'heading-2', type: 'HeadingElement', textContent: 'Second heading', setTextContent: vi.fn(), getTextContent: vi.fn() }
+        { id: 'heading-1', type: 'Heading', textContent: 'First heading', setTextContent: vi.fn(), getTextContent: vi.fn() },
+        { id: 'heading-2', type: 'Heading', textContent: 'Second heading', setTextContent: vi.fn(), getTextContent: vi.fn() }
       ];
       
       mockWebflowAPI.getAllElements.mockResolvedValueOnce(elementsWithHeadings);
@@ -207,8 +207,8 @@ describe('WebflowDesignerAPI Real-world Error Reproduction', () => {
       const h1Elements = await api.getElementsByTagName('h1');
       
       expect(h1Elements).toHaveLength(2); // Should find both HeadingElements
-      expect(h1Elements[0].type).toBe('HeadingElement');
-      expect(h1Elements[1].type).toBe('HeadingElement');
+      expect(h1Elements[0].type).toBe('Heading');
+      expect(h1Elements[1].type).toBe('Heading');
     });
   });
 
@@ -217,7 +217,7 @@ describe('WebflowDesignerAPI Real-world Error Reproduction', () => {
       const elementsWithNulls = [
         null,
         undefined,
-        { id: 'valid-h1', type: 'HeadingElement', textContent: 'Valid H1', setTextContent: vi.fn(), getTextContent: vi.fn() },
+        { id: 'valid-h1', type: 'Heading', textContent: 'Valid H1', setTextContent: vi.fn(), getTextContent: vi.fn() },
         null
       ];
       
@@ -226,14 +226,14 @@ describe('WebflowDesignerAPI Real-world Error Reproduction', () => {
       const h1Elements = await api.getElementsByTagName('h1');
       
       expect(h1Elements).toHaveLength(1);
-      expect(h1Elements[0].type).toBe('HeadingElement');
+      expect(h1Elements[0].type).toBe('Heading');
     });
 
     it('should handle elements with non-string type', async () => {
       const elementsWithInvalidType = [
         { id: 'invalid-1', type: 123, textContent: 'Number type', setTextContent: vi.fn(), getTextContent: vi.fn() },
         { id: 'invalid-2', type: { nested: 'object' }, textContent: 'Object type', setTextContent: vi.fn(), getTextContent: vi.fn() },
-        { id: 'valid-1', type: 'HeadingElement', textContent: 'Valid H1', setTextContent: vi.fn(), getTextContent: vi.fn() }
+        { id: 'valid-1', type: 'Heading', textContent: 'Valid H1', setTextContent: vi.fn(), getTextContent: vi.fn() }
       ];
       
       mockWebflowAPI.getAllElements.mockResolvedValueOnce(elementsWithInvalidType);
@@ -241,7 +241,7 @@ describe('WebflowDesignerAPI Real-world Error Reproduction', () => {
       const h1Elements = await api.getElementsByTagName('h1');
       
       expect(h1Elements).toHaveLength(1);
-      expect(h1Elements[0].type).toBe('HeadingElement');
+      expect(h1Elements[0].type).toBe('Heading');
     });
   });
 });

@@ -723,6 +723,44 @@ export default function Home() {
         }
       }
 
+      // Check for applied Introduction recommendations
+      const introCheckIndex = modifiedData.checks.findIndex(check =>
+        check.title === "Keyphrase in Introduction"
+      );
+
+      if (introCheckIndex !== -1 && isApplied("Keyphrase in Introduction")) {
+        const introCheck = modifiedData.checks[introCheckIndex];
+
+        // Only mark as passed if the actual SEO check shows keyphrase is found in introduction
+        if (introCheck && introCheck.passed) {
+          // Create a mutable copy of the checks array
+          const newChecks = [...modifiedData.checks];
+          const originalIntroCheck = newChecks[introCheckIndex];
+
+          // Check if the status is changing from failed to passed
+          const wasFailed = !originalIntroCheck.passed;
+
+          // Update the specific check
+          newChecks[introCheckIndex] = {
+            ...originalIntroCheck,
+            passed: true,
+            description: `Nice! The keyphrase "${analysisRequestData?.keyphrase || 'keyword'}" appears in the first paragraph.`,
+          };
+
+          // Update the overall counts if the status changed
+          if (wasFailed) {
+            modifiedData.passedChecks = (modifiedData.passedChecks ?? 0) + 1;
+            modifiedData.failedChecks = Math.max(0, (modifiedData.failedChecks ?? 0) - 1);
+            // Update score to simple percentage calculation to match backend
+            const passedCount = newChecks.filter(check => check.passed).length;
+            modifiedData.score = Math.round((passedCount / newChecks.length) * 100);
+          }
+
+          // Assign the modified checks array back to the data
+          modifiedData.checks = newChecks;
+        }
+      }
+
       setResults(modifiedData); // Set state with potentially modified data
       setSelectedCategory(null);
       setIsLoading(false);
@@ -742,7 +780,7 @@ export default function Home() {
         try {
           if (typeof window !== 'undefined' && window.webflow) {
             setH2ElementsFetched(true);
-            const api = new (await import('../lib/webflowDesignerApi')).WebflowDesignerExtensionAPI();
+            const api = new WebflowDesignerExtensionAPI();
             const h2s = await api.findAllH2Elements();
             setH2Elements(h2s);
           }
@@ -852,7 +890,6 @@ export default function Home() {
         // Collect H2 elements using the Designer API
         let h2Elements: H2ElementInfo[] = [];
         try {
-          const { WebflowDesignerExtensionAPI } = await import('../lib/webflowDesignerApi');
           const designerApi = new WebflowDesignerExtensionAPI();
           h2Elements = await designerApi.findAllH2Elements();
           logger.info("[Home onSubmit] Collected H2 elements:", h2Elements);
@@ -1610,30 +1647,7 @@ export default function Home() {
                                         if (result.success) {
                                           toast({
                                             title: "Your text has been included successfully",
-                                            description: "Don't forget to publish your website to update the SEO score.",
-                                          });
-
-                                          // Immediately update the H2 check to passed state
-                                          setResults(prevResults => {
-                                            if (!prevResults?.checks) return prevResults;
-
-                                            const updatedChecks = prevResults.checks.map(check =>
-                                              check.title === "Keyphrase in H2 Headings"
-                                                ? { ...check, passed: true }
-                                                : check
-                                            );
-
-                                            // Update score calculation
-                                            const passedCount = updatedChecks.filter(check => check.passed).length;
-                                            const updatedScore = Math.round((passedCount / updatedChecks.length) * 100);
-
-                                            return {
-                                              ...prevResults,
-                                              checks: updatedChecks,
-                                              score: updatedScore,
-                                              passedChecks: passedCount,
-                                              failedChecks: updatedChecks.length - passedCount
-                                            };
+                                            description: "Re-analyze the page to update your SEO score.",
                                           });
                                         }
                                         return result;

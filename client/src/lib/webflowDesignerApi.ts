@@ -331,7 +331,8 @@ export class WebflowDesignerExtensionAPI implements WebflowDesignerAPI {
       const introElement = await this.findIntroductionParagraph();
       
       if (!introElement) {
-        throw new Error('No suitable introduction paragraph found on the current page');
+        const diag = (this as any)._lastDiagnostic || 'no diagnostic';
+        throw new Error(`No suitable introduction paragraph found on the current page (${diag})`);
       }
       
       // Update the introduction element using the helper method
@@ -352,44 +353,88 @@ export class WebflowDesignerExtensionAPI implements WebflowDesignerAPI {
    */
   async getAllElements(): Promise<WebflowElement[]> {
     await this.waitForApiReady();
-    
+
     if (!window.webflow?.getAllElements) {
       throw new Error('getAllElements method not available in Webflow Designer API');
     }
-    
+
     const elements = await window.webflow?.getAllElements();
-    
+
+    // Filter out null/undefined entries first
+    const filteredElements = (elements || []).filter((element: WebflowElement) => element != null);
+
+    // Method availability statistics (critical for debugging)
+    const methodStats = {
+      total: filteredElements.length,
+      withGetTextContent: filteredElements.filter((e: WebflowElement) => typeof e.getTextContent === 'function').length,
+      withSetTextContent: filteredElements.filter((e: WebflowElement) => typeof e.setTextContent === 'function').length,
+      withGetHeadingLevel: filteredElements.filter((e: WebflowElement) => typeof e.getHeadingLevel === 'function').length,
+      withBothTextMethods: filteredElements.filter((e: WebflowElement) =>
+        typeof e.getTextContent === 'function' && typeof e.setTextContent === 'function'
+      ).length,
+      writableNonHeadings: filteredElements.filter((e: WebflowElement) =>
+        typeof e.setTextContent === 'function' &&
+        typeof e.getHeadingLevel !== 'function'
+      ).length
+    };
+
     // Debug logging to understand element structure
     console.log('[WebflowDesignerAPI] getAllElements returned:', {
-      count: elements?.length || 0,
+      count: filteredElements.length,
       type: typeof elements,
       isArray: Array.isArray(elements),
+      methodStats
     });
-    
+
+    // Group elements by type that have setTextContent (the key method for writing)
+    const typesWithSetTextContent = new Map<string, number>();
+    filteredElements.forEach((element: WebflowElement) => {
+      if (typeof element.setTextContent === 'function') {
+        const type = element.type || 'unknown';
+        typesWithSetTextContent.set(type, (typesWithSetTextContent.get(type) || 0) + 1);
+      }
+    });
+
+    if (typesWithSetTextContent.size > 0) {
+      console.log('[WebflowDesignerAPI] Element types that have setTextContent:',
+        Object.fromEntries(typesWithSetTextContent)
+      );
+    }
+
+    // Also log types with getTextContent for comparison
+    const typesWithGetTextContent = new Map<string, number>();
+    filteredElements.forEach((element: WebflowElement) => {
+      if (typeof element.getTextContent === 'function') {
+        const type = element.type || 'unknown';
+        typesWithGetTextContent.set(type, (typesWithGetTextContent.get(type) || 0) + 1);
+      }
+    });
+
+    if (typesWithGetTextContent.size > 0) {
+      console.log('[WebflowDesignerAPI] Element types that have getTextContent:',
+        Object.fromEntries(typesWithGetTextContent)
+      );
+    }
+
     // Sample the first few elements for debugging
-    if (elements && elements.length > 0) {
+    if (filteredElements.length > 0) {
       console.log('[WebflowDesignerAPI] Sample elements structure:');
-      elements.slice(0, 5).forEach((element, index) => {
+      filteredElements.slice(0, 5).forEach((element: WebflowElement, index: number) => {
         console.log(`[WebflowDesignerAPI] Element ${index}:`, {
           exists: !!element,
           objectType: typeof element,
           id: element?.id,
-          webflowType: element?.type, // This is the key property we need!
-          hasTextContent: 'textContent' in (element || {}),
-          textContentValue: element?.textContent,
+          webflowType: element?.type,
           hasGetTextContent: typeof element?.getTextContent === 'function',
           hasSetTextContent: typeof element?.setTextContent === 'function',
-          // Legacy properties that may not exist
-          hasTagName: 'tagName' in (element || {}),
-          tagName: element?.tagName, // Should be undefined per console logs
-          // All available properties
+          hasGetHeadingLevel: typeof element?.getHeadingLevel === 'function',
+          // Own enumerable keys (usually just ['id'] for proxy objects)
           allKeys: element ? Object.keys(element) : 'N/A'
         });
       });
     }
-    
-    // Return elements, filtering out any null/undefined entries
-    return (elements || []).filter(element => element != null);
+
+    return filteredElements;
   }
 
   /**
@@ -400,17 +445,22 @@ export class WebflowDesignerExtensionAPI implements WebflowDesignerAPI {
     const allElements = await this.getAllElements();
     
     // Map HTML tag names to Webflow element types
+    // Per Webflow docs: element.type returns "Paragraph", "Heading", "DivBlock", "DOM", "String", "Image", etc.
+    // Note: For headings, all H1-H6 are type "Heading" - use element.getHeadingLevel() to distinguish
     const tagToTypeMap: Record<string, string[]> = {
-      'h1': ['HeadingElement'], 
-      'h2': ['HeadingElement'],
-      'h3': ['HeadingElement'],
-      'h4': ['HeadingElement'],
-      'h5': ['HeadingElement'],
-      'h6': ['HeadingElement'],
-      'p': ['ParagraphElement', 'BlockElement'], // Paragraphs can be ParagraphElement or BlockElement
-      'div': ['BlockElement', 'DivBlockElement'],
-      'span': ['StringElement'],
-      'a': ['LinkElement'],
+      'h1': ['Heading'],
+      'h2': ['Heading'],
+      'h3': ['Heading'],
+      'h4': ['Heading'],
+      'h5': ['Heading'],
+      'h6': ['Heading'],
+      'p': ['Paragraph'],
+      'img': ['Image'],
+      'a': ['Link'],
+      'div': ['DivBlock', 'DOM'],
+      'section': ['Section'],
+      'form': ['FormForm'],
+      'span': ['String'],
     };
     
     const targetTypes = tagToTypeMap[tagName.toLowerCase()] || [];
@@ -439,106 +489,247 @@ export class WebflowDesignerExtensionAPI implements WebflowDesignerAPI {
 
   /**
    * Helper method to find the introduction paragraph
-   * Uses smart detection based on content length and Webflow element types
-   * Safely handles elements with undefined properties
+   * Finds the first writable text element after the H1 in document order.
+   * This aligns with SEO best practices for "Keyphrase in Introduction" checks.
+   *
+   * KEY INSIGHT: At runtime, elements have setTextContent but NOT getTextContent.
+   * We filter by:
+   * - Must have setTextContent (required for Apply button to work)
+   * - Must NOT have getHeadingLevel (excludes headings)
+   * - Try multiple fallback methods to read text content
+   * - As last resort, accept by element type if it's a content type
    */
   async findIntroductionParagraph(): Promise<WebflowElement | null> {
+    console.log('[WebflowDesignerAPI] findIntroductionParagraph: Starting search (setTextContent-based)...');
     const allElements = await this.getAllElements();
-    
-    // Strategy 1: Look for paragraph elements with substantial content
-    const paragraphs = allElements.filter(el => {
-      // Defensive checks before accessing properties
-      if (!el || !el.type || typeof el.type !== 'string') {
-        return false;
+    console.log('[WebflowDesignerAPI] findIntroductionParagraph: Got', allElements.length, 'elements');
+
+    // Content-like element types that are likely to be paragraphs
+    const contentTypes = ['Paragraph', 'Block', 'RichText', 'DivBlock', 'BlockElement', 'ParagraphElement', 'RichTextElement'];
+
+    // Helper to try multiple methods to get text content
+    const tryGetText = async (el: WebflowElement): Promise<string> => {
+      // Method 1: getTextContent (if available)
+      if (typeof el.getTextContent === 'function') {
+        try {
+          const text = await el.getTextContent();
+          if (text && text.trim().length > 0) return text.trim();
+        } catch { /* continue to next method */ }
       }
-      // Look for ParagraphElement or BlockElement types
-      return el.type === 'ParagraphElement' || el.type === 'BlockElement';
-    });
-    
-    for (const p of paragraphs) {
-      try {
-        // Check if getTextContent method exists before calling
-        if (typeof p.getTextContent === 'function') {
-          const currentText = await p.getTextContent();
-          if (currentText && currentText.trim().length > 50) {
-            console.log('[WebflowDesignerAPI] Found introduction paragraph:', {
-              type: p.type,
-              id: p.id,
-              textLength: currentText.trim().length,
-              textPreview: currentText.substring(0, 100) + '...'
-            });
-            return p;
+
+      // Method 2: getText (used by String elements)
+      if (typeof el.getText === 'function') {
+        try {
+          const text = await el.getText();
+          if (text && text.trim().length > 0) return text.trim();
+        } catch { /* continue to next method */ }
+      }
+
+      // Method 3: textContent property
+      if (typeof el.textContent === 'string' && el.textContent.trim().length > 0) {
+        return el.textContent.trim();
+      }
+
+      // Method 4: Check if element has children (indicates container with content)
+      if (typeof el.children === 'function') {
+        try {
+          const children = await el.children();
+          if (Array.isArray(children) && children.length > 0) {
+            // Element has children, likely contains content
+            return '[has-children]';
           }
+        } catch { /* continue */ }
+      }
+
+      return '';
+    };
+
+    // Phase 1: Find H1 index using getHeadingLevel (proven to work)
+    let h1Index = -1;
+    for (let i = 0; i < allElements.length; i++) {
+      const el = allElements[i];
+      if (!el) continue;
+
+      if (typeof el.getHeadingLevel === 'function') {
+        try {
+          const level = await el.getHeadingLevel();
+          if (level === 1) {
+            h1Index = i;
+            console.log('[WebflowDesignerAPI] Phase 1: Found H1 at index', i, { type: el.type, id: el.id });
+            break;
+          }
+        } catch {
+          continue;
         }
-      } catch (error) {
-        console.warn('[WebflowDesignerAPI] Failed to get text content from paragraph:', error);
-        continue;
       }
     }
-    
-    // Strategy 2: Look for RichText elements with substantial content
-    const richTextElements = allElements.filter(el => {
-      if (!el || !el.type || typeof el.type !== 'string') {
-        return false;
-      }
-      return el.type === 'RichTextElement';
-    });
-    
-    for (const richText of richTextElements) {
-      try {
-        // Check if getTextContent method exists before calling
-        if (typeof richText.getTextContent === 'function') {
-          const currentText = await richText.getTextContent();
-          if (currentText && currentText.trim().length > 50) {
-            console.log('[WebflowDesignerAPI] Found introduction in RichText element:', {
-              type: richText.type,
-              id: richText.id,
-              textLength: currentText.trim().length,
-              textPreview: currentText.substring(0, 100) + '...'
-            });
-            return richText;
-          }
-        }
-      } catch (error) {
-        console.warn('[WebflowDesignerAPI] Failed to get text content from rich text:', error);
+
+    if (h1Index === -1) {
+      console.log('[WebflowDesignerAPI] Phase 1: No H1 found');
+    }
+
+    // Phase 2: Find first writable element after H1 with verifiable text content
+    const startIndex = h1Index >= 0 ? h1Index + 1 : 0;
+    console.log('[WebflowDesignerAPI] Phase 2: Searching for writable element starting at index', startIndex);
+
+    for (let i = startIndex; i < allElements.length; i++) {
+      const el = allElements[i];
+      if (!el) continue;
+
+      // Skip headings (elements with getHeadingLevel method)
+      if (typeof el.getHeadingLevel === 'function') {
         continue;
       }
-    }
-    
-    // Strategy 3: Look for any text-containing elements by content matching
-    // This is a fallback for when we can't identify by type
-    const textElements = allElements.filter(el => {
-      if (!el || !el.type) return false;
-      // Include any element type that might contain text
-      return el.type.includes('Element') && 
-             (el.type.includes('Text') || el.type.includes('Block') || el.type.includes('Paragraph'));
-    });
-    
-    for (const textEl of textElements) {
-      try {
-        if (typeof textEl.getTextContent === 'function') {
-          const currentText = await textEl.getTextContent();
-          // Look specifically for content that starts like an introduction
-          if (currentText && 
-              currentText.trim().length > 50 && 
-              (currentText.toLowerCase().includes('as a') || 
-               currentText.toLowerCase().includes('welcome') ||
-               currentText.toLowerCase().includes('dedicated'))) {
-            console.log('[WebflowDesignerAPI] Found potential introduction by content match:', {
-              type: textEl.type,
-              id: textEl.id,
-              textLength: currentText.trim().length,
-              textPreview: currentText.substring(0, 100) + '...'
-            });
-            return textEl;
-          }
-        }
-      } catch (error) {
-        console.warn('[WebflowDesignerAPI] Failed to get text content from text element:', error);
+
+      // Must have setTextContent (required for Apply button to work)
+      if (typeof el.setTextContent !== 'function') {
         continue;
       }
+
+      // Try to verify it has text content using fallback methods
+      const text = await tryGetText(el);
+      if (text && text.length > 20) {
+        console.log('[WebflowDesignerAPI] Phase 2: Found intro paragraph after H1:', {
+          index: i,
+          type: el.type,
+          id: el.id,
+          textLength: text.length,
+          textPreview: text.substring(0, 80) + (text.length > 80 ? '...' : '')
+        });
+        return el;
+      }
     }
-    
+    console.log('[WebflowDesignerAPI] Phase 2: No element with verifiable text found after H1');
+
+    // Phase 3: Accept by type - first non-heading writable element with content type after H1
+    console.log('[WebflowDesignerAPI] Phase 3: Accepting by element type after H1...');
+
+    for (let i = startIndex; i < allElements.length; i++) {
+      const el = allElements[i];
+      if (!el) continue;
+
+      // Skip headings
+      if (typeof el.getHeadingLevel === 'function') {
+        continue;
+      }
+
+      // Must have setTextContent
+      if (typeof el.setTextContent !== 'function') {
+        continue;
+      }
+
+      // Accept if element type is a content type
+      if (el.type && contentTypes.includes(el.type)) {
+        console.log('[WebflowDesignerAPI] Phase 3: Accepting element by type (no text verification):', {
+          index: i,
+          type: el.type,
+          id: el.id
+        });
+        return el;
+      }
+    }
+    console.log('[WebflowDesignerAPI] Phase 3: No content-type element found after H1');
+
+    // Phase 4: Fallback - search entire document
+    console.log('[WebflowDesignerAPI] Phase 4: Fallback search entire document...');
+
+    for (let i = 0; i < allElements.length; i++) {
+      const el = allElements[i];
+      if (!el) continue;
+
+      // Skip headings
+      if (typeof el.getHeadingLevel === 'function') {
+        continue;
+      }
+
+      // Must have setTextContent
+      if (typeof el.setTextContent !== 'function') {
+        continue;
+      }
+
+      // Try text verification with higher threshold
+      const text = await tryGetText(el);
+      if (text && text.length > 50) {
+        console.log('[WebflowDesignerAPI] Phase 4: Found fallback intro paragraph:', {
+          index: i,
+          type: el.type,
+          id: el.id,
+          textLength: text.length
+        });
+        return el;
+      }
+
+      // Accept by type as last resort
+      if (el.type && contentTypes.includes(el.type)) {
+        console.log('[WebflowDesignerAPI] Phase 4: Accepting fallback by type:', {
+          index: i,
+          type: el.type,
+          id: el.id
+        });
+        return el;
+      }
+    }
+
+    // Log comprehensive diagnostics for debugging
+    const elementsWithGetTextContent = allElements.filter(e => e && typeof e.getTextContent === 'function').length;
+    const elementsWithSetTextContent = allElements.filter(e => e && typeof e.setTextContent === 'function').length;
+    const headingElements = allElements.filter(e => e && typeof e.getHeadingLevel === 'function').length;
+    const writableNonHeadings = allElements.filter(e =>
+      e &&
+      typeof e.setTextContent === 'function' &&
+      typeof e.getHeadingLevel !== 'function'
+    ).length;
+
+    // Group writable non-headings by type
+    const writableByType = new Map<string, number>();
+    allElements.forEach(e => {
+      if (e && typeof e.setTextContent === 'function' && typeof e.getHeadingLevel !== 'function') {
+        const type = e.type || 'unknown';
+        writableByType.set(type, (writableByType.get(type) || 0) + 1);
+      }
+    });
+
+    const diagnosticData = {
+      totalElements: allElements.length,
+      h1Found: h1Index >= 0,
+      h1Index,
+      elementsWithGetTextContent,
+      elementsWithSetTextContent,
+      headingElements,
+      writableNonHeadings,
+      writableByType: Object.fromEntries(writableByType)
+    };
+
+    console.log('[WebflowDesignerAPI] DIAGNOSTIC: Method availability summary:', diagnosticData);
+
+    // Log sample of writable non-heading elements for debugging
+    const writableSamples = allElements
+      .map((el, idx) => ({ el, idx }))
+      .filter(({ el }) =>
+        el &&
+        typeof el.setTextContent === 'function' &&
+        typeof el.getHeadingLevel !== 'function'
+      )
+      .slice(0, 5);
+
+    if (writableSamples.length > 0) {
+      console.log('[WebflowDesignerAPI] DIAGNOSTIC: Sample writable non-heading elements:');
+      for (const { el, idx } of writableSamples) {
+        const text = await tryGetText(el);
+        console.log(`  Index ${idx}:`, {
+          type: el.type,
+          id: el.id,
+          textLength: text?.length || 0,
+          textPreview: text?.substring(0, 50) || '(empty)'
+        });
+      }
+    }
+
+    (this as any)._lastDiagnostic = `totalElements=${diagnosticData.totalElements}, ` +
+      `h1Found=${diagnosticData.h1Found}, ` +
+      `writableNonHeadings=${diagnosticData.writableNonHeadings}`;
+
+    console.log('[WebflowDesignerAPI] No introduction paragraph found after all phases.', (this as any)._lastDiagnostic);
     return null;
   }
 

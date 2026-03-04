@@ -43,7 +43,7 @@ interface WebflowPage {
 // Webflow Element Interface - Based on official Webflow Designer Extension API
 interface WebflowElement {
   id: string; // Unique element identifier
-  type: string; // Element type: "HeadingElement", "ParagraphElement", "BlockElement", etc.
+  type: string; // Element type: "Paragraph", "Heading", "DivBlock", "DOM", "String", "Image", "Link", "Section", "Container", "FormForm", etc.
   textContent?: string; // Direct text content property (may not always be available)
   tagName?: string; // HTML tag name (may not always be available)
   className?: string;
@@ -59,7 +59,9 @@ interface WebflowElement {
   // Heading-specific methods
   getHeadingLevel?(): Promise<number>;
   setHeadingLevel?(level: number): Promise<void>;
-  
+  // DOM element methods
+  getTag?(): Promise<string | null>; // For DOM elements - returns HTML tag name
+
   // Allow arbitrary property access for debugging/inspection
   [key: string]: any;
 }

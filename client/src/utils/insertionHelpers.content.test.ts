@@ -4,11 +4,11 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { 
-  createInsertionRequest, 
-  canApplyRecommendation, 
+import {
+  createInsertionRequest,
+  canApplyRecommendation,
   getApplyDescription,
-  type RecommendationContext 
+  type RecommendationContext
 } from './insertionHelpers';
 import type { WebflowInsertionRequest } from '../types/webflow-data-api';
 
@@ -101,24 +101,22 @@ describe('Content Element Apply Functionality - ENABLED', () => {
       pageId: 'page_123'
     };
 
-    it('should recognize introduction check as NOT applicable (DISABLED)', () => {
-      // Introduction insertion is disabled for 'Keyphrase in Introduction' check per user request
-      expect(canApplyRecommendation('Keyphrase in Introduction')).toBe(false);
+    it('should recognize introduction check as applicable', () => {
+      expect(canApplyRecommendation('Keyphrase in Introduction')).toBe(true);
     });
 
-    it('should NOT create introduction insertion request (DISABLED)', () => {
-      // Introduction insertion is disabled for 'Keyphrase in Introduction' check per user request
+    it('should create introduction insertion request', () => {
       const result = createInsertionRequest(introContext);
-      
-      expect(result).toBeNull();
+
+      expect(result).not.toBeNull();
+      expect(result?.type).toBe('introduction_text');
     });
 
-    it('should provide no description for introduction (DISABLED)', () => {
-      // Introduction insertion is disabled for 'Keyphrase in Introduction' check per user request
-      expect(getApplyDescription('Keyphrase in Introduction')).toBe('This recommendation cannot be applied automatically');
+    it('should provide correct description for introduction', () => {
+      expect(getApplyDescription('Keyphrase in Introduction')).toBe('Apply as introduction paragraph');
     });
 
-    it('should NOT create introduction context (DISABLED)', () => {
+    it('should create introduction insertion request with page context', () => {
       const contextWithSelector: RecommendationContext = {
         checkTitle: 'Keyphrase in Introduction',
         recommendation: 'Optimized introduction',
@@ -126,8 +124,9 @@ describe('Content Element Apply Functionality - ENABLED', () => {
       };
 
       const result = createInsertionRequest(contextWithSelector);
-      
-      expect(result).toBeNull();
+
+      expect(result).not.toBeNull();
+      expect(result?.type).toBe('introduction_text');
     });
   });
 
@@ -160,8 +159,7 @@ describe('Content Element Apply Functionality - ENABLED', () => {
       // All these should return true now since the types are enabled
       expect(canApplyRecommendation('KEYPHRASE IN H1 HEADING')).toBe(true);
       expect(canApplyRecommendation('keyphrase in h2 headings')).toBe(true);
-      // 'Keyphrase In Introduction' should return false since it's specifically disabled
-      expect(canApplyRecommendation('Keyphrase In Introduction')).toBe(false);
+      expect(canApplyRecommendation('Keyphrase In Introduction')).toBe(true);
     });
 
     it('should provide fallback description for unknown types', () => {

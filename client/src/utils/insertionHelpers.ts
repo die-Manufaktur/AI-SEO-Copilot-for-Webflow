@@ -148,12 +148,10 @@ function getInsertionTypeFromCheckTitle(
   }
 
   // Introduction paragraph checks - Now supported with Webflow Designer API v2
-  // Note: 'Keyphrase in Introduction' is excluded from apply functionality per user request
   if (
-    (normalizedTitle.includes('introduction') ||
+    normalizedTitle.includes('introduction') ||
     normalizedTitle.includes('first paragraph') ||
-    normalizedTitle.includes('intro')) &&
-    !normalizedTitle.includes('keyphrase in introduction')
+    normalizedTitle.includes('intro')
   ) {
     return 'introduction_text';
   }
@@ -195,10 +193,6 @@ export function getApplyDescription(checkTitle: string): string {
     case 'introduction_text':
       return 'Apply as introduction paragraph';
     default:
-      // Check if it's specifically the disabled 'Keyphrase in Introduction' check
-      if (checkTitle.toLowerCase().includes('keyphrase in introduction')) {
-        return 'This recommendation cannot be applied automatically';
-      }
       return 'Apply content';
   }
 }
