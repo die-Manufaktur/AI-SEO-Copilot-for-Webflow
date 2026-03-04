@@ -1,3 +1,18 @@
+## [4.9.0](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/compare/v4.8.0...v4.9.0) (2026-03-04)
+
+### Features
+
+* enable Apply to page button for Keyphrase in Introduction check ([d1e8346](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/d1e8346e657c86fa4eb36f06ac1723de76599cb8))
+
+### Bug Fixes
+
+* **keyphrase-intro:** complete Apply button functionality with success state ([0affcd0](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/0affcd07233ac20f98384cd7922e061229dc353b))
+
+### Continuous Integration
+
+* remove duplicate CodeQL and unconfigured Snyk steps from security-scan ([3b384ac](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/3b384ac468de48489134778753e31ea0386c83dc))
+* remove duplicate CodeQL and unconfigured Snyk steps from security… ([#562](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/issues/562)) ([f31a157](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/f31a15709804cb4c1b1cdb58da04d191c2255e60))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
