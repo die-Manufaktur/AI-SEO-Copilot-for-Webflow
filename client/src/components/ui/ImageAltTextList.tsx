@@ -227,30 +227,33 @@ export function ImageAltTextList({
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleApply(image, index)}
-                      disabled={isDisabled || !isApplyable}
-                      className="hover:scale-110 active:scale-95 transition-transform flex items-center justify-center"
-                      style={{
-                        width: '2rem',
-                        height: '2rem',
-                        minWidth: '2rem',
-                        padding: '0.5rem',
-                        background: 'linear-gradient(#787878, #787878) padding-box, linear-gradient(135deg, rgba(255, 255, 255, 0.40) 0%, rgba(255, 255, 255, 0.00) 100%) border-box',
-                        border: '1px solid transparent',
-                        borderRadius: '1.6875rem',
-                        opacity: isApplyable ? 1 : 0.35,
-                        cursor: isApplyable ? undefined : 'not-allowed',
-                      }}
-                      aria-label={`Apply alt text for ${image.name}`}
-                    >
-                      <ApplyIcon className="h-4 w-4" />
-                    </Button>
+                    <span style={{ display: 'inline-flex' }}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleApply(image, index)}
+                        disabled={isDisabled || !isApplyable}
+                        className="hover:scale-110 active:scale-95 transition-transform flex items-center justify-center"
+                        style={{
+                          width: '2rem',
+                          height: '2rem',
+                          minWidth: '2rem',
+                          padding: '0.5rem',
+                          background: 'linear-gradient(#787878, #787878) padding-box, linear-gradient(135deg, rgba(255, 255, 255, 0.40) 0%, rgba(255, 255, 255, 0.00) 100%) border-box',
+                          border: '1px solid transparent',
+                          borderRadius: '1.6875rem',
+                          opacity: isApplyable ? 1 : 0.35,
+                          cursor: isApplyable ? undefined : 'not-allowed',
+                          pointerEvents: (isDisabled || !isApplyable) ? 'none' : undefined,
+                        }}
+                        aria-label={`Apply alt text for ${image.name}`}
+                      >
+                        <ApplyIcon className="h-4 w-4" />
+                      </Button>
+                    </span>
                   </TooltipTrigger>
                   <TooltipContent side="left">
-                    <p>{isApplyable ? 'Apply to page' : 'Cannot apply — image is nested inside a component'}</p>
+                    <p>{isApplyable ? 'Apply to page' : 'Image type not available through API'}</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
