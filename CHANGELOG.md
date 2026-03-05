@@ -1,3 +1,10 @@
+## [4.10.1](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/compare/v4.10.0...v4.10.1) (2026-03-05)
+
+### Bug Fixes
+
+* **security:** bump minimatch overrides to patch ReDoS vulnerabilities ([dc3c76f](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/dc3c76ff819f1e8f0c3afcf7ee2d7d3b09d398f3))
+* **security:** bump minimatch overrides to patch ReDoS vulnerabilities ([#565](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/issues/565)) ([b8424e0](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/b8424e08340a02e36a00685edae44403472e8710))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
