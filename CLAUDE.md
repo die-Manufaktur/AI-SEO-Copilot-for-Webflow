@@ -103,7 +103,7 @@ Built on **Tailwind CSS v4** with CSS custom properties under `@layer base` in `
 - **Editable Recommendations**: Inline editing before applying to page
 - **Batch Apply**: Apply multiple AI suggestions to Webflow elements at once
 - **H2 Generation**: Per-row regenerate icons + "Generate All" header button
-- **Image Alt Text**: Per-image AI alt text generation and apply
+- **Image Alt Text**: Per-image AI alt text generation and apply. Multi-strategy element matching (asset URL → getAttribute src → asset ID in CDN URL → nested child traversal). Apply buttons are grayed out for images not directly accessible via the Designer API (e.g., inside ComponentInstance or HtmlEmbed wrappers).
 - **Schema Generation**: AI-powered schema markup based on page type with dynamic site data
 - **Keyword Persistence**: Auto-saves keywords per page
 - **Multilingual**: 9 languages, auto-detection from `<html lang>`, per-site preferences (see `shared/types/language.ts`)

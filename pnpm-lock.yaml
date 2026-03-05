@@ -86,8 +86,8 @@ importers:
         specifier: ^2.0.27
         version: 2.0.27
       '@webflow/webflow-cli':
-        specifier: ^1.12.3
-        version: 1.12.3(@babel/core@7.29.0)(@rspack/core@1.7.6(@swc/helpers@0.5.19))(@swc/core@1.15.18(@swc/helpers@0.5.19))(@types/node@24.11.0)(esbuild@0.25.12)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3)
+        specifier: ^1.12.4
+        version: 1.12.4(@babel/core@7.29.0)(@rspack/core@1.7.6(@swc/helpers@0.5.19))(@swc/core@1.15.18(@swc/helpers@0.5.19))(@types/node@24.11.0)(esbuild@0.25.12)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3)
       canvas-confetti:
         specifier: ^1.9.4
         version: 1.9.4
@@ -162,8 +162,8 @@ importers:
         version: 4.3.6
     devDependencies:
       '@anthropic-ai/claude-code':
-        specifier: ^2.1.68
-        version: 2.1.68
+        specifier: ^2.1.69
+        version: 2.1.69
       '@cloudflare/vite-plugin':
         specifier: ^1.26.0
         version: 1.26.0(vite@6.4.1(@types/node@24.11.0)(jiti@2.6.1)(lightningcss@1.31.1)(terser@5.46.0)(tsx@4.21.0))(workerd@1.20260301.1)(wrangler@4.70.0)
@@ -255,8 +255,8 @@ importers:
         specifier: ^5.0.0
         version: 5.0.0(conventional-commits-filter@5.0.0)
       conventional-changelog-conventionalcommits:
-        specifier: ^9.2.0
-        version: 9.2.0
+        specifier: ^9.3.0
+        version: 9.3.0
       cross-env:
         specifier: ^7.0.3
         version: 7.0.3
@@ -349,8 +349,8 @@ packages:
     resolution: {integrity: sha512-30iZtAPgz+LTIYoeivqYo853f02jBYSd5uGnGpkFV0M3xOt9aN73erkgYAmZU43x4VfqcnLxW9Kpg3R5LC4YYw==}
     engines: {node: '>=6.0.0'}
 
-  '@anthropic-ai/claude-code@2.1.68':
-    resolution: {integrity: sha512-JfUAZSl7YM94uXBze2Kl5xgo/3mVjPIZQg+cOoQThIA16VLsb53FguiUJtt9WOcC3kgaHshvV/bFTrFFuKWqVQ==}
+  '@anthropic-ai/claude-code@2.1.69':
+    resolution: {integrity: sha512-H7KFlgeGQ2LM/2Cy1Aref58NxWUwaxxtC/XMdgGy7du3jD3uVP6C9MD498YZLzHECUTCSwUyTosfi87tGioD2g==}
     engines: {node: '>=18.0.0'}
     hasBin: true
 
@@ -3605,8 +3605,8 @@ packages:
   '@webflow/designer-extension-typings@2.0.27':
     resolution: {integrity: sha512-NXWYcAd1O1E7PtV3fb0L3y4mboYpMPYVOYzr+mUBbT5C3NR0OIXFv7Feowj3nlRBZoDLCSv7eITVsSF0h+5jsQ==}
 
-  '@webflow/webflow-cli@1.12.3':
-    resolution: {integrity: sha512-iVSSvDnjGmJmTl5UsoBBkUgC9nDAcHaaVNinTKmTKzi4/JKuXaCdmZFHoeA6NAa1A8VMZ6a9/ojCT8KTuG57Mg==}
+  '@webflow/webflow-cli@1.12.4':
+    resolution: {integrity: sha512-4ZcqsOryAwdStOetuWno9TIlr/ER5BWLhwmzjP46c95P9cW6mXpEcMOIrfP7tW48WhUCyKOvyqJG2OaH7XqxCw==}
     engines: {node: '>=18.16.0'}
     hasBin: true
 
@@ -4161,12 +4161,12 @@ packages:
     resolution: {integrity: sha512-ROjNchA9LgfNMTTFSIWPzebCwOGFdgkEq45EnvvrmSLvCtAw0HSmrCs7/ty+wAeYUZyNay0YMUNYFTRL72PkBQ==}
     engines: {node: '>=16'}
 
-  conventional-changelog-angular@8.2.0:
-    resolution: {integrity: sha512-4YB1zEXqB17oBI8yRsAs1T+ZhbdsOgJqkl6Trz+GXt/eKf1e4jnA0oW+sOd9BEENzEViuNW0DNoFFjSf3CeC5Q==}
+  conventional-changelog-angular@8.3.0:
+    resolution: {integrity: sha512-DOuBwYSqWzfwuRByY9O4oOIvDlkUCTDzfbOgcSbkY+imXXj+4tmrEFao3K+FxemClYfYnZzsvudbwrhje9VHDA==}
     engines: {node: '>=18'}
 
-  conventional-changelog-atom@5.0.0:
-    resolution: {integrity: sha512-WfzCaAvSCFPkznnLgLnfacRAzjgqjLUjvf3MftfsJzQdDICqkOOpcMtdJF3wTerxSpv2IAAjX8doM3Vozqle3g==}
+  conventional-changelog-atom@5.1.0:
+    resolution: {integrity: sha512-fw7GpI9jHNCWGBnTsPRI452ypQbNupGwsjrXfozvRNE0c92pJRpoj9rXfzDKUYJcsmk0H4XKaQjhjelwI9z27w==}
     engines: {node: '>=18'}
 
   conventional-changelog-cli@5.0.0:
@@ -4175,8 +4175,8 @@ packages:
     deprecated: This package is no longer maintained. Please use the conventional-changelog package instead.
     hasBin: true
 
-  conventional-changelog-codemirror@5.0.0:
-    resolution: {integrity: sha512-8gsBDI5Y3vrKUCxN6Ue8xr6occZ5nsDEc4C7jO/EovFGozx8uttCAyfhRrvoUAWi2WMm3OmYs+0mPJU7kQdYWQ==}
+  conventional-changelog-codemirror@5.1.0:
+    resolution: {integrity: sha512-iXhy63YczB+yWA9DrsYbquSYLvWKsK9M3WC+xQPEm8cOn4oXzKpmTp2uH3qi7+i10oTcGJTvq9lsBpZmMADaNg==}
     engines: {node: '>=18'}
 
   conventional-changelog-conventionalcommits@7.0.2:
@@ -4187,40 +4187,40 @@ packages:
     resolution: {integrity: sha512-eOvlTO6OcySPyyyk8pKz2dP4jjElYunj9hn9/s0OB+gapTO8zwS9UQWrZ1pmF2hFs3vw1xhonOLGcGjy/zgsuA==}
     engines: {node: '>=18'}
 
-  conventional-changelog-conventionalcommits@9.2.0:
-    resolution: {integrity: sha512-fCf+ODjseueTV09wVBoC0HXLi3OyuBJ+HfE3L63Khxqnr99f9nUcnQh3a15lCWHlGLihyZShW/mVVkBagr9JvQ==}
+  conventional-changelog-conventionalcommits@9.3.0:
+    resolution: {integrity: sha512-kYFx6gAyjSIMwNtASkI3ZE99U1fuVDJr0yTYgVy+I2QG46zNZfl2her+0+eoviG82c5WQvW1jMt1eOQTeJLodA==}
     engines: {node: '>=18'}
 
   conventional-changelog-core@8.0.0:
     resolution: {integrity: sha512-EATUx5y9xewpEe10UEGNpbSHRC6cVZgO+hXQjofMqpy+gFIrcGvH3Fl6yk2VFKh7m+ffenup2N7SZJYpyD9evw==}
     engines: {node: '>=18'}
 
-  conventional-changelog-ember@5.0.0:
-    resolution: {integrity: sha512-RPflVfm5s4cSO33GH/Ey26oxhiC67akcxSKL8CLRT3kQX2W3dbE19sSOM56iFqUJYEwv9mD9r6k79weWe1urfg==}
+  conventional-changelog-ember@5.1.0:
+    resolution: {integrity: sha512-XNcgGcdJt7wh341BBML0CI8DKpqE5lKD1WahzFHGZFvKTzJr1rZW976cw7beqKLOBbzdrH9ZIkE/s2TfbOuM3g==}
     engines: {node: '>=18'}
 
-  conventional-changelog-eslint@6.0.0:
-    resolution: {integrity: sha512-eiUyULWjzq+ybPjXwU6NNRflApDWlPEQEHvI8UAItYW/h22RKkMnOAtfCZxMmrcMO1OKUWtcf2MxKYMWe9zJuw==}
+  conventional-changelog-eslint@6.1.0:
+    resolution: {integrity: sha512-beWr3qzuEMN9gznMWa8PhTVfGkGXoq+XnUzViNXg5KygrgV728ZRqZngz3uPhz5+ayUhPrpNFYqIE0qHWz9NAw==}
     engines: {node: '>=18'}
 
-  conventional-changelog-express@5.0.0:
-    resolution: {integrity: sha512-D8Q6WctPkQpvr2HNCCmwU5GkX22BVHM0r4EW8vN0230TSyS/d6VQJDAxGb84lbg0dFjpO22MwmsikKL++Oo/oQ==}
+  conventional-changelog-express@5.1.0:
+    resolution: {integrity: sha512-g/s9eLohrefYTSNQaB6+k0ONbiVx41YOKBbIOIM3ST/NtedAgppCJnrpKXVN9sOmpPkN4vjFwURlfvpEDUjoeg==}
     engines: {node: '>=18'}
 
-  conventional-changelog-jquery@6.0.0:
-    resolution: {integrity: sha512-2kxmVakyehgyrho2ZHBi90v4AHswkGzHuTaoH40bmeNqUt20yEkDOSpw8HlPBfvEQBwGtbE+5HpRwzj6ac2UfA==}
+  conventional-changelog-jquery@6.1.0:
+    resolution: {integrity: sha512-/sFhULybhFrMg+qc8MHHHSj7kTVMfx5C7rSM6Z9EjduVoAQJdGRq/wpv/SWPMQ+KPNSYHqDLwm/x2Z5hOcYvqQ==}
     engines: {node: '>=18'}
 
-  conventional-changelog-jshint@5.1.0:
-    resolution: {integrity: sha512-t+lw1DsXYldiPH7t1bki0n1EDVigG0zvHsko2SNsgTaXRZJGgNdUHdicDpQrqQq85GPxRd7lMmTYWZmghxcQog==}
+  conventional-changelog-jshint@5.2.0:
+    resolution: {integrity: sha512-OaatyvHXP1fjI7Mx0b1IkmhbhTsVHsytnsQSkOj4rhGbFMoTcfvbwm/vAtCzRMXOxojK1EDMBBmBj1pM9KNy/Q==}
     engines: {node: '>=18'}
 
   conventional-changelog-preset-loader@5.0.0:
     resolution: {integrity: sha512-SetDSntXLk8Jh1NOAl1Gu5uLiCNSYenB5tm0YVeZKePRIgDW9lQImromTwLa3c/Gae298tsgOM+/CYT9XAl0NA==}
     engines: {node: '>=18'}
 
-  conventional-changelog-writer@8.3.0:
-    resolution: {integrity: sha512-l5hDOHjcTUVtnZJapoqXMCJ3IbyF6oV/vnxKL13AHulFH7mDp4PMJARxI7LWzob6UDDvhxIUWGTNUPW84JabQg==}
+  conventional-changelog-writer@8.4.0:
+    resolution: {integrity: sha512-HHBFkk1EECxxmCi4CTu091iuDpQv5/OavuCUAuZmrkWpmYfyD816nom1CvtfXJ/uYfAAjavgHvXHX291tSLK8g==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -6110,8 +6110,8 @@ packages:
     resolution: {integrity: sha512-9qny7Z9DsQU8Ou39ERsPU4OZQlSTP47ShQzuKZ6PRXpYLtIFgl/DEBYEXKlvcEa+9tHVcK8CF81Y2V72qaZhWA==}
     engines: {node: '>=18'}
 
-  npm@10.9.4:
-    resolution: {integrity: sha512-OnUG836FwboQIbqtefDNlyR0gTHzIfwRfE3DuiNewBvnMnWEpB0VEXwBlFVgqpNzIgYo/MHh3d2Hel/pszapAA==}
+  npm@10.9.5:
+    resolution: {integrity: sha512-tFABtwt8S5KDs6DKs4p8uQ+u+8Hpx4ReD6bmkrPzPI0hsYkRWIkY/esz6ZtHyHvqVOltTB9DM/812Lx++SIXRw==}
     engines: {node: ^18.17.0 || >=20.5.0}
     hasBin: true
     bundledDependencies:
@@ -7103,8 +7103,8 @@ packages:
     resolution: {integrity: sha512-ujeqbceABgwMZxEJnk2HDY2DlnUZ+9oEcb1KzTVfYHio0UE6dG71n60d8D2I4qNvleWrrXpmjpt7vZeF1LnMZQ==}
     engines: {node: '>=6'}
 
-  tar@7.5.9:
-    resolution: {integrity: sha512-BTLcK0xsDh2+PUe9F6c2TlRp4zOOBMTkoQHQIWSIzI0R7KG46uEwq4OPk2W7bZcprBMsuaeFsqwYr7pjh6CuHg==}
+  tar@7.5.10:
+    resolution: {integrity: sha512-8mOPs1//5q/rlkNSPcCegA6hiHJYDmSLEI8aMH/CdSQJNWztHC9WHNam5zdQlfpTwB9Xp7IBEsHfV5LKMJGVAw==}
     engines: {node: '>=18'}
 
   temp-dir@3.0.0:
@@ -7601,8 +7601,8 @@ packages:
   web-worker@1.5.0:
     resolution: {integrity: sha512-RiMReJrTAiA+mBjGONMnjVDP2u3p9R1vkcGz6gDIrOMT3oGuYwX2WRMYI9ipkphSuE5XKEhydbhNEJh4NY9mlw==}
 
-  webflow-api@3.2.0:
-    resolution: {integrity: sha512-fFZoxFl8TZeGCkC9/NGA7BKgVysfmEYPx4sK7HWLmHakd4pRI+ZivZk5ycCOJFHMmUKyH+owkzgYneDiJZ2cDA==}
+  webflow-api@3.2.2:
+    resolution: {integrity: sha512-q57QYXb/h+vnavgMkv1vWFRMdlvL8Bc/pq6SJSPXZSlgSydeJqEn3u35Tva37qbmF54BGgYJtPtU+Izp4rj2xQ==}
 
   webidl-conversions@3.0.1:
     resolution: {integrity: sha512-2JAn3z8AR6rjK8Sm8orRC0h/bcl/DqL7tRPdGZ4I1CjdF+EaMLmYxBHyXuKL849eucPFhvBoxMsflfOb8kxaeQ==}
@@ -7836,7 +7836,7 @@ snapshots:
       '@jridgewell/gen-mapping': 0.3.13
       '@jridgewell/trace-mapping': 0.3.31
 
-  '@anthropic-ai/claude-code@2.1.68':
+  '@anthropic-ai/claude-code@2.1.69':
     optionalDependencies:
       '@img/sharp-darwin-arm64': 0.34.5
       '@img/sharp-darwin-x64': 0.34.5
@@ -10485,8 +10485,8 @@ snapshots:
 
   '@semantic-release/commit-analyzer@13.0.1(semantic-release@24.2.9(typescript@5.9.3))':
     dependencies:
-      conventional-changelog-angular: 8.2.0
-      conventional-changelog-writer: 8.3.0
+      conventional-changelog-angular: 8.3.0
+      conventional-changelog-writer: 8.4.0
       conventional-commits-filter: 5.0.0
       conventional-commits-parser: 6.3.0
       debug: 4.4.3(supports-color@5.5.0)
@@ -10558,7 +10558,7 @@ snapshots:
       lodash-es: 4.17.23
       nerf-dart: 1.0.0
       normalize-url: 8.1.1
-      npm: 10.9.4
+      npm: 10.9.5
       rc: 1.2.8
       read-pkg: 9.0.1
       registry-auth-token: 5.1.1
@@ -10568,8 +10568,8 @@ snapshots:
 
   '@semantic-release/release-notes-generator@14.1.0(semantic-release@24.2.9(typescript@5.9.3))':
     dependencies:
-      conventional-changelog-angular: 8.2.0
-      conventional-changelog-writer: 8.3.0
+      conventional-changelog-angular: 8.3.0
+      conventional-changelog-writer: 8.4.0
       conventional-commits-filter: 5.0.0
       conventional-commits-parser: 6.3.0
       debug: 4.4.3(supports-color@5.5.0)
@@ -11216,7 +11216,7 @@ snapshots:
 
   '@webflow/designer-extension-typings@2.0.27': {}
 
-  '@webflow/webflow-cli@1.12.3(@babel/core@7.29.0)(@rspack/core@1.7.6(@swc/helpers@0.5.19))(@swc/core@1.15.18(@swc/helpers@0.5.19))(@types/node@24.11.0)(esbuild@0.25.12)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3)':
+  '@webflow/webflow-cli@1.12.4(@babel/core@7.29.0)(@rspack/core@1.7.6(@swc/helpers@0.5.19))(@swc/core@1.15.18(@swc/helpers@0.5.19))(@types/node@24.11.0)(esbuild@0.25.12)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3)':
     dependencies:
       '@babel/preset-env': 7.29.0(@babel/core@7.29.0)
       '@babel/preset-react': 7.28.5(@babel/core@7.29.0)
@@ -11254,11 +11254,11 @@ snapshots:
       semver: 7.7.4
       serve-handler: 6.1.7
       source-map-support: 0.5.21
-      tar: 7.5.9
+      tar: 7.5.10
       tsconfig-paths: 4.2.0
       tsconfig-paths-webpack-plugin: 4.2.0
       unionfs: 4.6.0
-      webflow-api: 3.2.0
+      webflow-api: 3.2.2
       webpack: 5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.19))(esbuild@0.25.12)
       webpack-merge: 6.0.1
       webpack-node-externals: 3.0.0
@@ -11898,11 +11898,11 @@ snapshots:
     dependencies:
       compare-func: 2.0.0
 
-  conventional-changelog-angular@8.2.0:
+  conventional-changelog-angular@8.3.0:
     dependencies:
       compare-func: 2.0.0
 
-  conventional-changelog-atom@5.0.0: {}
+  conventional-changelog-atom@5.1.0: {}
 
   conventional-changelog-cli@5.0.0(conventional-commits-filter@5.0.0):
     dependencies:
@@ -11913,7 +11913,7 @@ snapshots:
     transitivePeerDependencies:
       - conventional-commits-filter
 
-  conventional-changelog-codemirror@5.0.0: {}
+  conventional-changelog-codemirror@5.1.0: {}
 
   conventional-changelog-conventionalcommits@7.0.2:
     dependencies:
@@ -11923,7 +11923,7 @@ snapshots:
     dependencies:
       compare-func: 2.0.0
 
-  conventional-changelog-conventionalcommits@9.2.0:
+  conventional-changelog-conventionalcommits@9.3.0:
     dependencies:
       compare-func: 2.0.0
 
@@ -11931,7 +11931,7 @@ snapshots:
     dependencies:
       '@hutson/parse-repository-url': 5.0.0
       add-stream: 1.0.0
-      conventional-changelog-writer: 8.3.0
+      conventional-changelog-writer: 8.4.0
       conventional-commits-parser: 6.3.0
       git-raw-commits: 5.0.1(conventional-commits-filter@5.0.0)(conventional-commits-parser@6.3.0)
       git-semver-tags: 8.0.1(conventional-commits-filter@5.0.0)(conventional-commits-parser@6.3.0)
@@ -11942,21 +11942,21 @@ snapshots:
     transitivePeerDependencies:
       - conventional-commits-filter
 
-  conventional-changelog-ember@5.0.0: {}
+  conventional-changelog-ember@5.1.0: {}
 
-  conventional-changelog-eslint@6.0.0: {}
+  conventional-changelog-eslint@6.1.0: {}
 
-  conventional-changelog-express@5.0.0: {}
+  conventional-changelog-express@5.1.0: {}
 
-  conventional-changelog-jquery@6.0.0: {}
+  conventional-changelog-jquery@6.1.0: {}
 
-  conventional-changelog-jshint@5.1.0:
+  conventional-changelog-jshint@5.2.0:
     dependencies:
       compare-func: 2.0.0
 
   conventional-changelog-preset-loader@5.0.0: {}
 
-  conventional-changelog-writer@8.3.0:
+  conventional-changelog-writer@8.4.0:
     dependencies:
       '@simple-libs/stream-utils': 1.2.0
       conventional-commits-filter: 5.0.0
@@ -11966,16 +11966,16 @@ snapshots:
 
   conventional-changelog@6.0.0(conventional-commits-filter@5.0.0):
     dependencies:
-      conventional-changelog-angular: 8.2.0
-      conventional-changelog-atom: 5.0.0
-      conventional-changelog-codemirror: 5.0.0
+      conventional-changelog-angular: 8.3.0
+      conventional-changelog-atom: 5.1.0
+      conventional-changelog-codemirror: 5.1.0
       conventional-changelog-conventionalcommits: 8.0.0
       conventional-changelog-core: 8.0.0(conventional-commits-filter@5.0.0)
-      conventional-changelog-ember: 5.0.0
-      conventional-changelog-eslint: 6.0.0
-      conventional-changelog-express: 5.0.0
-      conventional-changelog-jquery: 6.0.0
-      conventional-changelog-jshint: 5.1.0
+      conventional-changelog-ember: 5.1.0
+      conventional-changelog-eslint: 6.1.0
+      conventional-changelog-express: 5.1.0
+      conventional-changelog-jquery: 6.1.0
+      conventional-changelog-jshint: 5.2.0
       conventional-changelog-preset-loader: 5.0.0
     transitivePeerDependencies:
       - conventional-commits-filter
@@ -13937,7 +13937,7 @@ snapshots:
       path-key: 4.0.0
       unicorn-magic: 0.3.0
 
-  npm@10.9.4: {}
+  npm@10.9.5: {}
 
   nth-check@2.1.1:
     dependencies:
@@ -14920,7 +14920,7 @@ snapshots:
       inherits: 2.0.4
       readable-stream: 3.6.2
 
-  tar@7.5.9:
+  tar@7.5.10:
     dependencies:
       '@isaacs/fs-minipass': 4.0.1
       chownr: 3.0.0
@@ -15381,7 +15381,7 @@ snapshots:
 
   web-worker@1.5.0: {}
 
-  webflow-api@3.2.0:
+  webflow-api@3.2.2:
     dependencies:
       crypto-browserify: 3.12.1
       form-data: 4.0.4

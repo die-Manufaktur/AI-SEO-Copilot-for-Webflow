@@ -214,4 +214,44 @@ describe('ImageAltTextList', () => {
       screen.getAllByRole('button').forEach(btn => expect(btn).toBeDisabled());
     });
   });
+
+  describe('applyableImageUrls', () => {
+    const threeImages: ImageAltTextItem[] = [
+      { id: 'img_1', url: 'https://cdn.example.com/aaa111_photo.jpg', name: 'photo.jpg', alt: 'Alt A' },
+      { id: 'img_2', url: 'https://cdn.example.com/bbb222_logo.svg', name: 'logo.svg', alt: 'Alt B' },
+      { id: 'img_3', url: 'https://cdn.example.com/ccc333_hero.webp', name: 'hero.webp', alt: 'Alt C' },
+    ];
+
+    it('disables Apply button and shows tooltip for non-applyable images', () => {
+      const applyableUrls = new Set(['https://cdn.example.com/bbb222_logo.svg']);
+
+      render(
+        <ImageAltTextList
+          {...defaultProps}
+          images={threeImages}
+          applyableImageUrls={applyableUrls}
+        />
+      );
+
+      const applyButtons = screen.getAllByRole('button', { name: /apply alt text/i });
+      expect(applyButtons).toHaveLength(3);
+
+      // Only the second image (bbb222) should be enabled
+      expect(applyButtons[0]).toBeDisabled();
+      expect(applyButtons[1]).not.toBeDisabled();
+      expect(applyButtons[2]).toBeDisabled();
+    });
+
+    it('enables Apply button for all images when applyableImageUrls is not provided', () => {
+      render(
+        <ImageAltTextList
+          {...defaultProps}
+          images={threeImages}
+        />
+      );
+
+      const applyButtons = screen.getAllByRole('button', { name: /apply alt text/i });
+      applyButtons.forEach(btn => expect(btn).not.toBeDisabled());
+    });
+  });
 });

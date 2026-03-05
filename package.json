@@ -36,7 +36,7 @@
     "commit": "git-cz --sign"
   },
   "devDependencies": {
-    "@anthropic-ai/claude-code": "^2.1.68",
+    "@anthropic-ai/claude-code": "^2.1.69",
     "@cloudflare/vite-plugin": "^1.26.0",
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
@@ -67,7 +67,7 @@
     "commitizen": "^4.3.1",
     "concurrently": "^9.2.1",
     "conventional-changelog-cli": "^5.0.0",
-    "conventional-changelog-conventionalcommits": "^9.2.0",
+    "conventional-changelog-conventionalcommits": "^9.3.0",
     "cross-env": "^7.0.3",
     "cz-conventional-changelog": "^3.3.0",
     "esbuild": "^0.25.12",
@@ -119,7 +119,7 @@
     "@tanstack/react-query": "^5.90.21",
     "@vitejs/plugin-react": "^5.1.4",
     "@webflow/designer-extension-typings": "^2.0.27",
-    "@webflow/webflow-cli": "^1.12.3",
+    "@webflow/webflow-cli": "^1.12.4",
     "canvas-confetti": "^1.9.4",
     "cheerio": "^1.2.0",
     "class-variance-authority": "^0.7.1",

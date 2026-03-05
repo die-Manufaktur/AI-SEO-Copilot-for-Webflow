@@ -370,6 +370,7 @@ export default function Home() {
   const h2ListRef = useRef<H2SelectionListHandle>(null);
   const [h2GeneratingAll, setH2GeneratingAll] = useState(false);
   const [imageAltGeneratingAll, setImageAltGeneratingAll] = useState(false);
+  const [applyableImageUrls, setApplyableImageUrls] = useState<Set<string> | undefined>(undefined);
   const [h2ElementsFetched, setH2ElementsFetched] = useState(false);
   const [secondaryKeywordsError, setSecondaryKeywordsError] = useState<string>('');
   const [selectedLanguage, setSelectedLanguage] = useState<Language>(getDefaultLanguage());
@@ -1007,11 +1008,42 @@ export default function Home() {
     getUrls();
   }, []);
 
-  const selectedCategoryChecks = selectedCategory && results && results.checks && Array.isArray(results.checks) ? 
+  const selectedCategoryChecks = selectedCategory && results && results.checks && Array.isArray(results.checks) ?
     results.checks.filter(check => {
       const categories = groupChecksByCategory(results.checks);
       return categories[selectedCategory]?.includes(check);
     }) : [];
+
+  // Determine which scraped images can be directly updated via the Designer API
+  useEffect(() => {
+    async function fetchApplyableImages() {
+      try {
+        const api = new WebflowDesignerExtensionAPI();
+        const assetIds = await api.getApplyableImageAssetIds();
+        const imageCheck = selectedCategoryChecks.find(c => c.title === 'Image Alt Attributes');
+        if (imageCheck?.imageData) {
+          const applyable = new Set<string>();
+          for (const img of imageCheck.imageData) {
+            for (const assetId of assetIds) {
+              if (img.url.includes(assetId)) {
+                applyable.add(img.url);
+                break;
+              }
+            }
+          }
+          setApplyableImageUrls(applyable);
+        }
+      } catch {
+        // On failure, don't restrict — leave all enabled
+      }
+    }
+    const hasImageCheck = selectedCategoryChecks.some(
+      c => c.title === 'Image Alt Attributes' && c.imageData && c.imageData.length > 0
+    );
+    if (hasImageCheck) {
+      fetchApplyableImages();
+    }
+  }, [selectedCategoryChecks]);
 
   return (
     <motion.div
@@ -1675,6 +1707,7 @@ export default function Home() {
                                       alt: img.alt || null,
                                     }))}
                                     onApply={async ({ image, newAltText }) => {
+                                      console.log('[Home] onApply called for image alt:', { imageUrl: image.url, altTextPreview: newAltText.substring(0, 50) });
                                       try {
                                         const result = await applyInsertion({
                                           type: 'image_alt',
@@ -1683,15 +1716,24 @@ export default function Home() {
                                           imageUrl: image.url,
                                           pageId: currentPageId,
                                         });
+                                        console.log('[Home] applyInsertion result:', result);
                                         if (result.success) {
                                           toast({
                                             title: "Your text has been included successfully",
                                             description: "Don't forget to publish your website to update the SEO score.",
                                           });
+                                        } else {
+                                          const errorMsg = result.error?.msg || 'Failed to apply image alt text';
+                                          toast({
+                                            variant: "destructive",
+                                            title: "Apply Failed",
+                                            description: errorMsg,
+                                          });
                                         }
                                         return { success: result.success };
                                       } catch (error) {
                                         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                                        console.error('[Home] onApply error:', errorMessage);
                                         toast({
                                           variant: "destructive",
                                           title: "Apply Failed",
@@ -1725,6 +1767,7 @@ export default function Home() {
                                     pageId={currentPageId}
                                     checkTitle="Image Alt Attributes"
                                     disabled={imageAltGeneratingAll || mutation.isPending}
+                                    applyableImageUrls={applyableImageUrls}
                                   />
                                 ) : (
                                   <motion.div

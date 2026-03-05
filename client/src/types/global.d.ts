@@ -61,6 +61,10 @@ interface WebflowElement {
   setHeadingLevel?(level: number): Promise<void>;
   // DOM element methods
   getTag?(): Promise<string | null>; // For DOM elements - returns HTML tag name
+  // Image-specific methods (official Webflow Designer Extension API)
+  getAsset?(): Promise<{ url?: string; name?: string; id?: string; [key: string]: any } | null>;
+  getAltText?(): Promise<string>;
+  setAltText?(altText: string): Promise<void>;
 
   // Allow arbitrary property access for debugging/inspection
   [key: string]: any;

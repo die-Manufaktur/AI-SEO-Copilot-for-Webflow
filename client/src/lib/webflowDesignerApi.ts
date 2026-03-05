@@ -33,6 +33,7 @@ interface WebflowDesignerAPI {
   updateH2Heading(pageId: string, content: string, index?: number): Promise<boolean>;
   updateIntroductionParagraph(pageId: string, content: string): Promise<boolean>;
   updateImageAltText(imageUrl: string, altText: string): Promise<boolean>;
+  getApplyableImageAssetIds(): Promise<Set<string>>;
   // Helper methods for element manipulation
   getAllElements(): Promise<WebflowElement[]>;
   getElementsByTagName(tagName: string): Promise<WebflowElement[]>;
@@ -864,8 +865,10 @@ export class WebflowDesignerExtensionAPI implements WebflowDesignerAPI {
   }
 
   /**
-   * Set the alt text attribute on an image element identified by its src URL.
-   * Matches by exact URL first, then by filename as a fallback.
+   * Set the alt text on an image element identified by its src URL.
+   * Uses the official Webflow Designer Extension API:
+   * - getAsset() to retrieve the image URL from the element's asset
+   * - setAltText() to set the alt text (NOT setAttribute)
    */
   async updateImageAltText(imageUrl: string, altText: string): Promise<boolean> {
     return this.retryOperation(async () => {
@@ -881,14 +884,24 @@ export class WebflowDesignerExtensionAPI implements WebflowDesignerAPI {
         throw new Error('getAllElements method not available in Webflow Designer API');
       }
       const rawElements = await window.webflow.getAllElements();
-      const allElements = (rawElements || []).filter((el: WebflowElement) => el != null);
-      const imageElement = this.findImageElementByUrl(allElements, imageUrl);
+      const allElements = (rawElements || []).filter(
+        (el: WebflowElement) => el != null
+      );
+
+      const imageElement = await this.findImageElementByUrl(allElements, imageUrl);
 
       if (!imageElement) {
         throw new Error(`No image element found matching URL: ${imageUrl}`);
       }
 
-      imageElement.setAttribute('alt', altText);
+      // Use the official Webflow Designer API method for setting alt text
+      if (typeof imageElement.setAltText === 'function') {
+        await imageElement.setAltText(altText);
+      } else {
+        // Fallback for older API versions
+        console.warn('[WebflowDesignerAPI] setAltText not available, falling back to setAttribute');
+        imageElement.setAttribute('alt', altText);
+      }
 
       console.log('[WebflowDesignerAPI] Successfully set alt text on image element');
       return true;
@@ -896,33 +909,179 @@ export class WebflowDesignerExtensionAPI implements WebflowDesignerAPI {
   }
 
   /**
-   * Find an image element whose src attribute matches the given URL.
-   * Strategy 1: filter by known image element types, match by src.
-   * Strategy 2: fallback — check getAttribute('src') on every element.
+   * Returns a Set of asset IDs from all top-level Image elements accessible via the Designer API.
+   * Used to determine which scraped images can be directly updated via Apply.
    */
-  private findImageElementByUrl(elements: WebflowElement[], targetUrl: string): WebflowElement | null {
+  async getApplyableImageAssetIds(): Promise<Set<string>> {
+    const ids = new Set<string>();
+    try {
+      const isTestEnvironment = typeof process !== 'undefined' && process.env.NODE_ENV === 'test';
+      if (!isTestEnvironment) {
+        await this.waitForApiReady();
+      }
+      if (!window.webflow?.getAllElements) return ids;
+      const rawElements = await window.webflow.getAllElements();
+      const allElements = (rawElements || []).filter((el: WebflowElement) => el != null);
+      const imageElements = allElements.filter((el: WebflowElement) => el?.type === 'Image');
+      for (const el of imageElements) {
+        try {
+          if (typeof el.getAsset === 'function') {
+            const asset = await el.getAsset();
+            if (asset?.id) {
+              ids.add(asset.id);
+            }
+          }
+        } catch {
+          // skip this element
+        }
+      }
+    } catch (error) {
+      console.warn('[WebflowDesignerAPI] Failed to get applyable image IDs:', error);
+    }
+    return ids;
+  }
+
+  /**
+   * Find an image element whose asset URL matches the given URL.
+   * Uses getAsset() on Image-type elements to retrieve their URL,
+   * then compares against the target URL with flexible matching.
+   */
+  private async findImageElementByUrl(elements: WebflowElement[], targetUrl: string): Promise<WebflowElement | null> {
     const targetFilename = targetUrl.split('/').pop()?.split('?')[0] ?? '';
 
-    const matchesByUrl = (src: string): boolean => {
-      if (src === targetUrl) return true;
-      if (targetUrl.includes(src) || src.includes(targetUrl)) return true;
-      const srcFilename = src.split('/').pop()?.split('?')[0] ?? '';
-      return !!(targetFilename && srcFilename && srcFilename === targetFilename);
+    const matchesByUrl = (assetUrl: string): boolean => {
+      if (assetUrl === targetUrl) return true;
+      if (targetUrl.includes(assetUrl) || assetUrl.includes(targetUrl)) return true;
+      const assetFilename = assetUrl.split('/').pop()?.split('?')[0] ?? '';
+      return !!(targetFilename && assetFilename && assetFilename === targetFilename);
     };
 
-    // Strategy 1: known image element types
-    const imageTypes = ['ImageElement', 'Image', 'ImageWidget'];
-    for (const el of elements) {
-      if (!el?.type || !imageTypes.includes(el.type)) continue;
-      const src = el.getAttribute('src');
-      if (src && matchesByUrl(src)) return el;
+    // Filter to Image-type elements only
+    const imageElements = elements.filter(el => el?.type === 'Image');
+    console.log(`[WebflowDesignerAPI] Found ${imageElements.length} Image elements out of ${elements.length} total`);
+    console.log('[WebflowDesignerAPI] Looking for URL:', targetUrl);
+
+    // Strategy 1: Match via getAsset() — the official API method
+    // Cache assets for reuse in Strategy 3
+    const assetCache = new Map<WebflowElement, { id?: string; url?: string; name?: string } | null>();
+    for (const el of imageElements) {
+      try {
+        if (typeof el.getAsset === 'function') {
+          const asset = await el.getAsset();
+          assetCache.set(el, asset);
+          if (asset) {
+            // Log asset structure for first few elements to aid debugging
+            console.log('[WebflowDesignerAPI] Image asset:', {
+              url: asset.url,
+              name: asset.name,
+              id: asset.id,
+              keys: Object.keys(asset),
+            });
+
+            if (!asset.url) {
+              console.log('[WebflowDesignerAPI] Asset has no url property, will try ID matching', { id: asset.id });
+            }
+
+            const assetUrl = asset.url || '';
+            if (assetUrl && matchesByUrl(assetUrl)) {
+              console.log('[WebflowDesignerAPI] Matched image element via getAsset() URL');
+              return el;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[WebflowDesignerAPI] Error calling getAsset():', err);
+      }
     }
 
-    // Strategy 2: any element that has a matching src attribute
-    for (const el of elements) {
-      if (!el) continue;
-      const src = el.getAttribute('src');
-      if (src && matchesByUrl(src)) return el;
+    // Strategy 2: Fallback — try getAttribute('src') in case the API behaves unexpectedly
+    for (const el of imageElements) {
+      try {
+        if (typeof el.getAttribute === 'function') {
+          const src = el.getAttribute('src');
+          if (src && matchesByUrl(src)) {
+            console.log('[WebflowDesignerAPI] Matched image element via getAttribute(src)');
+            return el;
+          }
+        }
+      } catch {
+        // continue
+      }
+    }
+
+    // Strategy 3: Match by asset ID in CDN URL (uses cached assets from Strategy 1)
+    // When the Webflow API returns asset objects with only 'id' (no url/name),
+    // check if the asset ID appears in the target CDN URL.
+    // Webflow CDN URL pattern: https://cdn.prod.website-files.com/{siteId}/{assetId}_{filename}.{ext}
+    for (const el of imageElements) {
+      const asset = assetCache.get(el);
+      if (asset?.id && targetUrl.includes(asset.id)) {
+        console.log('[WebflowDesignerAPI] Matched image element via asset ID in URL');
+        return el;
+      }
+    }
+
+    // Strategy 4: Search for images nested inside container elements (Link, Block, ComponentInstance)
+    // The SEO scraper finds images in the rendered HTML, but some are nested inside
+    // wrapper elements and don't appear as top-level Image types
+    const containerTypes = ['Link', 'Block', 'ComponentInstance'];
+    const containers = elements.filter(el => containerTypes.includes(el?.type));
+    for (const container of containers) {
+      const found = await this.findImageInChildren(container, targetUrl, 3);
+      if (found) {
+        console.log('[WebflowDesignerAPI] Matched nested image via asset ID in container:', container.type);
+        return found;
+      }
+    }
+
+    // Debug: Log all element types found if no match
+    const typeCounts: Record<string, number> = {};
+    elements.forEach(el => {
+      const t = el?.type || 'unknown';
+      typeCounts[t] = (typeCounts[t] || 0) + 1;
+    });
+    console.warn('[WebflowDesignerAPI] No image match found. Element types on page:', typeCounts);
+
+    return null;
+  }
+
+  /**
+   * Recursively search an element's children for an Image element whose asset ID
+   * appears in the target URL. Used by Strategy 4 to find images nested inside
+   * Link, Block, or ComponentInstance wrappers.
+   */
+  private async findImageInChildren(
+    element: WebflowElement,
+    targetUrl: string,
+    maxDepth: number
+  ): Promise<WebflowElement | null> {
+    if (maxDepth <= 0) return null;
+
+    try {
+      if (typeof element.getChildren !== 'function') return null;
+      const children = await element.getChildren();
+      if (!children) return null;
+
+      for (const child of children) {
+        if (child?.type === 'Image') {
+          try {
+            if (typeof child.getAsset === 'function') {
+              const asset = await child.getAsset();
+              if (asset?.id && targetUrl.includes(asset.id)) {
+                return child;
+              }
+            }
+          } catch {
+            // continue to next child
+          }
+        }
+
+        // Recurse into non-Image children
+        const found = await this.findImageInChildren(child, targetUrl, maxDepth - 1);
+        if (found) return found;
+      }
+    } catch {
+      // getChildren() failed — skip this element
     }
 
     return null;

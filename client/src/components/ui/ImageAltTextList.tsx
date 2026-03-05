@@ -44,6 +44,7 @@ export interface ImageAltTextListProps {
   checkTitle?: string;
   disabled?: boolean;
   className?: string;
+  applyableImageUrls?: Set<string>;
 }
 
 interface ItemState {
@@ -59,6 +60,7 @@ export function ImageAltTextList({
   onRegenerate,
   disabled = false,
   className = '',
+  applyableImageUrls,
 }: ImageAltTextListProps): React.ReactElement {
   const [itemStates, setItemStates] = useState<Record<number, ItemState>>({});
   const [editedTexts, setEditedTexts] = useState<Record<number, string>>(() => {
@@ -119,15 +121,28 @@ export function ImageAltTextList({
   const isAnyLoading = disabled || Object.values(itemStates).some(s => s.loading || s.regenerating);
 
   const handleApply = async (image: ImageAltTextItem, index: number) => {
-    if (isAnyLoading) return;
+    console.log('[ImageAltTextList] handleApply called', { imageName: image.name, index });
+    console.log('[ImageAltTextList] isAnyLoading:', isAnyLoading, 'disabled:', disabled);
+
+    if (isAnyLoading) {
+      console.log('[ImageAltTextList] BLOCKED: isAnyLoading is true');
+      return;
+    }
 
     const newAltText = editedTexts[index] ?? '';
-    if (!newAltText.trim()) return;
+    console.log('[ImageAltTextList] editedTexts[index]:', JSON.stringify(editedTexts[index]), 'newAltText:', JSON.stringify(newAltText));
 
+    if (!newAltText.trim()) {
+      console.log('[ImageAltTextList] BLOCKED: newAltText is empty');
+      return;
+    }
+
+    console.log('[ImageAltTextList] Calling onApply', { imageUrl: image.url, altTextPreview: newAltText.substring(0, 50) });
     updateItemState(index, { loading: true, error: undefined });
 
     try {
       const result = await onApply({ image, newAltText });
+      console.log('[ImageAltTextList] onApply result:', result);
       if (result.success) {
         updateItemState(index, { loading: false, success: true });
       } else {
@@ -135,6 +150,7 @@ export function ImageAltTextList({
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error('[ImageAltTextList] onApply error:', errorMessage);
       updateItemState(index, { loading: false, error: errorMessage });
     }
   };
@@ -156,6 +172,7 @@ export function ImageAltTextList({
       {images.map((image, index) => {
         const itemState = itemStates[index] || {};
         const isApplied = itemState.success;
+        const isApplyable = !applyableImageUrls || applyableImageUrls.has(image.url);
         const isDisabled = isAnyLoading || itemState.loading || itemState.regenerating;
 
         return (
@@ -214,7 +231,7 @@ export function ImageAltTextList({
                       variant="ghost"
                       size="sm"
                       onClick={() => handleApply(image, index)}
-                      disabled={isDisabled}
+                      disabled={isDisabled || !isApplyable}
                       className="hover:scale-110 active:scale-95 transition-transform flex items-center justify-center"
                       style={{
                         width: '2rem',
@@ -224,6 +241,8 @@ export function ImageAltTextList({
                         background: 'linear-gradient(#787878, #787878) padding-box, linear-gradient(135deg, rgba(255, 255, 255, 0.40) 0%, rgba(255, 255, 255, 0.00) 100%) border-box',
                         border: '1px solid transparent',
                         borderRadius: '1.6875rem',
+                        opacity: isApplyable ? 1 : 0.35,
+                        cursor: isApplyable ? undefined : 'not-allowed',
                       }}
                       aria-label={`Apply alt text for ${image.name}`}
                     >
@@ -231,7 +250,7 @@ export function ImageAltTextList({
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="left">
-                    <p>Apply to page</p>
+                    <p>{isApplyable ? 'Apply to page' : 'Cannot apply — image is nested inside a component'}</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
