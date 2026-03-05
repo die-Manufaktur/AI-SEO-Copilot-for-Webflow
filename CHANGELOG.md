@@ -1,3 +1,25 @@
+## [4.10.0](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/compare/v4.9.0...v4.10.0) (2026-03-05)
+
+### Features
+
+* **Home:** route image alt apply through standard insertion pipeline ([60d2a2d](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/60d2a2d1fbe2b291540fa55b18ee92385e1f6da2))
+* **insertionHelpers:** add image_alt type mapping and imageUrl context ([d2be610](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/d2be6102d974654fcfce1f21e1e234fdeeebaf30))
+* **types:** add image_alt insertion type and imageUrl field to WebflowInsertionRequest ([0f06dbb](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/0f06dbbb673be3aac4cb7f1791efcf66f79d91d0))
+* **webflowInsertion:** add applyImageAlt method for image_alt insertion type ([f80676a](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/f80676ae0d3e65399829e46d3970dc903ab66f91))
+
+### Bug Fixes
+
+* **image-alt:** multi-strategy element matching and applyability detection ([80d3934](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/80d39344b2cf8c0f8fd5d68487c4565ba3b59550))
+* **ImageAltTextList:** enable tooltip on disabled Apply buttons ([8ad78c6](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/8ad78c68b729efc59e332d902da9ff2a9cf3b550))
+
+### Documentation
+
+* optimize CLAUDE.md for AI context and update README.md for design system ([92d25b4](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/92d25b4c86bf0ba7a6fce211e6f18193f41d4f38))
+
+### Build System
+
+* **dependencies:** updated pnpm ([30a39fa](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/30a39faf9ad050d2ad96e046477360516dc3270a))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
