@@ -9,21 +9,24 @@ An advanced SEO analysis tool that performs 18 comprehensive checks with AI-powe
 
 ## Features
 
-- **🔍 Comprehensive SEO Analysis**: 18 different SEO checks covering all critical aspects
-- **🤖 AI-Powered Recommendations**: OpenAI-powered suggestions for improvements
-- **🌐 Multilingual Support**: AI recommendations in 9 languages with automatic site language detection
-- **💾 Keyword Persistence**: Automatically saves keywords per page for seamless workflow
-- **📊 Visual Progress Tracking**: Real-time SEO score calculation and progress indicators
-- **🎯 Page-Specific Analysis**: Tailored analysis for homepage vs. other pages
-- **🖼️ Image Optimization**: Alt text, size, and format recommendations
-- **📱 Modern UI**: Clean interface with status indicators
-- **⚡ Fast Performance**: Optimized for quick analysis and feedback
+- **Comprehensive SEO Analysis**: 18 different SEO checks covering all critical aspects
+- **AI-Powered Recommendations**: OpenAI-powered suggestions for improvements
+- **Multilingual Support**: AI recommendations in 9 languages with automatic site language detection
+- **Editable Recommendations**: Edit AI suggestions inline before applying them to your page
+- **Batch Apply**: Apply multiple AI suggestions to Webflow elements at once
+- **Image Alt Text Generation**: Per-image AI-generated alt text with one-click apply
+- **H2 Heading Suggestions**: Per-heading AI suggestions with individual and batch regeneration
+- **Schema Markup Generation**: AI-powered schema recommendations populated with live site data
+- **Keyword Persistence**: Automatically saves keywords per page for seamless workflow
+- **Visual Progress Tracking**: Real-time SEO score calculation and progress indicators
+- **Page-Specific Analysis**: Tailored analysis for homepage vs. other pages
 
-### SEO Checks Include:
+### SEO Checks Include
 - Title Tag Optimization
 - Meta Description Analysis
 - Content Structure Verification
 - Keyword Density Analysis
+- Keyphrase in Introduction
 - Image Alt Text Optimization
 - OpenGraph Tags Validation
 - Schema Markup Validation
@@ -34,22 +37,24 @@ An advanced SEO analysis tool that performs 18 comprehensive checks with AI-powe
 - Next-Gen Image Format Detection
 - Code Minification Check
 - Image File Size Optimization
-- **Intelligent Schema Recommendations**: AI-powered schema markup generation with dynamic site data population
+- Intelligent Schema Recommendations
 
 ## Multilingual AI Recommendations
 
 The extension provides AI-powered SEO recommendations in **9 languages** with intelligent site language detection:
 
 ### Supported Languages
-- 🇺🇸 **English** - English
-- 🇫🇷 **French** - Français
-- 🇩🇪 **German** - Deutsch
-- 🇪🇸 **Spanish** - Español
-- 🇮🇹 **Italian** - Italiano
-- 🇯🇵 **Japanese** - 日本語
-- 🇵🇹 **Portuguese** - Português
-- 🇳🇱 **Dutch** - Nederlands
-- 🇵🇱 **Polish** - Polski
+| Language | Code | Native Name |
+|----------|------|-------------|
+| English | en | English |
+| French | fr | Francais |
+| German | de | Deutsch |
+| Spanish | es | Espanol |
+| Italian | it | Italiano |
+| Japanese | ja | Japanese |
+| Portuguese | pt | Portugues |
+| Dutch | nl | Nederlands |
+| Polish | pl | Polski |
 
 ### Smart Language Detection
 - **Automatic Detection**: Detects your site's language from the `<html lang="...">` attribute
@@ -63,7 +68,7 @@ The extension provides AI-powered SEO recommendations in **9 languages** with in
 2. AI recommendations appear in the detected language by default
 3. You can change the language anytime using the dropdown selector
 4. Your language preference is saved per site and remembered for future sessions
-5. The dropdown clearly shows which language is the detected default with "(default)" indicator
+5. The dropdown shows which language is the detected default with a "(default)" indicator
 
 ## Local Development Setup
 
@@ -79,21 +84,21 @@ The extension provides AI-powered SEO recommendations in **9 languages** with in
    ```
 
 3. Configure environment:
-   Create a `.env` file in the root directory with the following variables:
-   
+   Create a `.env` file in the root directory:
+
    **Required for AI features:**
    - `OPENAI_API_KEY`: Your OpenAI API key for AI recommendations
-   - `USE_GPT_RECOMMENDATIONS`: Set to "true" to enable AI features
-   
+   - `USE_GPT_RECOMMENDATIONS`: Set to `true` to enable AI features
+
    **Required for development:**
-   - `VITE_WORKER_URL`: Set to "http://localhost:8787" for local development
-   - `VITE_FORCE_LOCAL_DEV`: Set to "true" to ensure local development mode
+   - `VITE_WORKER_URL`: Set to `http://localhost:8787` for local development
+   - `VITE_FORCE_LOCAL_DEV`: Set to `true` to ensure local development mode
 
 4. Start development server:
    ```bash
    pnpm dev
    ```
-   
+
    This starts three services concurrently:
    - **Vite dev server** on `http://localhost:5173` (React client)
    - **Webflow extension server** on `http://localhost:1337` (Extension host)
@@ -107,62 +112,69 @@ The extension provides AI-powered SEO recommendations in **9 languages** with in
 
 This project uses a **modular monorepo architecture** with three main components:
 
+### Tech Stack
+- **Frontend**: React 19 + TypeScript + Vite + Tailwind CSS v4 + Radix UI
+- **Backend**: Cloudflare Workers + Hono framework
+- **Testing**: Vitest (unit) + Playwright (E2E)
+- **Package Management**: pnpm
+- **CI/CD**: GitHub Actions + semantic-release
+
+### Design System
+The UI is built on a **Figma-based design system** implemented with Tailwind CSS v4 and CSS custom properties:
+- Design tokens (colors, spacing, typography, shadows) defined as CSS variables in `client/src/index.css`
+- ~35 reusable components in `client/src/components/ui/`
+- Design token consistency validated by automated tests
+
 ### Directory Structure
 ```
-├── client/                 # React frontend application
+├── client/                    # React frontend application
 │   ├── src/
-│   │   ├── components/     # React components
-│   │   ├── pages/         # Page components
-│   │   ├── hooks/         # Custom React hooks
-│   │   ├── lib/           # Client utilities
-│   │   └── utils/         # Client-specific utilities
-│   │       └── languageStorage.ts # Site-specific language preferences
-├── workers/               # Cloudflare Worker backend
-│   ├── modules/           # Modular worker components
-│   │   ├── seoAnalysis.ts    # SEO analysis logic
-│   │   ├── webScraper.ts     # Web scraping functionality
-│   │   ├── aiRecommendations.ts # Multilingual OpenAI integration
-│   │   └── validation.ts     # Request validation
-│   └── index.ts           # Main worker entry point
-├── shared/                # Shared types and utilities
-│   ├── types/             # TypeScript type definitions
-│   │   ├── language.ts    # Multilingual support & language detection
-│   │   └── index.ts       # Main type definitions
-│   └── utils/             # Shared utilities & intelligent schema population
-└── public/                # Built extension assets (generated)
+│   │   ├── components/ui/     # ~35 reusable UI components
+│   │   ├── pages/             # Home, OAuthCallback
+│   │   ├── hooks/             # Custom React hooks
+│   │   ├── lib/               # API client, Webflow APIs, content intelligence
+│   │   ├── utils/             # Storage, sanitization, insertion helpers
+│   │   └── styles/            # Design system tests
+│   └── vitest.config.ts       # Test configuration
+├── workers/                   # Cloudflare Worker backend
+│   ├── modules/
+│   │   ├── seoAnalysis.ts     # SEO analysis engine
+│   │   ├── aiRecommendations.ts  # Multilingual OpenAI integration
+│   │   ├── webScraper.ts      # Web scraping
+│   │   ├── oauthProxy.ts      # OAuth proxy
+│   │   └── validation.ts      # Request validation
+│   └── index.ts               # Worker entry point (Hono routes)
+├── shared/                    # Shared types and utilities
+│   ├── types/                 # TypeScript interfaces, language definitions
+│   └── utils/                 # SEO utils, schema population, string utils
+├── tests/e2e/                 # Playwright end-to-end tests
+├── scripts/                   # Build and validation utilities
+├── docs/plans/                # Implementation plan documents
+└── public/                    # Built extension assets (generated)
 ```
 
 ### Key Components
 
-#### 1. **React Client App** (`client/`)
-- **Framework**: React 19 with TypeScript, Vite build system
-- **UI**: Tailwind CSS v4 + Radix UI components
-- **State Management**: React Query for server state
-- **Entry Point**: `client/src/main.tsx`
+#### React Client (`client/`)
+- **Webflow Designer API**: Integration layer for reading/writing Webflow page elements
+- **Content Intelligence**: Analyzes page content for SEO recommendations
+- **Insertion Helpers**: Handles applying AI suggestions directly to Webflow elements
+- **State Management**: React Query for server state, local storage for preferences
 
-#### 2. **Cloudflare Worker API** (`workers/`)
-- **Runtime**: Cloudflare Workers with Hono framework
-- **Architecture**: Modular design with focused components
-- **Purpose**: Web scraping, SEO analysis, OpenAI integration
-- **API Endpoints**:
-  - `POST /api/analyze` - Main SEO analysis endpoint
-  - `GET /health` - Health check
+#### Cloudflare Worker (`workers/`)
+- **SEO Analysis**: Performs 18 different checks against scraped page content
+- **AI Recommendations**: Generates multilingual suggestions via OpenAI
+- **Web Scraper**: Fetches and parses target page HTML
+- **OAuth Proxy**: Handles Webflow OAuth authentication flow
+- **API Endpoints**: `POST /api/analyze` (SEO analysis), `GET /health` (health check)
 
-#### 3. **Shared Types & Utils** (`shared/`)
-- **Types**: Centralized TypeScript interfaces
-- **Utils**: Shared utilities for string processing, SEO logic, and intelligent schema population
-
-### Development Workflow
-
-The modular architecture enables:
-- **Independent development** of frontend and backend
-- **Type safety** across all boundaries
-- **Easy testing** with focused modules
-- **Scalable deployment** with separate services
+#### Shared (`shared/`)
+- **Types**: Centralized TypeScript interfaces for client-worker communication
+- **Utilities**: String processing, URL handling, schema population, SEO scoring
 
 ## Building for Production
 
-⚠️ **Important**: Only deploy to production when explicitly requested by the project maintainer.
+> **Important**: Only deploy to production when explicitly requested by the project maintainer.
 
 ```bash
 # Build the extension bundle
@@ -177,10 +189,16 @@ The build process creates a `bundle.zip` file ready for Webflow extension submis
 ## Testing
 
 ```bash
-pnpm test           # Run tests with coverage
-pnpm test:watch     # Run tests in watch mode
-pnpm test:ui        # Run tests with UI
-pnpm check          # TypeScript type checking
+pnpm test              # Run all tests with coverage
+pnpm test:unit         # Unit tests only
+pnpm test:watch        # Watch mode
+pnpm test:ui           # Vitest UI
+pnpm test:bundle       # Bundle validation
+pnpm test:workers      # Worker-specific tests
+pnpm test:e2e          # Playwright E2E tests
+pnpm test:coverage     # HTML coverage report
+pnpm check             # TypeScript type checking
+pnpm lint              # ESLint
 ```
 
 ## Environment Variables

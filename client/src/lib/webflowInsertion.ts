@@ -110,6 +110,9 @@ export class WebflowInsertion {
         case 'introduction_text':
           result = await this.applyIntroductionText(request);
           break;
+        case 'image_alt':
+          result = await this.applyImageAlt(request);
+          break;
         case 'custom_code':
           result = await this.applyCustomCode(request);
           break;
@@ -689,6 +692,54 @@ export class WebflowInsertion {
       }
     } catch (error) {
       console.error('[WebflowInsertion] Failed to update introduction text:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Apply image alt text change using Webflow Designer API
+   */
+  private async applyImageAlt(request: WebflowInsertionRequest): Promise<WebflowInsertionResult> {
+    try {
+      if (!request.imageUrl) {
+        throw new Error('Image URL is required for image_alt operations');
+      }
+
+      // Lazy initialization: window.webflow may not have been ready when the constructor ran
+      // (it's injected at runtime by the Webflow Designer, often after initial React renders)
+      if (!this.designerApi && typeof window !== 'undefined' && window.webflow) {
+        console.log('[WebflowInsertion] Late-initializing Designer API for image alt');
+        try {
+          this.designerApi = new WebflowDesignerExtensionAPI();
+          this.useDesignerAPI = true;
+        } catch (initError) {
+          console.warn('[WebflowInsertion] Late init of Designer API failed:', initError);
+        }
+      }
+
+      if (this.useDesignerAPI && this.designerApi) {
+        console.log('[WebflowInsertion] Using Designer API to update image alt text');
+        const success = await this.designerApi.updateImageAltText(request.imageUrl, request.value as string);
+
+        if (success) {
+          return {
+            success: true,
+            data: {
+              type: 'image_alt',
+              imageUrl: request.imageUrl,
+              originalValue: null,
+              newValue: request.value,
+              timestamp: new Date().toISOString()
+            }
+          };
+        } else {
+          throw new Error('Failed to update image alt text via Designer API');
+        }
+      } else {
+        throw new Error('Image alt text updates require Designer Extension API. Ensure this runs within Webflow Designer.');
+      }
+    } catch (error) {
+      console.error('[WebflowInsertion] Failed to update image alt text:', error);
       throw error;
     }
   }
