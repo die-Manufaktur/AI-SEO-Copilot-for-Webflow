@@ -32,13 +32,12 @@ export const getApiUrl = () => {
     return localUrl;
   }
   
-  // RULE 2: FORCE_LOCAL_DEV flag overrides everything else
-  if (FORCE_LOCAL_DEV) {
-    const localUrl = WORKER_URL || 'http://localhost:8787'; // Fallback to default local worker URL
+  // RULE 2: FORCE_LOCAL_DEV flag overrides — but only in development mode
+  // In production builds, this flag is ignored to prevent accidentally baking localhost into the bundle
+  if (FORCE_LOCAL_DEV && !import.meta.env.PROD) {
+    const localUrl = WORKER_URL || 'http://localhost:8787';
     logger.debug("Force local dev enabled - using:", localUrl);
-    if (import.meta.env.MODE === 'development') {
-      console.log("[DEBUG] Force local dev enabled - returning:", localUrl);
-    }
+    console.log("[DEBUG] Force local dev enabled - returning:", localUrl);
     return localUrl;
   }
   
