@@ -1,3 +1,13 @@
+## [4.10.3](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/compare/v4.10.2...v4.10.3) (2026-03-09)
+
+### Bug Fixes
+
+* **build:** add clean-public prebuild step to prevent stale asset hash mismatches ([8c03eb7](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/8c03eb7532bb73478c94812994cd6c0ed2e6bb40))
+
+### Documentation
+
+* add blog post draft on image alt text API workarounds ([34d0c1e](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/34d0c1e334898bdbb1a0a708720e8ca320eea649))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
