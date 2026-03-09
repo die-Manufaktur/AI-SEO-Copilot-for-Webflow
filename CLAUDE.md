@@ -91,6 +91,22 @@ Built on **Tailwind CSS v4** with CSS custom properties under `@layer base` in `
 - `GET /health` - Health check
 - CORS: Webflow domains + localhost
 
+### webflow.json — Critical Rules
+The `webflow.json` manifest controls how Webflow processes and serves the extension bundle. Mismatches between this file and the app's dashboard registration will cause the extension to fail silently (assets 404).
+
+- **DO NOT add `"extensionType": "hybrid"`** unless the app is registered as a Hybrid App in the Webflow dashboard. This app is registered as a **Designer Extension only**. Adding `"hybrid"` causes Webflow to serve the bundle differently, resulting in 404s for all asset files.
+- **DO NOT add `"oauth"` section or `webflowDataApi:*` permissions** unless the app registration supports them. These require Hybrid App registration.
+- **DO NOT add `"externalApi:http://localhost:*"`** to the production manifest. Dev-only URLs should not appear in production bundles.
+- **Keep permissions minimal** — only declare what the app registration actually supports. The working production config needs only: `clipboard-write`, `clipboard-read`, `designer:siteInfo:read`, `hostPattern_WebflowSite`, `site:read`, and the production `externalApi` URL.
+
+### Build Pipeline
+- `pnpm build` runs: `clean-public` → `vite build` → `sync-public` → `webflow extension bundle`
+- `clean-public` removes stale artifacts from `public/` before Vite runs (prevents circular copy issues with `publicDir`)
+- `sync-public` copies `dist/` to `public/` so the Webflow CLI can package it
+- `webflow extension bundle` packages `public/` into `bundle.zip`
+- The `bundle.zip` is gitignored — it gets attached to GitHub Releases automatically by the `release.yml` workflow on push to `main`
+- CI builds on clean runners are not affected by stale `public/` artifacts, but local builds are — always use `pnpm build` (which includes `clean-public`), never run `vite build` directly
+
 ### Development Workflow
 1. Extension loads in Webflow Designer from `http://localhost:1337`
 2. React client communicates with local Worker on port 8787
