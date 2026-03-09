@@ -14,6 +14,7 @@ bundle.zip
 .env
 .env.*
 !.env.example
+!.env.production
 .dev.vars*
 .prod.vars
 *.local
@@ -83,7 +84,6 @@ Thumbs.db
 # Cloudflare Workers
 .wrangler/
 .dev.vars
-.env.production
 .env.development
 workers-site/
 
