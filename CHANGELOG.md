@@ -1,3 +1,10 @@
+## [4.10.4](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/compare/v4.10.3...v4.10.4) (2026-03-09)
+
+### Bug Fixes
+
+* **config:** remove hybrid extension type from webflow.json to fix 40… ([#568](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/issues/568)) ([44554c7](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/44554c7e9400ae313c62f6d185db321e0325bfdd))
+* **config:** remove hybrid extension type from webflow.json to fix 404 errors ([73353d1](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/73353d14752e3b4689f834fee513130e24c59e72))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
