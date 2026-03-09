@@ -1,3 +1,10 @@
+## [4.10.2](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/compare/v4.10.1...v4.10.2) (2026-03-09)
+
+### Bug Fixes
+
+* **api:** prevent FORCE_LOCAL_DEV from baking localhost into production bundle ([95f3c5f](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/95f3c5f693d313bb93b9f4934a5f0b7a050dd68f))
+* **build:** disable source maps in production to meet Webflow 5MB bundle limit ([051fabf](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/051fabfe9a3b1a9744eac7370a805cf91ff3c081))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
