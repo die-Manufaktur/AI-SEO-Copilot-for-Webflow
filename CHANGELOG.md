@@ -1,3 +1,10 @@
+## [4.10.5](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/compare/v4.10.4...v4.10.5) (2026-03-10)
+
+### Bug Fixes
+
+* **build:** set Vite base to relative paths for Webflow subdirectory serving ([b55962d](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/b55962dc9c3b2a7fb02f311cba9ea59864d28c2a)), closes [#1097901](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/issues/1097901)
+* **test:** update bundle validation test to match Designer Extension config ([b2c325f](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/b2c325f817b9af5ad368f73a0f7b6798191a829c))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
