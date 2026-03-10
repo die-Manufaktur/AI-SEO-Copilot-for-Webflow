@@ -80,6 +80,31 @@ jobs:
             fi
           done
 
+      - name: Deploy Worker to Cloudflare
+        if: success()
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          # Only deploy if semantic-release created a new tag
+          LATEST_TAG=$(git tag --sort=-version:refname | head -n1)
+          PREVIOUS_TAG=$(git tag --sort=-version:refname | sed -n '2p')
+
+          if [ "$LATEST_TAG" != "$PREVIOUS_TAG" ] && [ -n "$LATEST_TAG" ]; then
+            echo "🚀 New release detected: ${LATEST_TAG}"
+
+            if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+              echo "⚠️ CLOUDFLARE_API_TOKEN not set — skipping worker deployment"
+              echo "ℹ️ Add CLOUDFLARE_API_TOKEN to GitHub secrets to enable auto-deploy"
+              exit 0
+            fi
+
+            npx wrangler deploy workers/index.ts --env production
+            echo "✅ Worker deployed to production"
+          else
+            echo "ℹ️ No new release — skipping worker deployment"
+          fi
+
       - name: Commit Version Updates
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
