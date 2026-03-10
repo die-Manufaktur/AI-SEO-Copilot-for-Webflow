@@ -6,6 +6,7 @@ import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 
 export default defineConfig(({ mode }) => ({
+  base: './', // Webflow serves extensions from a subdirectory — must use relative paths
   plugins: [
     tailwindcss(),
     react(),

@@ -98,6 +98,7 @@ The `webflow.json` manifest controls how Webflow processes and serves the extens
 - **DO NOT add `"oauth"` section or `webflowDataApi:*` permissions** unless the app registration supports them. These require Hybrid App registration.
 - **DO NOT add `"externalApi:http://localhost:*"`** to the production manifest. Dev-only URLs should not appear in production bundles.
 - **Keep permissions minimal** — only declare what the app registration actually supports. The working production config needs only: `clipboard-write`, `clipboard-read`, `designer:siteInfo:read`, `hostPattern_WebflowSite`, `site:read`, and the production `externalApi` URL.
+- **DO NOT remove `base: './'` from `vite.config.ts`.** Webflow serves Designer Extensions from a subdirectory, not the domain root. Without relative base paths, all asset references in the built HTML will 404 when uploaded to Webflow. This is the #1 cause of "works locally, 404s on Webflow" issues.
 
 ### Build Pipeline
 - `pnpm build` runs: `clean-public` → `vite build` → `sync-public` → `webflow extension bundle`
