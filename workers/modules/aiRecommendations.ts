@@ -56,19 +56,23 @@ export async function getAIRecommendation(
     }
     
     // Build language instruction if not default language
-    let languageInstruction = '';
+    let systemLanguageInstruction = '';
+    let userLanguageInstruction = '';
     if (languageCode !== DEFAULT_LANGUAGE_CODE && language) {
-      languageInstruction = `\n\nIMPORTANT: Generate all content in ${language.name} (${language.nativeName}). Provide recommendations entirely in this language.`;
+      // Strong instruction at the START of system prompt
+      systemLanguageInstruction = `CRITICAL LANGUAGE REQUIREMENT: You MUST respond entirely in ${language.name} (${language.nativeName}). Do NOT use English. Every word of your response must be in ${language.name}.\n\n`;
+      // Reinforce in user prompt
+      userLanguageInstruction = `\n\n[LANGUAGE: Respond in ${language.name} (${language.nativeName}) only. Do not use English.]`;
     }
     
-    const systemPrompt = needsCopyableContent 
-      ? `You are an SEO expert providing ready-to-use content.
+    const systemPrompt = needsCopyableContent
+      ? `${systemLanguageInstruction}You are an SEO expert providing ready-to-use content.
          Create a single, concise, and optimized ${checkType.toLowerCase()} that naturally incorporates the keyphrase.
          Return ONLY the final content with no additional explanation, quotes, or formatting.
          The content must be directly usable by copying and pasting.
-         Focus on being specific, clear, and immediately usable.${advancedContext ? ' Consider the page type and additional context provided to make recommendations more relevant and specific.' : ''}${languageInstruction}`
-      : `You are an SEO expert providing actionable advice.
-         Provide a concise recommendation for the SEO check "${checkType}".${advancedContext ? ' Consider the page type and additional context provided to make recommendations more relevant and specific.' : ''}${languageInstruction}`;
+         Focus on being specific, clear, and immediately usable.${advancedContext ? ' Consider the page type and additional context provided to make recommendations more relevant and specific.' : ''}`
+      : `${systemLanguageInstruction}You are an SEO expert providing actionable advice.
+         Provide a concise recommendation for the SEO check "${checkType}".${advancedContext ? ' Consider the page type and additional context provided to make recommendations more relevant and specific.' : ''}`;
 
     // Special handling for URL and H2 checks with enhanced logic
     const userPrompt = needsCopyableContent
@@ -125,7 +129,7 @@ export async function getAIRecommendation(
       model: "gpt-3.5-turbo",
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt }
+        { role: "user", content: userPrompt + userLanguageInstruction }
       ],
       max_tokens: 500,
       temperature: 0.5,

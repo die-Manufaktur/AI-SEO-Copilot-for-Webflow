@@ -954,7 +954,7 @@ export default function Home() {
         siteInfo: mappedSiteInfo,
         publishPath,
         webflowPageData: pageDataForApi as WebflowPageData,
-        ...(advancedOptionsEnabled && ((pageType && pageType !== "none") || secondaryKeywords || selectedLanguage.code !== getDefaultLanguage().code) && {
+        ...(advancedOptionsEnabled && {
           advancedOptions: {
             pageType: pageType !== "none" ? pageType : undefined,
             secondaryKeywords: sanitizedKeywords,

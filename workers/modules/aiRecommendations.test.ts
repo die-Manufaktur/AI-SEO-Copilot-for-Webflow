@@ -214,10 +214,19 @@ describe('aiRecommendations', () => {
 
       expect(result).toBe('Titre SEO optimisé avec mot-clé');
       expect(mockSanitizeText).toHaveBeenCalledWith('Titre SEO optimisé avec mot-clé', 'fr');
-      
-      // Check that language instruction was included in system prompt
+
+      // Check that language instruction was included in both system and user prompts
       const systemPrompt = mockCreate.mock.calls[0][0].messages[0].content;
-      expect(systemPrompt).toContain('Generate all content in French');
+      const userPrompt = mockCreate.mock.calls[0][0].messages[1].content;
+
+      // System prompt should start with critical language requirement
+      expect(systemPrompt).toContain('CRITICAL LANGUAGE REQUIREMENT');
+      expect(systemPrompt).toContain('You MUST respond entirely in French');
+      expect(systemPrompt).toContain('Do NOT use English');
+
+      // User prompt should also include language instruction
+      expect(userPrompt).toContain('[LANGUAGE: Respond in French');
+      expect(userPrompt).toContain('Do not use English');
     });
 
     it('generates concise alt text for Image Alt Attributes (not instructional advice)', async () => {
