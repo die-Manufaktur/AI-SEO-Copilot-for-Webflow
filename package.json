@@ -74,7 +74,7 @@
     "esbuild": "^0.25.12",
     "eslint": "^10.0.2",
     "eslint-plugin-react-hooks": "^7.0.1",
-    "happy-dom": "^20.8.3",
+    "happy-dom": "^20.8.9",
     "husky": "^9.1.7",
     "jsdom": "^26.1.0",
     "lucide-react": "^0.516.0",
@@ -141,7 +141,7 @@
     "sanitize-html": "^2.17.1",
     "styled-components": "^6.3.11",
     "tailwind-merge": "^3.5.0",
-    "undici": "^7.22.0",
+    "undici": "^7.24.7",
     "vaul": "^1.1.2",
     "wouter": "^3.9.0",
     "zod": "^4.3.6"
@@ -155,11 +155,17 @@
   "pnpm": {
     "overrides": {
       "koa": ">=3.0.3",
-      "lodash": ">=4.17.23",
+      "lodash": ">=4.18.0",
+      "lodash-es": ">=4.18.0",
       "axios": ">=1.13.5",
       "@conventional-changelog/git-client": ">=2.0.0",
       "minimatch@<3.1.4": "3.1.4",
-      "minimatch@>=9.0.0 <9.0.7": "9.0.7"
+      "minimatch@>=9.0.0 <9.0.7": "9.0.7",
+      "handlebars": ">=4.7.9",
+      "tar": ">=7.5.11",
+      "picomatch": ">=4.0.4",
+      "flatted": ">=3.4.2",
+      "undici": ">=7.24.0"
     }
   }
 }
