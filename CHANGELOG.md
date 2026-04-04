@@ -1,3 +1,16 @@
+## [4.10.6](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/compare/v4.10.5...v4.10.6) (2026-04-04)
+
+### Bug Fixes
+
+* ensure language selection impacts AI-generated content ([#538](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/issues/538)) ([6c86b31](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/6c86b313511aaa3f2819b1f3c8f0c937a6d85c5d))
+* ensure language selection impacts AI-generated content ([#538](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/issues/538)) ([#574](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/issues/574)) ([d3b88f7](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/d3b88f713a37ed690dfa98fdd7c272c6f5f7a5f0))
+* **security:** resolve high/critical dependency vulnerabilities ([71d1aac](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/71d1aac5b63f7e9962ddf9d2f57e95d5363c85cb))
+
+### Continuous Integration
+
+* add automatic worker deployment to release workflow ([89e707f](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/89e707f7bc0f4e0cad6093d4963b425623fa296d))
+* add automatic worker deployment to release workflow ([#571](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/issues/571)) ([146df33](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/146df3375ed9fb0d4a2ca22c7eafbcd952a5deaf))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
