@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateSEOScore } from './seoUtils';
+import { calculateSEOScore, shouldShowCopyButton } from './seoUtils';
 import type { SEOCheck } from '../types';
 import { createMockSEOCheck } from './test-helpers';
 
@@ -80,5 +80,27 @@ describe('calculateSEOScore', () => {
     ];
     
     expect(calculateSEOScore(checks)).toBe(0);
+  });
+});
+
+describe('shouldShowCopyButton', () => {
+  it('returns true for checks that produce copyable content', () => {
+    expect(shouldShowCopyButton('Keyphrase in Title')).toBe(true);
+    expect(shouldShowCopyButton('Keyphrase in Meta Description')).toBe(true);
+    expect(shouldShowCopyButton('Keyphrase in URL')).toBe(true);
+    expect(shouldShowCopyButton('Keyphrase in Introduction')).toBe(true);
+    expect(shouldShowCopyButton('Keyphrase in H1 Heading')).toBe(true);
+    expect(shouldShowCopyButton('Keyphrase in H2 Headings')).toBe(true);
+  });
+
+  it('returns true for Image Alt Attributes', () => {
+    expect(shouldShowCopyButton('Image Alt Attributes')).toBe(true);
+  });
+
+  it('returns false for checks that produce advisory text', () => {
+    expect(shouldShowCopyButton('Content Length')).toBe(false);
+    expect(shouldShowCopyButton('Internal Links')).toBe(false);
+    expect(shouldShowCopyButton('Code Minification')).toBe(false);
+    expect(shouldShowCopyButton('Schema Markup')).toBe(false);
   });
 });
