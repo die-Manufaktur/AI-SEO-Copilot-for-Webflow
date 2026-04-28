@@ -11,23 +11,29 @@ import MailIcon from '../assets/icons/IconoirMail.svg';
 const FooterContainer = styled.footer`
   width: 100%;
   margin-top: 0.5rem !important;
-  background-color: var(--background2);
-  border-top: 1px solid var(--color-border);
   margin-top: auto;
   position: sticky;
   bottom: 0;
   z-index: 10;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-compact-footer);
+  padding: var(--padding-compact-footer-y) var(--padding-compact-footer-x);
+  height: var(--footer-height-compact);
+  display: flex;
+  align-items: center;
+  /* Gradient border */
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--color-bg-700), var(--color-bg-700)) padding-box,
+    linear-gradient(112deg, #717171 0%, #4C4A4A 100.39%) border-box;
 `;
 
 const LinksContainer = styled.div`
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
   display: flex;
   flex-direction: row;
-  justify-content: space-evenly;
+  justify-content: space-between;
+  align-items: center;
   flex-wrap: nowrap;
-  gap: 0.5rem;
 `;
 
 const StyledLink = styled.a`
@@ -58,7 +64,7 @@ const IconWrapper = styled.span`
 `;
 
 const TextWrapper = styled.span`
-  font-size: 0.7rem;
+  font-size: var(--font-size-compact-xs);
 `;
 
 interface FooterLinkProps {
