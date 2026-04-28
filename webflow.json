@@ -1,6 +1,6 @@
 {
   "$schema": "https://cdn.jsdelivr.net/gh/webflow/designer-extension-typings@latest/schema/webflow.manifest.schema.json",
-  "name": "SEO Copilot",
+  "name": "AI SEO Copilot",
   "version": "4.6.3",
   "schema_version": "2.0.0",
   "apiVersion": "2",
@@ -20,12 +20,12 @@
     "designer:siteInfo:read": "Needed to access information about your site",
     "hostPattern_WebflowSite": true,
     "site:read": true,
-    "externalApi:https://seo-copilot-api-production.paul-130.workers.dev": "Needed to connect to SEO analysis service"
+    "externalApi:https://seo-copilot-api-production.paul-130.workers.dev": "Needed to connect to production API service"
   },
   "config_pages": [
     {
       "id": "main",
-      "title": "SEO Analysis Tool",
+      "title": "AI SEO Copilot",
       "path": "/",
       "description": "Analyze and improve your website's SEO"
     }
