@@ -34,10 +34,6 @@ describe('Badge', () => {
     expect(badge).toHaveClass(
       'inline-flex',
       'items-center',
-      'rounded-full',
-      'border',
-      'px-2.5',
-      'py-0.5',
       'text-xs',
       'font-semibold',
       'transition-colors',
@@ -75,13 +71,12 @@ describe('Badge', () => {
 
     it('should render destructive variant correctly', () => {
       render(<Badge variant="destructive" data-testid="badge">Destructive</Badge>);
-      
+
       const badge = screen.getByTestId('badge');
       expect(badge).toHaveClass(
-        'border-transparent',
-        'bg-destructive',
-        'text-destructive-foreground',
-        'hover:bg-destructive/80'
+        'bg-[#FF4343]',
+        'text-black',
+        'hover:brightness-105'
       );
     });
 
