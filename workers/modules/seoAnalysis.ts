@@ -662,7 +662,7 @@ export async function analyzeSEOElements(
     priority: analyzerCheckPriorities["Image Alt Attributes"]
   };
   
-  const isDecorative = (img: { alt: string | undefined; role?: string }) =>
+  const isDecorative = (img: ScrapedPageData['images'][number]) =>
     img.alt === '' || img.role === 'presentation' || img.role === 'none';
 
   const flaggableImages = scrapedData.images.filter(img => !isDecorative(img));
