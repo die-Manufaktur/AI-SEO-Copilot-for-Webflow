@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -8,6 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle as OriginalCardTitle } from ".
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "../components/ui/form";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
+import { Badge } from "../components/ui/badge";
+import { StatsSummary } from "../components/ui/stats-summary";
 import { ScrollArea } from "../components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Switch } from "../components/ui/switch";
@@ -19,7 +21,7 @@ import {
   AlertTriangle,
   CircleAlert,
   Info,
-  ChevronLeft,
+  ArrowLeft,
   ExternalLink,
   ChevronDown,
   ChevronUp
@@ -32,20 +34,20 @@ import {
   TooltipTrigger,
 } from "../components/ui/tooltip";
 import { useToast } from "../hooks/use-toast";
-import { analyzeSEO } from "../lib/api";
+import { analyzeSEO, generateRecommendation } from "../lib/api";
 import type { SEOCheck, SEOAnalysisResult, WebflowPageData, AnalyzeSEORequest } from "../lib/types";
 import { ProgressCircle } from "../components/ui/progress-circle";
 import { getLearnMoreUrl } from "../lib/docs-links";
 import styled from 'styled-components';
 import Footer from "../components/Footer";
-import { createLogger } from "./../lib/utils";
+import { createLogger, cn } from "./../lib/utils";
 import React from 'react';
 import { ImageSizeDisplay } from "../components/ImageSizeDisplay";
 import { copyTextToClipboard } from "../utils/clipboard";
 import { shouldShowCopyButton } from '../../../shared/utils/seoUtils';
 import { generatePageId, saveKeywordsForPage, loadKeywordsForPage } from '../utils/keywordStorage';
 import { saveAdvancedOptionsForPage, loadAdvancedOptionsForPage, type AdvancedOptions } from '../utils/advancedOptionsStorage';
-import sanitizeHtml from 'sanitize-html';
+import { sanitizeHtmlBrowser as sanitizeHtml } from '../utils/htmlSanitizer';
 import { sanitizeText } from '../../../shared/utils/stringUtils';
 import { getPageTypes, getPopulatedSchemaRecommendations } from '../../../shared/utils/schemaRecommendations';
 import { LanguageSelector } from '../components/ui/language-selector';
@@ -53,6 +55,12 @@ import { getDefaultLanguage, getLanguageByCode, type Language } from '../../../s
 import { loadLanguageForSite, saveLanguageForSite } from '../utils/languageStorage';
 import { SchemaDisplay } from '../components/ui/schema-display';
 import { EditableRecommendation } from '../components/ui/editable-recommendation';
+import { H2SelectionList, type H2SelectionListHandle } from '../components/ui/H2SelectionList';
+import { ImageAltTextList } from '../components/ui/ImageAltTextList';
+import { useInsertion } from '../contexts/InsertionContext';
+import { useAppliedRecommendations } from '../hooks/useAppliedRecommendations';
+import type { H2ElementInfo } from '../lib/webflowDesignerApi';
+import { WebflowDesignerExtensionAPI } from '../lib/webflowDesignerApi';
 
 const logger = createLogger("Home");
 
@@ -64,7 +72,7 @@ const formSchema = z.object({
 });
 
 // Secondary keywords validation
-const MAX_KEYWORDS_LENGTH = 500;
+const MAX_KEYWORDS_LENGTH = 2000;
 const MAX_KEYWORDS_COUNT = 10;
 const validateSecondaryKeywords = (input: string, languageCode?: string): { isValid: boolean; message?: string; sanitized: string } => {
   if (!input) return { isValid: true, sanitized: '' };
@@ -162,11 +170,11 @@ const iconAnimation = {
 export const getPriorityIcon = (priority: string, className: string = "h-4 w-4") => {
   switch (priority) {
     case 'high':
-      return <AlertTriangle className={`${className} text-redText`} style={{color: 'var(--redText)', stroke: 'var(--redText)'}} />;
+      return <AlertTriangle className={`${className} text-redText`} style={{color: 'rgb(var(--redText))', stroke: 'rgb(var(--redText))'}} />;
     case 'medium':
-      return <CircleAlert className={`${className} text-yellowText`} style={{color: 'var(--yellowText)', stroke: 'var(--yellowText)'}} />;
+      return <CircleAlert className={`${className} text-yellowText`} style={{color: 'rgb(var(--yellowText))', stroke: 'rgb(var(--yellowText))'}} />;
     case 'low':
-      return <Info className={`${className} text-blueText`} style={{color: 'var(--blueText)', stroke: 'var(--blueText)'}} />;
+      return <Info className={`${className} text-blueText`} style={{color: 'rgb(var(--blueText))', stroke: 'rgb(var(--blueText))'}} />;
     default:
       return null;
   }
@@ -236,12 +244,12 @@ const fetchPageInfo = async (
       setSlug(currentSlug);
       setIsHomePage(isHome);
     } else {
-      console.warn("Webflow API not available for fetching page info.");
+      logger.warn("Webflow API not available for fetching page info.");
       setSlug(null);
       setIsHomePage(false);
     }
   } catch (error) {
-    console.error("Error fetching page info:", error);
+    logger.error("Error fetching page info:", error);
     setSlug(null);
     setIsHomePage(false);
   }
@@ -263,19 +271,20 @@ const getCategoryStatus = (checks: SEOCheck[]) => {
 const getCategoryStatusIcon = (status: string) => {
   switch (status) {
     case "complete":
-      return <CheckCircle className="h-6 w-6 text-greenText" style={{color: 'var(--greenText)', stroke: 'var(--greenText)'}} />;
+      return <CheckCircle className="h-6 w-6 text-greenText" style={{color: 'rgb(var(--greenText))', stroke: 'rgb(var(--greenText))'}} />;
     case "inprogress":
-      return <CircleAlert className="h-6 w-6 text-yellowText" style={{color: 'var(--yellowText)', stroke: 'var(--yellowText)'}} />;
+      return <CircleAlert className="h-6 w-6 text-yellowText" style={{color: 'rgb(var(--yellowText))', stroke: 'rgb(var(--yellowText))'}} />;
     case "todo":
-      return <XCircle className="h-6 w-6 text-redText" style={{color: 'var(--redText)', stroke: 'var(--redText)'}} />;
+      return <XCircle className="h-6 w-6 text-redText" style={{color: 'rgb(var(--redText))', stroke: 'rgb(var(--redText))'}} />;
     default:
-      return <Info className="h-6 w-6 text-blueText" style={{color: 'var(--blueText)', stroke: 'var(--blueText)'}} />;
+      return <Info className="h-6 w-6 text-blueText" style={{color: 'rgb(var(--blueText))', stroke: 'rgb(var(--blueText))'}} />;
   }
 };
 
 const CategoryHeader = styled.div`
   display: flex;
   align-items: center;
+  width: 100%;
   margin-bottom: 16px;
 `;
 
@@ -287,12 +296,16 @@ const BackButton = styled.button`
   padding: 0;
   margin: 0;
   cursor: pointer;
-  color: inherit;
+  color: var(--text1);
   font: inherit;
-  gap: 8px; /* Add some spacing between the chevron and title */
+  gap: 8px;
+
+  &:hover {
+    color: var(--text2);
+  }
 
   &:focus {
-    outline: 2px solid var(--primaryText); /* Add focus styling for accessibility */
+    outline: 2px solid var(--primary);
     outline-offset: 2px;
   }
 `;
@@ -300,7 +313,9 @@ const BackButton = styled.button`
 const CardTitle = styled.h2`
   font-size: 20px;
   margin: 0;
-  font-weight: 500;
+  font-weight: 600;
+  color: var(--text1);
+  letter-spacing: -0.12px;
 `;
 
 // Helper function to find the most recently published domain
@@ -332,6 +347,7 @@ const getScoreRatingText = (score: number): string => {
 
 export default function Home() {
   const { toast } = useToast();
+  const { applyInsertion } = useInsertion();
   // Using underscore prefix for state variables that are set but not directly read
   const [_isLoading, setIsLoading] = useState(false);
   const [_slug, setSlug] = useState<string | null>(null);
@@ -343,18 +359,28 @@ export default function Home() {
   const [showedPerfectScoreMessage, setShowedPerfectScoreMessage] = useState<boolean>(false);
   const [currentPageId, setCurrentPageId] = useState<string>('');
   const [currentSiteId, setCurrentSiteId] = useState<string>('');
-  const [keywordSaveStatus, setKeywordSaveStatus] = useState<'saved' | 'saving' | 'none'>('none');
   
   // Advanced options state
   const [advancedOptionsEnabled, setAdvancedOptionsEnabled] = useState<boolean>(false);
-  const [pageType, setPageType] = useState<string>('');
+  const [pageType, setPageType] = useState<string>("none");
   const [secondaryKeywords, setSecondaryKeywords] = useState<string>('');
+  
+  // H2 elements state for H2SelectionList
+  const [h2Elements, setH2Elements] = useState<H2ElementInfo[]>([]);
+  const h2ListRef = useRef<H2SelectionListHandle>(null);
+  const [h2GeneratingAll, setH2GeneratingAll] = useState(false);
+  const [imageAltGeneratingAll, setImageAltGeneratingAll] = useState(false);
+  const [applyableImageUrls, setApplyableImageUrls] = useState<Set<string> | undefined>(undefined);
+  const [h2ElementsFetched, setH2ElementsFetched] = useState(false);
   const [secondaryKeywordsError, setSecondaryKeywordsError] = useState<string>('');
   const [selectedLanguage, setSelectedLanguage] = useState<Language>(getDefaultLanguage());
   const [advancedOptionsSaveStatus, setAdvancedOptionsSaveStatus] = useState<'saved' | 'saving' | 'none'>('none');
   
   // Store the analysis request data for schema population
   const [analysisRequestData, setAnalysisRequestData] = useState<AnalyzeSEORequest | null>(null);
+  
+  // Applied recommendations hook
+  const { isApplied, markAsApplied, getApplied } = useAppliedRecommendations({ pageId: currentPageId });
   
   const seoScore = results?.score ?? 0;
   const scoreRating = getScoreRatingText(seoScore);
@@ -379,7 +405,7 @@ export default function Home() {
         return false;
       }
     } catch (err) {
-      console.error("Error in clipboard operation:", err);
+      logger.error("Error in clipboard operation:", err);
       toast({
         title: "Unable to copy",
         description: "Please select the text manually and copy.",
@@ -412,7 +438,7 @@ export default function Home() {
             logger.info("Copy result:", success ? "success" : "failed");
           })
           .catch(error => {
-            console.error("Copy error:", error);
+            logger.error("Copy error:", error);
           });
       }
     };
@@ -424,7 +450,7 @@ export default function Home() {
   useEffect(() => {
     toast({
       title: "SEO Analyzer Ready",
-      description: "Enter your target keyphrase to begin analysis",
+      description: "Enter your main keyword to begin analysis",
       duration: 5000
     });
   }, []);
@@ -435,7 +461,7 @@ export default function Home() {
     
     // Check if webflow is available before proceeding
     if (!window.webflow) {
-      console.warn("Webflow API not available");
+      logger.warn("Webflow API not available");
       return;
     }
     
@@ -446,7 +472,7 @@ export default function Home() {
         const page = await window.webflow.getCurrentPage();
         currentPagePath = await page.getPublishPath();
       } catch (error) {
-        console.error("Failed to get initial page path:", error);
+        logger.error("Failed to get initial page path:", error);
       }
     };
     initCurrentPage();
@@ -469,7 +495,7 @@ export default function Home() {
           }, 300); // Slightly longer delay for stability
         }
       } catch (error) {
-        console.error("Error handling page change:", error);
+        logger.error("Error handling page change:", error);
       }
     });
     
@@ -512,13 +538,17 @@ export default function Home() {
         setCurrentPageId(pageId);
         setCurrentSiteId(siteInfo?.siteId || '');
         
+        // Reset H2 elements when page changes
+        setH2Elements([]);
+        setH2ElementsFetched(false);
+        
         // Load site-specific language preference
         if (siteInfo?.siteId) {
           try {
             const siteLanguage = loadLanguageForSite(siteInfo.siteId);
             setSelectedLanguage(siteLanguage);
           } catch (error) {
-            console.warn('Failed to load site language preference:', error);
+            logger.warn('Failed to load site language preference:', error);
             setSelectedLanguage(getDefaultLanguage());
           }
         }
@@ -527,15 +557,12 @@ export default function Home() {
         const savedKeywords = loadKeywordsForPage(pageId);
         if (savedKeywords) {
           form.setValue('keyphrase', savedKeywords);
-          setKeywordSaveStatus('saved');
-        } else {
-          setKeywordSaveStatus('none');
         }
         
         // Load saved advanced options for this page
         const savedAdvancedOptions = loadAdvancedOptionsForPage(pageId);
         if (savedAdvancedOptions.pageType || savedAdvancedOptions.secondaryKeywords || savedAdvancedOptions.languageCode) {
-          setPageType(savedAdvancedOptions.pageType || '');
+          setPageType(savedAdvancedOptions.pageType || "none");
           setSecondaryKeywords(savedAdvancedOptions.secondaryKeywords || '');
           
           // For backward compatibility, also check languageCode in advanced options
@@ -548,13 +575,13 @@ export default function Home() {
           setAdvancedOptionsEnabled(true);
           setAdvancedOptionsSaveStatus('saved');
         } else {
-          setPageType('');
+          setPageType("none");
           setSecondaryKeywords('');
           setAdvancedOptionsEnabled(false);
           setAdvancedOptionsSaveStatus('none');
         }
       } catch (error) {
-        console.warn('Failed to initialize page keywords:', error);
+        logger.warn('Failed to initialize page keywords:', error);
       }
     };
 
@@ -563,31 +590,17 @@ export default function Home() {
     }
   }, [form]);
 
-  // Watch for keyphrase changes to update save status
-  const watchedKeyphrase = form.watch('keyphrase');
-  useEffect(() => {
-    if (currentPageId) {
-      const savedKeywords = loadKeywordsForPage(currentPageId);
-      if (watchedKeyphrase === savedKeywords && watchedKeyphrase) {
-        setKeywordSaveStatus('saved');
-      } else if (watchedKeyphrase && watchedKeyphrase !== savedKeywords) {
-        setKeywordSaveStatus('none');
-      } else if (!watchedKeyphrase) {
-        setKeywordSaveStatus('none');
-      }
-    }
-  }, [watchedKeyphrase, currentPageId]);
 
   // Watch for advanced options changes to update save status
   useEffect(() => {
     if (currentPageId && advancedOptionsEnabled) {
       const savedAdvancedOptions = loadAdvancedOptionsForPage(currentPageId);
-      const currentOptions = { pageType, secondaryKeywords };
-      
+      const currentOptions = { pageType: pageType !== "none" ? pageType : undefined, secondaryKeywords };
+
       // Only show 'saved' status if there are actual values saved
       const hasSavedValues = savedAdvancedOptions.pageType || savedAdvancedOptions.secondaryKeywords;
-      const hasCurrentValues = pageType || secondaryKeywords;
-      
+      const hasCurrentValues = (pageType && pageType !== "none") || secondaryKeywords;
+
       if (hasSavedValues && JSON.stringify(currentOptions) === JSON.stringify({ pageType: savedAdvancedOptions.pageType, secondaryKeywords: savedAdvancedOptions.secondaryKeywords || '' })) {
         setAdvancedOptionsSaveStatus('saved');
       } else if (hasCurrentValues) {
@@ -609,7 +622,7 @@ export default function Home() {
     onSuccess: (data) => {
       // Validate API response structure
       if (!data || !Array.isArray(data.checks) || data.checks.length === 0) {
-        console.error('Invalid API response structure:', data);
+        logger.error('Invalid API response structure', { data });
         toast({
           variant: "destructive",
           title: "Invalid Response",
@@ -625,7 +638,7 @@ export default function Home() {
       );
       
       if (hasInvalidChecks) {
-        console.error('Invalid check structure in API response:', data.checks);
+        logger.error('Invalid check structure in API response', { checks: data.checks });
         toast({
           variant: "destructive",
           title: "Invalid Response",
@@ -671,6 +684,84 @@ export default function Home() {
         }
       }
 
+      // Check for applied H2 recommendations
+      const h2CheckIndex = modifiedData.checks.findIndex(check => 
+        check.title === "Keyphrase in H2 Headings"
+      );
+
+      if (h2CheckIndex !== -1 && isApplied("Keyphrase in H2 Headings")) {
+        // When H2 recommendation was applied, verify the current keyphrase is actually in current H2 content
+        const currentKeyphrase = analysisRequestData?.keyphrase?.toLowerCase();
+        const h2KeywordMatch = modifiedData.checks[h2CheckIndex];
+        
+        // Only mark as passed if the actual SEO check shows keyphrase is found in H2s
+        if (h2KeywordMatch && h2KeywordMatch.passed) {
+        // Create a mutable copy of the checks array
+        const newChecks = [...modifiedData.checks];
+        const originalH2Check = newChecks[h2CheckIndex];
+
+        // Check if the status is changing from failed to passed
+        const wasFailed = !originalH2Check.passed;
+
+        // Update the specific check
+        newChecks[h2CheckIndex] = {
+          ...originalH2Check,
+          passed: true,
+          description: `Good! The keyphrase "${analysisRequestData?.keyphrase || 'keyword'}" is found in at least one H2 heading.`,
+        };
+
+        // Update the overall counts if the status changed
+        if (wasFailed) {
+          modifiedData.passedChecks = (modifiedData.passedChecks ?? 0) + 1;
+          modifiedData.failedChecks = Math.max(0, (modifiedData.failedChecks ?? 0) - 1);
+          // Update score to simple percentage calculation to match backend
+          const passedCount = newChecks.filter(check => check.passed).length;
+          modifiedData.score = Math.round((passedCount / newChecks.length) * 100);
+        }
+
+        // Assign the modified checks array back to the data
+        modifiedData.checks = newChecks;
+        }
+      }
+
+      // Check for applied Introduction recommendations
+      const introCheckIndex = modifiedData.checks.findIndex(check =>
+        check.title === "Keyphrase in Introduction"
+      );
+
+      if (introCheckIndex !== -1 && isApplied("Keyphrase in Introduction")) {
+        const introCheck = modifiedData.checks[introCheckIndex];
+
+        // Only mark as passed if the actual SEO check shows keyphrase is found in introduction
+        if (introCheck && introCheck.passed) {
+          // Create a mutable copy of the checks array
+          const newChecks = [...modifiedData.checks];
+          const originalIntroCheck = newChecks[introCheckIndex];
+
+          // Check if the status is changing from failed to passed
+          const wasFailed = !originalIntroCheck.passed;
+
+          // Update the specific check
+          newChecks[introCheckIndex] = {
+            ...originalIntroCheck,
+            passed: true,
+            description: `Nice! The keyphrase "${analysisRequestData?.keyphrase || 'keyword'}" appears in the first paragraph.`,
+          };
+
+          // Update the overall counts if the status changed
+          if (wasFailed) {
+            modifiedData.passedChecks = (modifiedData.passedChecks ?? 0) + 1;
+            modifiedData.failedChecks = Math.max(0, (modifiedData.failedChecks ?? 0) - 1);
+            // Update score to simple percentage calculation to match backend
+            const passedCount = newChecks.filter(check => check.passed).length;
+            modifiedData.score = Math.round((passedCount / newChecks.length) * 100);
+          }
+
+          // Assign the modified checks array back to the data
+          modifiedData.checks = newChecks;
+        }
+      }
+
       setResults(modifiedData); // Set state with potentially modified data
       setSelectedCategory(null);
       setIsLoading(false);
@@ -684,6 +775,27 @@ export default function Home() {
          });
          setShowedPerfectScoreMessage(true); // Ensure flag is set here too
       }
+
+      // Fetch H2 elements for H2SelectionList after successful analysis
+      const fetchH2Elements = async () => {
+        try {
+          if (typeof window !== 'undefined' && window.webflow) {
+            setH2ElementsFetched(true);
+            const api = new WebflowDesignerExtensionAPI();
+            const h2s = await api.findAllH2Elements();
+            setH2Elements(h2s);
+          }
+        } catch (error) {
+          logger.warn('Failed to fetch H2 elements', { error });
+          setH2Elements([]); // Reset to empty array on error
+          setH2ElementsFetched(true); // Mark as fetched even on error to prevent retries
+        }
+      };
+      
+      // Only fetch H2s if we haven't already tried
+      if (!h2ElementsFetched) {
+        fetchH2Elements();
+      }
     },
     onError: (error: Error) => {
       setIsLoading(false);
@@ -692,7 +804,7 @@ export default function Home() {
         toast({
           variant: "destructive",
           title: "Unpublished Page",
-          description: "It seems the page you are trying to analyze is empty. Can you make sure you published the page (top right corner button) and try again.",
+          description: "Unable to analyze this page. Please ensure the page has been published and has content, then try again.",
           duration: 6000,
           className: "bg-amber-50 dark:bg-amber-900 border-amber-200 dark:border-amber-800",
           style: {
@@ -713,19 +825,18 @@ export default function Home() {
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     // Save keywords for current page
     if (currentPageId && values.keyphrase) {
-      setKeywordSaveStatus('saving');
       saveKeywordsForPage(currentPageId, values.keyphrase);
-      setKeywordSaveStatus('saved');
     }
     
     // Save advanced options for current page
-    if (currentPageId && advancedOptionsEnabled && (pageType || secondaryKeywords || selectedLanguage.code !== getDefaultLanguage().code)) {
+    // Always save when advanced options is enabled to allow clearing previously saved values
+    if (currentPageId && advancedOptionsEnabled) {
       setAdvancedOptionsSaveStatus('saving');
       const sanitizedContext = secondaryKeywords ? validateSecondaryKeywords(secondaryKeywords, selectedLanguage.code).sanitized : '';
-      saveAdvancedOptionsForPage(currentPageId, { 
-        pageType, 
+      saveAdvancedOptionsForPage(currentPageId, {
+        pageType: pageType !== "none" ? pageType : undefined,
         secondaryKeywords: sanitizedContext,
-        languageCode: selectedLanguage.code 
+        languageCode: selectedLanguage.code
       });
       setAdvancedOptionsSaveStatus('saved');
     }
@@ -777,6 +888,16 @@ export default function Home() {
         publishPath = (await currentPage.getPublishPath()) ?? "";
         setIsHomePage(await currentPage.isHomepage());
 
+        // Collect H2 elements using the Designer API
+        let h2Elements: H2ElementInfo[] = [];
+        try {
+          const designerApi = new WebflowDesignerExtensionAPI();
+          h2Elements = await designerApi.findAllH2Elements();
+          logger.info("[Home onSubmit] Collected H2 elements:", h2Elements);
+        } catch (h2Error) {
+          logger.warn("[Home onSubmit] Failed to collect H2 elements:", h2Error);
+        }
+
         rawPageData = {
           title: (await currentPage.getTitle()) ?? "",
           metaDescription: (await currentPage.getDescription()) ?? "",
@@ -784,7 +905,8 @@ export default function Home() {
           ogTitle: (await currentPage.getOpenGraphTitle()) ?? '',
           ogDescription: (await currentPage.getOpenGraphDescription()) ?? '',
           usesTitleAsOpenGraphTitle: await currentPage.usesTitleAsOpenGraphTitle(),
-          usesDescriptionAsOpenGraphDescription: await currentPage.usesDescriptionAsOpenGraphDescription()
+          usesDescriptionAsOpenGraphDescription: await currentPage.usesDescriptionAsOpenGraphDescription(),
+          h2Elements
         };
         logger.info("[Home onSubmit] Fetched Raw Webflow Page Data:", rawPageData);
 
@@ -799,6 +921,14 @@ export default function Home() {
 
       const finalUrlPath = publishPath === '/' ? '' : publishPath;
       const url = `${baseUrl}${finalUrlPath.startsWith('/') ? '' : '/'}${finalUrlPath}`;
+      
+      // Debug logging for URL construction
+      logger.debug('URL construction debug', {
+        baseUrl,
+        publishPath,
+        finalUrlPath,
+        constructedUrl: url
+      });
 
       const pageDataForApi: Partial<WebflowPageData> = { ...rawPageData };
       
@@ -824,9 +954,9 @@ export default function Home() {
         siteInfo: mappedSiteInfo,
         publishPath,
         webflowPageData: pageDataForApi as WebflowPageData,
-        ...(advancedOptionsEnabled && (pageType || secondaryKeywords || selectedLanguage.code !== getDefaultLanguage().code) && {
+        ...(advancedOptionsEnabled && {
           advancedOptions: {
-            pageType: pageType || undefined,
+            pageType: pageType !== "none" ? pageType : undefined,
             secondaryKeywords: sanitizedKeywords,
             languageCode: selectedLanguage.code
           }
@@ -878,29 +1008,54 @@ export default function Home() {
     getUrls();
   }, []);
 
-  const selectedCategoryChecks = selectedCategory && results && results.checks && Array.isArray(results.checks) ? 
+  const selectedCategoryChecks = selectedCategory && results && results.checks && Array.isArray(results.checks) ?
     results.checks.filter(check => {
       const categories = groupChecksByCategory(results.checks);
       return categories[selectedCategory]?.includes(check);
     }) : [];
 
+  // Determine which scraped images can be directly updated via the Designer API
+  useEffect(() => {
+    async function fetchApplyableImages() {
+      try {
+        const api = new WebflowDesignerExtensionAPI();
+        const assetIds = await api.getApplyableImageAssetIds();
+        const imageCheck = selectedCategoryChecks.find(c => c.title === 'Image Alt Attributes');
+        if (imageCheck?.imageData) {
+          const applyable = new Set<string>();
+          for (const img of imageCheck.imageData) {
+            for (const assetId of assetIds) {
+              if (img.url.includes(assetId)) {
+                applyable.add(img.url);
+                break;
+              }
+            }
+          }
+          setApplyableImageUrls(applyable);
+        }
+      } catch {
+        // On failure, don't restrict — leave all enabled
+      }
+    }
+    const hasImageCheck = selectedCategoryChecks.some(
+      c => c.title === 'Image Alt Attributes' && c.imageData && c.imageData.length > 0
+    );
+    if (hasImageCheck) {
+      fetchApplyableImages();
+    }
+  }, [selectedCategoryChecks]);
+
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="min-h-screen bg-background p-4 md:p-6 flex flex-col"
-      style={{ color: "#FFFFFF" }}
+      initial={{ y: -20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ duration: 0.5 }}
+      style={{ width: 715, minWidth: 715, maxWidth: 715, color: "#FFFFFF" }}
+      className="bg-background p-[24px] flex flex-col items-center justify-between gap-[24px]"
     >
-      <div className="mx-auto w-full max-w-3xl space-y-6 flex-grow">
-        <motion.div
-          initial={{ y: -20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.5 }}
-          className="w-full"
-        >
           <Card className="w-full">
             <CardHeader>
-              <OriginalCardTitle className="text-center">SEO Analysis Tool</OriginalCardTitle>
+              <CardTitle className="text-center" style={{ fontSize: 20, fontWeight: 600 }}>Set up your SEO analysis</CardTitle>
             </CardHeader>
             <CardContent>
               <Form {...form}>
@@ -909,28 +1064,16 @@ export default function Home() {
                     control={form.control}
                     name="keyphrase"
                     render={({ field }: { field: any }) => (
-                      <FormItem className="w-full">
-                        <div className="flex justify-between items-center mb-1">
-                          <FormLabel className="mb-0">Target keyphrase</FormLabel>
-                          {/* Keyword Save Status Indicator */}
-                          <span className="text-xs font-medium" style={{
-                            color: keywordSaveStatus === 'saved' ? 'var(--greenText)' :
-                                   keywordSaveStatus === 'saving' ? 'var(--yellowText)' :
-                                   'var(--redText)'
-                          }}>
-                            {keywordSaveStatus === 'saved' ? 'Keyword saved' :
-                             keywordSaveStatus === 'saving' ? 'Saving...' :
-                             'No keyword saved'}
-                          </span>
-                        </div>
+                      <FormItem className="w-full space-y-3">
+                        <FormLabel className="text-[14px] font-semibold text-text1">Main keyword</FormLabel>
                         <FormControl>
                           <motion.div
                             whileHover={{ scale: 1.01 }}
                             whileTap={{ scale: 0.99 }}
-                            className="w-full mt-2"
+                            className="w-full"
                           >
                             <Input
-                              placeholder="Enter your target keyphrase"
+                              placeholder="Enter your main keyword"
                               {...field}
                               className="w-full"
                             />
@@ -942,68 +1085,77 @@ export default function Home() {
                   />
                   
                   {/* Advanced Tab Section */}
-                  <div className="border-t pt-4 mt-4">
+                  <div className="border-t pt-4 mt-4" style={{ borderColor: 'var(--BG-500, #444)' }}>
                     <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h3 className="text-lg font-semibold">Advanced Analysis</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Add secondary keywords and specify page type for more targeted SEO analysis
+                      <div className="max-w-[28.625rem]">
+                        <h3 className="text-[14px] font-semibold text-text1">
+                          Advanced Analysis
+                          <span className="text-xs font-normal text-text2 ml-2">optional</span>
+                        </h3>
+                        <p className="text-body-sm text-text2">
+                          Get smarter, page-specific recommendations based
+                          <br />
+                          on your page context.
                         </p>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          checked={advancedOptionsEnabled}
-                          onCheckedChange={(checked) => {
-                            setAdvancedOptionsEnabled(checked);
-                            if (!checked) {
-                              // When turning off, only clear UI state but preserve stored settings
-                              setPageType('');
-                              setSecondaryKeywords('');
-                              setSelectedLanguage(getDefaultLanguage());
-                              setAdvancedOptionsSaveStatus('none');
-                            } else {
-                              // When turning on, restore saved settings
-                              if (currentPageId) {
-                                const savedAdvancedOptions = loadAdvancedOptionsForPage(currentPageId);
-                                if (savedAdvancedOptions.pageType || savedAdvancedOptions.secondaryKeywords || savedAdvancedOptions.languageCode) {
-                                  setPageType(savedAdvancedOptions.pageType || '');
-                                  setSecondaryKeywords(savedAdvancedOptions.secondaryKeywords || '');
-                                  const savedLanguage = savedAdvancedOptions.languageCode 
-                                    ? getLanguageByCode(savedAdvancedOptions.languageCode) || getDefaultLanguage()
-                                    : getDefaultLanguage();
-                                  setSelectedLanguage(savedLanguage);
-                                  setAdvancedOptionsSaveStatus('saved');
-                                }
+                      <Switch
+                        data-testid="advanced-analysis-switch"
+                        checked={advancedOptionsEnabled}
+                        onCheckedChange={(checked) => {
+                          setAdvancedOptionsEnabled(checked);
+                          if (!checked) {
+                            // When turning off, only clear UI state but preserve stored settings
+                            setPageType("none");
+                            setSecondaryKeywords('');
+                            setSelectedLanguage(getDefaultLanguage());
+                            setAdvancedOptionsSaveStatus('none');
+                          } else {
+                            // When turning on, restore saved settings
+                            if (currentPageId) {
+                              const savedAdvancedOptions = loadAdvancedOptionsForPage(currentPageId);
+                              if (savedAdvancedOptions.pageType || savedAdvancedOptions.secondaryKeywords || savedAdvancedOptions.languageCode) {
+                                setPageType(savedAdvancedOptions.pageType || "none");
+                                setSecondaryKeywords(savedAdvancedOptions.secondaryKeywords || '');
+                                const savedLanguage = savedAdvancedOptions.languageCode
+                                  ? getLanguageByCode(savedAdvancedOptions.languageCode) || getDefaultLanguage()
+                                  : getDefaultLanguage();
+                                setSelectedLanguage(savedLanguage);
+                                setAdvancedOptionsSaveStatus('saved');
                               }
                             }
-                          }}
-                        />
-                        <span className="text-sm">{advancedOptionsEnabled ? 'On' : 'Off'}</span>
-                      </div>
+                          }
+                        }}
+                      />
                     </div>
 
                     <AnimatePresence>
                       {advancedOptionsEnabled && (
                         <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          exit={{ opacity: 0, height: 0 }}
-                          transition={{ duration: 0.3 }}
+                          initial={process.env.NODE_ENV === 'test' ? {} : { opacity: 0, height: 0 }}
+                          animate={process.env.NODE_ENV === 'test' ? {} : { opacity: 1, height: "auto" }}
+                          exit={process.env.NODE_ENV === 'test' ? {} : { opacity: 0, height: 0 }}
+                          transition={process.env.NODE_ENV === 'test' ? { duration: 0 } : { duration: 0.3 }}
                           className="space-y-4"
                         >
-                          {/* Page Type Dropdown */}
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium">Page Type</label>
+                          {/* Page type Dropdown */}
+                          <div className="flex flex-col gap-3">
+                            <label className="text-[14px] font-semibold text-text1">Page type</label>
                             <Select value={pageType} onValueChange={setPageType}>
-                              <SelectTrigger className="focus:ring-0 focus:ring-offset-0">
+                              <SelectTrigger className="focus:ring-0 focus:ring-offset-0 bg-[var(--color-bg-500)] text-text1 placeholder:text-text2 [&>span]:!text-[var(--color-text-primary)]">
                                 <SelectValue placeholder="Select a page type" />
                               </SelectTrigger>
-                              <SelectContent className="bg-background border border-input shadow-md">
+                              <SelectContent className="bg-background3 border border-divider shadow-md">
+                                <SelectItem
+                                  value="none"
+                                  className="cursor-pointer focus:bg-background4 focus:text-text1 data-[highlighted]:bg-background4 data-[highlighted]:text-text1 hover:bg-background4 hover:text-text1 transition-colors"
+                                >
+                                  Select a page type
+                                </SelectItem>
                                 {PAGE_TYPES.map((type) => (
-                                  <SelectItem 
-                                    key={type} 
+                                  <SelectItem
+                                    key={type}
                                     value={type}
-                                    className="cursor-pointer focus:bg-accent focus:text-accent-foreground data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                                    className="cursor-pointer focus:bg-background4 focus:text-text1 data-[highlighted]:bg-background4 data-[highlighted]:text-text1 hover:bg-background4 hover:text-text1 transition-colors"
                                   >
                                     {type}
                                   </SelectItem>
@@ -1014,7 +1166,7 @@ export default function Home() {
 
                           {/* Language Selector */}
                           <LanguageSelector
-                            label="Generate AI suggestions in"
+                            label="AI recommendations language"
                             selectedLanguage={selectedLanguage}
                             onLanguageChange={(language) => {
                               try {
@@ -1024,12 +1176,12 @@ export default function Home() {
                                 if (currentSiteId) {
                                   saveLanguageForSite(currentSiteId, language.code);
                                 } else {
-                                  console.warn('No site ID available for saving language preference');
+                                  logger.warn('No site ID available for saving language preference');
                                 }
                                 
                                 setAdvancedOptionsSaveStatus('none'); // Mark as unsaved when changed
                               } catch (error) {
-                                console.warn('Failed to save language preference:', error);
+                                logger.warn('Failed to save language preference', { error });
                                 toast({
                                   variant: "destructive",
                                   title: "Language Setting Error",
@@ -1039,14 +1191,14 @@ export default function Home() {
                                 setSelectedLanguage(getDefaultLanguage());
                               }
                             }}
-                            className="space-y-2"
+                            className="space-y-3"
                           />
 
                           {/* Secondary Keywords Input */}
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium">
-                              Secondary Keywords
-                              <span className="text-xs text-muted-foreground ml-2">
+                          <div className="space-y-3">
+                            <label className="text-[14px] font-semibold text-text1 flex items-center gap-3">
+                              Secondary keywords
+                              <span className="text-xs font-normal text-text2">
                                 ({(secondaryKeywords || '').length}/{MAX_KEYWORDS_LENGTH} characters)
                               </span>
                             </label>
@@ -1055,7 +1207,7 @@ export default function Home() {
                               onChange={(e) => {
                                 const input = e.target.value;
                                 setSecondaryKeywords(input);
-                                
+
                                 // Only validate and show errors, don't sanitize during typing
                                 const validation = validateSecondaryKeywords(input, selectedLanguage.code);
                                 if (!validation.isValid) {
@@ -1064,40 +1216,26 @@ export default function Home() {
                                   setSecondaryKeywordsError('');
                                 }
                               }}
-                              placeholder="Enter secondary keywords separated by commas (e.g., webflow expert, webflow specialist, cms developer)"
+                              placeholder="SEO Webflow, search engine optimization..."
                               rows={2}
-                              className={`w-full px-3 py-2 border rounded-md text-sm placeholder:text-muted-foreground resize-none ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-                                secondaryKeywordsError 
-                                  ? 'border-red-500 focus-visible:ring-red-500' 
-                                  : 'border-input bg-background'
-                              }`}
+                              className={cn(
+                                "flex w-full p-[0.875rem] rounded-[0.625rem] text-body-sm text-[var(--color-text-primary)] placeholder:!text-[var(--color-text-primary)] resize-none ring-offset-background focus-visible:outline-none focus-visible:ring-1",
+                                secondaryKeywordsError
+                                  ? 'border border-redText focus-visible:ring-redText bg-input'
+                                  : 'gradient-border'
+                              )}
                               maxLength={MAX_KEYWORDS_LENGTH}
                             />
                             {secondaryKeywordsError && (
-                              <p className="text-xs text-red-500 flex items-center gap-1">
+                              <p className="text-caption text-redText flex items-center gap-1">
                                 <AlertTriangle className="h-3 w-3" />
                                 {secondaryKeywordsError}
                               </p>
                             )}
-                            <p className="text-xs text-muted-foreground">
-                              Secondary keywords help your content rank for related terms. SEO checks will pass if either your main keyword or any secondary keyword is found.
+                            <p className="text-caption text-text3">
+                              Add related or synonym keywords to help AI deliver richer SEO recommendations.
                             </p>
                           </div>
-
-                          {/* Advanced Options Save Status */}
-                          {(pageType || secondaryKeywords || advancedOptionsSaveStatus === 'saving') && (
-                            <div className="flex justify-end">
-                              <span className="text-xs font-medium" style={{
-                                color: advancedOptionsSaveStatus === 'saved' ? 'var(--greenText)' :
-                                       advancedOptionsSaveStatus === 'saving' ? 'var(--yellowText)' :
-                                       'var(--redText)'
-                              }}>
-                                {advancedOptionsSaveStatus === 'saved' ? 'Secondary keywords and page type saved' :
-                                 advancedOptionsSaveStatus === 'saving' ? 'Saving...' :
-                                 'Secondary keywords and page type not saved'}
-                              </span>
-                            </div>
-                          )}
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -1107,15 +1245,17 @@ export default function Home() {
                   <motion.div
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    className="w-full pt-2"
+                    className="w-full pt-2 flex justify-center"
                   >
                     <Button
                       type="submit"
+                      variant="optimize"
+                      size="optimize"
                       disabled={mutation.isPending}
-                      className="w-full h-11 cursor-pointer"
+                      className="cursor-pointer"
                     >
                       {mutation.isPending && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
-                      Start optimizing your SEO
+                      Optimize my SEO
                     </Button>
                   </motion.div>
                   {process.env.NODE_ENV !== 'production' && (
@@ -1172,7 +1312,6 @@ export default function Home() {
               </Form>
             </CardContent>
           </Card>
-        </motion.div>
 
         <AnimatePresence mode="wait">
           {results && (
@@ -1182,95 +1321,166 @@ export default function Home() {
               exit={{ opacity: 0, y: -20 }}
               className="w-full"
             >
-              <Card className="w-full">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    {selectedCategory ? (
-                      <CategoryHeader>
-                        <BackButton onClick={() => setSelectedCategory(null)}>
-                          <ChevronLeft />
-                          <CardTitle>{selectedCategory}</CardTitle>
-                        </BackButton>
-                      </CategoryHeader>
-                    ) : (
-                      <OriginalCardTitle className="text-center">Analysis Results</OriginalCardTitle>
-                    )}
-                  </div>
-                  {!selectedCategory && (
-                    <div className="flex flex-col items-center justify-center mt-4">
-                      <ProgressCircle 
-                        value={seoScore} 
-                        size={140} 
-                        strokeWidth={10}
-                        scoreText="SEO Score" 
-                      />
-                      <div className="mt-2 text-center">
-                        <p className="text-lg font-medium">{scoreRating}</p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {results.passedChecks} passed <CheckCircle className="inline-block h-4 w-4 text-greenText" style={{color: 'var(--greenText)', stroke: 'var(--greenText)'}} /> • {results.failedChecks} to improve <XCircle className="inline-block h-4 w-4 text-redText" style={{color: 'var(--redText)', stroke: 'var(--redText)'}} />
-                        </p>
-                        
-                        {seoScore === 100 && (
-                          <motion.div
-                            initial={{ opacity: 0, scale: 0.8 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className="mt-4 p-3 bg-green-100 dark:bg-green-900 rounded-md text-green-800 dark:text-green-100 font-medium"
-                          >
-                            You are an absolute SEO legend, well done! 🎉
-                            <p className="text-sm font-normal mt-1">
-                              Feel free to take a screenshot and brag about it on Linkedin. We might have a special something for you in return.
-                            </p>
-                          </motion.div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  {selectedCategory && (
+              {selectedCategory ? (
+                <Card className="w-full rounded-[14px] shadow-none" style={{ border: '1px solid var(--color-bg-500)' }}>
+                  <CardHeader>
+                    <CategoryHeader>
+                      <BackButton onClick={() => setSelectedCategory(null)}>
+                        <ArrowLeft />
+                      </BackButton>
+                      <CardTitle className="flex-1 text-center">{selectedCategory} overview</CardTitle>
+                      {/* Invisible spacer to keep title centered */}
+                      <div style={{ width: 24 }} />
+                    </CategoryHeader>
                     <motion.div
                       initial={{ scale: 0.9 }}
                       animate={{ scale: 1 }}
-                      className="text-sm text-muted-foreground text-center"
+                      className="flex items-center justify-center mb-10"
                     >
-                      {results.passedChecks} passes <CheckCircle className="inline-block h-4 w-4 text-greenText" style={{color: 'var(--greenText)', stroke: 'var(--greenText)'}} /> • {results.failedChecks} improvements needed <XCircle className="inline-block h-4 w-4 text-redText" style={{color: 'var(--redText)', stroke: 'var(--redText)'}} />
+                      <div className="inline-flex items-center gap-4 bg-background3 rounded-full px-5 py-2" style={{ borderRadius: '41px' }}>
+                        <span className="flex items-center gap-1.5 text-sm font-medium" style={{ color: 'white' }}>
+                          <svg width="1.5625rem" height="1.5625rem" viewBox="0 0 31 29" fill="none" style={{ flexShrink: 0, stroke: 'none' }} aria-hidden="true">
+                            <g filter="url(#filter_success_home)">
+                              <path d="M14.2287 4.5C14.6136 3.83333 15.5759 3.83333 15.9608 4.5L25.0541 20.25C25.439 20.9167 24.9578 21.75 24.188 21.75H6.00149C5.23169 21.75 4.75057 20.9167 5.13547 20.25L14.2287 4.5Z" fill="#A2FFB4" style={{ stroke: 'none' }}/>
+                              <path d="M14.2287 4.5C14.6136 3.83333 15.5759 3.83333 15.9608 4.5L25.0541 20.25C25.439 20.9167 24.9578 21.75 24.188 21.75H6.00149C5.23169 21.75 4.75057 20.9167 5.13547 20.25L14.2287 4.5Z" fill="url(#paint_success_home)" style={{ stroke: 'none' }}/>
+                            </g>
+                            <defs>
+                              <filter id="filter_success_home" x="0" y="1" width="30.1895" height="27.75" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+                                <feFlood floodOpacity="0" result="BackgroundImageFix"/>
+                                <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+                                <feOffset dy="2"/>
+                                <feGaussianBlur stdDeviation="2.5"/>
+                                <feComposite in2="hardAlpha" operator="out"/>
+                                <feColorMatrix type="matrix" values="0 0 0 0 0.282353 0 0 0 0 0.788235 0 0 0 0 0.521569 0 0 0 0.3 0"/>
+                                <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow"/>
+                                <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow" result="shape"/>
+                              </filter>
+                              <linearGradient id="paint_success_home" x1="2.59476" y1="3" x2="27.5948" y2="28" gradientUnits="userSpaceOnUse">
+                                <stop stopColor="white" stopOpacity="0.4"/>
+                                <stop offset="1" stopColor="white" stopOpacity="0"/>
+                              </linearGradient>
+                            </defs>
+                          </svg>
+                          {results.passedChecks} passed
+                        </span>
+                        <span className="flex items-center gap-1.5 text-sm font-medium" style={{ color: 'white' }}>
+                          <svg width="1.5625rem" height="1.5625rem" viewBox="0 0 31 28" fill="none" style={{ flexShrink: 0, stroke: 'none' }} aria-hidden="true">
+                            <g filter="url(#filter_fail_home)">
+                              <path d="M15.9608 20.5C15.5759 21.1667 14.6136 21.1667 14.2287 20.5L5.13547 4.75C4.75057 4.08334 5.23169 3.25 6.00149 3.25L24.188 3.25C24.9578 3.25 25.439 4.08333 25.0541 4.75L15.9608 20.5Z" fill="#FF4343" style={{ stroke: 'none' }}/>
+                              <path d="M15.9608 20.5C15.5759 21.1667 14.6136 21.1667 14.2287 20.5L5.13547 4.75C4.75057 4.08334 5.23169 3.25 6.00149 3.25L24.188 3.25C24.9578 3.25 25.439 4.08333 25.0541 4.75L15.9608 20.5Z" fill="url(#paint_fail_home)" style={{ stroke: 'none' }}/>
+                            </g>
+                            <defs>
+                              <filter id="filter_fail_home" x="0" y="0.25" width="30.1895" height="27.75" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+                                <feFlood floodOpacity="0" result="BackgroundImageFix"/>
+                                <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+                                <feOffset dy="2"/>
+                                <feGaussianBlur stdDeviation="2.5"/>
+                                <feComposite in2="hardAlpha" operator="out"/>
+                                <feColorMatrix type="matrix" values="0 0 0 0 0.996078 0 0 0 0 0.294118 0 0 0 0 0.145098 0 0 0 0.4 0"/>
+                                <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow"/>
+                                <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow" result="shape"/>
+                              </filter>
+                              <linearGradient id="paint_fail_home" x1="27.5948" y1="22" x2="2.59476" y2="-3" gradientUnits="userSpaceOnUse">
+                                <stop stopColor="white" stopOpacity="0.4"/>
+                                <stop offset="1" stopColor="white" stopOpacity="0"/>
+                              </linearGradient>
+                            </defs>
+                          </svg>
+                          {results.failedChecks} to improve
+                        </span>
+                      </div>
                     </motion.div>
-                  )}
-                </CardHeader>
-                <CardContent>
-                  {selectedCategory ? (
+                  </CardHeader>
+                  <CardContent>
                     <ScrollArea className="h-[600px] w-full scrollarea-fix">
                       <motion.div
                         variants={container}
                         initial="hidden"
                         animate="show"
-                        className="space-y-5 w-full pt-5"
+                        className="w-full bg-[var(--color-bg-700)] rounded-[20px] p-5 py-8"
+                        style={{ border: '2px solid var(--color-bg-500)' }}
                       >
                         {selectedCategoryChecks.map((check, index) => (
                           <motion.div
                             key={index}
                             variants={item}
-                            className="border p-4 w-full rounded-lg hover:bg-background2 transition-colors"
-                            whileHover={{ y: -2, transition: { duration: 0.2 } }}
+                            className={`py-6 px-0 w-full transition-colors ${index > 0 ? 'border-t border-[var(--color-bg-500)]' : ''}`}
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: index * 0.1 }}
                           >
                             <div className="flex items-start justify-between w-full">
-                              <div className="space-y-2 flex-1">
+                              <div className="space-y-2 flex-1 min-w-0">
                                 <motion.div
-                                  className="font-medium flex items-center gap-2"
+                                  className="font-medium flex items-center gap-1 whitespace-nowrap"
                                 >
-                                  <motion.div
-                                    variants={iconAnimation}
-                                    initial="initial"
-                                    animate="animate"
-                                  >
+                                  <div className="flex items-center gap-1">
+                                    {/* Triangle arrow indicator */}
                                     {check.passed ? (
-                                      <CheckCircle className="h-5 w-5 text-greenText flex-shrink-0" style={{color: 'var(--greenText)', stroke: 'var(--greenText)'}} />
+                                      <svg width="1.5625rem" height="1.5625rem" viewBox="0 0 31 29" fill="none" style={{ flexShrink: 0, stroke: 'none' }} aria-hidden="true">
+                                        <g filter="url(#filter_success_detail)">
+                                          <path d="M14.2287 4.5C14.6136 3.83333 15.5759 3.83333 15.9608 4.5L25.0541 20.25C25.439 20.9167 24.9578 21.75 24.188 21.75H6.00149C5.23169 21.75 4.75057 20.9167 5.13547 20.25L14.2287 4.5Z" fill="#A2FFB4" style={{ stroke: 'none' }}/>
+                                          <path d="M14.2287 4.5C14.6136 3.83333 15.5759 3.83333 15.9608 4.5L25.0541 20.25C25.439 20.9167 24.9578 21.75 24.188 21.75H6.00149C5.23169 21.75 4.75057 20.9167 5.13547 20.25L14.2287 4.5Z" fill="url(#paint_success_detail)" style={{ stroke: 'none' }}/>
+                                        </g>
+                                        <defs>
+                                          <filter id="filter_success_detail" x="0" y="1" width="30.1895" height="27.75" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+                                            <feFlood floodOpacity="0" result="BackgroundImageFix"/>
+                                            <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+                                            <feOffset dy="2"/>
+                                            <feGaussianBlur stdDeviation="2.5"/>
+                                            <feComposite in2="hardAlpha" operator="out"/>
+                                            <feColorMatrix type="matrix" values="0 0 0 0 0.282353 0 0 0 0 0.788235 0 0 0 0 0.521569 0 0 0 0.3 0"/>
+                                            <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow"/>
+                                            <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow" result="shape"/>
+                                          </filter>
+                                          <linearGradient id="paint_success_detail" x1="5.13547" y1="4.5" x2="25.0541" y2="21.75" gradientUnits="userSpaceOnUse">
+                                            <stop stopColor="white" stopOpacity="0.4"/>
+                                            <stop offset="1" stopColor="white" stopOpacity="0"/>
+                                          </linearGradient>
+                                        </defs>
+                                      </svg>
                                     ) : (
-                                      <XCircle className="h-5 w-5 text-redText flex-shrink-0" style={{color: 'var(--redText)', stroke: 'var(--redText)'}} />
+                                      <svg width="1.5625rem" height="1.5625rem" viewBox="0 0 31 28" fill="none" style={{ flexShrink: 0, stroke: 'none' }} aria-hidden="true">
+                                        <g filter="url(#filter_fail_detail)">
+                                          <path d="M15.9608 20.5C15.5759 21.1667 14.6136 21.1667 14.2287 20.5L5.13547 4.75C4.75057 4.08334 5.23169 3.25 6.00149 3.25L24.188 3.25C24.9578 3.25 25.439 4.08333 25.0541 4.75L15.9608 20.5Z" fill="#FF4343" style={{ stroke: 'none' }}/>
+                                          <path d="M15.9608 20.5C15.5759 21.1667 14.6136 21.1667 14.2287 20.5L5.13547 4.75C4.75057 4.08334 5.23169 3.25 6.00149 3.25L24.188 3.25C24.9578 3.25 25.439 4.08333 25.0541 4.75L15.9608 20.5Z" fill="url(#paint_fail_detail)" style={{ stroke: 'none' }}/>
+                                        </g>
+                                        <defs>
+                                          <filter id="filter_fail_detail" x="0" y="0.25" width="30.1895" height="27.75" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+                                            <feFlood floodOpacity="0" result="BackgroundImageFix"/>
+                                            <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+                                            <feOffset dy="2"/>
+                                            <feGaussianBlur stdDeviation="2.5"/>
+                                            <feComposite in2="hardAlpha" operator="out"/>
+                                            <feColorMatrix type="matrix" values="0 0 0 0 0.996078 0 0 0 0 0.294118 0 0 0 0 0.145098 0 0 0 0.4 0"/>
+                                            <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow"/>
+                                            <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow" result="shape"/>
+                                          </filter>
+                                          <linearGradient id="paint_fail_detail" x1="5.13547" y1="3.25" x2="25.0541" y2="20.5" gradientUnits="userSpaceOnUse">
+                                            <stop stopColor="white" stopOpacity="0.4"/>
+                                            <stop offset="1" stopColor="white" stopOpacity="0"/>
+                                          </linearGradient>
+                                        </defs>
+                                      </svg>
                                     )}
-                                  </motion.div>
+                                  </div>
                                   {check.title}
+                                  {!check.passed && check.priority && (
+                                    <Badge
+                                      variant={check.priority === 'high' ? 'destructive' : 'default'}
+                                      style={{
+                                        background: check.priority === 'high' ? '#FF8484' : '#FFEA9E',
+                                        border: '1px solid rgba(255, 255, 255, 0.40)',
+                                        color: 'black',
+                                        fontSize: '0.75rem',
+                                        fontWeight: 400,
+                                        lineHeight: '130%',
+                                        padding: '2px 10px',
+                                      }}
+                                    >
+                                      {getPriorityText(check.priority)}
+                                    </Badge>
+                                  )}
 
                                   <TooltipProvider>
                                     <Tooltip>
@@ -1292,121 +1502,508 @@ export default function Home() {
                                 </motion.div>
                                 
                                 {/* Always show description - keyword results are no longer displayed */}
-                                <div className="text-sm text-muted-foreground text-break">
-                                  <p className="inline">{check.description}</p>
-                                  {!check.passed && (
-                                    <a 
-                                      href={getLearnMoreUrl(check.title)} 
-                                      target="_blank" 
-                                      rel="noopener noreferrer"
-                                      className="ml-1 inline-flex items-center text-primaryText hover:underline"
-                                    >
-                                      Learn more
-                                      <ExternalLink className="h-3 w-3 ml-1" />
-                                    </a>
-                                  )}
+                                <div className="text-body-sm text-text2 text-break">
+                                  <p className="inline">
+                                    {check.passed
+                                      ? check.description
+                                      : isApplied(check.title)
+                                        ? `Previously applied recommendation but the issue persists. ${check.description}`
+                                        : check.description
+                                    }
+                                    {!check.passed && (
+                                      <>
+                                        {' '}
+                                        <a
+                                          href={getLearnMoreUrl(check.title)}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="inline-flex items-center font-semibold text-primaryText hover:underline"
+                                        >
+                                          Learn More <span className="ml-0.5">↗</span>
+                                        </a>
+                                      </>
+                                    )}
+                                  </p>
                                 </div>
                               </div>
+                              {check.title === "Keyphrase in H2 Headings" && !check.passed && h2Elements.length > 0 && (
+                                <button
+                                  className="flex items-center gap-2 text-white text-sm whitespace-nowrap flex-shrink-0 hover:opacity-80 transition-opacity"
+                                  style={{
+                                    background: 'linear-gradient(#787878, #787878) padding-box, linear-gradient(135deg, rgba(255, 255, 255, 0.40) 0%, rgba(255, 255, 255, 0.00) 100%) border-box',
+                                    border: '1px solid transparent',
+                                    borderRadius: '1.6875rem',
+                                    padding: '8px 16px',
+                                  }}
+                                  disabled={h2GeneratingAll}
+                                  onClick={async () => {
+                                    setH2GeneratingAll(true);
+                                    try {
+                                      await h2ListRef.current?.triggerRegenerateAll();
+                                    } finally {
+                                      setH2GeneratingAll(false);
+                                    }
+                                  }}
+                                >
+                                  {h2GeneratingAll ? (
+                                    <svg className="animate-spin h-4 w-4" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                      <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeDasharray="25 13" strokeLinecap="round"/>
+                                    </svg>
+                                  ) : (
+                                    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                      <path d="M8 1.5L8.63857 3.22572C9.34757 5.14175 10.8582 6.65243 12.7743 7.36143L14.5 8L12.7743 8.63857C10.8582 9.34757 9.34757 10.8582 8.63857 12.7743L8 14.5L7.36143 12.7743C6.65243 10.8582 5.14175 9.34757 3.22572 8.63857L1.5 8L3.22572 7.36143C5.14175 6.65243 6.65243 5.14175 7.36143 3.22572L8 1.5Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/>
+                                    </svg>
+                                  )}
+                                  Generate All
+                                </button>
+                              )}
+                              {check.title === "Image Alt Attributes" && !check.passed && (
+                                <button
+                                  className="flex items-center gap-2 text-white text-sm whitespace-nowrap flex-shrink-0 hover:opacity-80 transition-opacity"
+                                  style={{
+                                    background: 'linear-gradient(#787878, #787878) padding-box, linear-gradient(135deg, rgba(255, 255, 255, 0.40) 0%, rgba(255, 255, 255, 0.00) 100%) border-box',
+                                    border: '1px solid transparent',
+                                    borderRadius: '1.6875rem',
+                                    padding: '8px 16px',
+                                  }}
+                                  disabled={imageAltGeneratingAll}
+                                  onClick={async () => {
+                                    // Generate AI alt text for every image missing alt text in parallel.
+                                    // Promise.allSettled ensures one failure does not abort the batch.
+                                    const images = check.imageData;
+                                    if (!images || images.length === 0) return;
+                                    setImageAltGeneratingAll(true);
+                                    try {
+                                    const keyphrase = analysisRequestData?.keyphrase || form.getValues('keyphrase');
+                                    const advancedOptions = analysisRequestData?.advancedOptions;
+
+                                    const results_settled = await Promise.allSettled(
+                                      images.map(img =>
+                                        generateRecommendation({
+                                          checkType: 'Image Alt Attributes',
+                                          keyphrase,
+                                          context: img.url,
+                                          advancedOptions,
+                                        })
+                                      )
+                                    );
+
+                                    const successCount = results_settled.filter(r => r.status === 'fulfilled').length;
+                                    const total = images.length;
+
+                                    // Update alt text for each image that succeeded
+                                    setResults(prev => {
+                                      if (!prev?.checks) return prev;
+                                      return {
+                                        ...prev,
+                                        checks: prev.checks.map(c => {
+                                          if (c.title !== 'Image Alt Attributes' || !c.imageData) return c;
+                                          const updatedImageData = c.imageData.map((img, idx) => {
+                                            const settled = results_settled[idx];
+                                            if (settled && settled.status === 'fulfilled') {
+                                              return { ...img, alt: settled.value };
+                                            }
+                                            return img;
+                                          });
+                                          return { ...c, imageData: updatedImageData };
+                                        }),
+                                      };
+                                    });
+
+                                    if (successCount === total) {
+                                      toast({
+                                        title: `Generated all ${total} alt text suggestions`,
+                                        description: 'AI alt text suggestions are ready for each image.',
+                                      });
+                                    } else {
+                                      toast({
+                                        title: `Generated ${successCount} of ${total} alt text suggestions`,
+                                        description: 'Some suggestions could not be generated. Please try again.',
+                                      });
+                                    }
+                                  } finally {
+                                    setImageAltGeneratingAll(false);
+                                  }
+                                  }}
+                                >
+                                  {imageAltGeneratingAll ? (
+                                    <svg className="animate-spin h-4 w-4" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                      <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeDasharray="25 13" strokeLinecap="round"/>
+                                    </svg>
+                                  ) : (
+                                    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                      <path d="M8 1.5L8.63857 3.22572C9.34757 5.14175 10.8582 6.65243 12.7743 7.36143L14.5 8L12.7743 8.63857C10.8582 9.34757 9.34757 10.8582 8.63857 12.7743L8 14.5L7.36143 12.7743C6.65243 10.8582 5.14175 9.34757 3.22572 8.63857L1.5 8L3.22572 7.36143C5.14175 6.65243 6.65243 5.14175 7.36143 3.22572L8 1.5Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/>
+                                    </svg>
+                                  )}
+                                  Generate All
+                                </button>
+                              )}
                             </div>
-                            {!check.passed && check.recommendation && (
-                              <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: "auto" }}
-                                exit={{ opacity: 0, height: 0 }}
-                                className="mt-4 text-sm p-4 bg-background3 rounded-md w-full"
-                                style={{ backgroundColor: 'var(--background3)' }}
-                              >
-                                {check.imageData && Array.isArray(check.imageData) && check.imageData.length > 0 ? (
-                                  <>
-                                    <ImageSizeDisplay 
-                                      images={check.imageData}
-                                      showMimeType={check.title === "Next-Gen Image Formats"}
-                                      showFileSize={check.title === "Image File Size" || check.title !== "Image Alt Attributes"}
-                                      showAltText={check.title === "Image Alt Attributes"}
-                                      className="mt-2"
-                                    />
-                                  </>
-                                ) : shouldShowCopyButton(check.title) ? (
-                                  // Use editable recommendation for AI-generated recommendations
-                                  <EditableRecommendation
-                                    recommendation={check.recommendation || ''}
-                                    onCopy={copyToClipboard}
+                            {!check.passed && (
+                              check.recommendation ||
+                              check.h2Recommendations?.length ||
+                              (check.title === "Keyphrase in H2 Headings" && h2Elements.length > 0) ||
+                              (check.title === "Image Alt Attributes" && (check.imageData?.length ?? 0) > 0)
+                            ) && (
+                              <div className="mt-8">
+                                {/* Recommendation title - rendered outside dark box */}
+                                {shouldShowCopyButton(check.title)
+                                  && !(check.imageData && Array.isArray(check.imageData) && check.imageData.length > 0)
+                                  && check.title !== "Keyphrase in H2 Headings"
+                                  && check.title !== "Image Alt Attributes" && (
+                                  <p className="text-base font-bold mb-2" style={{ color: 'var(--text1)' }}>
+                                    {check.title} recommendation
+                                  </p>
+                                )}
+                                {check.title === "Keyphrase in H2 Headings" ? (
+                                  // H2SelectionList renders its own per-item dark containers
+                                  <H2SelectionList
+                                    ref={h2ListRef}
+                                    hideGenerateAllHeader
+                                    h2Elements={h2Elements}
+                                    h2Recommendations={check.h2Recommendations}
+                                    keyphrase={analysisRequestData?.keyphrase || form.getValues('keyphrase')}
+                                    advancedOptions={analysisRequestData?.advancedOptions}
+                                    onApply={async ({ h2Element, recommendation }) => {
+                                      try {
+                                        const insertionRequest = {
+                                          type: 'h2_heading' as const,
+                                          value: recommendation,
+                                          elementIndex: h2Element.index,
+                                          selector: `#${h2Element.id}`,
+                                          pageId: currentPageId
+                                        };
+
+                                        const result = await applyInsertion(insertionRequest);
+
+                                        if (result.success) {
+                                          toast({
+                                            title: "Your text has been included successfully",
+                                            description: "Re-analyze the page to update your SEO score.",
+                                          });
+                                        }
+                                        return result;
+                                      } catch (error) {
+                                        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                                        toast({
+                                          variant: "destructive",
+                                          title: "Apply Failed",
+                                          description: errorMessage
+                                        });
+                                        throw error;
+                                      }
+                                    }}
+                                    pageId={currentPageId}
+                                    checkTitle="Keyphrase in H2 Headings"
                                     disabled={mutation.isPending}
                                   />
+                                ) : check.title === "Image Alt Attributes" && check.imageData && Array.isArray(check.imageData) && check.imageData.length > 0 ? (
+                                  // ImageAltTextList renders its own per-item dark containers
+                                  <ImageAltTextList
+                                    images={check.imageData.map((img, idx) => ({
+                                      id: img.name || `img-${idx}`,
+                                      url: img.url,
+                                      name: img.name,
+                                      alt: img.alt || null,
+                                    }))}
+                                    onApply={async ({ image, newAltText }) => {
+                                      console.log('[Home] onApply called for image alt:', { imageUrl: image.url, altTextPreview: newAltText.substring(0, 50) });
+                                      try {
+                                        const result = await applyInsertion({
+                                          type: 'image_alt',
+                                          value: newAltText,
+                                          checkTitle: 'Image Alt Attributes',
+                                          imageUrl: image.url,
+                                          pageId: currentPageId,
+                                        });
+                                        console.log('[Home] applyInsertion result:', result);
+                                        if (result.success) {
+                                          toast({
+                                            title: "Your text has been included successfully",
+                                            description: "Don't forget to publish your website to update the SEO score.",
+                                          });
+                                        } else {
+                                          const errorMsg = result.error?.msg || 'Failed to apply image alt text';
+                                          toast({
+                                            variant: "destructive",
+                                            title: "Apply Failed",
+                                            description: errorMsg,
+                                          });
+                                        }
+                                        return { success: result.success };
+                                      } catch (error) {
+                                        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                                        console.error('[Home] onApply error:', errorMessage);
+                                        toast({
+                                          variant: "destructive",
+                                          title: "Apply Failed",
+                                          description: errorMessage,
+                                        });
+                                        return { success: false };
+                                      }
+                                    }}
+                                    onRegenerate={async (image, _index) => {
+                                      const keyphrase = analysisRequestData?.keyphrase || form.getValues('keyphrase');
+                                      const newRec = await generateRecommendation({
+                                        checkType: 'Image Alt Attributes',
+                                        keyphrase,
+                                        context: image.url,
+                                        advancedOptions: analysisRequestData?.advancedOptions,
+                                      });
+                                      setResults(prev => {
+                                        if (!prev?.checks) return prev;
+                                        return {
+                                          ...prev,
+                                          checks: prev.checks.map(c => {
+                                            if (c.title !== 'Image Alt Attributes' || !c.imageData) return c;
+                                            const updatedImageData = c.imageData.map(img =>
+                                              img.url === image.url ? { ...img, alt: newRec } : img
+                                            );
+                                            return { ...c, imageData: updatedImageData };
+                                          }),
+                                        };
+                                      });
+                                    }}
+                                    pageId={currentPageId}
+                                    checkTitle="Image Alt Attributes"
+                                    disabled={imageAltGeneratingAll || mutation.isPending}
+                                    applyableImageUrls={applyableImageUrls}
+                                  />
                                 ) : (
-                                  // Keep current rendering for checks that don't support copying
-                                  check.recommendation
+                                  <motion.div
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: "auto" }}
+                                    exit={{ opacity: 0, height: 0 }}
+                                    className="text-sm p-4 rounded-[7px] w-full"
+                                    style={{
+                                      background: 'linear-gradient(var(--background3), var(--background3)) padding-box, linear-gradient(135deg, rgba(255, 255, 255, 0.40) 0%, rgba(255, 255, 255, 0.00) 100%) border-box',
+                                      border: '1px solid transparent',
+                                    }}
+                                  >
+                                    {check.imageData && Array.isArray(check.imageData) && check.imageData.length > 0 ? (
+                                      <ImageSizeDisplay
+                                        images={check.imageData}
+                                        showMimeType={check.title === "Next-Gen Image Formats"}
+                                        showFileSize={check.title === "Image File Size"}
+                                        className="mt-2"
+                                      />
+                                    ) : shouldShowCopyButton(check.title) ? (
+                                    // Editable recommendation (title rendered above, outside dark box)
+                                    <EditableRecommendation
+                                      recommendation={check.recommendation || ''}
+                                      onCopy={copyToClipboard}
+                                      disabled={mutation.isPending}
+                                      checkTitle={check.title}
+                                      pageId={currentPageId}
+                                      showApplyButton={true}
+                                      onRegenerate={async () => {
+                                        const keyphrase = analysisRequestData?.keyphrase || form.getValues('keyphrase');
+                                        const newRec = await generateRecommendation({
+                                          checkType: check.title,
+                                          keyphrase,
+                                          context: check.recommendation || check.description,
+                                          advancedOptions: analysisRequestData?.advancedOptions,
+                                        });
+                                        setResults(prev => {
+                                          if (!prev?.checks) return prev;
+                                          return {
+                                            ...prev,
+                                            checks: prev.checks.map(c =>
+                                              c.title === check.title
+                                                ? { ...c, recommendation: newRec }
+                                                : c
+                                            ),
+                                          };
+                                        });
+                                      }}
+                                      onApplySuccess={(appliedCheckTitle) => {
+                                        // Mark the check as passed to trigger collapse-to-success pattern
+                                        setResults(prevResults => {
+                                          if (!prevResults?.checks) return prevResults;
+
+                                          const updatedChecks = prevResults.checks.map(check =>
+                                            check.title === appliedCheckTitle
+                                              ? { ...check, passed: true }
+                                              : check
+                                          );
+
+                                          // Update score calculation
+                                          const passedCount = updatedChecks.filter(check => check.passed).length;
+                                          const updatedScore = Math.round((passedCount / updatedChecks.length) * 100);
+
+                                          return {
+                                            ...prevResults,
+                                            checks: updatedChecks,
+                                            score: updatedScore,
+                                            passedChecks: passedCount,
+                                            failedChecks: updatedChecks.length - passedCount
+                                          };
+                                        });
+                                      }}
+                                    />
+                                  ) : (
+                                    // Keep current rendering for checks that don't support copying
+                                    check.recommendation
+                                    )}
+                                  </motion.div>
                                 )}
-                              </motion.div>
+                              </div>
                             )}
                           </motion.div>
                         ))}
                         
                         {/* Schema Recommendations for Technical SEO category */}
-                        {selectedCategory === 'Technical SEO' && pageType && (
+                        {selectedCategory === 'Technical SEO' && pageType && pageType !== "none" && (
                           <motion.div
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             className="mt-6 pt-2 border-t"
                           >
-                            <SchemaDisplay 
+                            <SchemaDisplay
                               pageType={pageType}
                               schemas={getPopulatedSchemaRecommendations(pageType, {
                                 siteInfo: analysisRequestData?.siteInfo,
                                 webflowPageData: analysisRequestData?.webflowPageData,
                                 url: analysisRequestData?.url
                               })}
+                              pageId={currentPageId}
                             />
                           </motion.div>
                         )}
                       </motion.div>
                     </ScrollArea>
-                  ) : (
-                    <div className="space-y-6">
-                      {groupedChecks && results && results.checks && Object.entries(groupChecksByCategory(results.checks)).map(([category, checks]) => {
-                        if (!checks || !Array.isArray(checks)) return null;
-                        const status = getCategoryStatus(checks);
-                        const passedCount = checks.filter(check => check && typeof check.passed === 'boolean' && check.passed).length;
-                        return (
-                          <motion.div
-                            key={category}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="border rounded-lg p-4 hover:bg-background2 transition-colors cursor-pointer"
-                            onClick={() => setSelectedCategory(category)}
-                          >
-                            <div className="flex items-center justify-between mb-2">
-                              <h3 className="text-lg font-medium">{category}</h3>
-                              <div className="flex items-center gap-2">
-                                {getCategoryStatusIcon(status)}
-                                <span className="text-sm text-muted-foreground">
-                                  {passedCount}/{checks.length} passed
-                                </span>
-                              </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="flex flex-col gap-[24px] w-full">
+                  {/* Score Card */}
+                  <Card className="w-full">
+                    <CardHeader>
+                      <div className="flex flex-col items-center justify-center mt-4">
+                        <ProgressCircle
+                          value={seoScore}
+                          size={244}
+                          strokeWidth={25}
+                          scoreText="SEO Score"
+                        />
+                        <div className="mt-2 text-center">
+                          <p className="text-body-lg font-medium text-text1 max-w-xs mx-auto">{scoreRating}</p>
+                          <StatsSummary
+                            passed={results.passedChecks}
+                            toImprove={results.failedChecks}
+                            className="mx-auto"
+                          />
+
+                          {seoScore === 100 && (
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.8 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              className="mt-4 p-3 bg-green-100 dark:bg-green-900 rounded-md text-green-800 dark:text-green-100 font-medium"
+                            >
+                              You are an absolute SEO legend, well done! 🎉
+                              <p className="text-sm font-normal mt-1">
+                                Feel free to take a screenshot and brag about it on Linkedin. We might have a special something for you in return.
+                              </p>
+                            </motion.div>
+                          )}
+                        </div>
+                      </div>
+                    </CardHeader>
+                  </Card>
+
+                  {/* Category Summary Cards */}
+                  {groupedChecks && results && results.checks && Object.entries(groupChecksByCategory(results.checks)).map(([category, checks]) => {
+                    if (!checks || !Array.isArray(checks)) return null;
+                    const status = getCategoryStatus(checks);
+                    const passedCount = checks.filter(check => check && typeof check.passed === 'boolean' && check.passed).length;
+                    return (
+                      <motion.div
+                        key={category}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="gradient-border-section rounded-[0.875rem] p-5 hover:brightness-110 transition-all cursor-pointer"
+                        onClick={() => setSelectedCategory(category)}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="text-lg font-medium">{category}</h3>
+                          <div className="flex items-center gap-2">
+                            {getCategoryStatusIcon(status)}
+                            <Badge variant={passedCount === 0 ? "destructive" : passedCount === checks.length ? "success" : "warning"} className="flex items-center">
+                              {passedCount}/{checks.length} passed
+                            </Badge>
+                            <Badge variant={passedCount === 0 ? "destructive" : passedCount === checks.length ? "success" : "warning"} className="flex items-center justify-center !w-9 !h-9 !p-0 !rounded-full !gap-0">
+                              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                                <path d="M4 4H12M12 4V12M12 4L4 12" stroke="black" strokeWidth="1.5"/>
+                              </svg>
+                            </Badge>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-muted-foreground">
+                          {checks.filter(check => check && check.title).map((check, idx) => {
+                            const uniqueId = `${category.replace(/\s+/g, '_')}_${idx}`;
+                            return (
+                            <div key={idx} className="flex items-center gap-1.5">
+                              {check.passed ? (
+                                <svg width="1.5625rem" height="1.5625rem" viewBox="0 0 31 29" fill="none" style={{ flexShrink: 0, stroke: 'none' }} aria-hidden="true">
+                                  <g filter={`url(#filter_success_${uniqueId})`}>
+                                    <path d="M14.2287 4.5C14.6136 3.83333 15.5759 3.83333 15.9608 4.5L25.0541 20.25C25.439 20.9167 24.9578 21.75 24.188 21.75H6.00149C5.23169 21.75 4.75057 20.9167 5.13547 20.25L14.2287 4.5Z" fill="#A2FFB4" style={{ stroke: 'none' }}/>
+                                    <path d="M14.2287 4.5C14.6136 3.83333 15.5759 3.83333 15.9608 4.5L25.0541 20.25C25.439 20.9167 24.9578 21.75 24.188 21.75H6.00149C5.23169 21.75 4.75057 20.9167 5.13547 20.25L14.2287 4.5Z" fill={`url(#paint_success_${uniqueId})`} style={{ stroke: 'none' }}/>
+                                  </g>
+                                  <defs>
+                                    <filter id={`filter_success_${uniqueId}`} x="0" y="1" width="30.1895" height="27.75" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+                                      <feFlood floodOpacity="0" result="BackgroundImageFix"/>
+                                      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+                                      <feOffset dy="2"/>
+                                      <feGaussianBlur stdDeviation="2.5"/>
+                                      <feComposite in2="hardAlpha" operator="out"/>
+                                      <feColorMatrix type="matrix" values="0 0 0 0 0.282353 0 0 0 0 0.788235 0 0 0 0 0.521569 0 0 0 0.3 0"/>
+                                      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow"/>
+                                      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow" result="shape"/>
+                                    </filter>
+                                    <linearGradient id={`paint_success_${uniqueId}`} x1="2.59476" y1="3" x2="27.5948" y2="28" gradientUnits="userSpaceOnUse">
+                                      <stop stopColor="white" stopOpacity="0.4"/>
+                                      <stop offset="1" stopColor="white" stopOpacity="0"/>
+                                    </linearGradient>
+                                  </defs>
+                                </svg>
+                              ) : (
+                                <svg width="1.5625rem" height="1.5625rem" viewBox="0 0 31 28" fill="none" style={{ flexShrink: 0, stroke: 'none' }} aria-hidden="true">
+                                  <g filter={`url(#filter_fail_${uniqueId})`}>
+                                    <path d="M15.9608 20.5C15.5759 21.1667 14.6136 21.1667 14.2287 20.5L5.13547 4.75C4.75057 4.08334 5.23169 3.25 6.00149 3.25L24.188 3.25C24.9578 3.25 25.439 4.08333 25.0541 4.75L15.9608 20.5Z" fill="#FF4343" style={{ stroke: 'none' }}/>
+                                    <path d="M15.9608 20.5C15.5759 21.1667 14.6136 21.1667 14.2287 20.5L5.13547 4.75C4.75057 4.08334 5.23169 3.25 6.00149 3.25L24.188 3.25C24.9578 3.25 25.439 4.08333 25.0541 4.75L15.9608 20.5Z" fill={`url(#paint_fail_${uniqueId})`} style={{ stroke: 'none' }}/>
+                                  </g>
+                                  <defs>
+                                    <filter id={`filter_fail_${uniqueId}`} x="0" y="0.25" width="30.1895" height="27.75" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+                                      <feFlood floodOpacity="0" result="BackgroundImageFix"/>
+                                      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+                                      <feOffset dy="2"/>
+                                      <feGaussianBlur stdDeviation="2.5"/>
+                                      <feComposite in2="hardAlpha" operator="out"/>
+                                      <feColorMatrix type="matrix" values="0 0 0 0 0.996078 0 0 0 0 0.294118 0 0 0 0 0.145098 0 0 0 0.4 0"/>
+                                      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow"/>
+                                      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow" result="shape"/>
+                                    </filter>
+                                    <linearGradient id={`paint_fail_${uniqueId}`} x1="27.5948" y1="22" x2="2.59476" y2="-3" gradientUnits="userSpaceOnUse">
+                                      <stop stopColor="white" stopOpacity="0.4"/>
+                                      <stop offset="1" stopColor="white" stopOpacity="0"/>
+                                    </linearGradient>
+                                  </defs>
+                                </svg>
+                              )}
+                              <span>{check.title}</span>
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-muted-foreground">
-                              {checks.filter(check => check && check.title).map((check, idx) => (
-                                <div key={idx} className="flex items-center gap-1.5">
-                                  {check.passed ? 
-                                    <CheckCircle className="h-4 w-4 text-greenText flex-shrink-0" style={{color: 'var(--greenText)', stroke: 'var(--greenText)'}} /> : 
-                                    <XCircle className="h-4 w-4 text-redText flex-shrink-0" style={{color: 'var(--redText)', stroke: 'var(--redText)'}} />
-                                  }
-                                  <span>{check.title}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </motion.div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                            );
+                          })}
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
-      <Footer />
+        <Footer />
     </motion.div>
   );
 }

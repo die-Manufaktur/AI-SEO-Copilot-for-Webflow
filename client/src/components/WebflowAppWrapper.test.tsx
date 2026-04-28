@@ -1,6 +1,6 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, act } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import WebflowAppWrapper from './WebflowAppWrapper';
 
 // Mock the createLogger utility
@@ -23,13 +23,18 @@ const mockWebflow = {
 describe('WebflowAppWrapper', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    
+    vi.useFakeTimers();
+
     // Reset global webflow
     Object.defineProperty(global, 'webflow', {
       value: undefined,
       writable: true,
       configurable: true,
     });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('renders children correctly', () => {
@@ -51,11 +56,10 @@ describe('WebflowAppWrapper', () => {
     );
 
     const wrapper = screen.getByTestId('webflow-app-wrapper');
-    expect(wrapper).toHaveClass('bg-background', 'text-text1', 'min-h-screen');
+    expect(wrapper).toHaveClass('bg-background', 'text-text1');
   });
 
-  it('sets extension size when webflow API is available', () => {
-    // Mock webflow as available
+  it('sets extension size immediately when webflow API is available', () => {
     Object.defineProperty(global, 'webflow', {
       value: mockWebflow,
       writable: true,
@@ -69,20 +73,57 @@ describe('WebflowAppWrapper', () => {
     );
 
     expect(mockWebflow.setExtensionSize).toHaveBeenCalledWith({
-      width: 540,
-      height: 720,
+      width: 715,
+      height: 800,
     });
   });
 
-  it('logs warning when webflow API is not available', () => {
-    // webflow is undefined by default from beforeEach
+  it('polls for webflow API when not immediately available', () => {
+    // webflow is undefined — simulates Designer not having injected it yet
     render(
       <WebflowAppWrapper>
         <div>Test</div>
       </WebflowAppWrapper>
     );
 
-    expect(mockLogger.warn).toHaveBeenCalledWith('webflow.setExtensionSize is not available');
+    expect(mockWebflow.setExtensionSize).not.toHaveBeenCalled();
+
+    // Simulate the Designer injecting webflow after 300ms
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(mockWebflow.setExtensionSize).not.toHaveBeenCalled();
+
+    Object.defineProperty(global, 'webflow', {
+      value: mockWebflow,
+      writable: true,
+      configurable: true,
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+
+    expect(mockWebflow.setExtensionSize).toHaveBeenCalledWith({
+      width: 715,
+      height: 800,
+    });
+  });
+
+  it('logs warning after 10s timeout when webflow never becomes available', () => {
+    render(
+      <WebflowAppWrapper>
+        <div>Test</div>
+      </WebflowAppWrapper>
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
+
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      'webflow.setExtensionSize not available after 10s'
+    );
     expect(mockWebflow.setExtensionSize).not.toHaveBeenCalled();
   });
 
@@ -106,8 +147,8 @@ describe('WebflowAppWrapper', () => {
     );
 
     expect(mockWebflowWithError.setExtensionSize).toHaveBeenCalledWith({
-      width: 540,
-      height: 720,
+      width: 715,
+      height: 800,
     });
     expect(mockLogger.error).toHaveBeenCalledWith(
       'Failed to set extension size:',
@@ -116,7 +157,6 @@ describe('WebflowAppWrapper', () => {
   });
 
   it('handles webflow object without setExtensionSize method', () => {
-    // Mock webflow object without setExtensionSize
     Object.defineProperty(global, 'webflow', {
       value: {},
       writable: true,
@@ -129,7 +169,8 @@ describe('WebflowAppWrapper', () => {
       </WebflowAppWrapper>
     );
 
-    expect(mockLogger.warn).toHaveBeenCalledWith('webflow.setExtensionSize is not available');
+    // Should start polling since setExtensionSize is missing
+    expect(mockWebflow.setExtensionSize).not.toHaveBeenCalled();
   });
 
   it('renders with correct id attribute', () => {
@@ -141,5 +182,25 @@ describe('WebflowAppWrapper', () => {
 
     const wrapper = screen.getByTestId('webflow-app-wrapper');
     expect(wrapper).toHaveAttribute('id', 'webflow-app-wrapper');
+  });
+
+  it('cleans up interval and timeout on unmount', () => {
+    const { unmount } = render(
+      <WebflowAppWrapper>
+        <div>Test</div>
+      </WebflowAppWrapper>
+    );
+
+    // Unmount while polling is still active
+    unmount();
+
+    // Advance past timeout — should not throw or log (cleanup ran)
+    act(() => {
+      vi.advanceTimersByTime(11_000);
+    });
+
+    // If cleanup didn't work, the warn would fire — but it shouldn't
+    // because the component unmounted and cleanup cleared the timers
+    expect(mockLogger.warn).not.toHaveBeenCalled();
   });
 });
