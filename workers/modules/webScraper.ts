@@ -155,19 +155,21 @@ function extractParagraphs($: cheerio.CheerioAPI): string[] {
 /**
  * Extract all images with their metadata
  */
-function extractImages($: cheerio.CheerioAPI): Array<{src: string, alt: string, size?: number}> {
-  const images: Array<{src: string, alt: string, size?: number}> = [];
-  
+export function extractImages($: cheerio.CheerioAPI): Array<{src: string, alt: string | undefined, role?: string, size?: number}> {
+  const images: Array<{src: string, alt: string | undefined, role?: string, size?: number}> = [];
+
   $('img').each((_, element) => {
     const src = $(element).attr('src') || '';
-    if (src) {
-      images.push({
-        src,
-        alt: $(element).attr('alt') || '',
-      });
-    }
+    if (!src) return;
+    const alt = $(element).attr('alt'); // string | undefined — preserve missing-vs-empty distinction
+    const role = $(element).attr('role')?.toLowerCase();
+    images.push({
+      src,
+      alt,
+      ...(role ? { role } : {}),
+    });
   });
-  
+
   return images;
 }
 

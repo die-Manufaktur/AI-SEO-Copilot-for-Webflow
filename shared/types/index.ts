@@ -99,7 +99,8 @@ export interface ScrapedPageData {
   paragraphs: string[];
   images: Array<{
     src: string;
-    alt: string;
+    alt: string | undefined;
+    role?: string;
     size?: number;
   }>;
   internalLinks: string[];

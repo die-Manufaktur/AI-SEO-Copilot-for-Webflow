@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { scrapeWebPage } from './webScraper';
+import * as cheerio from 'cheerio';
+import { scrapeWebPage, extractImages } from './webScraper';
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -408,6 +409,62 @@ describe('webScraper', () => {
       // External links should include both protocols (with trailing slashes)
       expect(result.outboundLinks).toContain('https://external.com/');
       expect(result.outboundLinks).toContain('http://external.com/');
+    });
+  });
+
+  describe('extractImages — decorative image distinction', () => {
+    it('returns alt: undefined when the alt attribute is absent', () => {
+      const html = `<html><body><img src="/a.png"></body></html>`;
+      const $ = cheerio.load(html);
+      const images = extractImages($);
+      expect(images[0].alt).toBeUndefined();
+    });
+
+    it('returns alt: "" when alt is present-but-empty (decorative)', () => {
+      const html = `<html><body><img src="/a.png" alt=""></body></html>`;
+      const $ = cheerio.load(html);
+      const images = extractImages($);
+      expect(images[0].alt).toBe('');
+    });
+
+    it('returns alt with the actual content when populated', () => {
+      const html = `<html><body><img src="/a.png" alt="A photograph"></body></html>`;
+      const $ = cheerio.load(html);
+      const images = extractImages($);
+      expect(images[0].alt).toBe('A photograph');
+    });
+
+    it('captures role="presentation" and role="none"', () => {
+      const html = `
+        <html><body>
+          <img src="/a.png" role="presentation">
+          <img src="/b.png" role="none">
+          <img src="/c.png">
+        </body></html>`;
+      const $ = cheerio.load(html);
+      const images = extractImages($);
+      expect(images[0].role).toBe('presentation');
+      expect(images[1].role).toBe('none');
+      expect(images[2].role).toBeUndefined();
+    });
+
+    it('normalizes role attribute to lowercase (WAI-ARIA case-insensitive matching)', () => {
+      const html = `
+        <html><body>
+          <img src="/a.png" role="Presentation">
+          <img src="/b.png" role="NONE">
+        </body></html>`;
+      const $ = cheerio.load(html);
+      const images = extractImages($);
+      expect(images[0].role).toBe('presentation');
+      expect(images[1].role).toBe('none');
+    });
+
+    it('treats <img alt> (valueless boolean attribute) as decorative empty alt', () => {
+      const html = `<html><body><img src="/a.png" alt></body></html>`;
+      const $ = cheerio.load(html);
+      const images = extractImages($);
+      expect(images[0].alt).toBe('');
     });
   });
 });
