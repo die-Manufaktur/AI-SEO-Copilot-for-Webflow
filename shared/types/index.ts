@@ -21,6 +21,11 @@ export interface SEOCheck {
     mimeType?: string;
     alt?: string;
   }>;
+  h2Recommendations?: Array<{
+    h2Index: number;
+    h2Text: string;
+    suggestion: string;
+  }>;
 }
 
 /**
@@ -225,6 +230,23 @@ export interface AnalyzeSEORequest {
   publishPath?: string;
   debug?: boolean;
   advancedOptions?: AdvancedOptions;
+}
+
+/**
+ * Request payload for the generate-recommendation endpoint
+ */
+export interface GenerateRecommendationRequest {
+  checkType: string;       // e.g. "Keyphrase in Title", "Image Alt Attributes"
+  keyphrase: string;       // the target keyphrase
+  context?: string;        // current content (existing title, image URL, H2 text, etc.)
+  advancedOptions?: AdvancedOptions;
+}
+
+/**
+ * Response payload for the generate-recommendation endpoint
+ */
+export interface GenerateRecommendationResponse {
+  recommendation: string;
 }
 
 // Language types for multilingual SEO suggestions

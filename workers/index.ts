@@ -1,9 +1,10 @@
 import { Hono } from 'hono';
 import { corsMiddleware } from './middleware/cors';
-import { AnalyzeSEORequest, WorkerEnvironment } from '../shared/types/index';
+import { AnalyzeSEORequest, GenerateRecommendationRequest, WorkerEnvironment } from '../shared/types/index';
 import { validateAnalyzeRequest } from './modules/validation';
 import { scrapeWebPage } from './modules/webScraper';
 import { analyzeSEOElements, checkKeywordMatch } from './modules/seoAnalysis';
+import { getAIRecommendation } from './modules/aiRecommendations';
 import { oauthProxy } from './modules/oauthProxy';
 
 const app = new Hono();
@@ -78,6 +79,29 @@ app.post('/api/analyze', async (c) => {
     */
   } catch (error) {
     console.error('[SEO Analyzer] Error in /api/analyze route:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+app.post('/api/generate-recommendation', async (c) => {
+  try {
+    const body = await c.req.json() as GenerateRecommendationRequest;
+
+    if (!body.checkType || !body.keyphrase) {
+      return c.json({ error: 'checkType and keyphrase are required' }, 400);
+    }
+
+    const recommendation = await getAIRecommendation(
+      body.checkType,
+      body.keyphrase,
+      c.env as WorkerEnvironment,
+      body.context,
+      body.advancedOptions
+    );
+
+    return c.json({ recommendation });
+  } catch (error) {
+    console.error('[SEO Analyzer] Error in /api/generate-recommendation route:', error);
     return c.json({ error: 'Internal server error' }, 500);
   }
 });

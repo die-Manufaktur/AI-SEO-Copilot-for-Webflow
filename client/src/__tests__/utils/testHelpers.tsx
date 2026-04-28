@@ -245,21 +245,6 @@ export function setupDOMEnvironment() {
     takeRecords: vi.fn(() => []),
   }));
 
-  // Mock matchMedia
-  Object.defineProperty(window, 'matchMedia', {
-    value: vi.fn().mockImplementation((query: string) => ({
-      matches: false,
-      media: query,
-      onchange: null,
-      addListener: vi.fn(), // deprecated
-      removeListener: vi.fn(), // deprecated
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    })),
-    writable: true,
-  });
-
   // Mock requestAnimationFrame and cancelAnimationFrame
   global.requestAnimationFrame = vi.fn((callback) => {
     return setTimeout(callback, 16) as unknown as number;

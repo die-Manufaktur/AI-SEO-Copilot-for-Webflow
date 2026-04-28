@@ -47,7 +47,6 @@ describe('insertionHelpers', () => {
       const nonInsertableChecks = [
         'Content Length',
         'Keyphrase Density',
-        'Image Alt Attributes',
         'Internal Links'
       ];
       
@@ -190,6 +189,53 @@ describe('insertionHelpers', () => {
     it('should return correct description for schema checks', () => {
       expect(getApplyDescription('Schema Markup')).toBe('Apply schema to page head');
       expect(getApplyDescription('Structured Data')).toBe('Apply schema to page head');
+    });
+  });
+
+  describe('createInsertionRequest - Image Alt checks', () => {
+    it('should create image_alt request for "Image Alt Attributes" check', () => {
+      const context: RecommendationContext = {
+        checkTitle: 'Image Alt Attributes',
+        recommendation: 'A golden retriever playing fetch in the park',
+        imageUrl: 'https://example.com/dog.jpg',
+      };
+
+      const request = createInsertionRequest(context);
+
+      expect(request).not.toBeNull();
+      expect(request?.type).toBe('image_alt');
+      expect(request?.value).toBe('A golden retriever playing fetch in the park');
+      expect(request?.imageUrl).toBe('https://example.com/dog.jpg');
+    });
+
+    it('should handle various image alt check title formats', () => {
+      const imageAltChecks = [
+        'Image Alt Attributes',
+        'Alt Attribute',
+        'image alt',
+      ];
+
+      imageAltChecks.forEach(checkTitle => {
+        const request = createInsertionRequest({
+          checkTitle,
+          recommendation: 'Test alt text',
+          imageUrl: 'https://example.com/test.jpg',
+        });
+
+        expect(request?.type).toBe('image_alt');
+      });
+    });
+  });
+
+  describe('canApplyRecommendation - Image Alt checks', () => {
+    it('should return true for "Image Alt Attributes"', () => {
+      expect(canApplyRecommendation('Image Alt Attributes')).toBe(true);
+    });
+  });
+
+  describe('getApplyDescription - Image Alt checks', () => {
+    it('should return correct description for image alt checks', () => {
+      expect(getApplyDescription('Image Alt Attributes')).toBe('Apply as image alt text');
     });
   });
 });

@@ -1,8 +1,7 @@
 import * as React from "react";
 import { useState, useRef, useEffect } from "react";
 import { Button } from "./button";
-import { Copy, Edit3, Check, X } from "lucide-react";
-import { motion } from "framer-motion";
+import { Check, X } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -12,6 +11,19 @@ import {
 import { ApplyButton } from "./ApplyButton";
 import { useInsertion } from "../../contexts/InsertionContext";
 import { createInsertionRequest, canApplyRecommendation, getApplyDescription, type RecommendationContext } from "../../utils/insertionHelpers";
+
+const ApplyIcon = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M8 5V8M8 11V8M8 8H11M8 8H5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+const RegenerateIcon = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M8 1.5L8.63857 3.22572C9.34757 5.14175 10.8582 6.65243 12.7743 7.36143L14.5 8L12.7743 8.63857C10.8582 9.34757 9.34757 10.8582 8.63857 12.7743L8 14.5L7.36143 12.7743C6.65243 10.8582 5.14175 9.34757 3.22572 8.63857L1.5 8L3.22572 7.36143C5.14175 6.65243 6.65243 5.14175 7.36143 3.22572L8 1.5Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
 
 interface EditableRecommendationProps {
   recommendation: string;
@@ -26,6 +38,7 @@ interface EditableRecommendationProps {
   showApplyButton?: boolean;
   showOnlyApplyButton?: boolean; // When true, only show the apply button without text content
   onApplySuccess?: (checkTitle: string) => void; // Callback for successful application
+  onRegenerate?: () => Promise<void>; // Callback to regenerate AI suggestion
 }
 
 export function EditableRecommendation({
@@ -39,7 +52,8 @@ export function EditableRecommendation({
   fieldId,
   showApplyButton = true,
   showOnlyApplyButton = false,
-  onApplySuccess
+  onApplySuccess,
+  onRegenerate
 }: EditableRecommendationProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedText, setEditedText] = useState(recommendation);
@@ -116,6 +130,9 @@ export function EditableRecommendation({
     if (disabled) return;
     setTempText(editedText);
     setIsEditing(true);
+    // Clear any previous error state when entering edit mode
+    setApplyError(false);
+    setApplyErrorMessage(null);
   };
 
   const handleSave = () => {
@@ -167,6 +184,50 @@ export function EditableRecommendation({
     return result;
   };
 
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isApplying, setIsApplying] = useState(false);
+  const [applySuccess, setApplySuccess] = useState(false);
+  const [applyError, setApplyError] = useState(false);
+  const [applyErrorMessage, setApplyErrorMessage] = useState<string | null>(null);
+
+  const handleApplyClick = async () => {
+    if (!canApply) return;
+    setIsApplying(true);
+    setApplySuccess(false);
+    setApplyError(false);
+    setApplyErrorMessage(null);
+    try {
+      const result = await handleApply(null);
+      if (result.success) {
+        setApplySuccess(true);
+        setTimeout(() => setApplySuccess(false), 2000);
+      } else {
+        setApplyError(true);
+        const errorMsg = result.error?.msg || 'Failed to apply recommendation. Please try again.';
+        setApplyErrorMessage(errorMsg);
+      }
+    } catch (err) {
+      console.error('[EditableRecommendation] Apply failed:', err);
+      setApplyError(true);
+      const errorMsg = err instanceof Error ? err.message : 'Failed to apply recommendation. Please try again.';
+      setApplyErrorMessage(errorMsg);
+    } finally {
+      setIsApplying(false);
+    }
+  };
+
+  const handleRegenerate = async () => {
+    if (!onRegenerate) return;
+    setIsRegenerating(true);
+    // Clear any previous error state when regenerating
+    setApplyError(false);
+    setApplyErrorMessage(null);
+    try {
+      await onRegenerate();
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
 
   if (isEditing) {
     return (
@@ -247,72 +308,86 @@ export function EditableRecommendation({
   }
 
   return (
-    <div className={`group relative ${className}`}>
-      <div 
-        className={`${canApply ? "pr-32" : "pr-20"} cursor-pointer hover:bg-background2/50 -m-1 p-1 rounded transition-colors`} 
-        onClick={handleEdit}
-      >
-        {editedText}
-      </div>
-      <div className="absolute top-0 right-0 flex items-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        {canApply && (
-          <div className="flex items-center">
-            <ApplyButton
-              insertionRequest={createInsertionRequest(insertionContext) || { type: 'page_title', value: editedText }}
-              onApply={handleApply}
-              loading={isLoading}
-              error={error || undefined}
-              disabled={disabled}
-              label="Apply"
-              ariaLabel={getApplyDescription(checkTitle || '')}
-            />
-          </div>
-        )}
-        
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+    <div className={className}>
+      <div className="flex items-center gap-3">
+        <div className="flex-1 text-break">
+          {editedText}
+        </div>
+        <div className="flex-shrink-0 flex flex-col items-center gap-2">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={handleEdit}
-                  disabled={disabled}
-                  className="h-8 w-8 p-0 hover:bg-background2"
-                  aria-label="Edit recommendation"
+                  onClick={handleApplyClick}
+                  disabled={disabled || !canApply || isApplying}
+                  className="hover:scale-110 active:scale-95 transition-transform flex items-center justify-center"
+                  style={{
+                    width: '2rem',
+                    height: '2rem',
+                    minWidth: '2rem',
+                    padding: '0.5rem',
+                    background: applySuccess
+                      ? 'linear-gradient(#22c55e, #16a34a) padding-box, linear-gradient(135deg, rgba(255, 255, 255, 0.40) 0%, rgba(255, 255, 255, 0.00) 100%) border-box'
+                      : applyError
+                      ? 'linear-gradient(#ef4444, #dc2626) padding-box, linear-gradient(135deg, rgba(255, 255, 255, 0.40) 0%, rgba(255, 255, 255, 0.00) 100%) border-box'
+                      : 'linear-gradient(#787878, #787878) padding-box, linear-gradient(135deg, rgba(255, 255, 255, 0.40) 0%, rgba(255, 255, 255, 0.00) 100%) border-box',
+                    border: '1px solid transparent',
+                    borderRadius: '1.6875rem',
+                    opacity: isApplying ? 0.6 : 1,
+                    transition: 'background 0.3s, opacity 0.2s',
+                  }}
+                  aria-label="Apply to page"
                 >
-                  <Edit3 className="h-3 w-3" />
+                  {isApplying ? (
+                    <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : applySuccess ? (
+                    <Check className="h-4 w-4 text-white" />
+                  ) : (
+                    <ApplyIcon className="h-4 w-4" />
+                  )}
                 </Button>
-              </motion.div>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Edit recommendation</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-        
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+              </TooltipTrigger>
+              <TooltipContent side="left">
+                <p>Apply to page</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={handleCopy}
-                  disabled={disabled}
-                  className="h-8 w-8 p-0 hover:bg-background2"
-                  aria-label="Copy recommendation to clipboard"
+                  onClick={handleRegenerate}
+                  disabled={disabled || isRegenerating}
+                  className="hover:scale-110 active:scale-95 transition-transform flex items-center justify-center"
+                  style={{
+                    width: '2rem',
+                    height: '2rem',
+                    minWidth: '2rem',
+                    padding: '0.5rem',
+                    background: 'linear-gradient(#787878, #787878) padding-box, linear-gradient(135deg, rgba(255, 255, 255, 0.40) 0%, rgba(255, 255, 255, 0.00) 100%) border-box',
+                    border: '1px solid transparent',
+                    borderRadius: '1.6875rem',
+                  }}
+                  aria-label="Generate new suggestion"
                 >
-                  <Copy className="h-3 w-3" />
+                  <RegenerateIcon className="h-4 w-4" />
                 </Button>
-              </motion.div>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Copy recommendation to clipboard</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+              </TooltipTrigger>
+              <TooltipContent side="left">
+                <p>Generate new suggestion</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
       </div>
+      {applyErrorMessage && (
+        <p className="text-xs text-red-400 mt-2">{applyErrorMessage}</p>
+      )}
     </div>
   );
 }

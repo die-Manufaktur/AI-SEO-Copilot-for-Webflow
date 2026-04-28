@@ -1,4 +1,4 @@
-import type { SEOAnalysisResult, WebflowPageData, AnalyzeSEORequest, Asset } from "../../../shared/types";
+import type { SEOAnalysisResult, WebflowPageData, AnalyzeSEORequest, Asset, GenerateRecommendationRequest } from "../../../shared/types";
 import { createLogger } from '../lib/utils';
 import { formatBytes } from '../../../shared/utils/formatUtils';
 
@@ -32,13 +32,12 @@ export const getApiUrl = () => {
     return localUrl;
   }
   
-  // RULE 2: FORCE_LOCAL_DEV flag overrides everything else
-  if (FORCE_LOCAL_DEV) {
-    const localUrl = WORKER_URL || 'http://localhost:8787'; // Fallback to default local worker URL
+  // RULE 2: FORCE_LOCAL_DEV flag overrides — but only in development mode
+  // In production builds, this flag is ignored to prevent accidentally baking localhost into the bundle
+  if (FORCE_LOCAL_DEV && !import.meta.env.PROD) {
+    const localUrl = WORKER_URL || 'http://localhost:8787';
     logger.debug("Force local dev enabled - using:", localUrl);
-    if (import.meta.env.MODE === 'development') {
-      console.log("[DEBUG] Force local dev enabled - returning:", localUrl);
-    }
+    console.log("[DEBUG] Force local dev enabled - returning:", localUrl);
     return localUrl;
   }
   
@@ -153,6 +152,22 @@ export async function analyzeSEO({
       ? new Error(`SEO Analysis failed: ${error.message}`)
       : new Error("An unknown error occurred during SEO analysis.");
   }
+}
+
+export async function generateRecommendation(
+  request: GenerateRecommendationRequest
+): Promise<string> {
+  const apiBaseUrl = getApiUrl();
+  logger.info("[Generate Recommendation] Starting with API endpoint:", apiBaseUrl);
+  const response = await fetch(`${apiBaseUrl}/api/generate-recommendation`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(request),
+  });
+  if (!response.ok) throw new Error(`API returned status ${response.status}`);
+  const data = await response.json();
+  return data.recommendation;
 }
 
 export async function fetchOAuthToken(authCode: string): Promise<string> {

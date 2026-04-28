@@ -639,7 +639,9 @@ describe('InsertionContext', () => {
       }, { timeout: 1000 });
 
       // Verify success result
-      expect(screen.getByTestId('last-result')).toHaveTextContent('success');
+      await waitFor(() => {
+        expect(screen.getByTestId('last-result')).toHaveTextContent('success');
+      }, { timeout: 1000 });
     });
   });
 

@@ -162,20 +162,13 @@ describe('Production Bundle Validation', () => {
       if (fs.existsSync(webflowJsonPath)) {
         const webflowConfig = JSON.parse(fs.readFileSync(webflowJsonPath, 'utf8'));
         
-        // Validate that BOTH development and production API permissions exist
-        expect(webflowConfig.permissions).toHaveProperty('externalApi:http://localhost:8787');
+        // Validate production API permission exists (no localhost in production manifest)
         expect(webflowConfig.permissions).toHaveProperty('externalApi:https://seo-copilot-api-production.paul-130.workers.dev');
-        
-        // Validate that production URL is properly formatted
-        const productionUrl = 'https://seo-copilot-api-production.paul-130.workers.dev';
-        expect(productionUrl).toMatch(/^https:\/\//);
-        expect(productionUrl).toContain('workers.dev');
-        
-        // Validate extension structure
-        expect(webflowConfig.extensionType).toBe('hybrid');
-        expect(webflowConfig.oauth).toHaveProperty('redirectUri');
-        expect(webflowConfig.oauth).toHaveProperty('callbackPath');
-        expect(webflowConfig.oauth.callbackPath).toBe('/oauth/callback');
+        expect(webflowConfig.permissions).not.toHaveProperty('externalApi:http://localhost:8787');
+
+        // Validate this is a Designer Extension only (NOT hybrid)
+        expect(webflowConfig).not.toHaveProperty('extensionType');
+        expect(webflowConfig).not.toHaveProperty('oauth');
       }
     });
 

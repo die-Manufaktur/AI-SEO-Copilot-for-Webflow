@@ -1012,7 +1012,7 @@ describe('seoAnalysis', () => {
 
     it('should calculate correct SEO scores', async () => {
       const { analyzeSEOElements } = await import('./seoAnalysis');
-      
+
       const result = await analyzeSEOElements(
         mockScrapedData,
         'SEO',
@@ -1023,6 +1023,115 @@ describe('seoAnalysis', () => {
 
       expect(result.passedChecks + result.failedChecks).toBe(result.totalChecks);
       expect(result.score).toBe(Math.round((result.passedChecks / result.totalChecks) * 100));
+    });
+
+    it('generates AI alt text for each image missing alt text when AI is enabled', async () => {
+      const { analyzeSEOElements } = await import('./seoAnalysis');
+
+      (getAIRecommendation as any).mockResolvedValue('AI generated alt text');
+
+      const dataWithMissingAlts = {
+        ...mockScrapedData,
+        images: [
+          { src: 'https://example.com/photo1.jpg', alt: '' },
+          { src: 'https://example.com/photo2.jpg', alt: '' }
+        ]
+      };
+
+      const aiEnv = { USE_GPT_RECOMMENDATIONS: 'true', OPENAI_API_KEY: 'test-key' };
+
+      const result = await analyzeSEOElements(
+        dataWithMissingAlts,
+        'SEO',
+        'https://example.com/test',
+        false,
+        aiEnv
+      );
+
+      const imageAltCheck = result.checks.find(c => c.title === 'Image Alt Attributes');
+      expect(imageAltCheck).toBeDefined();
+      expect(imageAltCheck!.imageData).toBeDefined();
+      expect(imageAltCheck!.imageData!.length).toBe(2);
+
+      imageAltCheck!.imageData!.forEach(img => {
+        expect(img.alt).toBe('AI generated alt text');
+      });
+
+      const imageAltCalls = (getAIRecommendation as any).mock.calls.filter(
+        (call: any[]) => call[0] === 'Image Alt Attributes'
+      );
+      expect(imageAltCalls.length).toBe(2);
+
+      // call[3] is the context argument (image URL)
+      expect(imageAltCalls[0][3]).toContain('https://example.com/photo1.jpg');
+      expect(imageAltCalls[1][3]).toContain('https://example.com/photo2.jpg');
+    });
+
+    it('leaves imageData alt empty when AI is disabled', async () => {
+      const { analyzeSEOElements } = await import('./seoAnalysis');
+
+      const dataWithMissingAlts = {
+        ...mockScrapedData,
+        images: [
+          { src: 'https://example.com/photo1.jpg', alt: '' },
+          { src: 'https://example.com/photo2.jpg', alt: '' }
+        ]
+      };
+
+      // mockEnv has USE_GPT_RECOMMENDATIONS: 'false'
+      const result = await analyzeSEOElements(
+        dataWithMissingAlts,
+        'SEO',
+        'https://example.com/test',
+        false,
+        mockEnv
+      );
+
+      const imageAltCheck = result.checks.find(c => c.title === 'Image Alt Attributes');
+      expect(imageAltCheck!.imageData!.every(img => img.alt === '')).toBe(true);
+
+      const imageAltCalls = (getAIRecommendation as any).mock.calls.filter(
+        (call: any[]) => call[0] === 'Image Alt Attributes'
+      );
+      expect(imageAltCalls.length).toBe(0);
+    });
+
+    it('gracefully handles partial AI failures during image alt generation', async () => {
+      const { analyzeSEOElements } = await import('./seoAnalysis');
+
+      let imageAltCallCount = 0;
+      (getAIRecommendation as any).mockImplementation(async (checkType: string) => {
+        if (checkType === 'Image Alt Attributes') {
+          imageAltCallCount++;
+          if (imageAltCallCount === 2) throw new Error('AI failure for second image');
+          return 'AI alt for first image';
+        }
+        return 'Mocked AI recommendation';
+      });
+
+      const dataWithMissingAlts = {
+        ...mockScrapedData,
+        images: [
+          { src: 'https://example.com/photo1.jpg', alt: '' },
+          { src: 'https://example.com/photo2.jpg', alt: '' }
+        ]
+      };
+
+      const aiEnv = { USE_GPT_RECOMMENDATIONS: 'true', OPENAI_API_KEY: 'test-key' };
+
+      const result = await analyzeSEOElements(
+        dataWithMissingAlts,
+        'SEO',
+        'https://example.com/test',
+        false,
+        aiEnv
+      );
+
+      const imageAltCheck = result.checks.find(c => c.title === 'Image Alt Attributes');
+      expect(imageAltCheck).toBeDefined();
+      // Analysis should complete even when one AI call fails
+      expect(imageAltCheck!.imageData).toBeDefined();
+      expect(imageAltCheck!.imageData!.length).toBe(2);
     });
   });
 });

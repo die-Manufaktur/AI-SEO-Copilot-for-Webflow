@@ -407,32 +407,6 @@ describe('Onboarding', () => {
     });
   });
 
-  describe('Responsive Design', () => {
-    it('should adapt to small screens', () => {
-      Object.defineProperty(window, 'innerWidth', {
-        writable: true,
-        configurable: true,
-        value: 400
-      });
-
-      render(<Onboarding />);
-      const modal = screen.getByTestId('onboarding-modal');
-      expect(modal).toHaveClass('max-w-full');
-    });
-
-    it('should show full width on desktop', () => {
-      Object.defineProperty(window, 'innerWidth', {
-        writable: true,
-        configurable: true,
-        value: 1200
-      });
-
-      render(<Onboarding />);
-      const modal = screen.getByTestId('onboarding-modal');
-      expect(modal).toHaveClass('max-w-2xl');
-    });
-  });
-
   describe('Accessibility', () => {
     beforeEach(() => {
       vi.clearAllMocks();

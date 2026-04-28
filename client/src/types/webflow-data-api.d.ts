@@ -220,12 +220,13 @@ export interface WebflowDataApiConfig {
 
 // Insertion Types (for apply functionality)
 export interface WebflowInsertionRequest {
-  type: 'page_title' | 'meta_description' | 'page_seo' | 'page_slug' | 'cms_field' | 'custom_code' | 'h1_heading' | 'h2_heading' | 'introduction_text';
+  type: 'page_title' | 'meta_description' | 'page_seo' | 'page_slug' | 'cms_field' | 'custom_code' | 'h1_heading' | 'h2_heading' | 'introduction_text' | 'image_alt';
   // Note: h1_heading, h2_heading, and introduction_text types are now supported via Webflow Designer API v2
   pageId?: string;
   cmsItemId?: string;
   fieldId?: string;
   value: any;
+  imageUrl?: string; // For image_alt type: identifies which image to update by src URL
   location?: 'head' | 'body_end'; // For custom_code type
   elementIndex?: number; // For heading elements (e.g., first H2 = 0)
   selector?: string; // CSS selector for element targeting

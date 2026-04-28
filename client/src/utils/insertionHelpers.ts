@@ -10,6 +10,7 @@ export interface RecommendationContext {
   pageId?: string;
   cmsItemId?: string;
   fieldId?: string;
+  imageUrl?: string;
 }
 
 /**
@@ -46,6 +47,10 @@ export function createInsertionRequest(
     baseRequest.fieldId = fieldId;
   }
 
+  if (context.imageUrl) {
+    baseRequest.imageUrl = context.imageUrl;
+  }
+
   // For custom code (schema), default to head placement
   if (insertionType === 'custom_code') {
     baseRequest.location = 'head';
@@ -63,7 +68,7 @@ export function createInsertionRequest(
  */
 function getInsertionTypeFromCheckTitle(
   checkTitle: string
-): 'page_title' | 'meta_description' | 'page_seo' | 'page_slug' | 'cms_field' | 'custom_code' | 'h1_heading' | 'h2_heading' | 'introduction_text' | null {
+): 'page_title' | 'meta_description' | 'page_seo' | 'page_slug' | 'cms_field' | 'custom_code' | 'h1_heading' | 'h2_heading' | 'introduction_text' | 'image_alt' | null {
   // Normalize the check title for comparison
   const normalizedTitle = checkTitle.toLowerCase().trim();
 
@@ -148,14 +153,20 @@ function getInsertionTypeFromCheckTitle(
   }
 
   // Introduction paragraph checks - Now supported with Webflow Designer API v2
-  // Note: 'Keyphrase in Introduction' is excluded from apply functionality per user request
   if (
-    (normalizedTitle.includes('introduction') ||
+    normalizedTitle.includes('introduction') ||
     normalizedTitle.includes('first paragraph') ||
-    normalizedTitle.includes('intro')) &&
-    !normalizedTitle.includes('keyphrase in introduction')
+    normalizedTitle.includes('intro')
   ) {
     return 'introduction_text';
+  }
+
+  // Image alt text checks
+  if (
+    normalizedTitle.includes('image alt') ||
+    normalizedTitle.includes('alt attribute')
+  ) {
+    return 'image_alt';
   }
 
   // Return null for checks that don't map to insertable content
@@ -194,11 +205,9 @@ export function getApplyDescription(checkTitle: string): string {
       return 'Apply as first H2 heading';
     case 'introduction_text':
       return 'Apply as introduction paragraph';
+    case 'image_alt':
+      return 'Apply as image alt text';
     default:
-      // Check if it's specifically the disabled 'Keyphrase in Introduction' check
-      if (checkTitle.toLowerCase().includes('keyphrase in introduction')) {
-        return 'This recommendation cannot be applied automatically';
-      }
       return 'Apply content';
   }
 }
