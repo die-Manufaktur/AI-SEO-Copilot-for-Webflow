@@ -9,7 +9,10 @@ const logger = createLogger('PageSlug');
  */
 export async function getPageSlug(): Promise<string> {
   try {
-    const page = await webflow.getCurrentPage();
+    if (!window.webflow) {
+      throw new Error('Webflow API not available');
+    }
+    const page = await window.webflow.getCurrentPage();
     const pageSlug = await page.getSlug();
     
     // Only log in debug mode as this is diagnostic information
