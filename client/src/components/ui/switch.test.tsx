@@ -31,7 +31,7 @@ describe('Switch', () => {
     const switchEl = screen.getByTestId('switch-root');
     expect(switchEl).toBeInTheDocument();
     expect(switchEl).toHaveAttribute('role', 'switch');
-    expect(switchEl).toHaveClass('peer', 'inline-flex', 'h-6', 'w-11');
+    expect(switchEl).toHaveClass('peer', 'inline-flex', 'h-[34px]', 'w-[62px]');
   });
 
   it('handles checked state', () => {
@@ -70,7 +70,7 @@ describe('Switch', () => {
   it('renders thumb component', () => {
     render(<Switch />);
     expect(screen.getByTestId('switch-thumb')).toBeInTheDocument();
-    expect(screen.getByTestId('switch-thumb')).toHaveClass('pointer-events-none', 'block', 'h-5', 'w-5');
+    expect(screen.getByTestId('switch-thumb')).toHaveClass('pointer-events-none', 'block', 'h-[26px]', 'w-[26px]');
   });
 
   it('handles disabled state', () => {

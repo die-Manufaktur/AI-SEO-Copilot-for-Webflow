@@ -3,16 +3,19 @@ import app from './index';
 import { validateAnalyzeRequest } from './modules/validation';
 import { scrapeWebPage } from './modules/webScraper';
 import { analyzeSEOElements, checkKeywordMatch } from './modules/seoAnalysis';
+import { getAIRecommendation } from './modules/aiRecommendations';
 
 // Mock dependencies
 vi.mock('./modules/validation');
 vi.mock('./modules/webScraper');
 vi.mock('./modules/seoAnalysis');
+vi.mock('./modules/aiRecommendations');
 
 const mockedValidateAnalyzeRequest = vi.mocked(validateAnalyzeRequest);
 const mockedScrapeWebPage = vi.mocked(scrapeWebPage);
 const mockedAnalyzeSEOElements = vi.mocked(analyzeSEOElements);
 const mockedCheckKeywordMatch = vi.mocked(checkKeywordMatch);
+const mockedGetAIRecommendation = vi.mocked(getAIRecommendation);
 
 // Mock Hono context
 const createMockContext = (body?: any, env?: any) => ({
@@ -307,9 +310,129 @@ describe('Workers API Index', () => {
     it('should apply CORS middleware to all routes', async () => {
       // Test that CORS is applied by checking response headers
       const response = await app.request('/health');
-      
+
       // The response should be successful, indicating CORS middleware doesn't block
       expect(response.status).toBe(200);
+    });
+  });
+
+  describe('POST /api/generate-recommendation', () => {
+    it('should return 400 if checkType is missing', async () => {
+      const response = await app.request('/api/generate-recommendation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keyphrase: 'web developer' }),
+      });
+
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data).toEqual({ error: 'checkType and keyphrase are required' });
+      expect(mockedGetAIRecommendation).not.toHaveBeenCalled();
+    });
+
+    it('should return 400 if keyphrase is missing', async () => {
+      const response = await app.request('/api/generate-recommendation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ checkType: 'Keyphrase in Title' }),
+      });
+
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data).toEqual({ error: 'checkType and keyphrase are required' });
+      expect(mockedGetAIRecommendation).not.toHaveBeenCalled();
+    });
+
+    it('should return 200 with recommendation for a valid request', async () => {
+      mockedGetAIRecommendation.mockResolvedValue('SEO Optimized Title with Web Developer');
+
+      const response = await app.request('/api/generate-recommendation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          checkType: 'Keyphrase in Title',
+          keyphrase: 'web developer',
+        }),
+      });
+
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data).toEqual({ recommendation: 'SEO Optimized Title with Web Developer' });
+    });
+
+    it('should pass context through to getAIRecommendation', async () => {
+      mockedGetAIRecommendation.mockResolvedValue('Updated title with context');
+
+      const requestBody = {
+        checkType: 'Keyphrase in Title',
+        keyphrase: 'web developer',
+        context: 'Current page title text',
+      };
+
+      await app.request('/api/generate-recommendation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      });
+
+      expect(mockedGetAIRecommendation).toHaveBeenCalledWith(
+        'Keyphrase in Title',
+        'web developer',
+        undefined, // env is undefined in test context
+        'Current page title text',
+        undefined
+      );
+    });
+
+    it('should pass advancedOptions through to getAIRecommendation', async () => {
+      mockedGetAIRecommendation.mockResolvedValue('Advanced recommendation');
+
+      const advancedOptions = {
+        pageType: 'Product Page',
+        secondaryKeywords: 'agency, design',
+        languageCode: 'fr',
+      };
+
+      const requestBody = {
+        checkType: 'Keyphrase in Meta Description',
+        keyphrase: 'web developer',
+        advancedOptions,
+      };
+
+      await app.request('/api/generate-recommendation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      });
+
+      expect(mockedGetAIRecommendation).toHaveBeenCalledWith(
+        'Keyphrase in Meta Description',
+        'web developer',
+        undefined, // env is undefined in test context
+        undefined,
+        advancedOptions
+      );
+    });
+
+    it('should return 500 if getAIRecommendation throws', async () => {
+      mockedGetAIRecommendation.mockRejectedValue(new Error('OpenAI failure'));
+
+      const response = await app.request('/api/generate-recommendation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          checkType: 'Keyphrase in Title',
+          keyphrase: 'web developer',
+        }),
+      });
+
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data).toEqual({ error: 'Internal server error' });
     });
   });
 });

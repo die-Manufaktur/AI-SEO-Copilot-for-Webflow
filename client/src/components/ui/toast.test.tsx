@@ -113,9 +113,8 @@ describe('Toast Components', () => {
       const viewport = screen.getByTestId('toast-viewport');
       expect(viewport).toBeInTheDocument();
       expect(viewport).toHaveClass(
-        'fixed', 'top-0', 'z-[100]', 'flex', 'max-h-screen', 'w-full', 
-        'flex-col-reverse', 'p-4', 'sm:bottom-0', 'sm:right-0', 'sm:top-auto', 
-        'sm:flex-col', 'md:max-w-[420px]'
+        'fixed', 'bottom-4', 'left-0', 'right-0', 'z-[100]', 'flex', 'max-h-screen', 'w-full',
+        'flex-col', 'p-4', 'md:max-w-[420px]', 'md:left-auto', 'md:right-4'
       );
     });
 
@@ -196,14 +195,14 @@ describe('Toast Components', () => {
       const title = screen.getByTestId('toast-title');
       expect(title).toBeInTheDocument();
       expect(title).toHaveTextContent('Test Title');
-      expect(title).toHaveClass('text-sm', 'font-semibold');
+      expect(title).toHaveClass('text-base', 'font-semibold', 'leading-snug');
     });
 
     it('applies custom className', () => {
       render(<ToastTitle className="custom-title">Title</ToastTitle>);
 
       const title = screen.getByTestId('toast-title');
-      expect(title).toHaveClass('custom-title', 'text-sm', 'font-semibold');
+      expect(title).toHaveClass('custom-title', 'text-base', 'font-semibold', 'leading-snug');
     });
 
     it('forwards ref correctly', () => {
@@ -221,14 +220,14 @@ describe('Toast Components', () => {
       const description = screen.getByTestId('toast-description');
       expect(description).toBeInTheDocument();
       expect(description).toHaveTextContent('Test Description');
-      expect(description).toHaveClass('text-sm', 'opacity-90');
+      expect(description).toHaveClass('text-sm', 'text-[var(--color-text-secondary)]', 'mt-0.5');
     });
 
     it('applies custom className', () => {
       render(<ToastDescription className="custom-description">Description</ToastDescription>);
 
       const description = screen.getByTestId('toast-description');
-      expect(description).toHaveClass('custom-description', 'text-sm', 'opacity-90');
+      expect(description).toHaveClass('custom-description', 'text-sm', 'text-[var(--color-text-secondary)]', 'mt-0.5');
     });
 
     it('forwards ref correctly', () => {
