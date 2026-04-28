@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { sanitizeForAI, sanitizeText } from '../../shared/utils/stringUtils';
+import { sanitizeForAI, sanitizeText, stripWrappingQuotes } from '../../shared/utils/stringUtils';
 import { shouldShowCopyButton } from '../../shared/utils/seoUtils';
 import { WorkerEnvironment, AdvancedOptions } from '../../shared/types/index';
 import { getLanguageByCode, DEFAULT_LANGUAGE_CODE } from '../../shared/types/language';
@@ -56,21 +56,25 @@ export async function getAIRecommendation(
     }
     
     // Build language instruction if not default language
-    let languageInstruction = '';
+    let systemLanguageInstruction = '';
+    let userLanguageInstruction = '';
     if (languageCode !== DEFAULT_LANGUAGE_CODE && language) {
-      languageInstruction = `\n\nIMPORTANT: Generate all content in ${language.name} (${language.nativeName}). Provide recommendations entirely in this language.`;
+      // Strong instruction at the START of system prompt
+      systemLanguageInstruction = `CRITICAL LANGUAGE REQUIREMENT: You MUST respond entirely in ${language.name} (${language.nativeName}). Do NOT use English. Every word of your response must be in ${language.name}.\n\n`;
+      // Reinforce in user prompt
+      userLanguageInstruction = `\n\n[LANGUAGE: Respond in ${language.name} (${language.nativeName}) only. Do not use English.]`;
     }
     
-    const systemPrompt = needsCopyableContent 
-      ? `You are an SEO expert providing ready-to-use content.
+    const systemPrompt = needsCopyableContent
+      ? `${systemLanguageInstruction}You are an SEO expert providing ready-to-use content.
          Create a single, concise, and optimized ${checkType.toLowerCase()} that naturally incorporates the keyphrase.
          Return ONLY the final content with no additional explanation, quotes, or formatting.
          The content must be directly usable by copying and pasting.
-         Focus on being specific, clear, and immediately usable.${advancedContext ? ' Consider the page type and additional context provided to make recommendations more relevant and specific.' : ''}${languageInstruction}`
-      : `You are an SEO expert providing actionable advice.
-         Provide a concise recommendation for the SEO check "${checkType}".${advancedContext ? ' Consider the page type and additional context provided to make recommendations more relevant and specific.' : ''}${languageInstruction}`;
+         Focus on being specific, clear, and immediately usable.${advancedContext ? ' Consider the page type and additional context provided to make recommendations more relevant and specific.' : ''}`
+      : `${systemLanguageInstruction}You are an SEO expert providing actionable advice.
+         Provide a concise recommendation for the SEO check "${checkType}".${advancedContext ? ' Consider the page type and additional context provided to make recommendations more relevant and specific.' : ''}`;
 
-    // Special handling for URL checks with enhanced logic from v3.3.14
+    // Special handling for URL and H2 checks with enhanced logic
     const userPrompt = needsCopyableContent
       ? checkType === "Keyphrase in URL"
         ? `Create an SEO-friendly URL slug for the keyphrase "${keyphrase}".
@@ -84,6 +88,32 @@ export async function getAIRecommendation(
            - Keep it concise and readable
            - Example: For URL "https://example.com/blog/posts/my-page", return only "my-page-with-keyphrase"
            Return ONLY the page slug (no protocol, domain, folders, or slashes) with no explanations or other text.`
+        : checkType === "Keyphrase in H2 Headings"
+        ? `Create a perfect H2 heading for the keyphrase "${keyphrase}".
+           Current H2 headings: ${context || 'None'}${advancedContext}
+           CRITICAL: The H2 heading must contain the exact word "${keyphrase}" literally in the text.
+
+           Requirements:
+           - Include the exact word "${keyphrase}" (not synonyms like "testimonials" for "test")
+           - Keep it engaging and readable (40-60 characters ideal)
+           - Make it compelling and relevant${advancedOptions?.pageType ? ` for a ${advancedOptions.pageType.toLowerCase()}` : ''}
+           - Use title case capitalization
+
+           Return ONLY the H2 heading text with no explanations, quotes, or additional formatting.`
+        : checkType === "Image Alt Attributes"
+        ? (() => {
+            const imageUrl = context || '';
+            const filename = imageUrl.split('/').pop()?.split('?')[0] || 'unknown';
+            return `Create a concise, descriptive alt tag for this image that naturally incorporates the keyphrase "${keyphrase}".
+           Image URL: ${imageUrl}
+           Image filename: ${filename}${advancedContext}
+           Requirements:
+           - Return ONLY the alt text string with no explanations, quotes, or formatting
+           - Keep it under 125 characters (alt tag best practice)
+           - Naturally incorporate the keyphrase "${keyphrase}"
+           - Describe what the image likely shows based on the filename and context
+           - Make it specific and descriptive`;
+          })()
         : `Create a perfect ${checkType.toLowerCase()} for the keyphrase "${keyphrase}".
            Current content: ${context || 'None'}${advancedContext}
            Remember to:
@@ -99,7 +129,7 @@ export async function getAIRecommendation(
       model: "gpt-3.5-turbo",
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt }
+        { role: "user", content: userPrompt + userLanguageInstruction }
       ],
       max_tokens: 500,
       temperature: 0.5,
@@ -109,8 +139,10 @@ export async function getAIRecommendation(
       throw new Error("No recommendation received from OpenAI");
     }
 
-    const recommendation = sanitizeText(response.choices[0].message.content.trim(), languageCode);
-    
+    const recommendation = stripWrappingQuotes(
+      sanitizeText(response.choices[0].message.content.trim(), languageCode)
+    );
+
     // Basic validation for language-specific content
     if (languageCode !== DEFAULT_LANGUAGE_CODE && language) {
       // Simple heuristic: if non-English language was requested but response seems to be in English,

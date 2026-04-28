@@ -9,6 +9,13 @@ import {
   calculateSEOScore,
 } from './seoAnalysis';
 
+// Mock the AI recommendations module
+vi.mock('./aiRecommendations', () => ({
+  getAIRecommendation: vi.fn()
+}));
+
+import { getAIRecommendation } from './aiRecommendations';
+
 describe('seoAnalysis', () => {
   describe('calculateSEOScore', () => {
     it('should calculate correct SEO score from checks', () => {
@@ -191,6 +198,39 @@ describe('seoAnalysis', () => {
       
       expect(result.found).toBe(true);
       expect(result.keywordResults.filter(r => r.keyword.trim().length > 0)).toHaveLength(4);
+    });
+
+    it('should use word boundaries and not match partial words', () => {
+      // Test the specific bug: "test" should not match "testimonial"
+      const content = 'Read our customer testimonials and see what clients say about our service.';
+      const primaryKeyword = 'test';
+      
+      const result = checkKeywordMatch(content, primaryKeyword);
+      
+      expect(result.found).toBe(false);
+      expect(result.matchedKeyword).toBeUndefined();
+    });
+
+    it('should match whole words correctly', () => {
+      // "test" should match when it appears as a whole word
+      const content = 'We test our products thoroughly before release.';
+      const primaryKeyword = 'test';
+      
+      const result = checkKeywordMatch(content, primaryKeyword);
+      
+      expect(result.found).toBe(true);
+      expect(result.matchedKeyword).toBe(primaryKeyword);
+    });
+
+    it('should handle multi-word keyphrases with word boundaries', () => {
+      // "web design" should match "web design" but not in "website designer"
+      const content = 'We offer web design services and website designer consultation.';
+      const primaryKeyword = 'web design';
+      
+      const result = checkKeywordMatch(content, primaryKeyword);
+      
+      expect(result.found).toBe(true);
+      expect(result.matchedKeyword).toBe(primaryKeyword);
     });
   });
 
@@ -529,10 +569,10 @@ describe('seoAnalysis', () => {
     let mockAdvancedOptions: any;
 
     beforeEach(() => {
-      // Mock the AI recommendation function
-      vi.mock('./aiRecommendations', () => ({
-        getAIRecommendation: vi.fn().mockResolvedValue('Mocked AI recommendation')
-      }));
+      vi.clearAllMocks();
+      
+      // Set up the AI recommendation mock to return a test value
+      (getAIRecommendation as any).mockResolvedValue('Mocked AI recommendation');
 
       mockScrapedData = {
         title: 'Test Page Title',
@@ -547,7 +587,7 @@ describe('seoAnalysis', () => {
         images: [
           { src: 'https://example.com/image1.jpg', alt: 'Test image 1', size: 150000 },
           { src: 'https://example.com/image2.webp', alt: 'Test image 2', size: 200000 },
-          { src: 'https://example.com/image3.jpg', alt: '', size: 600000 }
+          { src: 'https://example.com/image3.jpg', alt: undefined, size: 600000 }
         ],
         internalLinks: ['https://example.com/page1', 'https://example.com/page2'],
         outboundLinks: ['https://external.com/resource'],
@@ -949,9 +989,7 @@ describe('seoAnalysis', () => {
 
     it('should handle AI recommendation errors gracefully', async () => {
       // Mock AI function to throw error
-      vi.doMock('./aiRecommendations', () => ({
-        getAIRecommendation: vi.fn().mockRejectedValue(new Error('AI API Error'))
-      }));
+      (getAIRecommendation as any).mockRejectedValue(new Error('AI API Error'));
 
       const aiMockEnv = {
         USE_GPT_RECOMMENDATIONS: 'true',
@@ -974,7 +1012,7 @@ describe('seoAnalysis', () => {
 
     it('should calculate correct SEO scores', async () => {
       const { analyzeSEOElements } = await import('./seoAnalysis');
-      
+
       const result = await analyzeSEOElements(
         mockScrapedData,
         'SEO',
@@ -985,6 +1023,251 @@ describe('seoAnalysis', () => {
 
       expect(result.passedChecks + result.failedChecks).toBe(result.totalChecks);
       expect(result.score).toBe(Math.round((result.passedChecks / result.totalChecks) * 100));
+    });
+
+    it('generates AI alt text for each image missing alt text when AI is enabled', async () => {
+      const { analyzeSEOElements } = await import('./seoAnalysis');
+
+      (getAIRecommendation as any).mockResolvedValue('AI generated alt text');
+
+      const dataWithMissingAlts = {
+        ...mockScrapedData,
+        images: [
+          { src: 'https://example.com/photo1.jpg', alt: undefined },
+          { src: 'https://example.com/photo2.jpg', alt: undefined }
+        ]
+      };
+
+      const aiEnv = { USE_GPT_RECOMMENDATIONS: 'true', OPENAI_API_KEY: 'test-key' };
+
+      const result = await analyzeSEOElements(
+        dataWithMissingAlts,
+        'SEO',
+        'https://example.com/test',
+        false,
+        aiEnv
+      );
+
+      const imageAltCheck = result.checks.find(c => c.title === 'Image Alt Attributes');
+      expect(imageAltCheck).toBeDefined();
+      expect(imageAltCheck!.imageData).toBeDefined();
+      expect(imageAltCheck!.imageData!.length).toBe(2);
+
+      imageAltCheck!.imageData!.forEach(img => {
+        expect(img.alt).toBe('AI generated alt text');
+      });
+
+      const imageAltCalls = (getAIRecommendation as any).mock.calls.filter(
+        (call: any[]) => call[0] === 'Image Alt Attributes'
+      );
+      expect(imageAltCalls.length).toBe(2);
+
+      // call[3] is the context argument (image URL)
+      expect(imageAltCalls[0][3]).toContain('https://example.com/photo1.jpg');
+      expect(imageAltCalls[1][3]).toContain('https://example.com/photo2.jpg');
+    });
+
+    it('leaves imageData alt empty when AI is disabled', async () => {
+      const { analyzeSEOElements } = await import('./seoAnalysis');
+
+      const dataWithMissingAlts = {
+        ...mockScrapedData,
+        images: [
+          { src: 'https://example.com/photo1.jpg', alt: undefined },
+          { src: 'https://example.com/photo2.jpg', alt: undefined }
+        ]
+      };
+
+      // mockEnv has USE_GPT_RECOMMENDATIONS: 'false'
+      const result = await analyzeSEOElements(
+        dataWithMissingAlts,
+        'SEO',
+        'https://example.com/test',
+        false,
+        mockEnv
+      );
+
+      const imageAltCheck = result.checks.find(c => c.title === 'Image Alt Attributes');
+      expect(imageAltCheck!.imageData!.every(img => img.alt === '')).toBe(true);
+
+      const imageAltCalls = (getAIRecommendation as any).mock.calls.filter(
+        (call: any[]) => call[0] === 'Image Alt Attributes'
+      );
+      expect(imageAltCalls.length).toBe(0);
+    });
+
+    it('gracefully handles partial AI failures during image alt generation', async () => {
+      const { analyzeSEOElements } = await import('./seoAnalysis');
+
+      let imageAltCallCount = 0;
+      (getAIRecommendation as any).mockImplementation(async (checkType: string) => {
+        if (checkType === 'Image Alt Attributes') {
+          imageAltCallCount++;
+          if (imageAltCallCount === 2) throw new Error('AI failure for second image');
+          return 'AI alt for first image';
+        }
+        return 'Mocked AI recommendation';
+      });
+
+      const dataWithMissingAlts = {
+        ...mockScrapedData,
+        images: [
+          { src: 'https://example.com/photo1.jpg', alt: undefined },
+          { src: 'https://example.com/photo2.jpg', alt: undefined }
+        ]
+      };
+
+      const aiEnv = { USE_GPT_RECOMMENDATIONS: 'true', OPENAI_API_KEY: 'test-key' };
+
+      const result = await analyzeSEOElements(
+        dataWithMissingAlts,
+        'SEO',
+        'https://example.com/test',
+        false,
+        aiEnv
+      );
+
+      const imageAltCheck = result.checks.find(c => c.title === 'Image Alt Attributes');
+      expect(imageAltCheck).toBeDefined();
+      // Analysis should complete even when one AI call fails
+      expect(imageAltCheck!.imageData).toBeDefined();
+      expect(imageAltCheck!.imageData!.length).toBe(2);
+    });
+  });
+
+  describe('Image Alt Attributes — decorative image handling (issue #573)', () => {
+    let baseScrapedData: any;
+    let mockEnv: any;
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+      (getAIRecommendation as any).mockResolvedValue('Mocked AI recommendation');
+
+      // Minimal valid scrapedData; tests will override `images`.
+      baseScrapedData = {
+        title: 'Test',
+        metaDescription: 'Test description with sufficient length for the check',
+        content: 'a '.repeat(700),
+        headings: [{ level: 1, text: 'Heading' }],
+        paragraphs: ['Paragraph'],
+        images: [],
+        internalLinks: [],
+        outboundLinks: [],
+        ogImage: '',
+        resources: { js: [], css: [] },
+        schemaMarkup: { hasSchema: false, schemaCount: 0, schemaTypes: [] },
+      };
+
+      mockEnv = { USE_GPT_RECOMMENDATIONS: 'false', OPENAI_API_KEY: undefined };
+    });
+
+    it('does NOT flag images with alt="" (explicit decorative)', async () => {
+      const { analyzeSEOElements } = await import('./seoAnalysis');
+      const data = {
+        ...baseScrapedData,
+        images: [
+          { src: '/spacer.png', alt: '' },        // decorative
+          { src: '/photo.png', alt: undefined },  // missing → flag
+        ],
+      };
+      const result = await analyzeSEOElements(data, 'SEO', 'https://example.com/', false, mockEnv);
+      const check = result.checks.find(c => c.title === 'Image Alt Attributes');
+      expect(check?.passed).toBe(false);
+      expect(check?.imageData).toHaveLength(1);
+      expect(check?.imageData?.[0].url).toBe('/photo.png');
+    });
+
+    it('does NOT flag images with role="presentation" or role="none"', async () => {
+      const { analyzeSEOElements } = await import('./seoAnalysis');
+      const data = {
+        ...baseScrapedData,
+        images: [
+          { src: '/divider.png', alt: undefined, role: 'presentation' },
+          { src: '/icon.png',    alt: undefined, role: 'none' },
+          { src: '/hero.png',    alt: undefined },
+        ],
+      };
+      const result = await analyzeSEOElements(data, 'SEO', 'https://example.com/', false, mockEnv);
+      const check = result.checks.find(c => c.title === 'Image Alt Attributes');
+      expect(check?.imageData).toHaveLength(1);
+      expect(check?.imageData?.[0].url).toBe('/hero.png');
+    });
+
+    it('passes the check when ALL non-decoratives are alt-OK', async () => {
+      const { analyzeSEOElements } = await import('./seoAnalysis');
+      const data = {
+        ...baseScrapedData,
+        images: [
+          { src: '/a.png', alt: '' },                              // decorative
+          { src: '/b.png', alt: undefined, role: 'presentation' }, // decorative
+          { src: '/c.png', alt: 'A real photograph' },             // populated → passes
+        ],
+      };
+      const result = await analyzeSEOElements(data, 'SEO', 'https://example.com/', false, mockEnv);
+      const check = result.checks.find(c => c.title === 'Image Alt Attributes');
+      expect(check?.passed).toBe(true);
+    });
+
+    it('treats whitespace-only alt as missing (still flagged)', async () => {
+      const { analyzeSEOElements } = await import('./seoAnalysis');
+      const data = {
+        ...baseScrapedData,
+        images: [{ src: '/a.png', alt: '   ' }],
+      };
+      const result = await analyzeSEOElements(data, 'SEO', 'https://example.com/', false, mockEnv);
+      const check = result.checks.find(c => c.title === 'Image Alt Attributes');
+      expect(check?.passed).toBe(false);
+      expect(check?.imageData).toHaveLength(1);
+    });
+
+    it('mentions decorative-exclusion count in the description when decoratives exist', async () => {
+      const { analyzeSEOElements } = await import('./seoAnalysis');
+      const data = {
+        ...baseScrapedData,
+        images: [
+          { src: '/a.png', alt: '' },         // decorative
+          { src: '/b.png', alt: '' },         // decorative
+          { src: '/c.png', alt: undefined },  // missing → flag
+        ],
+      };
+      const result = await analyzeSEOElements(data, 'SEO', 'https://example.com/', false, mockEnv);
+      const check = result.checks.find(c => c.title === 'Image Alt Attributes');
+      expect(check?.description).toMatch(/Skipped 2 decorative image\(s\)/);
+      expect(check?.description).toMatch(/role="presentation"\/"none"/);
+    });
+
+    it('does NOT add the exclusion sentence when there are no decoratives', async () => {
+      const { analyzeSEOElements } = await import('./seoAnalysis');
+      const data = {
+        ...baseScrapedData,
+        images: [
+          { src: '/a.png', alt: undefined },
+        ],
+      };
+      const result = await analyzeSEOElements(data, 'SEO', 'https://example.com/', false, mockEnv);
+      const check = result.checks.find(c => c.title === 'Image Alt Attributes');
+      expect(check?.description).not.toMatch(/decorative/i);
+    });
+
+    it('does NOT generate AI suggestions for decorative images', async () => {
+      const { analyzeSEOElements } = await import('./seoAnalysis');
+      (getAIRecommendation as any).mockClear();
+      const data = {
+        ...baseScrapedData,
+        images: [
+          { src: '/spacer.png', alt: '' },        // decorative — should NOT trigger AI
+          { src: '/photo.png', alt: undefined },  // missing → SHOULD trigger AI
+        ],
+      };
+      const aiEnv = { USE_GPT_RECOMMENDATIONS: 'true', OPENAI_API_KEY: 'test-key' };
+      await analyzeSEOElements(data, 'SEO', 'https://example.com/', false, aiEnv);
+
+      // Filter to only the image-alt invocations (other checks may also call getAIRecommendation)
+      const altCalls = (getAIRecommendation as any).mock.calls.filter(
+        (call: any[]) => call[0] === 'Image Alt Attributes'
+      );
+      expect(altCalls).toHaveLength(1);
+      expect(altCalls[0][3]).toBe('/photo.png'); // 4th arg is the image src
     });
   });
 });

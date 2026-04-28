@@ -83,6 +83,22 @@ export function getSuccessMessage(checkType: string): string {
 }
 
 /**
+ * Helper function to check if a keyword matches content using word boundaries
+ */
+function matchesWithWordBoundary(content: string, keyword: string): boolean {
+  if (!content || !keyword) return false;
+  
+  // Escape special regex characters in the keyword
+  const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  
+  // Create regex with word boundaries - handle multi-word keywords
+  const pattern = escapedKeyword.replace(/\s+/g, '\\s+');
+  const regex = new RegExp(`\\b${pattern}\\b`, 'i');
+  
+  return regex.test(content);
+}
+
+/**
  * Helper function to check keywords in content with detailed results
  */
 export function checkKeywordMatch(content: string, primaryKeyword: string, secondaryKeywords?: string): { 
@@ -96,11 +112,8 @@ export function checkKeywordMatch(content: string, primaryKeyword: string, secon
     return { found: false, keywordResults: [] };
   }
 
-  const normalizedContent = content.toLowerCase();
-  
-  // Check primary keyword first
-  const normalizedPrimary = primaryKeyword.toLowerCase();
-  const primaryPassed = normalizedContent.includes(normalizedPrimary);
+  // Check primary keyword first using word boundary matching
+  const primaryPassed = matchesWithWordBoundary(content, primaryKeyword);
   results.push({
     keyword: primaryKeyword,
     passed: primaryPassed,
@@ -121,8 +134,7 @@ export function checkKeywordMatch(content: string, primaryKeyword: string, secon
     const keywords = secondaryKeywords.split(',').map(k => k.trim()).filter(k => k.length > 0);
     
     for (const keyword of keywords) {
-      const normalizedKeyword = keyword.toLowerCase();
-      const keywordPassed = normalizedContent.includes(normalizedKeyword);
+      const keywordPassed = matchesWithWordBoundary(content, keyword);
       results.push({
         keyword: keyword,
         passed: keywordPassed,
@@ -172,9 +184,8 @@ export function checkUrlKeywordMatch(url: string, primaryKeyword: string, second
     .replace(/[_-]/g, ' ') // Convert hyphens and underscores to spaces
     .replace(/%20/g, ' '); // Convert URL-encoded spaces
   
-  // Check primary keyword first
-  const normalizedPrimary = primaryKeyword.toLowerCase();
-  const primaryPassed = normalizedUrl.includes(normalizedPrimary);
+  // Check primary keyword first using word boundary matching
+  const primaryPassed = matchesWithWordBoundary(normalizedUrl, primaryKeyword);
   results.push({
     keyword: primaryKeyword,
     passed: primaryPassed,
@@ -195,8 +206,7 @@ export function checkUrlKeywordMatch(url: string, primaryKeyword: string, second
     const keywords = secondaryKeywords.split(',').map(k => k.trim()).filter(k => k.length > 0);
     
     for (const keyword of keywords) {
-      const normalizedKeyword = keyword.toLowerCase();
-      const keywordPassed = normalizedUrl.includes(normalizedKeyword);
+      const keywordPassed = matchesWithWordBoundary(normalizedUrl, keyword);
       results.push({
         keyword: keyword,
         passed: keywordPassed,
@@ -231,26 +241,29 @@ export function checkUrlKeywordMatch(url: string, primaryKeyword: string, second
 export function calculateCombinedKeyphraseDensity(content: string, primaryKeyword: string, secondaryKeywords?: string): number {
   if (!content || !primaryKeyword) return 0;
 
-  const lowercaseContent = content.toLowerCase();
   let totalOccurrences = 0;
 
-  // Count primary keyword
-  const primaryRegex = new RegExp(primaryKeyword.toLowerCase(), 'g');
-  const primaryMatches = lowercaseContent.match(primaryRegex);
+  // Count primary keyword with word boundaries
+  const escapedPrimary = primaryKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const primaryPattern = escapedPrimary.replace(/\s+/g, '\\s+');
+  const primaryRegex = new RegExp(`\\b${primaryPattern}\\b`, 'gi');
+  const primaryMatches = content.match(primaryRegex);
   totalOccurrences += primaryMatches ? primaryMatches.length : 0;
 
-  // Count secondary keywords
+  // Count secondary keywords with word boundaries
   if (secondaryKeywords) {
     const keywords = secondaryKeywords.split(',').map(k => k.trim()).filter(k => k.length > 0);
     
     for (const keyword of keywords) {
-      const keywordRegex = new RegExp(keyword.toLowerCase(), 'g');
-      const keywordMatches = lowercaseContent.match(keywordRegex);
+      const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const keywordPattern = escapedKeyword.replace(/\s+/g, '\\s+');
+      const keywordRegex = new RegExp(`\\b${keywordPattern}\\b`, 'gi');
+      const keywordMatches = content.match(keywordRegex);
       totalOccurrences += keywordMatches ? keywordMatches.length : 0;
     }
   }
 
-  const words = lowercaseContent.split(/\s+/);
+  const words = content.toLowerCase().split(/\s+/);
   const wordCount = words.length || 1;
   
   return (totalOccurrences / wordCount) * 100;
@@ -369,15 +382,20 @@ async function createSEOCheck(
 ): Promise<SEOCheck> {
   const passed = conditionFn();
   
+  // Ensure consistent message handling
+  const finalSuccessMessage = matchedKeyword && matchedKeyword !== keyphrase ? 
+    successMessage.replace(keyphrase, matchedKeyword) : 
+    successMessage;
+  
   const check: SEOCheck = {
     title,
-    description: passed ? 
-      (matchedKeyword && matchedKeyword !== keyphrase ? 
-        successMessage.replace(keyphrase, matchedKeyword) : 
-        successMessage) : 
-      failureMessage,
+    name: title, // Set name property for test compatibility
+    description: passed ? finalSuccessMessage : failureMessage,
     passed,
-    priority: analyzerCheckPriorities[title] || 'medium'
+    priority: analyzerCheckPriorities[title] || 'medium',
+    details: context, // Add details property
+    successMessage: passed ? finalSuccessMessage : undefined,
+    errorMessage: passed ? undefined : failureMessage
   };
 
   // Add AI recommendation if check failed and AI is enabled
@@ -567,22 +585,73 @@ export async function analyzeSEOElements(
   );
   checks.push(h1Check);
 
-  // --- Keyphrase in H2 Headings Check with v3.3.14 enhanced logic ---
-  const h2Text = scrapedData.headings.filter(h => h.level === 2).map(h => h.text).join(' ');
+  // --- Keyphrase in H2 Headings Check with Designer API integration ---
+  // Prefer H2 content from Webflow Designer API when available, fall back to scraped data
+  let h2Text = '';
+  let h2Count = 0;
+
+  if (webflowPageData?.h2Elements && Array.isArray(webflowPageData.h2Elements)) {
+    h2Text = webflowPageData.h2Elements.map(h2 => h2.text).join(' ');
+    h2Count = webflowPageData.h2Elements.length;
+  } else {
+    const scrapedH2s = scrapedData.headings.filter(h => h.level === 2);
+    h2Text = scrapedH2s.map(h => h.text).join(' ');
+    h2Count = scrapedH2s.length;
+  }
+
   const h2KeywordMatch = checkKeywordMatch(h2Text, keyphrase, secondaryKeywords);
+  console.log('[Backend H2 Debug] H2 text:', h2Text);
+  console.log('[Backend H2 Debug] Keyphrase:', keyphrase);
+  console.log('[Backend H2 Debug] Match result:', h2KeywordMatch);
+
+  // When individual H2 elements are available, skip the blanket AI call and use per-H2 recs instead
+  const hasIndividualH2Elements = Boolean(webflowPageData?.h2Elements?.length);
+  const h2Env: WorkerEnvironment = hasIndividualH2Elements
+    ? { ...env, USE_GPT_RECOMMENDATIONS: undefined }
+    : env;
+
   const h2Check = await createSEOCheck(
     "Keyphrase in H2 Headings",
     () => h2KeywordMatch.found,
-    h2KeywordMatch.matchedKeyword ? 
+    h2KeywordMatch.matchedKeyword ?
       `Good! The keyword "${h2KeywordMatch.matchedKeyword}" is found in at least one H2 heading.` :
       `Good! The keyphrase "${keyphrase}" is found in at least one H2 heading.`,
     `H2 headings do not contain the keyphrase "${keyphrase}"${secondaryKeywords ? ' or any secondary keywords' : ''}.`,
-    h2Text,
+    `${h2Text} (${h2Count} found)`,
     keyphrase,
-    env,
+    h2Env,
     advancedOptions,
     h2KeywordMatch.matchedKeyword
   );
+
+  // Generate per-H2 suggestions in parallel when individual H2 elements are available
+  if (
+    !h2Check.passed &&
+    hasIndividualH2Elements &&
+    env.USE_GPT_RECOMMENDATIONS === 'true' &&
+    env.OPENAI_API_KEY
+  ) {
+    const h2Elements = webflowPageData!.h2Elements!;
+    const recs = await Promise.all(
+      h2Elements.map(async (h2El) => {
+        try {
+          const suggestion = await getAIRecommendation(
+            'Keyphrase in H2 Headings',
+            keyphrase,
+            env,
+            h2El.text,
+            advancedOptions
+          );
+          return { h2Index: h2El.index, h2Text: h2El.text, suggestion };
+        } catch (error) {
+          console.error(`[Per-H2 AI] Failed to generate suggestion for H2 "${h2El.text}":`, error);
+          return { h2Index: h2El.index, h2Text: h2El.text, suggestion: '' };
+        }
+      })
+    );
+    h2Check.h2Recommendations = recs.filter(r => r.suggestion.length > 0);
+  }
+
   checks.push(h2Check);
 
   // --- Image Alt Attributes Check with v3.3.14 enhanced logic ---
@@ -593,31 +662,27 @@ export async function analyzeSEOElements(
     priority: analyzerCheckPriorities["Image Alt Attributes"]
   };
   
-  const imagesWithoutAlt = scrapedData.images.filter(img => !img.alt || img.alt.trim().length === 0);
+  const isDecorative = (img: ScrapedPageData['images'][number]) =>
+    img.alt === '' || img.role === 'presentation' || img.role === 'none';
+
+  const flaggableImages = scrapedData.images.filter(img => !isDecorative(img));
+  const decorativeCount = scrapedData.images.length - flaggableImages.length;
+
+  const imagesWithoutAlt = flaggableImages.filter(
+    img => img.alt === undefined || img.alt.trim().length === 0
+  );
   imageAltCheck.passed = imagesWithoutAlt.length === 0;
-  
+
   if (imageAltCheck.passed) {
     imageAltCheck.description = getSuccessMessage(imageAltCheck.title);
   } else {
-    imageAltCheck.description = `Found ${imagesWithoutAlt.length} image(s) without alt attributes.`;
-    
-    try {
-      if (env.USE_GPT_RECOMMENDATIONS === 'true' && env.OPENAI_API_KEY) {
-        const imageAltResult = await getAIRecommendation(
-          imageAltCheck.title,
-          keyphrase,
-          env,
-          `${imagesWithoutAlt.length} image(s) found without alt attributes.`,
-          advancedOptions
-        );
-        imageAltCheck.recommendation = imageAltResult;
-      }
-    } catch (error) {
-      console.error("[SEO Analysis] Error getting AI recommendation for image alt attributes:", error);
-    }
+    const decorativeNote = decorativeCount > 0
+      ? ` Skipped ${decorativeCount} decorative image(s) (alt="" or role="presentation"/"none").`
+      : '';
+    imageAltCheck.description = `Found ${imagesWithoutAlt.length} image(s) without alt attributes.${decorativeNote}`;
   }
   checks.push(imageAltCheck);
-  
+
   if (!imageAltCheck.passed) {
     imageAltCheck.imageData = imagesWithoutAlt.map(img => ({
       url: img.src,
@@ -627,6 +692,27 @@ export async function analyzeSEOElements(
       mimeType: 'Unknown',
       alt: img.alt || ''
     }));
+
+    // Generate AI alt text for each image in parallel during analysis
+    if (env.USE_GPT_RECOMMENDATIONS === 'true' && env.OPENAI_API_KEY) {
+      const altResults = await Promise.allSettled(
+        imagesWithoutAlt.map(async (img, idx) => {
+          const suggestion = await getAIRecommendation(
+            'Image Alt Attributes',
+            keyphrase,
+            env,
+            img.src,
+            advancedOptions
+          );
+          return { idx, suggestion };
+        })
+      );
+      altResults.forEach(result => {
+        if (result.status === 'fulfilled' && result.value.suggestion) {
+          imageAltCheck.imageData![result.value.idx].alt = result.value.suggestion;
+        }
+      });
+    }
   }
 
   // --- Internal Links Check with v3.3.14 enhanced logic ---
