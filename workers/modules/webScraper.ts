@@ -1,4 +1,4 @@
-import { URL } from "url";
+import { URL } from "node:url";
 import * as cheerio from 'cheerio';
 import { ScrapedPageData, Resource } from '../../shared/types/index';
 
@@ -10,6 +10,16 @@ import { ScrapedPageData, Resource } from '../../shared/types/index';
  */
 export async function scrapeWebPage(url: string, keyphrase: string): Promise<ScrapedPageData> {
   try {
+    console.log('[Web Scraper] Attempting to fetch URL:', url);
+    
+    // Try a HEAD request first to check if URL exists
+    try {
+      const headResponse = await fetch(url, { method: 'HEAD' });
+      console.log('[Web Scraper] HEAD request status:', headResponse.status, headResponse.statusText);
+    } catch (headError) {
+      console.log('[Web Scraper] HEAD request failed:', headError);
+    }
+    
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -145,19 +155,21 @@ function extractParagraphs($: cheerio.CheerioAPI): string[] {
 /**
  * Extract all images with their metadata
  */
-function extractImages($: cheerio.CheerioAPI): Array<{src: string, alt: string, size?: number}> {
-  const images: Array<{src: string, alt: string, size?: number}> = [];
-  
+export function extractImages($: cheerio.CheerioAPI): Array<{src: string, alt: string | undefined, role?: string, size?: number}> {
+  const images: Array<{src: string, alt: string | undefined, role?: string, size?: number}> = [];
+
   $('img').each((_, element) => {
     const src = $(element).attr('src') || '';
-    if (src) {
-      images.push({
-        src,
-        alt: $(element).attr('alt') || '',
-      });
-    }
+    if (!src) return;
+    const alt = $(element).attr('alt'); // string | undefined — preserve missing-vs-empty distinction
+    const role = $(element).attr('role')?.toLowerCase();
+    images.push({
+      src,
+      alt,
+      ...(role ? { role } : {}),
+    });
   });
-  
+
   return images;
 }
 
@@ -210,7 +222,11 @@ function extractLinks($: cheerio.CheerioAPI, url: string): {
       if (linkUrl.hostname === baseDomain) {
         internalLinks.push(fullUrl);
       } else {
-        outboundLinks.push(fullUrl);
+        // Normalize external links by ensuring domain-only URLs have trailing slash
+        const normalizedUrl = linkUrl.pathname === '/' && !fullUrl.endsWith('/') 
+          ? fullUrl + '/' 
+          : fullUrl;
+        outboundLinks.push(normalizedUrl);
       }
     } catch (error) {
       // Skip invalid URLs
@@ -279,11 +295,13 @@ function extractSchemaMarkup($: cheerio.CheerioAPI): {
   hasSchema: boolean;
   schemaTypes: string[];
   schemaCount: number;
+  detected?: any[];
 } {
   const schemaMarkup = {
     hasSchema: false,
     schemaTypes: [] as string[],
-    schemaCount: 0
+    schemaCount: 0,
+    detected: []
   };
   
   $('script[type="application/ld+json"]').each((_, element) => {

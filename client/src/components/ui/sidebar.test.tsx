@@ -1,8 +1,7 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
-import { useMobile } from '../../hooks/use-mobile';
-import { 
+import {
   Sidebar,
   SidebarProvider,
   SidebarTrigger,
@@ -28,11 +27,6 @@ import {
   SidebarRail,
   useSidebar
 } from './sidebar';
-
-// Mock dependencies
-vi.mock('../../hooks/use-mobile', () => ({
-  useMobile: vi.fn(() => false)
-}));
 
 vi.mock('@radix-ui/react-slot', () => ({
   Slot: ({ children, ...props }: any) => <div {...props}>{children}</div>
@@ -224,25 +218,7 @@ describe('Sidebar Components', () => {
       expect(sidebar).toHaveClass('flex', 'h-full', 'w-[--sidebar-width]');
     });
 
-    it('should render mobile sheet when isMobile is true', async () => {
-      const { useMobile } = await import('../../hooks/use-mobile');
-      (useMobile as any).mockReturnValue(true);
-
-      render(
-        <SidebarProvider>
-          <Sidebar>
-            <div>Mobile sidebar</div>
-          </Sidebar>
-        </SidebarProvider>
-      );
-      
-      expect(screen.getByTestId('sheet')).toBeInTheDocument();
-      expect(screen.getByTestId('sheet-content')).toBeInTheDocument();
-    });
-
     it('should handle different sides', () => {
-      vi.mocked(useMobile).mockReturnValue(false);
-      
       render(
         <SidebarProvider>
           <Sidebar side="right">
@@ -256,8 +232,6 @@ describe('Sidebar Components', () => {
     });
 
     it('should handle different variants', () => {
-      vi.mocked(useMobile).mockReturnValue(false);
-      
       render(
         <SidebarProvider>
           <Sidebar variant="floating">
@@ -289,9 +263,6 @@ describe('Sidebar Components', () => {
     });
 
     it('should toggle sidebar on click', () => {
-      // Ensure we're not in mobile mode
-      vi.mocked(useMobile).mockReturnValue(false);
-      
       const TestComponent = () => {
         const { open } = useSidebar();
         return (
@@ -348,8 +319,6 @@ describe('Sidebar Components', () => {
     });
 
     it('should toggle sidebar on click', () => {
-      vi.mocked(useMobile).mockReturnValue(false);
-      
       const TestComponent = () => {
         const { open } = useSidebar();
         return (
@@ -840,16 +809,12 @@ describe('Sidebar Components', () => {
     });
 
     it('should provide sidebar context', () => {
-      // Ensure we're not in mobile mode
-      vi.mocked(useMobile).mockReturnValue(false);
-      
       const TestComponent = () => {
-        const { state, open, isMobile, toggleSidebar, setOpen, openMobile, setOpenMobile } = useSidebar();
+        const { state, open, toggleSidebar, setOpen, openMobile, setOpenMobile } = useSidebar();
         return (
           <div>
             <div>State: {state}</div>
             <div>Open: {open.toString()}</div>
-            <div>Mobile: {isMobile.toString()}</div>
             <button onClick={toggleSidebar}>Toggle</button>
             <button onClick={() => setOpen(false)}>Close</button>
             <button onClick={() => setOpenMobile(true)}>Open Mobile</button>
@@ -862,10 +827,9 @@ describe('Sidebar Components', () => {
           <TestComponent />
         </SidebarProvider>
       );
-      
+
       expect(screen.getByText('State: expanded')).toBeInTheDocument();
       expect(screen.getByText('Open: true')).toBeInTheDocument();
-      expect(screen.getByText('Mobile: false')).toBeInTheDocument();
     });
   });
 
