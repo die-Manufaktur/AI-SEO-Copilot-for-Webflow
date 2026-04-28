@@ -1,3 +1,14 @@
+## [4.10.7](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/compare/v4.10.6...v4.10.7) (2026-04-28)
+
+### Bug Fixes
+
+* **security:** patch high-severity vite and claude-code CVEs ([931b3ee](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/931b3ee9a1a9ab5eab771bd5ec83d35f0a63eb8a))
+
+### Miscellaneous Chores
+
+* **deps:** update react-dom requirement from ^19.1.1 to ^19.2.0 ([6dbbf08](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/6dbbf08f9c7f5e0aa91b44da9ee2499f9fb59155))
+* **deps:** update react-dom requirement from ^19.1.1 to ^19.2.0 ([#519](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/issues/519)) ([7f34206](https://github.com/die-Manufaktur/AI-SEO-Copilot-for-Webflow/commit/7f34206c41093044a1160af88296c190478333e6))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
