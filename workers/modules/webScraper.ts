@@ -162,7 +162,7 @@ export function extractImages($: cheerio.CheerioAPI): Array<{src: string, alt: s
     const src = $(element).attr('src') || '';
     if (!src) return;
     const alt = $(element).attr('alt'); // string | undefined — preserve missing-vs-empty distinction
-    const role = $(element).attr('role');
+    const role = $(element).attr('role')?.toLowerCase();
     images.push({
       src,
       alt,

@@ -447,5 +447,24 @@ describe('webScraper', () => {
       expect(images[1].role).toBe('none');
       expect(images[2].role).toBeUndefined();
     });
+
+    it('normalizes role attribute to lowercase (WAI-ARIA case-insensitive matching)', () => {
+      const html = `
+        <html><body>
+          <img src="/a.png" role="Presentation">
+          <img src="/b.png" role="NONE">
+        </body></html>`;
+      const $ = cheerio.load(html);
+      const images = extractImages($);
+      expect(images[0].role).toBe('presentation');
+      expect(images[1].role).toBe('none');
+    });
+
+    it('treats <img alt> (valueless boolean attribute) as decorative empty alt', () => {
+      const html = `<html><body><img src="/a.png" alt></body></html>`;
+      const $ = cheerio.load(html);
+      const images = extractImages($);
+      expect(images[0].alt).toBe('');
+    });
   });
 });
