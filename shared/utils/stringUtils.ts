@@ -106,6 +106,16 @@ export function sanitizeText(text: string, languageCode?: string): string {
 }
 
 /**
+ * Strips wrapping quote characters (", ', `) that LLMs sometimes add to responses
+ * despite instructions not to. Only strips if the same character wraps both ends.
+ * Should run after sanitizeText so curly quotes have already been normalised to straight quotes.
+ */
+export function stripWrappingQuotes(text: string): string {
+  if (!text) return text;
+  return text.replace(/^(["'`])([\s\S]+)\1$/, '$2').trim();
+}
+
+/**
  * Sanitize input specifically for AI prompts to prevent prompt injection
  */
 export function sanitizeForAI(input: string, languageCode?: string): string {

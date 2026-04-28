@@ -7,38 +7,38 @@ describe('Button', () => {
   it('renders correctly with default props', () => {
     render(<Button>Click me</Button>);
     expect(screen.getByRole('button')).toHaveTextContent('Click me');
-    expect(screen.getByRole('button')).toHaveClass('bg-primary', 'text-primary-foreground');
+    expect(screen.getByRole('button')).toHaveClass('bg-primary-blue', 'text-text-primary');
   });
 
   it('applies different variants correctly', () => {
     const { rerender } = render(<Button variant="destructive">Destructive</Button>);
-    expect(screen.getByRole('button')).toHaveClass('bg-destructive', 'text-destructive-foreground');
-    
+    expect(screen.getByRole('button')).toHaveClass('bg-error', 'text-text-primary');
+
     rerender(<Button variant="outline">Outline</Button>);
-    expect(screen.getByRole('button')).toHaveClass('border', 'border-input', 'bg-background');
-    
+    expect(screen.getByRole('button')).toHaveClass('border', 'border-color', 'bg-transparent');
+
     rerender(<Button variant="secondary">Secondary</Button>);
-    expect(screen.getByRole('button')).toHaveClass('bg-secondary', 'text-secondary-foreground');
-    
+    expect(screen.getByRole('button')).toHaveClass('bg-input-bg', 'text-text-primary');
+
     rerender(<Button variant="ghost">Ghost</Button>);
-    expect(screen.getByRole('button')).toHaveClass('hover:bg-accent');
-    
+    expect(screen.getByRole('button')).toHaveClass('hover:bg-input-bg', 'text-text-primary');
+
     rerender(<Button variant="link">Link</Button>);
     expect(screen.getByRole('button')).toHaveClass('text-primary', 'underline-offset-4');
   });
 
   it('applies different sizes correctly', () => {
     const { rerender } = render(<Button size="default">Default</Button>);
-    expect(screen.getByRole('button')).toHaveClass('h-10', 'px-4', 'py-2');
-    
+    expect(screen.getByRole('button')).toHaveClass('h-button-height-lg', 'px-6', 'py-3');
+
     rerender(<Button size="sm">Small</Button>);
-    expect(screen.getByRole('button')).toHaveClass('h-9', 'px-3');
-    
+    expect(screen.getByRole('button')).toHaveClass('h-button-height-sm', 'px-4', 'py-2');
+
     rerender(<Button size="lg">Large</Button>);
-    expect(screen.getByRole('button')).toHaveClass('h-11', 'px-8');
-    
+    expect(screen.getByRole('button')).toHaveClass('h-button-height-lg', 'px-8', 'py-4');
+
     rerender(<Button size="icon">Icon</Button>);
-    expect(screen.getByRole('button')).toHaveClass('h-10', 'w-10');
+    expect(screen.getByRole('button')).toHaveClass('h-button-height-sm', 'w-8');
   });
 
   it('handles click events', async () => {
@@ -73,10 +73,53 @@ describe('Button', () => {
         <a href="https://example.com">Link Button</a>
       </Button>
     );
-    
+
     const linkButton = screen.getByRole('link');
     expect(linkButton).toHaveTextContent('Link Button');
     expect(linkButton).toHaveAttribute('href', 'https://example.com');
-    expect(linkButton).toHaveClass('bg-primary', 'text-primary-foreground');
+    expect(linkButton).toHaveClass('bg-primary-blue', 'text-text-primary');
+  });
+
+  describe('New Design System Features', () => {
+    it('should have auto-width optimize variant with primary blue styling and pill border radius', () => {
+      render(<Button variant="optimize" size="optimize">Optimize my SEO</Button>);
+      const button = screen.getByRole('button');
+
+      // Should NOT have w-full class - button sizes to content
+      expect(button).not.toHaveClass('w-full');
+      expect(button).toHaveClass('bg-[#1A72F5]');
+      expect(button).toHaveClass('!rounded-[9999px]');
+    });
+
+    it('should apply optimize size variant correctly', () => {
+      render(<Button variant="optimize" size="optimize">Optimize my SEO</Button>);
+      const button = screen.getByRole('button');
+
+      expect(button).toHaveClass('h-14');
+      expect(button).toHaveClass('px-8');
+      expect(button).toHaveClass('py-4');
+    });
+
+    it('should use design tokens for primary variant', () => {
+      render(<Button variant="default">Primary Button</Button>);
+      const button = screen.getByRole('button');
+
+      expect(button).toHaveClass('bg-primary-blue', 'text-text-primary');
+      expect(button).toHaveClass('hover:bg-primary-blue-hover');
+    });
+
+    it('should have proper height with design tokens', () => {
+      render(<Button size="lg">Large Button</Button>);
+      const button = screen.getByRole('button');
+
+      expect(button).toHaveClass('h-button-height-lg');
+    });
+
+    it('should apply new border radius', () => {
+      render(<Button>Modern Button</Button>);
+      const button = screen.getByRole('button');
+
+      expect(button).toHaveClass('rounded-radius-xl');
+    });
   });
 });
