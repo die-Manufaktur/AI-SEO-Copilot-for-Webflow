@@ -10,25 +10,42 @@ interface WebflowAppWrapperProps {
 
 export default function WebflowAppWrapper({ children }: WebflowAppWrapperProps) {
   useEffect(() => {
-    if (window.webflow && window.webflow.setExtensionSize) {
-      try {
-        window.webflow.setExtensionSize({
-          width: 540,
-          height: 720
-        });
-      } catch (error) {
-        logger.error('Failed to set extension size:', error);
+    const setSize = () => {
+      if (window.webflow?.setExtensionSize) {
+        try {
+          window.webflow.setExtensionSize({ width: 715, height: 800 });
+          return true;
+        } catch (error) {
+          logger.error('Failed to set extension size:', error);
+          return true; // Don't retry on errors — the API exists but threw
+        }
       }
-    } else {
-      logger.warn('webflow.setExtensionSize is not available');
+      return false;
+    };
+
+    if (!setSize()) {
+      // Retry until window.webflow is injected by the Designer
+      const interval = setInterval(() => {
+        if (setSize()) clearInterval(interval);
+      }, 100);
+      // Stop trying after 10 seconds
+      const timeout = setTimeout(() => {
+        clearInterval(interval);
+        logger.warn('webflow.setExtensionSize not available after 10s');
+      }, 10_000);
+      return () => {
+        clearInterval(interval);
+        clearTimeout(timeout);
+      };
     }
   }, []);
 
   return (
-    <div 
-      id="webflow-app-wrapper" 
+    <div
+      id="webflow-app-wrapper"
       data-testid="webflow-app-wrapper"
-      className="bg-background text-text1 min-h-screen"
+      style={{ width: 715, minWidth: 715, maxWidth: 715 }}
+      className="bg-background text-text1"
     >
       {children}
     </div>
