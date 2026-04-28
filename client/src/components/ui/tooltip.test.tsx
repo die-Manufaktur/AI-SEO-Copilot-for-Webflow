@@ -54,7 +54,7 @@ describe('Tooltip', () => {
 
     const content = screen.getByTestId('tooltip-content');
     expect(content).toHaveClass('custom-class');
-    expect(content).toHaveClass('z-999999', 'rounded-md', 'border', 'bg-background');
+    expect(content).toHaveClass('z-999999', 'rounded-[10px]', 'border', 'p-3', 'text-xs', 'text-white', 'text-center');
   });
 
   it('applies correct side offset to tooltip content', () => {

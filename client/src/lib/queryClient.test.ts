@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { queryClient } from './queryClient';
+import { disableMSWForTest } from '../__tests__/utils/testHelpers';
+
+// Disable MSW for this test file since we need direct fetch mocking
+disableMSWForTest();
 
 // Mock fetch globally
 const mockFetch = vi.fn();
