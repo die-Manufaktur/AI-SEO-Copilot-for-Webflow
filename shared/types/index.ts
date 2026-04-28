@@ -9,6 +9,10 @@ export interface SEOCheck {
   recommendation?: string;
   introPhrase?: string;
   matchedKeyword?: string; // Which keyword was found (primary or secondary)
+  name?: string; // Name identifier for the check
+  details?: string; // Additional details about the check
+  errorMessage?: string; // Error message when check fails
+  successMessage?: string; // Success message when check passes
   imageData?: Array<{
     url: string;
     name: string;
@@ -16,6 +20,11 @@ export interface SEOCheck {
     size?: number;
     mimeType?: string;
     alt?: string;
+  }>;
+  h2Recommendations?: Array<{
+    h2Index: number;
+    h2Text: string;
+    suggestion: string;
   }>;
 }
 
@@ -38,12 +47,23 @@ export interface Resource {
 }
 
 /**
+ * H2 Element Information from Webflow Designer API
+ */
+export interface H2ElementInfo {
+  element: any; // WebflowElement type would be defined in client-side code
+  id: string;
+  text: string;
+  index: number;
+}
+
+/**
  * Type for Schema Markup detection results
  */
 export interface SchemaMarkupResult {
   hasSchema: boolean;
   schemaTypes: string[];
   schemaCount: number;
+  detected?: any[]; // Array of detected schema markup objects
 }
 
 /**
@@ -54,12 +74,15 @@ export interface WebflowPageData {
   metaDescription: string;
   canonicalUrl?: string;
   openGraphImage?: string;
+  openGraphTitle?: string;
+  openGraphDescription?: string;
   ogTitle?: string;
   ogDescription?: string;
   ogImage?: string;
   usesTitleAsOpenGraphTitle?: boolean;
   usesDescriptionAsOpenGraphDescription?: boolean;
   designerImages?: Array<{ url: string }>;
+  h2Elements?: H2ElementInfo[];
 }
 
 /**
@@ -76,7 +99,8 @@ export interface ScrapedPageData {
   paragraphs: string[];
   images: Array<{
     src: string;
-    alt: string;
+    alt: string | undefined;
+    role?: string;
     size?: number;
   }>;
   internalLinks: string[];
@@ -207,6 +231,23 @@ export interface AnalyzeSEORequest {
   publishPath?: string;
   debug?: boolean;
   advancedOptions?: AdvancedOptions;
+}
+
+/**
+ * Request payload for the generate-recommendation endpoint
+ */
+export interface GenerateRecommendationRequest {
+  checkType: string;       // e.g. "Keyphrase in Title", "Image Alt Attributes"
+  keyphrase: string;       // the target keyphrase
+  context?: string;        // current content (existing title, image URL, H2 text, etc.)
+  advancedOptions?: AdvancedOptions;
+}
+
+/**
+ * Response payload for the generate-recommendation endpoint
+ */
+export interface GenerateRecommendationResponse {
+  recommendation: string;
 }
 
 // Language types for multilingual SEO suggestions

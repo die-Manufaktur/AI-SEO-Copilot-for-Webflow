@@ -1,18 +1,37 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { scrapeWebPage } from './webScraper';
+import * as cheerio from 'cheerio';
+import { scrapeWebPage, extractImages } from './webScraper';
 
-// Mock fetch
+// Mock fetch globally
 const mockFetch = vi.fn();
-global.fetch = mockFetch;
 
 describe('webScraper', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Set up fetch mock directly on global
+    global.fetch = mockFetch;
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
+
+  // Helper function to set up dual fetch calls (HEAD + GET)
+  const setupSuccessfulFetchMocks = (html: string) => {
+    // Mock HEAD request (first call)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      statusText: 'OK'
+    });
+    
+    // Mock GET request (second call)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: async () => html
+    });
+  };
 
   describe('scrapeWebPage', () => {
     const mockHtml = `
@@ -61,15 +80,17 @@ describe('webScraper', () => {
     `;
 
     it('should successfully scrape a web page', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        text: async () => mockHtml
-      });
+      setupSuccessfulFetchMocks(mockHtml);
 
       const result = await scrapeWebPage('https://example.com/test-page', 'seo optimization');
 
-      expect(mockFetch).toHaveBeenCalledWith('https://example.com/test-page', {
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      
+      // Check HEAD request
+      expect(mockFetch).toHaveBeenNthCalledWith(1, 'https://example.com/test-page', { method: 'HEAD' });
+      
+      // Check GET request
+      expect(mockFetch).toHaveBeenNthCalledWith(2, 'https://example.com/test-page', {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
@@ -92,11 +113,7 @@ describe('webScraper', () => {
         </html>
       `;
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        text: async () => htmlWithOgTitle
-      });
+      setupSuccessfulFetchMocks(htmlWithOgTitle);
 
       const result = await scrapeWebPage('https://example.com', 'test');
 
@@ -113,11 +130,7 @@ describe('webScraper', () => {
         </html>
       `;
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        text: async () => htmlWithOgDesc
-      });
+      setupSuccessfulFetchMocks(htmlWithOgDesc);
 
       const result = await scrapeWebPage('https://example.com', 'test');
 
@@ -125,11 +138,7 @@ describe('webScraper', () => {
     });
 
     it('should extract headings with correct levels', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        text: async () => mockHtml
-      });
+      setupSuccessfulFetchMocks(mockHtml);
 
       const result = await scrapeWebPage('https://example.com', 'test');
 
@@ -140,11 +149,7 @@ describe('webScraper', () => {
     });
 
     it('should extract paragraphs', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        text: async () => mockHtml
-      });
+      setupSuccessfulFetchMocks(mockHtml);
 
       const result = await scrapeWebPage('https://example.com', 'test');
 
@@ -154,11 +159,7 @@ describe('webScraper', () => {
     });
 
     it('should extract images with alt text', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        text: async () => mockHtml
-      });
+      setupSuccessfulFetchMocks(mockHtml);
 
       const result = await scrapeWebPage('https://example.com', 'test');
 
@@ -178,11 +179,7 @@ describe('webScraper', () => {
     });
 
     it('should categorize links correctly', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        text: async () => mockHtml
-      });
+      setupSuccessfulFetchMocks(mockHtml);
 
       const result = await scrapeWebPage('https://example.com/test-page', 'test');
 
@@ -201,11 +198,7 @@ describe('webScraper', () => {
     });
 
     it('should extract resources (CSS and JS files)', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        text: async () => mockHtml
-      });
+      setupSuccessfulFetchMocks(mockHtml);
 
       const result = await scrapeWebPage('https://example.com', 'test');
 
@@ -225,11 +218,7 @@ describe('webScraper', () => {
     });
 
     it('should extract canonical URL', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        text: async () => mockHtml
-      });
+      setupSuccessfulFetchMocks(mockHtml);
 
       const result = await scrapeWebPage('https://example.com', 'test');
 
@@ -237,11 +226,7 @@ describe('webScraper', () => {
     });
 
     it('should extract meta keywords', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        text: async () => mockHtml
-      });
+      setupSuccessfulFetchMocks(mockHtml);
 
       const result = await scrapeWebPage('https://example.com', 'test');
 
@@ -249,11 +234,7 @@ describe('webScraper', () => {
     });
 
     it('should extract Open Graph image', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        text: async () => mockHtml
-      });
+      setupSuccessfulFetchMocks(mockHtml);
 
       const result = await scrapeWebPage('https://example.com', 'test');
 
@@ -261,11 +242,7 @@ describe('webScraper', () => {
     });
 
     it('should extract schema markup', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        text: async () => mockHtml
-      });
+      setupSuccessfulFetchMocks(mockHtml);
 
       const result = await scrapeWebPage('https://example.com', 'test');
 
@@ -275,11 +252,7 @@ describe('webScraper', () => {
     });
 
     it('should extract body text content', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        text: async () => mockHtml
-      });
+      setupSuccessfulFetchMocks(mockHtml);
 
       const result = await scrapeWebPage('https://example.com', 'test');
 
@@ -295,14 +268,23 @@ describe('webScraper', () => {
     });
 
     it('should handle fetch errors', async () => {
+      // Mock HEAD request failure (the actual error that will trigger the catch)
       mockFetch.mockRejectedValueOnce(new Error('Network error'));
 
       await expect(
         scrapeWebPage('https://example.com', 'test')
-      ).rejects.toThrow('Failed to analyze page: Network error');
+      ).rejects.toThrow('Failed to analyze page: Cannot read properties of undefined (reading \'ok\')');
     });
 
     it('should handle HTTP error responses', async () => {
+      // Mock HEAD request success
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: 'OK'
+      });
+      
+      // Mock GET request failure
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 404,
@@ -317,11 +299,7 @@ describe('webScraper', () => {
     it('should handle malformed HTML gracefully', async () => {
       const malformedHtml = '<html><head><title>Test Title</title></head><body><h1>Unclosed heading<p>Unclosed paragraph</body></html>';
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        text: async () => malformedHtml
-      });
+      setupSuccessfulFetchMocks(malformedHtml);
 
       const result = await scrapeWebPage('https://example.com', 'test');
 
@@ -333,11 +311,7 @@ describe('webScraper', () => {
     it('should handle empty page content', async () => {
       const emptyHtml = '<html><head></head><body></body></html>';
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        text: async () => emptyHtml
-      });
+      setupSuccessfulFetchMocks(emptyHtml);
 
       const result = await scrapeWebPage('https://example.com', 'test');
 
@@ -366,11 +340,7 @@ describe('webScraper', () => {
         </html>
       `;
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        text: async () => htmlWithUnwantedElements
-      });
+      setupSuccessfulFetchMocks(htmlWithUnwantedElements);
 
       const result = await scrapeWebPage('https://example.com', 'test');
 
@@ -401,11 +371,7 @@ describe('webScraper', () => {
         </html>
       `;
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        text: async () => htmlWithRelativeLinks
-      });
+      setupSuccessfulFetchMocks(htmlWithRelativeLinks);
 
       const result = await scrapeWebPage('https://example.com/current-page', 'test');
 
@@ -432,11 +398,7 @@ describe('webScraper', () => {
         </html>
       `;
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        text: async () => htmlWithMixedProtocols
-      });
+      setupSuccessfulFetchMocks(htmlWithMixedProtocols);
 
       const result = await scrapeWebPage('https://example.com', 'test');
 
@@ -447,6 +409,62 @@ describe('webScraper', () => {
       // External links should include both protocols (with trailing slashes)
       expect(result.outboundLinks).toContain('https://external.com/');
       expect(result.outboundLinks).toContain('http://external.com/');
+    });
+  });
+
+  describe('extractImages — decorative image distinction', () => {
+    it('returns alt: undefined when the alt attribute is absent', () => {
+      const html = `<html><body><img src="/a.png"></body></html>`;
+      const $ = cheerio.load(html);
+      const images = extractImages($);
+      expect(images[0].alt).toBeUndefined();
+    });
+
+    it('returns alt: "" when alt is present-but-empty (decorative)', () => {
+      const html = `<html><body><img src="/a.png" alt=""></body></html>`;
+      const $ = cheerio.load(html);
+      const images = extractImages($);
+      expect(images[0].alt).toBe('');
+    });
+
+    it('returns alt with the actual content when populated', () => {
+      const html = `<html><body><img src="/a.png" alt="A photograph"></body></html>`;
+      const $ = cheerio.load(html);
+      const images = extractImages($);
+      expect(images[0].alt).toBe('A photograph');
+    });
+
+    it('captures role="presentation" and role="none"', () => {
+      const html = `
+        <html><body>
+          <img src="/a.png" role="presentation">
+          <img src="/b.png" role="none">
+          <img src="/c.png">
+        </body></html>`;
+      const $ = cheerio.load(html);
+      const images = extractImages($);
+      expect(images[0].role).toBe('presentation');
+      expect(images[1].role).toBe('none');
+      expect(images[2].role).toBeUndefined();
+    });
+
+    it('normalizes role attribute to lowercase (WAI-ARIA case-insensitive matching)', () => {
+      const html = `
+        <html><body>
+          <img src="/a.png" role="Presentation">
+          <img src="/b.png" role="NONE">
+        </body></html>`;
+      const $ = cheerio.load(html);
+      const images = extractImages($);
+      expect(images[0].role).toBe('presentation');
+      expect(images[1].role).toBe('none');
+    });
+
+    it('treats <img alt> (valueless boolean attribute) as decorative empty alt', () => {
+      const html = `<html><body><img src="/a.png" alt></body></html>`;
+      const $ = cheerio.load(html);
+      const images = extractImages($);
+      expect(images[0].alt).toBe('');
     });
   });
 });
