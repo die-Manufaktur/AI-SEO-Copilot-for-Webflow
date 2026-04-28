@@ -662,14 +662,24 @@ export async function analyzeSEOElements(
     priority: analyzerCheckPriorities["Image Alt Attributes"]
   };
   
-  const imagesWithoutAlt = scrapedData.images.filter(img => !img.alt || img.alt.trim().length === 0);
+  const isDecorative = (img: ScrapedPageData['images'][number]) =>
+    img.alt === '' || img.role === 'presentation' || img.role === 'none';
+
+  const flaggableImages = scrapedData.images.filter(img => !isDecorative(img));
+  const decorativeCount = scrapedData.images.length - flaggableImages.length;
+
+  const imagesWithoutAlt = flaggableImages.filter(
+    img => img.alt === undefined || img.alt.trim().length === 0
+  );
   imageAltCheck.passed = imagesWithoutAlt.length === 0;
-  
+
   if (imageAltCheck.passed) {
     imageAltCheck.description = getSuccessMessage(imageAltCheck.title);
   } else {
-    imageAltCheck.description = `Found ${imagesWithoutAlt.length} image(s) without alt attributes.`;
-    
+    const decorativeNote = decorativeCount > 0
+      ? ` Skipped ${decorativeCount} decorative image(s) (alt="" or role="presentation"/"none").`
+      : '';
+    imageAltCheck.description = `Found ${imagesWithoutAlt.length} image(s) without alt attributes.${decorativeNote}`;
   }
   checks.push(imageAltCheck);
 

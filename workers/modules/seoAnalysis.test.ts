@@ -587,7 +587,7 @@ describe('seoAnalysis', () => {
         images: [
           { src: 'https://example.com/image1.jpg', alt: 'Test image 1', size: 150000 },
           { src: 'https://example.com/image2.webp', alt: 'Test image 2', size: 200000 },
-          { src: 'https://example.com/image3.jpg', alt: '', size: 600000 }
+          { src: 'https://example.com/image3.jpg', alt: undefined, size: 600000 }
         ],
         internalLinks: ['https://example.com/page1', 'https://example.com/page2'],
         outboundLinks: ['https://external.com/resource'],
@@ -1033,8 +1033,8 @@ describe('seoAnalysis', () => {
       const dataWithMissingAlts = {
         ...mockScrapedData,
         images: [
-          { src: 'https://example.com/photo1.jpg', alt: '' },
-          { src: 'https://example.com/photo2.jpg', alt: '' }
+          { src: 'https://example.com/photo1.jpg', alt: undefined },
+          { src: 'https://example.com/photo2.jpg', alt: undefined }
         ]
       };
 
@@ -1073,8 +1073,8 @@ describe('seoAnalysis', () => {
       const dataWithMissingAlts = {
         ...mockScrapedData,
         images: [
-          { src: 'https://example.com/photo1.jpg', alt: '' },
-          { src: 'https://example.com/photo2.jpg', alt: '' }
+          { src: 'https://example.com/photo1.jpg', alt: undefined },
+          { src: 'https://example.com/photo2.jpg', alt: undefined }
         ]
       };
 
@@ -1112,8 +1112,8 @@ describe('seoAnalysis', () => {
       const dataWithMissingAlts = {
         ...mockScrapedData,
         images: [
-          { src: 'https://example.com/photo1.jpg', alt: '' },
-          { src: 'https://example.com/photo2.jpg', alt: '' }
+          { src: 'https://example.com/photo1.jpg', alt: undefined },
+          { src: 'https://example.com/photo2.jpg', alt: undefined }
         ]
       };
 
@@ -1132,6 +1132,142 @@ describe('seoAnalysis', () => {
       // Analysis should complete even when one AI call fails
       expect(imageAltCheck!.imageData).toBeDefined();
       expect(imageAltCheck!.imageData!.length).toBe(2);
+    });
+  });
+
+  describe('Image Alt Attributes — decorative image handling (issue #573)', () => {
+    let baseScrapedData: any;
+    let mockEnv: any;
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+      (getAIRecommendation as any).mockResolvedValue('Mocked AI recommendation');
+
+      // Minimal valid scrapedData; tests will override `images`.
+      baseScrapedData = {
+        title: 'Test',
+        metaDescription: 'Test description with sufficient length for the check',
+        content: 'a '.repeat(700),
+        headings: [{ level: 1, text: 'Heading' }],
+        paragraphs: ['Paragraph'],
+        images: [],
+        internalLinks: [],
+        outboundLinks: [],
+        ogImage: '',
+        resources: { js: [], css: [] },
+        schemaMarkup: { hasSchema: false, schemaCount: 0, schemaTypes: [] },
+      };
+
+      mockEnv = { USE_GPT_RECOMMENDATIONS: 'false', OPENAI_API_KEY: undefined };
+    });
+
+    it('does NOT flag images with alt="" (explicit decorative)', async () => {
+      const { analyzeSEOElements } = await import('./seoAnalysis');
+      const data = {
+        ...baseScrapedData,
+        images: [
+          { src: '/spacer.png', alt: '' },        // decorative
+          { src: '/photo.png', alt: undefined },  // missing → flag
+        ],
+      };
+      const result = await analyzeSEOElements(data, 'SEO', 'https://example.com/', false, mockEnv);
+      const check = result.checks.find(c => c.title === 'Image Alt Attributes');
+      expect(check?.passed).toBe(false);
+      expect(check?.imageData).toHaveLength(1);
+      expect(check?.imageData?.[0].url).toBe('/photo.png');
+    });
+
+    it('does NOT flag images with role="presentation" or role="none"', async () => {
+      const { analyzeSEOElements } = await import('./seoAnalysis');
+      const data = {
+        ...baseScrapedData,
+        images: [
+          { src: '/divider.png', alt: undefined, role: 'presentation' },
+          { src: '/icon.png',    alt: undefined, role: 'none' },
+          { src: '/hero.png',    alt: undefined },
+        ],
+      };
+      const result = await analyzeSEOElements(data, 'SEO', 'https://example.com/', false, mockEnv);
+      const check = result.checks.find(c => c.title === 'Image Alt Attributes');
+      expect(check?.imageData).toHaveLength(1);
+      expect(check?.imageData?.[0].url).toBe('/hero.png');
+    });
+
+    it('passes the check when ALL non-decoratives are alt-OK', async () => {
+      const { analyzeSEOElements } = await import('./seoAnalysis');
+      const data = {
+        ...baseScrapedData,
+        images: [
+          { src: '/a.png', alt: '' },                              // decorative
+          { src: '/b.png', alt: undefined, role: 'presentation' }, // decorative
+          { src: '/c.png', alt: 'A real photograph' },             // populated → passes
+        ],
+      };
+      const result = await analyzeSEOElements(data, 'SEO', 'https://example.com/', false, mockEnv);
+      const check = result.checks.find(c => c.title === 'Image Alt Attributes');
+      expect(check?.passed).toBe(true);
+    });
+
+    it('treats whitespace-only alt as missing (still flagged)', async () => {
+      const { analyzeSEOElements } = await import('./seoAnalysis');
+      const data = {
+        ...baseScrapedData,
+        images: [{ src: '/a.png', alt: '   ' }],
+      };
+      const result = await analyzeSEOElements(data, 'SEO', 'https://example.com/', false, mockEnv);
+      const check = result.checks.find(c => c.title === 'Image Alt Attributes');
+      expect(check?.passed).toBe(false);
+      expect(check?.imageData).toHaveLength(1);
+    });
+
+    it('mentions decorative-exclusion count in the description when decoratives exist', async () => {
+      const { analyzeSEOElements } = await import('./seoAnalysis');
+      const data = {
+        ...baseScrapedData,
+        images: [
+          { src: '/a.png', alt: '' },         // decorative
+          { src: '/b.png', alt: '' },         // decorative
+          { src: '/c.png', alt: undefined },  // missing → flag
+        ],
+      };
+      const result = await analyzeSEOElements(data, 'SEO', 'https://example.com/', false, mockEnv);
+      const check = result.checks.find(c => c.title === 'Image Alt Attributes');
+      expect(check?.description).toMatch(/Skipped 2 decorative image\(s\)/);
+      expect(check?.description).toMatch(/role="presentation"\/"none"/);
+    });
+
+    it('does NOT add the exclusion sentence when there are no decoratives', async () => {
+      const { analyzeSEOElements } = await import('./seoAnalysis');
+      const data = {
+        ...baseScrapedData,
+        images: [
+          { src: '/a.png', alt: undefined },
+        ],
+      };
+      const result = await analyzeSEOElements(data, 'SEO', 'https://example.com/', false, mockEnv);
+      const check = result.checks.find(c => c.title === 'Image Alt Attributes');
+      expect(check?.description).not.toMatch(/decorative/i);
+    });
+
+    it('does NOT generate AI suggestions for decorative images', async () => {
+      const { analyzeSEOElements } = await import('./seoAnalysis');
+      (getAIRecommendation as any).mockClear();
+      const data = {
+        ...baseScrapedData,
+        images: [
+          { src: '/spacer.png', alt: '' },        // decorative — should NOT trigger AI
+          { src: '/photo.png', alt: undefined },  // missing → SHOULD trigger AI
+        ],
+      };
+      const aiEnv = { USE_GPT_RECOMMENDATIONS: 'true', OPENAI_API_KEY: 'test-key' };
+      await analyzeSEOElements(data, 'SEO', 'https://example.com/', false, aiEnv);
+
+      // Filter to only the image-alt invocations (other checks may also call getAIRecommendation)
+      const altCalls = (getAIRecommendation as any).mock.calls.filter(
+        (call: any[]) => call[0] === 'Image Alt Attributes'
+      );
+      expect(altCalls).toHaveLength(1);
+      expect(altCalls[0][3]).toBe('/photo.png'); // 4th arg is the image src
     });
   });
 });
