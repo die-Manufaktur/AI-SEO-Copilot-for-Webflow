@@ -1232,7 +1232,8 @@ describe('seoAnalysis', () => {
       };
       const result = await analyzeSEOElements(data, 'SEO', 'https://example.com/', false, mockEnv);
       const check = result.checks.find(c => c.title === 'Image Alt Attributes');
-      expect(check?.description).toMatch(/2 decorative image\(s\) excluded/);
+      expect(check?.description).toMatch(/Skipped 2 decorative image\(s\)/);
+      expect(check?.description).toMatch(/role="presentation"\/"none"/);
     });
 
     it('does NOT add the exclusion sentence when there are no decoratives', async () => {

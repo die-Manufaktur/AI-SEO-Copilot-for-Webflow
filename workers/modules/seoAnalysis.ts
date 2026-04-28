@@ -677,7 +677,7 @@ export async function analyzeSEOElements(
     imageAltCheck.description = getSuccessMessage(imageAltCheck.title);
   } else {
     const decorativeNote = decorativeCount > 0
-      ? ` ${decorativeCount} decorative image(s) excluded.`
+      ? ` Skipped ${decorativeCount} decorative image(s) (alt="" or role="presentation"/"none").`
       : '';
     imageAltCheck.description = `Found ${imagesWithoutAlt.length} image(s) without alt attributes.${decorativeNote}`;
   }
