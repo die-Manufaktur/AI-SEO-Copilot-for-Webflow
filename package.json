@@ -134,7 +134,7 @@
     "input-otp": "^1.4.2",
     "net": "^1.0.2",
     "openai": "^5.23.2",
-    "react": "^19.2.4",
+    "react": "^19.2.6",
     "react-day-picker": "^9.14.0",
     "react-dom": "^19.2.4",
     "react-resizable-panels": "^3.0.6",
