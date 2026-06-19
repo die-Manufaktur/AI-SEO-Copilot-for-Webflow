@@ -119,7 +119,7 @@
     "@tailwindcss/postcss": "^4.2.1",
     "@tanstack/react-query": "^5.90.21",
     "@vitejs/plugin-react": "^5.1.4",
-    "@webflow/designer-extension-typings": "^2.0.27",
+    "@webflow/designer-extension-typings": "^2.1.1",
     "@webflow/webflow-cli": "^1.12.4",
     "canvas-confetti": "^1.9.4",
     "cheerio": "^1.2.0",
