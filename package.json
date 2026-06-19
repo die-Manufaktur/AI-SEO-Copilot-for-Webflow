@@ -120,7 +120,7 @@
     "@tanstack/react-query": "^5.90.21",
     "@vitejs/plugin-react": "^5.1.4",
     "@webflow/designer-extension-typings": "^2.0.27",
-    "@webflow/webflow-cli": "^1.12.4",
+    "@webflow/webflow-cli": "^1.23.0",
     "canvas-confetti": "^1.9.4",
     "cheerio": "^1.2.0",
     "class-variance-authority": "^0.7.1",
