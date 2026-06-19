@@ -144,7 +144,7 @@
     "undici": "^7.24.7",
     "vaul": "^1.1.2",
     "wouter": "^3.9.0",
-    "zod": "^4.3.6"
+    "zod": "^4.4.3"
   },
   "packageManager": "pnpm@10.14.0",
   "config": {
