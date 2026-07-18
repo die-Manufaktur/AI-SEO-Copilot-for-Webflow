@@ -63,7 +63,7 @@
     "@vitejs/plugin-react-swc": "^3.11.0",
     "@vitest/coverage-v8": "^3.2.4",
     "@vitest/ui": "3.2.4",
-    "adm-zip": "^0.5.16",
+    "adm-zip": "^0.6.0",
     "autoprefixer": "^10.4.27",
     "commitizen": "^4.3.1",
     "concurrently": "^9.2.1",
